@@ -4,7 +4,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // The lazily loaded 3D chunk (three + fiber + drei) is ~950 kB minified; that is expected.
+  // The lazily loaded 3D code is ~960 kB minified (three core, shared with the exporter, ~390 kB;
+  // fiber + drei + the view ~570 kB); that is expected.
   build: { chunkSizeWarningLimit: 1100 },
   test: {
     environment: 'node',

@@ -8,6 +8,7 @@ import { createEmptyPlan, defaultLevelId } from '../model/plan';
 import type { MeasureTo, Plan } from '../model/types';
 import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planStore';
 import { useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
+import { visible3dLevels } from '../view3d/visibility';
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
@@ -42,6 +43,84 @@ function loadPlan(plan: Plan): void {
   usePlanStore.getState().setPlan(plan);
   useUiStore.getState().setActiveLevel(defaultLevelId(plan));
   zoomToFit();
+}
+
+/**
+ * Export menu: the 3D model as binary glTF (metres) or OBJ (inches), exactly as the 3D view shows
+ * it (view mode and visible levels). The exporter and three load on first use.
+ */
+function ExportMenu() {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const hidden = useUiStore((s) => s.hidden3dLevels);
+  const only = useUiStore((s) => s.only3dActiveAndBelow);
+  const active = useUiStore((s) => s.activeLevelId);
+  const order = usePlanStore((s) => s.plan.levelOrder);
+  const levels = usePlanStore((s) => s.plan.levels);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [open]);
+
+  const run = async (format: 'glb' | 'obj') => {
+    setBusy(true);
+    try {
+      const { downloadExport } = await import('../io/export3d');
+      const ui = useUiStore.getState();
+      await downloadExport(format, getPlan(), ui.viewMode, ui);
+      setOpen(false);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const shown = visible3dLevels(order, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active })
+    .map((id) => levels[id]?.name)
+    .join(', ');
+
+  return (
+    <div
+      className="menu-host"
+      ref={ref}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          setOpen(false);
+        }
+      }}
+    >
+      <button aria-haspopup="menu" aria-expanded={open} className={open ? 'active' : ''} onClick={() => setOpen((o) => !o)}>
+        Export
+      </button>
+      {open && (
+        <div className="menu" role="menu" aria-label="Export">
+          <button role="menuitem" disabled={busy} onClick={() => void run('glb')}>
+            Export 3D (.glb)
+            <small>glTF binary, in metres</small>
+          </button>
+          <button role="menuitem" disabled={busy} onClick={() => void run('obj')}>
+            Export 3D (.obj)
+            <small>Wavefront OBJ, in inches</small>
+          </button>
+          <p className="menu-note">
+            Exports what the 3D view shows: the {VIEW_MODE_LABEL[viewMode]} view of {shown || 'no levels'}.
+          </p>
+          <p className="menu-note">
+            Import in SketchUp: File &gt; Import, choose glTF; OBJ: set units to inches.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PlanName() {
@@ -201,6 +280,7 @@ export function Toolbar() {
         <button onClick={() => downloadPlan(getPlan())}>Save</button>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={onOpen} />
       </div>
+      <ExportMenu />
     </header>
   );
 }

@@ -1128,3 +1128,103 @@ button.primary:hover:not(:disabled) {
 .calibrate-buttons button {
   flex: 1 1 100%;
 }
+
+/* Walk mode ---------------------------------------------------------------------------------- */
+
+.view3d-toolbar kbd {
+  font-size: 10px;
+}
+
+.walk-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    linear-gradient(#fff, #fff) center / 2px 100% no-repeat,
+    linear-gradient(#fff, #fff) center / 100% 2px no-repeat;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+}
+
+.walk-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 14px;
+  max-width: calc(100% - 24px);
+  padding: 6px 12px;
+  background: rgba(24, 24, 27, 0.72);
+  color: #f4f4f5;
+  border-radius: 6px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.walk-hint kbd {
+  padding: 0 4px;
+  margin: 0 1px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  color: inherit;
+}
+
+.walk-hint .walk-note {
+  color: #fcd34d;
+}
+
+.view3d-host.walking .view3d-canvas {
+  cursor: crosshair;
+}
+
+/* Menus -------------------------------------------------------------------------------------- */
+
+.menu-host {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 260px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.menu > button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border-color: transparent;
+  text-align: left;
+}
+
+.menu > button small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.menu-note {
+  margin: 4px 6px 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}

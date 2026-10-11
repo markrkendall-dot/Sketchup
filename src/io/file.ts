@@ -6,26 +6,31 @@ import type { usePlanStore } from '../store/planStore';
 export const AUTOSAVE_KEY = 'homeplan:autosave';
 const AUTOSAVE_DEBOUNCE_MS = 300;
 
-function fileName(plan: Plan): string {
+/** Download file name for the plan: its name as a slug, plus the extension (without the dot). */
+export function planFileName(plan: Pick<Plan, 'name'>, ext: string): string {
   const slug = plan.name
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return `${slug || 'homeplan'}.json`;
+  return `${slug || 'homeplan'}.${ext}`;
 }
 
-/** Trigger a browser download of the plan as JSON. */
-export function downloadPlan(plan: Plan): void {
-  const blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
+/** Trigger a browser download of a blob. */
+export function downloadBlob(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = fileName(plan);
+  a.download = name;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Trigger a browser download of the plan as JSON. */
+export function downloadPlan(plan: Plan): void {
+  downloadBlob(new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' }), planFileName(plan, 'json'));
 }
 
 /** Read and validate a plan file chosen by the user. Throws a readable Error. */

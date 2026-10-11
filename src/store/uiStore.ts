@@ -9,6 +9,8 @@ export type UnderlayMode = 'move' | 'scale' | 'rotate';
 /** Which views the workspace shows. */
 export type Layout = '2d' | 'split' | '3d';
 export const LAYOUTS: readonly Layout[] = ['2d', 'split', '3d'];
+/** 3D camera: orbit around the model, or walk through it in first person. */
+export type CameraMode = 'orbit' | 'walk';
 /** Phases the drawing tools can create; demo is applied to existing elements instead. */
 export type DrawPhase = Extract<Phase, 'existing' | 'new'>;
 
@@ -162,6 +164,12 @@ export interface UiState {
   /** The active level's underlay is selected (exclusive with the entity selection). */
   underlaySelected: boolean;
   underlayMode: UnderlayMode;
+  /** 3D view camera: orbit, or first-person walk (only while the 3D view is shown). */
+  cameraMode: CameraMode;
+  /** Walk mode: the level the eye is on (its floor top + eye height). */
+  walkLevelId: Id | null;
+  /** Walk mode: the pointer is locked to the 3D canvas (mouse looks around). */
+  walkLocked: boolean;
   setTool: (tool: ToolName) => void;
   setActiveLevel: (id: Id) => void;
   setSelection: (sel: Selection) => void;
@@ -191,6 +199,10 @@ export interface UiState {
   selectUnderlay: (on: boolean) => void;
   /** Change the underlay tool mode; drops any half-made calibration. */
   setUnderlayMode: (mode: UnderlayMode) => void;
+  /** Leaving walk mode clears the walk state. */
+  setCameraMode: (mode: CameraMode) => void;
+  setWalkLevel: (id: Id | null) => void;
+  setWalkLocked: (locked: boolean) => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -247,6 +259,9 @@ export const useUiStore = create<UiState>()((set) => ({
   showUnderlay: true,
   underlaySelected: false,
   underlayMode: 'move',
+  cameraMode: 'orbit',
+  walkLevelId: null,
+  walkLocked: false,
   setTool: (activeTool) =>
     set((s) => ({
       activeTool,
@@ -296,7 +311,9 @@ export const useUiStore = create<UiState>()((set) => ({
       viewMode: drawPhase === 'new' && s.viewMode === 'existing' ? 'proposed' : s.viewMode,
     })),
   toggleShowLevelBelow: () => set((s) => ({ showLevelBelow: !s.showLevelBelow })),
-  setLayout: (layout) => set({ layout }),
+  // The 2D layout has no 3D view to walk in.
+  setLayout: (layout) =>
+    set((s) => (layout === '2d' && s.cameraMode === 'walk' ? { layout, cameraMode: 'orbit', walkLevelId: null, walkLocked: false } : { layout })),
   setSplitRatio: (ratio) => set({ splitRatio: Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, ratio)) }),
   toggle3dLevel: (id) =>
     set((s) => ({
@@ -314,6 +331,16 @@ export const useUiStore = create<UiState>()((set) => ({
       underlayMode,
       draft: { ...s.draft, underlayPoints: [], lengthBuffer: '', error: false, message: null },
     })),
+  setCameraMode: (cameraMode) =>
+    set((s) =>
+      s.cameraMode === cameraMode
+        ? s
+        : cameraMode === 'walk'
+          ? { cameraMode, layout: s.layout === '2d' ? '3d' : s.layout }
+          : { cameraMode, walkLevelId: null, walkLocked: false },
+    ),
+  setWalkLevel: (walkLevelId) => set({ walkLevelId }),
+  setWalkLocked: (walkLocked) => set((s) => (s.walkLocked === walkLocked ? s : { walkLocked })),
 }));
 
 export const useViewport = () => useUiStore((s) => s.viewport);

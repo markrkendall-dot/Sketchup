@@ -284,17 +284,36 @@ little darker; floors tan, stairs grey. Hemisphere + one directional light, no s
 framing the plan's bounding box on first mount; Fit re-frames the visible levels. Overlay toolbar:
 level checkboxes and "Only active level and below". Layout (uiStore): 2D, split (draggable divider,
 ratio in uiStore) or 3D, toolbar buttons and backtick to cycle; the 2D canvas stays mounted (hidden
-in 3D), the 3D canvas mounts only when shown. First-person (PointerLockControls + WASD, eye height
-66", `frameloop="always"` while active) is still to come. Camera near 1, far 20000 (scene in inches).
-No collision in v1.
+in 3D), the 3D canvas mounts only when shown. Camera near 1, far 20000 (scene in inches).
+
+First-person walk (`uiStore.cameraMode`, overlay "Walk" button or `F` while the 3D view shows;
+`view3d/FirstPerson.tsx`, pure helpers in `view3d/walk.ts`): the orbit controls unmount (saving
+their pose) and drei `PointerLockControls` mount, so only one controls component exists at a time.
+Entry at the centre of the active level's outer face (the largest room's label point if that is
+inside a wall), eye 66" above the floor top, looking along +x, fov 65. A click on the canvas
+requests the pointer lock (our own call, so a refusal is caught; drei's document-wide click-to-lock
+is disabled with a selector that matches nothing); while unlocked, dragging with the left button
+looks around instead. WASD / arrows (by `KeyboardEvent.code`) move at 60"/s in the horizontal plane
+relative to the yaw, Shift doubles it, using `useFrame` delta (clamped to 0.25 s). Q/E or
+PageDown/PageUp step through the levels the 3D view shows, snapping the eye to that level. Esc, `F`
+or the pointer-lock `unlock` event return to orbit, restoring the orbit pose. Keys are captured on
+`window` in the capture phase while walking, so the 2D tools and hotkeys never see them (App's
+handler also ignores keys while a pointer lock is active). `frameloop="always"` while walking,
+`"demand"` otherwise. A point light follows the eye (indoors the sky and sun reach only floors).
+Crosshair and a hint ("Walls are not solid in walk mode": no collision in v1).
 
 ## Persistence and export
 
 JSON download/upload with `schemaVersion` and `migrate()`. Autosave to IndexedDB (idb-keyval) on
 every plan change (debounced), restored on load. Underlays downscaled to <= 2048px JPEG data URLs.
-glTF export builds a fresh Group from derived geometry (not the live scene), root scaled by 0.0254,
-`binary: true`, named mesh and group per level, one material per phase. OBJ export in inches.
-Export only what the current view mode shows.
+3D export (`io/export3d.ts`, toolbar "Export" menu, loaded on first use): `buildExportScene` builds
+a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
+root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
+skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs` with cloned
+geometry and cloned live materials (one per phase/kind, named without spaces), disposed after
+export. glTF: `GLTFExporter`, `binary: true`, `trs: true`. OBJ: `OBJExporter` on the same group with
+the scale reset to 1 (inches; SketchUp asks for units) and each mesh name prefixed with its level,
+since OBJ objects are flat. Only what the current view mode and level visibility show is exported.
 
 ## Risks
 

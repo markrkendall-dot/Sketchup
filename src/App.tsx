@@ -42,6 +42,8 @@ function isEditable(target: EventTarget | null): boolean {
  */
 function onKeyDown(e: KeyboardEvent): void {
   if (isEditable(e.target)) return;
+  // Walk mode owns the keyboard (view3d/FirstPerson.tsx captures keys before they get here).
+  if (document.pointerLockElement || useUiStore.getState().cameraMode === 'walk') return;
   if (e.key === 'Shift') dispatchShift(true);
   if (dispatchKey(e)) {
     e.preventDefault();
@@ -85,6 +87,7 @@ function onKeyDown(e: KeyboardEvent): void {
     updateSettings({ orthoLock: !plan.settings.orthoLock });
   } else if (key === 'g') ui.toggleGrid();
   else if (key === 'v') cycleViewMode();
+  else if (key === 'f' && ui.layout !== '2d') ui.setCameraMode('walk');
   else if (/^[1-9]$/.test(key)) switchLevelByIndex(Number(key) - 1);
   else return;
   e.preventDefault();

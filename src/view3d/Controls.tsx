@@ -5,19 +5,29 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { getPlan } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { planBox } from './bounds';
+import { FirstPerson } from './FirstPerson';
 import { visible3dLevels } from './visibility';
 
-/** Camera pose kept across unmounts (switching to the 2D layout and back). */
+/** Camera pose kept across unmounts (switching to the 2D layout or to walk mode, and back). */
 let saved: { position: Vector3; target: Vector3 } | null = null;
 
 /** Seen from the south-east (plan +x, +y), above. */
 const VIEW_DIR = new Vector3(0.85, 0.75, 1.25).normalize();
 
 /**
+ * The 3D camera controls: orbit, or the first-person walk. Exactly one is mounted at a time; the
+ * orbit pose is saved when the orbit controls unmount and restored when they mount again.
+ */
+export function Controls() {
+  const mode = useUiStore((s) => s.cameraMode);
+  return mode === 'walk' ? <FirstPerson /> : <OrbitView />;
+}
+
+/**
  * Orbit controls. On first mount the camera frames the whole plan (target at the bounding box
  * centre); the Fit button (uiStore.requestFit3d) re-frames the visible levels.
  */
-export function Controls() {
+function OrbitView() {
   const ref = useRef<ComponentRef<typeof OrbitControls>>(null);
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
@@ -47,7 +57,8 @@ export function Controls() {
     invalidate();
   }, [camera, invalidate]);
 
-  // First mount: restore the previous pose, or frame the plan.
+  // First mount: restore the previous pose, or frame the plan. The cleanup saves the pose (leaving
+  // the 3D layout, or switching to walk mode) from the controls object captured here.
   useEffect(() => {
     const controls = ref.current;
     if (saved && controls) {
@@ -57,8 +68,7 @@ export function Controls() {
       invalidate();
     } else fit();
     return () => {
-      const c = ref.current;
-      if (c) saved = { position: camera.position.clone(), target: c.target.clone() };
+      if (controls) saved = { position: camera.position.clone(), target: controls.target.clone() };
     };
   }, [camera, fit, invalidate]);
 

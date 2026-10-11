@@ -92,13 +92,14 @@ function Levels() {
   );
 }
 
-/** Small overlay toolbar: level visibility and Fit. */
+/** Small overlay toolbar: level visibility, Fit, and the walk mode toggle. */
 function View3dToolbar() {
   const order = usePlanStore((s) => s.plan.levelOrder);
   const names = usePlanStore((s) => s.plan.levelOrder.map((id) => s.plan.levels[id]?.name ?? '').join('\u0000'));
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
-  const { toggle3dLevel, setOnly3dActiveAndBelow, requestFit3d } = useUiStore.getState();
+  const walking = useUiStore((s) => s.cameraMode === 'walk');
+  const { toggle3dLevel, setOnly3dActiveAndBelow, requestFit3d, setCameraMode } = useUiStore.getState();
   const nameList = names.split('\u0000');
   return (
     <div className="view3d-toolbar" role="toolbar" aria-label="3D view">
@@ -114,23 +115,62 @@ function View3dToolbar() {
         Only active level and below
       </label>
       <span className="sep" />
-      <button onClick={requestFit3d} title="Frame the visible levels">
+      <button onClick={requestFit3d} disabled={walking} title="Frame the visible levels">
         Fit
+      </button>
+      <button
+        className={walking ? 'active' : ''}
+        aria-pressed={walking}
+        onClick={() => setCameraMode(walking ? 'orbit' : 'walk')}
+        title="Walk through the model in first person (F); Esc returns to orbit"
+      >
+        Walk <kbd>F</kbd>
       </button>
     </div>
   );
 }
 
+/** Walk mode: a crosshair and the controls hint. */
+function WalkOverlay() {
+  const locked = useUiStore((s) => s.walkLocked);
+  const levelId = useUiStore((s) => s.walkLevelId);
+  const levelName = usePlanStore((s) => (levelId ? (s.plan.levels[levelId]?.name ?? '') : ''));
+  return (
+    <>
+      <div className="walk-crosshair" aria-hidden="true" />
+      <div className="walk-hint" role="status">
+        {levelName && <strong>{levelName}</strong>}
+        <span>{locked ? 'Mouse looks around' : 'Click the view to look around with the mouse (or drag)'}</span>
+        <span>
+          <kbd>W</kbd>
+          <kbd>A</kbd>
+          <kbd>S</kbd>
+          <kbd>D</kbd> / arrows walk, <kbd>Shift</kbd> runs
+        </span>
+        <span>
+          <kbd>Q</kbd> / <kbd>E</kbd> level down / up
+        </span>
+        <span>
+          <kbd>Esc</kbd> back to orbit
+        </span>
+        <span className="walk-note">Walls are not solid in walk mode.</span>
+      </div>
+    </>
+  );
+}
+
 /**
- * The 3D model: one group per level at its elevation, orbit controls, a ground grid. Renders on
- * demand only (frameloop="demand"), so an idle model costs nothing.
+ * The 3D model: one group per level at its elevation, orbit or walk controls, a ground grid.
+ * Renders on demand only (frameloop="demand") while orbiting, so an idle model costs nothing.
  */
 export default function Scene3D() {
+  // Walking moves the camera every frame; orbiting renders only on change.
+  const walking = useUiStore((s) => s.cameraMode === 'walk');
   return (
-    <section className="view3d-host" aria-label="3D view">
+    <section className={`view3d-host${walking ? ' walking' : ''}`} aria-label="3D view">
       <Canvas
         className="view3d-canvas"
-        frameloop="demand"
+        frameloop={walking ? 'always' : 'demand'}
         dpr={[1, 2]}
         camera={{ fov: 50, near: 1, far: 20000, position: [900, 700, 1200] }}
         gl={{ antialias: true, preserveDrawingBuffer: import.meta.env.DEV }}
@@ -145,6 +185,7 @@ export default function Scene3D() {
         <DebugHandle />
       </Canvas>
       <View3dToolbar />
+      {walking && <WalkOverlay />}
     </section>
   );
 }
