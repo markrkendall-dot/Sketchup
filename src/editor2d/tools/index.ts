@@ -11,6 +11,7 @@ import {
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint, type GhostWall } from '../snap';
 import { doorTool, passageTool, windowTool } from './openingTool';
+import { roofTool } from './roofTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
 import { stairsTool } from './stairsTool';
@@ -65,6 +66,7 @@ const tools: Record<ToolName, Tool> = {
   window: windowTool,
   passage: passageTool,
   stairs: stairsTool,
+  roof: roofTool,
   underlay: underlayTool,
 };
 
@@ -201,8 +203,9 @@ export function pruneSelection(): void {
   });
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
   const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings, rooms, stairs });
+  const roofs = sel.roofs.filter((id) => level.roofs[id] && isVisible(level.roofs[id].phase, vm));
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs });
   }
   // An inline rename of a room that undo removed has nothing left to edit.
   const edit = ui.roomEdit;

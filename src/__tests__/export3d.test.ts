@@ -175,6 +175,41 @@ describe('buildExportScene', () => {
     expect(disposedOriginals).toBe(0);
   });
 
+  it('roofs export as Roof meshes with roof_<finish>_<phase> materials, and follow the view mode', () => {
+    const { first, second } = fixture();
+    const roof = {
+      shape: 'gable' as const,
+      outline: [
+        { x: -3.25, y: -3.25 },
+        { x: 363.25, y: -3.25 },
+        { x: 363.25, y: 483.25 },
+        { x: -3.25, y: 483.25 },
+      ],
+      ridgeAngle: 90,
+      pitch: 8,
+      overhang: 24,
+      bearingOffset: 0,
+      thickness: 8,
+      fascia: 6,
+      phase: 'existing' as const,
+      finish: 'metal' as const,
+    };
+    expect(store().addRoof(second, roof)).not.toBeNull();
+    expect(store().addRoof(first, { ...roof, shape: 'shed', ridgeAngle: 270, pitch: 3, phase: 'demo', finish: 'shingle' })).not.toBeNull();
+    const plan = store().plan;
+    const root = buildExportScene(plan, 'all', allVisible(first));
+    const roofs = (name: string) => byName(root, name)!.children.filter((c) => c.name === 'Roof') as Mesh[];
+    expect(roofs('Second Floor')).toHaveLength(1);
+    expect(roofs('First Floor')).toHaveLength(1);
+    expect((roofs('Second Floor')[0].material as MeshStandardMaterial).name).toBe('roof_metal_existing');
+    expect((roofs('First Floor')[0].material as MeshStandardMaterial).name).toBe('roof_shingle_demo');
+    disposeExportScene(root);
+    const proposed = buildExportScene(plan, 'proposed', allVisible(first));
+    expect(byName(proposed, 'First Floor')!.children.some((c) => c.name === 'Roof')).toBe(false);
+    expect(byName(proposed, 'Second Floor')!.children.some((c) => c.name === 'Roof')).toBe(true);
+    disposeExportScene(proposed);
+  });
+
   it('the proposed view leaves the demolished wall out', () => {
     const { plan, first } = fixture();
     const root = buildExportScene(plan, 'proposed', allVisible(first));

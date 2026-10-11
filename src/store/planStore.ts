@@ -7,13 +7,14 @@ import { clampOpeningHeight, clampOpeningOffset, openingFitsHeight, wallHeightOf
 import {
   clampOpenings,
   createEmptyPlan,
+  roofProblem,
   findNodeNear,
   MERGE_EPS,
   newId,
   normalizeLevel,
   wallLength,
 } from '../model/plan';
-import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Id, Level, Opening, Phase, Plan, PlanSettings, Roof, Room, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { normalizeDegrees, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
@@ -41,6 +42,8 @@ export type RoomPatch = Partial<Omit<Room, 'id'>>;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 export type StairsPatch = Partial<Omit<Stairs, 'id'>>;
 export type NewStairs = Omit<Stairs, 'id'> & { id?: Id };
+export type RoofPatch = Partial<Omit<Roof, 'id'>>;
+export type NewRoof = Omit<Roof, 'id'> & { id?: Id };
 export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** Which end of a wall stays put when its length is edited. */
@@ -52,6 +55,7 @@ export interface EntitySelection {
   openings?: Id[];
   rooms?: Id[];
   stairs?: Id[];
+  roofs?: Id[];
 }
 
 export interface PlanState {
@@ -96,8 +100,13 @@ export interface PlanState {
   /** Patch stairs; invalid sizes are rejected, the direction is normalized to [0, 360). */
   updateStairs: (levelId: Id, id: Id, patch: StairsPatch) => void;
   deleteStairs: (levelId: Id, ids: Id[]) => void;
-  /** Set the phase of walls, openings and stairs together (e.g. "Mark demolish"). */
-  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[] }, phase: Phase) => void;
+  /** Add a roof; returns the id, or null when its outline or sizes are not usable. */
+  addRoof: (levelId: Id, roof: NewRoof) => Id | null;
+  /** Patch a roof; an unusable outline or size is rejected, the ridge angle is normalized to [0, 360). */
+  updateRoof: (levelId: Id, id: Id, patch: RoofPatch) => void;
+  deleteRoofs: (levelId: Id, ids: Id[]) => void;
+  /** Set the phase of walls, openings, stairs and roofs together (e.g. "Mark demolish"). */
+  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[] }, phase: Phase) => void;
   /**
    * Copy the nodes and walls (not openings) of one level into another, merged with whatever is
    * there, in one undo step. Returns the number of walls copied.
@@ -153,7 +162,9 @@ function deleteInPlace(
   openingIds: Id[] = [],
   roomIds: Id[] = [],
   stairsIds: Id[] = [],
+  roofIds: Id[] = [],
 ): void {
+  for (const id of roofIds) delete level.roofs[id];
   for (const id of openingIds) delete level.openings[id];
   for (const id of roomIds) delete level.rooms[id];
   for (const id of stairsIds) delete level.stairs[id];
@@ -196,6 +207,11 @@ const validStairs = (s: Omit<Stairs, 'id'>, limits: { width: boolean; run: boole
   Number.isFinite(s.direction) &&
   Number.isFinite(s.origin.x) &&
   Number.isFinite(s.origin.y);
+
+/** A roof's stored form: outline points copied, ridge angle in [0, 360). */
+function cleanRoof(r: Roof): Roof {
+  return { ...r, outline: r.outline.map((p) => ({ x: p.x, y: p.y })), ridgeAngle: normalizeDegrees(r.ridgeAngle) };
+}
 
 /** Walls lying along the straight path a..b, following the graph after splits. */
 function wallsAlong(level: Level, a: Id, b: Id): Id[] {
@@ -313,7 +329,7 @@ export const usePlanStore = create<PlanState>()(
 
         deleteEntities: (levelId, sel) =>
           editLevel(levelId, (level) => {
-            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs);
+            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs, sel.roofs);
             // Removing walls changes the corner joins of their neighbours.
             if (sel.nodes.length || sel.walls.length) clampOpenings(level);
           }),
@@ -509,8 +525,44 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete level.stairs[id];
           }),
 
+        addRoof: (levelId, input) => {
+          let id: Id | null = null;
+          editLevel(levelId, (level) => {
+            const roof = cleanRoof({ ...input, id: input.id ?? newId() });
+            if (roofProblem(roof)) return false;
+            level.roofs[roof.id] = roof;
+            id = roof.id;
+          });
+          return id;
+        },
+
+        updateRoof: (levelId, id, patch) =>
+          editLevel(levelId, (level) => {
+            const r = level.roofs[id];
+            if (!r) return false;
+            const next = cleanRoof({ ...r, ...patch, id });
+            if (roofProblem(next)) return false;
+            const keys = Object.keys(patch) as (keyof RoofPatch)[];
+            const same = (k: keyof RoofPatch) =>
+              k === 'outline'
+                ? next.outline.length === r.outline.length && next.outline.every((p, i) => p.x === r.outline[i].x && p.y === r.outline[i].y)
+                : next[k] === r[k];
+            if (keys.every(same)) return false;
+            for (const k of keys) if (!same(k)) (r as unknown as Record<string, unknown>)[k] = next[k];
+          }),
+
+        deleteRoofs: (levelId, ids) =>
+          editLevel(levelId, (level) => {
+            if (!ids.some((id) => level.roofs[id])) return false;
+            for (const id of ids) delete level.roofs[id];
+          }),
+
         setPhase: (levelId, sel, phase) =>
           editLevel(levelId, (level) => {
+            for (const id of sel.roofs ?? []) {
+              const r = level.roofs[id];
+              if (r && r.phase !== phase) r.phase = phase;
+            }
             for (const id of sel.stairs ?? []) {
               const st = level.stairs[id];
               if (st && st.phase !== phase) st.phase = phase;

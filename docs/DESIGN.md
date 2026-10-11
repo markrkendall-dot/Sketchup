@@ -69,13 +69,29 @@ export interface Underlay {
   rotation: Degrees; opacity: number; locked: boolean;
 }
 
+export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';
+export interface Roof {
+  id: Id; shape: RoofShape;
+  outline: Vec2[];           // plan polygon of the bearing walls' outside faces
+  ridgeAngle: Degrees;       // 0 = ridge along +x, 90 = along +y; shed: the direction it slopes down
+  pitch: number;             // rise per 12
+  overhang: Inches;          // beyond the outline on every side (eaves and rakes)
+  bearingOffset: Inches;     // bearing height above the level's ceiling (usually 0)
+  thickness: Inches;         // slab thickness, measured vertically
+  fascia: Inches;            // fascia and rake board depth
+  phase: Phase; finish: 'metal' | 'shingle';
+}
+
 export interface Level {
   id: Id; name: string;
   wallHeight: Inches;        // floor top to underside of next floor; 96 or 108
   floorThickness: Inches;    // the slab/framing under THIS level (~12 framed, 4 slab)
   nodes: Record<Id, Node>; walls: Record<Id, Wall>; openings: Record<Id, Opening>;
-  rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; underlay?: Underlay;
+  rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; roofs: Record<Id, Roof>; underlay?: Underlay;
 }
+
+// The site (M9 gives these behaviour; the file carries them from schema version 2).
+export interface Site { northAngle: Degrees; gradePoints: Record<Id, GradePoint>; columns: Record<Id, Column> }
 
 export interface PlanSettings {
   snapGrid: Inches;          // 1
@@ -88,11 +104,11 @@ export interface PlanSettings {
 // undo. migrate() ignores them in older files.
 
 export interface Plan {
-  schemaVersion: 1; id: Id; name: string;
+  schemaVersion: 2; id: Id; name: string;
   levelOrder: Id[];          // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
-  settings: PlanSettings; modifiedAt: string;
+  settings: PlanSettings; site: Site; modifiedAt: string;
 }
 ```
 
@@ -186,6 +202,62 @@ instead). Then:
 `getLevelMeshes(plan, levelId, viewMode)` memoizes per level and view mode, reuses each wall's
 geometry while its footprint object, wall, openings list, height and context (bands, neighbour
 heights, split points) are unchanged, and disposes geometry that drops out of the cache.
+
+## Roofs (`derive/roofs.ts`)
+
+A roof is a set of planes over its plan outline, each passing through the bearing height along an
+eave line and rising at `pitch / 12` per inch from it. The bearing height is level-local:
+`wallHeight + bearingOffset` (the level's ceiling). The outline is meant to be the bearing walls'
+outside faces (the roof tool snaps to them), so the eave line, where the underside meets the plate,
+is the outside face of the eave walls and the overhang hangs lower by `overhang * pitch / 12`.
+
+- Ridge frame: `u` = the ridgeAngle direction, `v` across it; `umin..umax`, `vmin..vmax` are the
+  outline's extents in that frame.
+- Gable: two planes at the bearing height on `v = vmin` and `v = vmax`, meeting at the ridge through
+  the middle. Shed: one plane at the bearing height on `u = umax`, rising against `u` (it slopes down
+  in the ridgeAngle direction). Hip: the gable's planes plus one on `u = umin` and one on `u = umax`,
+  over the outline's bounding rectangle in the ridge frame (the panel says so). Flat, or pitch 0:
+  one level plane.
+- The underside at a point is the lowest of the planes there (`roofHeightAt`, null outside the
+  overhang outline): for convex roofs the planes' lower envelope is the roof. Splitting the overhang
+  outline by the half-planes where each plane is the lowest gives one region per plane; region
+  edges inside the outline are the ridge and hip lines.
+- The solid: each region from its plane up `thickness` (vertically), vertical faces round the
+  overhang outline and none along ridge or hip lines, so the slab is one closed surface. Boards 1.5"
+  proud of every edge, top flush with the roof's top, `fascia` deep: level stretches (eaves) are
+  fascia boards that run on past a convex corner to cover it, sloped stretches are rake boards; at a
+  reflex corner the incoming board stops short so boards never overlap. Each board is closed. No CSG;
+  roofs that overlap (a wing roof running into the main wall) just overlap.
+- `roofs.ts` has no three.js import (it is in the 2D editor's chunk); it returns position arrays,
+  triangulating with its own ear clipping, and `meshes.ts` wraps them (`buildRoofGeometry`).
+
+Walls follow the roof (`wallRoofProfile`, used by `buildWallGeometry`): an exterior wall is covered by
+a visible roof on its level when the middle of its centerline is strictly inside the roof's outline.
+Its top is then `max(wall height, lowest covering roof's underside)`, sampled along the wall's
+outside face (the face nearer the outline's edge): on a gable end that is constant across the wall,
+on an eave wall it is the plate, so eave walls are unchanged; the high wall of a shed rises level to
+the roof at its outside face. The profile is piecewise linear in the position along the wall, with
+stations at the outline ends and at every bend (ridge and hip crossings, and where the roof rises
+above the plate). The wall's spans are cut at the stations, each raised piece gets a part above the
+wall height with a sloped top (a prism between two height fields), and the band below it loses its
+top cap; faces between raised pieces, and the join face to a collinear neighbour raised by the same
+roof (same thickness and class), are internal. The level's walls stay one closed surface with a roof
+present (tested). Openings keep their heights and are still clamped to the wall height. Interior
+walls are not raised (an attic over a flat ceiling).
+
+Phase and view mode apply like walls: a roof hidden in the view is not drawn, not exported and does
+not raise walls. `getLevelMeshes` caches each roof's geometry per roof object and bearing height.
+
+2D: the outline dashed, the overhang outline lighter, ridge and hip lines thin and solid; demolished
+roofs hatched red, new ones green; a selected roof shows corner handles that the select tool drags
+(snapping like the roof tool, one undo step per drag). The level below's roofs show as a faint ghost.
+Roof tool (K): click corners, snapping to wall outline corners (footprint fill points), then nodes,
+then points on wall faces, then the usual snaps; where two exterior face lines meet just past the
+end of one (the house corner under a porch whose wall continues the end wall) is a corner too.
+Close on the first corner, a double-click or Enter. Defaults: gable, ridge along the longer side of
+the bounding box, 8:12, 24" overhang, 8" thick, 6" fascia, metal, the toolbar's "Draw as" phase.
+"Fit to walls" in the panel sets the outline to the level's outer-face polygon when the walls close
+exactly one ring.
 
 ## 2D editor
 
@@ -323,7 +395,9 @@ r3f `<Canvas frameloop="demand">` (lazy-loaded chunk), invalidate on plan change
 settings the 3D view uses (not on the 2D draft). One `<group>` per level at its floor top; meshes use
 the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat shading, FrontSide:
 existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior a
-little darker; floors tan, stairs grey. Hemisphere + one directional light, no shadows. drei `<Grid>`
+little darker; floors tan, stairs grey; roofs by finish (metal `#6e6259`, metalness 0.4, roughness
+0.5; shingle `#4a4a4a`), demolished translucent like walls, new pulled toward green. Fit 3D and the
+walk start count roof overhangs and roof tops in the scene bounds. Hemisphere + one directional light, no shadows. drei `<Grid>`
 (12" cells, 10' sections) at the lowest slab's bottom. Orbit (drei OrbitControls, makeDefault)
 framing the plan's bounding box on first mount; Fit re-frames the visible levels. Overlay toolbar:
 level checkboxes and "Only active level and below". Layout (uiStore): 2D, split (draggable divider,
@@ -350,10 +424,12 @@ Crosshair and a hint ("Walls are not solid in walk mode": no collision in v1).
 
 JSON download/upload with `schemaVersion` and `migrate()`. `MIGRATIONS[n]` upgrades a version n
 document to n + 1 and they run in order (0 -> 1: entity arrays become records keyed by id, a
-missing `levelOrder` comes from the levels array, settings are filled). The upgraded document is
+missing `levelOrder` comes from the levels array, settings are filled; 1 -> 2: every level gets an
+empty `roofs` record and the plan a default `site`). The upgraded document is
 then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
 file's order so a current file round-trips byte for byte), with defaults for missing optional
-values and broken openings, rooms, stairs and underlays dropped. New and Open replace the plan and
+values and broken openings, rooms, stairs and underlays dropped (a broken roof is dropped with a
+console warning naming it). New and Open replace the plan and
 clear the undo history (New confirms when the plan has walls, rooms, stairs or an image). Autosave
 to IndexedDB (idb-keyval) on every plan change (debounced), restored on load; a failed save
 (storage full, IndexedDB unavailable) shows "Autosave failed: ..." in the status bar until a later
@@ -361,8 +437,9 @@ save works, and is never thrown. Underlays downscaled to <= 2048px JPEG data URL
 3D export (`io/export3d.ts`, toolbar "Export" menu, loaded on first use): `buildExportScene` builds
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
-skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs` with cloned
-geometry and cloned live materials (one per phase/kind, named without spaces), disposed after
+skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof` with
+cloned geometry and cloned live materials (one per phase/kind, roofs `roof_<finish>_<phase>`, named
+without spaces), disposed after
 export. glTF: `GLTFExporter`, `binary: true`, `trs: true`. OBJ: `OBJExporter` on the same group with
 the scale reset to 1 (inches; SketchUp asks for units) and each mesh name prefixed with its level,
 since OBJ objects are flat. Only what the current view mode and level visibility show is exported.

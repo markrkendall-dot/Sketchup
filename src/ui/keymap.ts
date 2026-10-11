@@ -66,12 +66,13 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   tool('n', 'window', 'Place a window: point at a wall, click to place, or type the distance from the nearer corner and press Enter'),
   tool('p', 'passage', 'Place a passage (an opening without a door), the same way as a door'),
   tool('t', 'stairs', 'Place stairs: move the mouse the way they go up, click to place the bottom step; edit the size in the properties panel'),
+  tool('k', 'roof', 'Draw a roof: click the outline corners (they snap to the outside wall faces), click the first corner or press Enter to close; set the shape, ridge and slope in the properties panel'),
   tool('u', 'underlay', 'Image underlay: load, move, scale by two points; lock it, then trace walls with W'),
 
   { keys: "12'6  150  6 1/2\"", label: "Type a length (walls), or the distance from the nearer corner's inside face to the near edge (doors, windows, passages); Enter commits", group: 'While drawing' },
   { keys: 'Enter or click', label: 'Walls: with nothing typed, commit the wall at the cursor', group: 'While drawing' },
-  { keys: 'Backspace', label: 'Edit the typed length', group: 'While drawing' },
-  { keys: 'Esc', label: 'Clear the typed length, then finish the wall chain; with Select, clear the selection', group: 'While drawing' },
+  { keys: 'Backspace', label: 'Edit the typed length; roof: remove the last corner', group: 'While drawing' },
+  { keys: 'Esc', label: 'Clear the typed length, then finish the wall chain; roof: cancel the outline; with Select, clear the selection', group: 'While drawing' },
   {
     keys: 'X',
     label: 'Next wall: exterior or interior',

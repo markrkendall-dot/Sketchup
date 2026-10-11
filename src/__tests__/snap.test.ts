@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { snapPoint, type SnapContext } from '../editor2d/snap';
+import { computeFootprints } from '../derive/footprint';
+import { faceSnapSources, snapFaceCorner, snapFaceEdge, snapPoint, type SnapContext } from '../editor2d/snap';
 import type { Level, Node, Wall } from '../model/types';
 
 const node = (id: string, x: number, y: number): Node => ({ id, x, y });
@@ -235,5 +236,36 @@ describe('ghost snapping (level below)', () => {
 
   it('without ghost lists nothing changes', () => {
     expect(snapPoint({ x: 507, y: 496 }, base).kind).toBe('grid');
+  });
+});
+
+describe('wall face snaps (roof tool)', () => {
+  // The main block's north-east corner with a porch whose east wall continues the block's east wall:
+  // the east walls are a through pair at (300, 0) and the north wall butts into them.
+  const porch = {
+    ...level(
+      [node('a', 0, 0), node('ne', 300, 0), node('se', 300, 200), node('pn', 300, -96)],
+      [wall('north', 'a', 'ne'), wall('east', 'ne', 'se'), wall('peast', 'pn', 'ne')],
+    ),
+  } as Level;
+  const fps = computeFootprints(porch, 'all');
+
+  it('offers the footprints\' outline corners, and where two exterior face lines meet past a face end', () => {
+    const src = faceSnapSources(fps, porch.walls);
+    // The outside corner of the block under the porch: the north wall's outside face (y = -3.25)
+    // meets the east walls' outside face (x = 303.25), 6.5" past the end of the north wall's face.
+    const hit = snapFaceCorner({ x: 302, y: -2 }, src, 1);
+    expect(hit?.kind).toBe('face-corner');
+    expect(hit?.point.x).toBeCloseTo(303.25, 9);
+    expect(hit?.point.y).toBeCloseTo(-3.25, 9);
+    // Interior walls do not add face-line corners.
+    const interior = { ...porch, walls: { ...porch.walls, north: { ...porch.walls.north, kind: 'interior' as const } } };
+    const src2 = faceSnapSources(fps, interior.walls);
+    expect(src2.corners.some((p) => Math.abs(p.x - 303.25) < 1e-6 && Math.abs(p.y + 3.25) < 1e-6)).toBe(false);
+    // A point on a face away from corners snaps onto the face.
+    const edge = snapFaceEdge({ x: 150, y: -5 }, src, 1);
+    expect(edge?.kind).toBe('face-edge');
+    expect(edge?.point.y).toBeCloseTo(-3.25, 9);
+    expect(snapFaceEdge({ x: 150, y: -20 }, src, 1)).toBeNull();
   });
 });

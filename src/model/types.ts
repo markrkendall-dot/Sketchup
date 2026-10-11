@@ -57,6 +57,62 @@ export interface Stairs {
   cutsFloorAbove: boolean;
 }
 
+export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';
+export type RoofFinish = 'metal' | 'shingle';
+
+/**
+ * A roof over a plan outline (DESIGN.md "Roofs"). The underside passes through the bearing height
+ * (the level's ceiling + bearingOffset) along the outline's eave edges and rises at `pitch` from
+ * there; the overhang extends the outline on every side.
+ */
+export interface Roof {
+  id: Id;
+  shape: RoofShape;
+  /** Plan polygon of the bearing walls' outside faces (snaps to walls). */
+  outline: Vec2[];
+  /** 0 = ridge runs along +x, 90 = along +y; for a shed: the direction the roof slopes down. */
+  ridgeAngle: Degrees;
+  /** Rise per 12 of run (8 for 8:12); hip and gable share one pitch. */
+  pitch: number;
+  /** Eave and rake overhang beyond the outline. */
+  overhang: Inches;
+  /** Bearing height above the level's ceiling (usually 0). */
+  bearingOffset: Inches;
+  /** Roof slab thickness, measured vertically. */
+  thickness: Inches;
+  /** Fascia (and rake) board depth. */
+  fascia: Inches;
+  phase: Phase;
+  finish: RoofFinish;
+}
+
+/** A post or chimney on the site (M9 implements their behaviour). */
+export interface Column {
+  id: Id;
+  at: Vec2;
+  width: Inches;
+  depth: Inches;
+  rotation: Degrees;
+  base: Inches;
+  top: Inches;
+  kind: 'post' | 'chimney';
+  phase: Phase;
+}
+
+/** A spot elevation of the ground (M9). */
+export interface GradePoint {
+  id: Id;
+  at: Vec2;
+  elevation: Inches;
+}
+
+export interface Site {
+  /** Plan rotation to true north; 0 = north is up the screen. */
+  northAngle: Degrees;
+  gradePoints: Record<Id, GradePoint>;
+  columns: Record<Id, Column>;
+}
+
 export interface Underlay {
   image: string; // data URL (JPEG, downscaled on import)
   pixelWidth: number;
@@ -78,6 +134,7 @@ export interface Level {
   openings: Record<Id, Opening>;
   rooms: Record<Id, Room>;
   stairs: Record<Id, Stairs>;
+  roofs: Record<Id, Roof>;
   underlay?: Underlay;
 }
 
@@ -92,12 +149,13 @@ export interface PlanSettings {
 }
 
 export interface Plan {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: Id;
   name: string;
   levelOrder: Id[]; // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
   settings: PlanSettings;
+  site: Site;
   modifiedAt: string;
 }

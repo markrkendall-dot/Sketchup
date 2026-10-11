@@ -3,15 +3,17 @@ import { getFootprints } from '../derive/footprint';
 import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
-import { facesBesideWall, getFaces, roomDimensions, type Face, type FaceSet } from '../derive/rooms';
+import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
+import { roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { floorToFloor, STAIRS_LIMITS, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool } from '../editor2d/tools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
 import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
-import { wallLength } from '../model/plan';
-import type { Id, Level, Opening, Phase, Room, Stairs, Wall, WallKind } from '../model/types';
+import { MAX_ROOF_PITCH, wallLength } from '../model/plan';
+import { boundsOf } from '../model/geometry';
+import type { Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Stairs, Wall, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -214,14 +216,14 @@ function common<T, V>(items: T[], get: (t: T) => V): V | null {
 
 // ---------------------------------------------------------------------------------------------
 
-function SelectionActions({ levelId, walls, openings, stairs }: { levelId: Id; walls: Wall[]; openings: Opening[]; stairs: Stairs[] }) {
+function SelectionActions({ levelId, walls, openings, stairs, roofs }: { levelId: Id; walls: Wall[]; openings: Opening[]; stairs: Stairs[]; roofs: Roof[] }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const items = [...walls, ...openings, ...stairs];
+  const items = [...walls, ...openings, ...stairs, ...roofs];
   if (items.length === 0 && selectionSize(selection) === 0) return null;
   const allDemo = items.length > 0 && items.every((i) => i.phase === 'demo');
-  const ids = { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id) };
+  const ids = { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id), roofs: roofs.map((r) => r.id) };
   return (
     <div className="panel-actions">
       {items.length > 0 && (
@@ -696,27 +698,138 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
   );
 }
 
+const roofShapeOptions = (['gable', 'shed', 'hip', 'flat'] as const).map((v) => ({ value: v, label: ROOF_SHAPE_LABEL[v] }));
+const roofFinishOptions: { value: RoofFinish; label: string }[] = [
+  { value: 'metal', label: 'Metal' },
+  { value: 'shingle', label: 'Shingle' },
+];
+
+/** Ridge direction buttons: along x or y for a gable or hip, the four downhill directions for a shed. */
+const RIDGE_BUTTONS: Record<RoofShape, { angle: number; label: string; title: string }[]> = {
+  gable: [
+    { angle: 0, label: '0° (along x)', title: 'Ridge runs left to right on the plan' },
+    { angle: 90, label: '90° (along y)', title: 'Ridge runs top to bottom on the plan' },
+  ],
+  hip: [
+    { angle: 0, label: '0° (along x)', title: 'Ridge runs left to right on the plan' },
+    { angle: 90, label: '90° (along y)', title: 'Ridge runs top to bottom on the plan' },
+  ],
+  shed: [
+    { angle: 0, label: '0° right', title: 'Slopes down toward +x (right on the plan)' },
+    { angle: 90, label: '90° down', title: 'Slopes down toward +y (down the plan)' },
+    { angle: 180, label: '180° left', title: 'Slopes down toward -x (left on the plan)' },
+    { angle: 270, label: '270° up', title: 'Slopes down toward -y (up the plan)' },
+  ],
+  flat: [],
+};
+
+function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
+  const updateRoof = usePlanStore((s) => s.updateRoof);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const [fitNote, setFitNote] = useState<{ text: string; error: boolean } | null>(null);
+  const set = (patch: Partial<Roof>) => updateRoof(level.id, roof.id, patch);
+  const bearing = roofBearing(level.wallHeight, roof);
+  const { ridge, eave } = roofExtremes(roof, bearing);
+  const b = boundsOf(roof.outline);
+  const fitToWalls = () => {
+    const outlines = slabOutlines(getFaces(level, viewMode), true);
+    if (outlines.length !== 1) {
+      setFitNote({
+        text: outlines.length === 0 ? 'No closed ring of walls on this level to fit to.' : `The walls make ${outlines.length} separate outlines; draw this roof's corners instead.`,
+        error: true,
+      });
+      return;
+    }
+    set({ outline: outlines[0] });
+    setFitNote({ text: `Fitted to the outside faces (${outlines[0].length} corners).`, error: false });
+  };
+  return (
+    <>
+      <h3>Roof</h3>
+      <SelectField label="Shape" value={roof.shape} options={roofShapeOptions} onChange={(shape) => set({ shape })} />
+      {roof.shape === 'hip' && <p className="panel-note">A hip roof is built over the outline's bounding rectangle (in the ridge direction).</p>}
+      {roof.shape !== 'flat' && (
+        <>
+          <div className="field">
+            <span className="label">{roof.shape === 'shed' ? 'Slopes down toward' : 'Ridge direction'}</span>
+            <div className="panel-buttons ridge-buttons">
+              {RIDGE_BUTTONS[roof.shape].map((r) => (
+                <button key={r.angle} className={roof.ridgeAngle === r.angle ? 'active' : ''} aria-pressed={roof.ridgeAngle === r.angle} title={r.title} onClick={() => set({ ridgeAngle: r.angle })}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <NumberField
+            label={roof.shape === 'shed' ? 'Downhill angle' : 'Ridge angle'}
+            value={roof.ridgeAngle}
+            onCommit={(v) => set({ ridgeAngle: v })}
+            hint="Degrees: 0 along +x, 90 along +y (down the plan)."
+          />
+          <NumberField
+            label="Pitch"
+            value={roof.pitch}
+            onCommit={(v) => set({ pitch: v })}
+            check={(v) => (v < 0 || v > MAX_ROOF_PITCH ? `Between 0 and ${MAX_ROOF_PITCH}.` : null)}
+            hint={`Rise per 12 of run (8 is 8:12).`}
+          />
+        </>
+      )}
+      <LengthField label="Overhang" value={roof.overhang} bound="nonnegative" onCommit={(v) => void (v !== null && set({ overhang: v }))} hint="Eaves and rakes, beyond the outline." />
+      <LengthField
+        label="Bearing offset"
+        value={roof.bearingOffset}
+        bound="any"
+        onCommit={(v) => void (v !== null && set({ bearingOffset: v }))}
+        hint="Where the roof sits above this level's ceiling (usually 0)."
+      />
+      <LengthField label="Thickness" value={roof.thickness} onCommit={(v) => void (v !== null && set({ thickness: v }))} hint="Measured vertically." />
+      <LengthField label="Fascia" value={roof.fascia} bound="nonnegative" onCommit={(v) => void (v !== null && set({ fascia: v }))} hint="Depth of the fascia and rake boards." />
+      <SelectField label="Finish" value={roof.finish} options={roofFinishOptions} onChange={(finish) => set({ finish })} />
+      <SelectField label="Phase" value={roof.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      <ReadOnly label={roof.shape === 'shed' ? 'High side' : roof.shape === 'flat' ? 'Underside' : 'Ridge'}>{formatLength(ridge, denom)} above the floor</ReadOnly>
+      <ReadOnly label="Eave">{formatLength(eave, denom)} above the floor</ReadOnly>
+      {b && (
+        <ReadOnly label="Outline">
+          {roof.outline.length} corners, {formatLength(b.maxX - b.minX, denom)} x {formatLength(b.maxY - b.minY, denom)}
+        </ReadOnly>
+      )}
+      <div className="panel-buttons">
+        <button onClick={fitToWalls} title="Set the outline to the outside faces of this level's walls (when they close one ring)">
+          Fit to walls
+        </button>
+      </div>
+      {fitNote && <p className={`panel-note${fitNote.error ? ' warning' : ''}`}>{fitNote.text}</p>}
+      <p className="panel-note">Heights are underside heights at the outline. Drag an outline corner with the select tool to move it.</p>
+    </>
+  );
+}
+
 function MixedProps({
   levelId,
   sel,
   walls,
   openings,
   stairs,
+  roofs,
 }: {
   levelId: Id;
   sel: Selection;
   walls: Wall[];
   openings: Opening[];
   stairs: Stairs[];
+  roofs: Roof[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const parts: string[] = [];
   if (walls.length) parts.push(`${walls.length} ${walls.length === 1 ? 'wall' : 'walls'}`);
   if (openings.length) parts.push(`${openings.length} ${openings.length === 1 ? 'opening' : 'openings'}`);
   if (stairs.length) parts.push(`${stairs.length} stairs`);
+  if (roofs.length) parts.push(`${roofs.length} ${roofs.length === 1 ? 'roof' : 'roofs'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const items = [...walls, ...openings, ...stairs];
+  const items = [...walls, ...openings, ...stairs, ...roofs];
   return (
     <>
       <h3>{parts.join(', ')}</h3>
@@ -726,7 +839,11 @@ function MixedProps({
           value={common(items, (i) => i.phase)}
           options={phaseOptions}
           onChange={(p) =>
-            setPhase(levelId, { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id) }, p)
+            setPhase(
+              levelId,
+              { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id), roofs: roofs.map((r) => r.id) },
+              p,
+            )
           }
         />
       )}
@@ -736,7 +853,26 @@ function MixedProps({
 }
 
 /** A number input in degrees: commits on Enter or blur, Escape reverts. */
-function DegreesField({ label, value, onCommit, disabled }: { label: string; value: number; onCommit: (v: number) => void; disabled?: boolean }) {
+function DegreesField(props: { label: string; value: number; onCommit: (v: number) => void; disabled?: boolean; hint?: ReactNode }) {
+  return <NumberField hint="Clockwise, about the image centre." {...props} />;
+}
+
+/** A plain number input: commits on Enter or blur, Escape reverts; `check` returns an error or null. */
+function NumberField({
+  label,
+  value,
+  onCommit,
+  disabled,
+  hint,
+  check,
+}: {
+  label: string;
+  value: number;
+  onCommit: (v: number) => void;
+  disabled?: boolean;
+  hint?: ReactNode;
+  check?: (v: number) => string | null;
+}) {
   const fmt = (v: number) => String(Math.round(v * 100) / 100);
   const [text, setText] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
@@ -750,7 +886,12 @@ function DegreesField({ label, value, onCommit, disabled }: { label: string; val
   const commit = (): boolean => {
     const v = Number(text.trim().replace(/°$/, ''));
     if (text.trim() === '' || !Number.isFinite(v)) {
-      setError('Enter an angle in degrees.');
+      setError('Enter a number.');
+      return false;
+    }
+    const bad = check?.(v) ?? null;
+    if (bad) {
+      setError(bad);
       return false;
     }
     setError(null);
@@ -794,7 +935,7 @@ function DegreesField({ label, value, onCommit, disabled }: { label: string; val
         }}
       />
       {error && <div className="field-error" role="alert">{error}</div>}
-      {!error && <div className="field-hint">Clockwise, about the image centre.</div>}
+      {!error && hint && <div className="field-hint">{hint}</div>}
     </div>
   );
 }
@@ -1051,7 +1192,7 @@ function LevelProps({ level }: { level: Level }) {
           only found where walls close a loop.
         </p>
       )}
-      <p className="panel-note">Select walls, openings or room labels to edit them. R names a room.</p>
+      <p className="panel-note">Select walls, openings, room labels or roofs to edit them. R names a room, K draws a roof.</p>
     </>
   );
 }
@@ -1068,12 +1209,14 @@ export function PropertiesPanel() {
   const nodes = sel.nodes.filter((id) => level.nodes[id]);
   const rooms = sel.rooms.map((id) => level.rooms[id]).filter(Boolean);
   const stairs = sel.stairs.map((id) => level.stairs[id]).filter(Boolean);
+  const roofs = sel.roofs.map((id) => level.roofs[id]).filter(Boolean);
   const live: Selection = {
     nodes,
     walls: walls.map((w) => w.id),
     openings: openings.map((o) => o.id),
     rooms: rooms.map((r) => r.id),
     stairs: stairs.map((st) => st.id),
+    roofs: roofs.map((r) => r.id),
   };
   const total = selectionSize(live);
 
@@ -1085,15 +1228,16 @@ export function PropertiesPanel() {
     body = <OpeningProps key={openings[0].id} level={level} opening={openings[0]} />;
   else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
   else if (total === 1 && stairs.length === 1) body = <StairsProps key={stairs[0].id} level={level} stairs={stairs[0]} />;
+  else if (total === 1 && roofs.length === 1) body = <RoofProps key={roofs[0].id} level={level} roof={roofs[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} />}
       </div>
     </aside>
   );

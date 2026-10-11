@@ -3,9 +3,9 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
 import { getLevelMeshes } from '../derive/meshes';
-import type { Phase, Plan, ViewMode, WallKind } from '../model/types';
+import type { Phase, Plan, RoofFinish, ViewMode, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { floorMaterial, stairsMaterial, wallMaterial } from '../view3d/materials';
+import { floorMaterial, roofMaterial, stairsMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -24,11 +24,12 @@ export type ExportFormat = 'glb' | 'obj';
 /** Material names without spaces: OBJ `usemtl` and some importers stop at the first space. */
 const wallMaterialName = (phase: Phase, kind: WallKind) => `wall_${phase}_${kind}`;
 const stairsMaterialName = (phase: Phase) => `stairs_${phase}`;
+const roofMaterialName = (finish: RoofFinish, phase: Phase) => `roof_${finish}_${phase}`;
 
 /**
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
  * with one group per visible level at its floor-top elevation holding `Wall <n> (<kind>, <phase>)`,
- * `Floor` and `Stairs` meshes. Levels with nothing to show are left out. Geometries are clones (the
+ * `Floor`, `Stairs` and `Roof` meshes. Levels with nothing to show are left out. Geometries are clones (the
  * mesh cache owns the originals) and materials are clones of the live view's, one per phase/kind
  * combination; free both with disposeExportScene().
  */
@@ -56,7 +57,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   for (const id of visible3dLevels(plan.levelOrder, levelVisibility)) {
     const level = plan.levels[id];
     const meshes = getLevelMeshes(plan, id, viewMode);
-    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.stairs.length)) continue;
+    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.stairs.length && !meshes.roofs.length)) continue;
     const group = new Group();
     group.name = level.name;
     group.position.set(0, elev[id]?.floorTop ?? 0, 0);
@@ -70,6 +71,11 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     });
     for (const s of meshes.stairs) {
       group.add(mesh('Stairs', s.geometry, material(stairsMaterialName(s.phase), stairsMaterial(s.phase))));
+    }
+    for (const r of meshes.roofs) {
+      const m = mesh('Roof', r.geometry, material(roofMaterialName(r.finish, r.phase), roofMaterial(r.finish, r.phase)));
+      if (r.phase === 'demo') m.renderOrder = 1;
+      group.add(m);
     }
     root.add(group);
   }
@@ -122,7 +128,7 @@ export async function downloadExport(
 ): Promise<void> {
   const root = buildExportScene(plan, viewMode, levelVisibility);
   try {
-    if (!root.children.length) throw new Error('Nothing to export: the visible levels have no walls, floors or stairs.');
+    if (!root.children.length) throw new Error('Nothing to export: the visible levels have no walls, floors, stairs or roofs.');
     const blob =
       format === 'glb'
         ? new Blob([await toGlb(root)], { type: 'model/gltf-binary' })

@@ -1,4 +1,5 @@
 import { getLevelElevations } from '../derive/levels';
+import { roofBearing, roofExtremes, roofOutlineWithOverhang } from '../derive/roofs';
 import type { Id, Plan } from '../model/types';
 
 export interface Box3d {
@@ -7,8 +8,9 @@ export interface Box3d {
 }
 
 /**
- * Bounding box of the given levels in three coordinates (x, Y up, plan y): the nodes in plan, from
- * the lowest slab bottom to the highest ceiling. An empty plan gives a 20' box at the origin.
+ * Bounding box of the given levels in three coordinates (x, Y up, plan y): the nodes and roof
+ * overhangs in plan, from the lowest slab bottom to the highest ceiling or roof top. An empty plan
+ * gives a 20' box at the origin.
  */
 export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): Box3d {
   const elev = getLevelElevations(plan);
@@ -29,6 +31,15 @@ export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): 
       maxX = Math.max(maxX, n.x);
       minZ = Math.min(minZ, n.y);
       maxZ = Math.max(maxZ, n.y);
+    }
+    for (const roof of Object.values(level.roofs ?? {})) {
+      for (const p of roofOutlineWithOverhang(roof)) {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.y);
+        maxZ = Math.max(maxZ, p.y);
+      }
+      maxY = Math.max(maxY, e.floorTop + roofExtremes(roof, roofBearing(level.wallHeight, roof)).ridge + roof.thickness);
     }
   }
   if (!Number.isFinite(minX)) {

@@ -4,9 +4,10 @@ import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { faceAt, getFaces, type Face, type FaceSet } from '../derive/rooms';
+import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
 import { floorToFloor, stairsSymbol, stairSteps, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
-import type { Id, Level, Opening, Vec2, ViewMode, Wall } from '../model/types';
+import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore, useViewportScale } from '../store/uiStore';
@@ -386,7 +387,7 @@ const NO_RECORD: Readonly<Record<Id, unknown>> = {};
  * layer of per-entity components does not re-render (and re-create every child) when an entity
  * only changes, e.g. on every step of a corner drag. The children select their own entity.
  */
-function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs'): Id[] {
+function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs'): Id[] {
   return usePlanStore(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
 }
 
@@ -425,6 +426,86 @@ const StairsLayer = memo(function StairsLayer({ levelId }: { levelId: Id }) {
     <g className="layer-stairs" pointerEvents="none">
       {ids.map((id) => (
         <StairsShape key={id} levelId={levelId} stairsId={id} />
+      ))}
+    </g>
+  );
+});
+
+/** A roof's plan paths, built once per roof object. */
+const roofPathCache = new WeakMap<Roof, { outline: string; overhang: string; ridge: string }>();
+function roofPaths(roof: Roof) {
+  let hit = roofPathCache.get(roof);
+  if (!hit) {
+    hit = { outline: polyPath(roof.outline), overhang: polyPath(roofOutlineWithOverhang(roof)), ridge: segPath(roofRidgeLines(roof)) };
+    roofPathCache.set(roof, hit);
+  }
+  return hit;
+}
+
+/**
+ * A roof on the plan: the overhang outline lighter, the outline it bears on dashed, the ridge (or
+ * hip lines) solid and thin; demolished roofs hatched red, new ones green, like walls. A selected
+ * roof shows handles on its outline corners (the select tool drags them). `ghost`: the level
+ * below's roof, faint and never selected.
+ */
+const RoofShape = memo(function RoofShape({ levelId, roofId, ghost }: { levelId: Id; roofId: Id; ghost?: boolean }) {
+  const roof = usePlanStore((s) => s.plan.levels[levelId]?.roofs?.[roofId]);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const selected = useUiStore((s) => !ghost && s.selection.roofs.includes(roofId));
+  if (!roof || !isVisible(roof.phase, viewMode)) return null;
+  const d = roofPaths(roof);
+  return (
+    <g className={`roof phase-${roof.phase}${selected ? ' is-selected' : ''}${ghost ? ' roof-ghost' : ''}`} data-roof-id={ghost ? undefined : roofId}>
+      <path className="roof-overhang" d={d.overhang} vectorEffect="non-scaling-stroke" />
+      <path className="roof-outline" d={d.outline} vectorEffect="non-scaling-stroke" />
+      {d.ridge && <path className="roof-ridge" d={d.ridge} vectorEffect="non-scaling-stroke" />}
+      {selected && <RoofHandles outline={roof.outline} />}
+    </g>
+  );
+});
+
+/** Corner handles of a selected roof, constant on screen (only these follow the zoom). */
+function RoofHandles({ outline }: { outline: readonly Vec2[] }) {
+  const k = useViewportScale();
+  return (
+    <>
+      {outline.map((p, i) => (
+        <rect key={i} className="roof-handle" x={p.x - 4 / k} y={p.y - 4 / k} width={8 / k} height={8 / k} vectorEffect="non-scaling-stroke" />
+      ))}
+    </>
+  );
+}
+
+/**
+ * The level's roofs, above the room fills and below the walls. Picking is done by the tools
+ * (selectTool hitTest), so the layer takes pointer events (for the cursor) only in the select and
+ * roof tools.
+ */
+const RoofsLayer = memo(function RoofsLayer({ levelId }: { levelId: Id }) {
+  const ids = useEntityIds(levelId, 'roofs');
+  const tool = useUiStore((s) => s.activeTool);
+  if (ids.length === 0) return null;
+  return (
+    <g className="layer-roofs" pointerEvents={tool === 'select' || tool === 'roof' ? 'auto' : 'none'}>
+      {ids.map((id) => (
+        <RoofShape key={id} levelId={levelId} roofId={id} />
+      ))}
+    </g>
+  );
+});
+
+/** The roofs of the level below, faint, so an upper floor is drawn knowing where a lower roof is. */
+const RoofGhostLayer = memo(function RoofGhostLayer({ levelId }: { levelId: Id }) {
+  const belowId = usePlanStore((s) => {
+    const i = s.plan.levelOrder.indexOf(levelId);
+    return i > 0 ? s.plan.levelOrder[i - 1] : null;
+  });
+  const ids = usePlanStore(useShallow((s) => Object.keys((belowId && s.plan.levels[belowId]?.roofs) || NO_RECORD)));
+  if (!belowId || ids.length === 0) return null;
+  return (
+    <g className="layer-roof-ghost" pointerEvents="none" data-ghost-roofs={belowId}>
+      {ids.map((id) => (
+        <RoofShape key={id} levelId={belowId} roofId={id} ghost />
       ))}
     </g>
   );
@@ -789,6 +870,8 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
       <PatternDefs />
       <UnderlayLayer levelId={levelId} />
       <RoomFillsLayer levelId={levelId} />
+      <RoofGhostLayer levelId={levelId} />
+      <RoofsLayer levelId={levelId} />
       <StairsLayer levelId={levelId} />
       <WallsLayer levelId={levelId} />
       <OpeningsLayer levelId={levelId} />

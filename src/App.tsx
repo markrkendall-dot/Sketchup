@@ -80,7 +80,8 @@ function onKeyDown(e: KeyboardEvent): void {
   }
   const drawing =
     (after.activeTool === 'wall' && after.draft.wallStart !== null) ||
-    (after.activeTool === 'underlay' && after.draft.underlayPoints.length > 0);
+    (after.activeTool === 'underlay' && after.draft.underlayPoints.length > 0) ||
+    (after.activeTool === 'roof' && after.draft.roofPoints.length > 0);
   if (drawing && !binding.whileDrawing) return;
   if (binding.run(e) === false) return;
   e.preventDefault();

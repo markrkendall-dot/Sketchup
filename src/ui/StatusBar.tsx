@@ -12,6 +12,8 @@ const SNAP_LABEL: Record<SnapKind, string> = {
   wall: 'on wall',
   'ghost-node': 'corner below',
   'ghost-wall': 'wall below',
+  'face-corner': 'wall face corner',
+  'face-edge': 'wall face',
   guide: 'aligned',
   angle: '15° step',
   grid: 'grid',
@@ -51,6 +53,10 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: 'Point at a wall, click or type the distance from the corner.',
     busy: 'Type the distance from the corner, then Enter.',
   },
+  roof: {
+    idle: 'Click the roof outline corners on the outside wall faces.',
+    busy: 'Click the next corner; the first one or Enter closes. Esc cancels.',
+  },
   // Replaced by underlayHint(); kept for the Record type.
   underlay: { idle: '', busy: '' },
 };
@@ -84,6 +90,10 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   passage: {
     idle: "Point at a wall. Click to place, or type the distance from the nearer corner's inside face and Enter.",
     busy: "Type the distance from the nearer corner's inside face to the opening edge, then Enter.",
+  },
+  roof: {
+    idle: 'Click the corners of the roof outline; they snap to the outside corners and faces of the walls. Then set the shape, ridge and slope in the properties panel (or use Fit to walls there).',
+    busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
   },
   underlay: { idle: '', busy: '' },
 };
@@ -162,7 +172,7 @@ export function StatusBar() {
   const lengthBuffer = useUiStore((s) => s.draft.lengthBuffer);
   const error = useUiStore((s) => s.draft.error);
   const message = useUiStore((s) => s.draft.message);
-  const drawing = useUiStore((s) => s.draft.wallStart !== null || s.draft.lengthBuffer !== '');
+  const drawing = useUiStore((s) => s.draft.wallStart !== null || s.draft.lengthBuffer !== '' || s.draft.roofPoints.length > 0);
   const underlayPoints = useUiStore((s) => s.draft.underlayPoints.length);
   const kind = useUiStore((s) => s.nextWallKind);
   const levelId = useUiStore((s) => s.activeLevelId);

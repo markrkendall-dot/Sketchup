@@ -2,10 +2,10 @@ import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { dist, projectPointToSegment, segmentIntersection } from './geometry';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
-import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Stairs, Underlay, Vec2, Wall } from './types';
+import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
-export const SCHEMA_VERSION = 1 as const;
+export const SCHEMA_VERSION = 2 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
 export const MERGE_EPS = 0.5;
 
@@ -30,8 +30,12 @@ export function createLevel(name: string, wallHeight: number, floorThickness: nu
     openings: {},
     rooms: {},
     stairs: {},
+    roofs: {},
   };
 }
+
+/** The site of a new plan (and of files from before schema version 2). */
+export const defaultSite = (): Site => ({ northAngle: 0, gradePoints: {}, columns: {} });
 
 export function createEmptyPlan(name = 'Untitled plan'): Plan {
   const levels = [
@@ -47,6 +51,7 @@ export function createEmptyPlan(name = 'Untitled plan'): Plan {
     levels: Object.fromEntries(levels.map((l) => [l.id, l])),
     baseFloorElevation: -100,
     settings: { ...DEFAULT_SETTINGS },
+    site: defaultSite(),
     modifiedAt: new Date().toISOString(),
   };
 }
@@ -374,6 +379,18 @@ export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
     next.schemaVersion = 1;
     return next;
   },
+  /** Version 1: levels have no roofs and the plan has no site; add empty ones. */
+  1: (doc) => {
+    const next: Json = { ...doc };
+    if (isObject(doc.levels)) {
+      const upgraded: Json = {};
+      for (const [id, raw] of Object.entries(doc.levels)) upgraded[id] = isObject(raw) ? { ...raw, roofs: {} } : raw;
+      next.levels = upgraded;
+    }
+    next.site = defaultSite();
+    next.schemaVersion = 2;
+    return next;
+  },
 };
 
 const PHASES = new Set(['existing', 'demo', 'new']);
@@ -385,9 +402,14 @@ const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove'] as const;
+const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish'] as const;
+const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
+const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
+const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
+const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
-const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'underlay'] as const;
-const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'modifiedAt'] as const;
+const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'underlay'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
 
 function migrateNodes(raw: Json, where: string): Level['nodes'] {
@@ -477,6 +499,89 @@ function migrateStairs(raw: Json): Level['stairs'] {
   return out;
 }
 
+/** Largest roof pitch the editor accepts (rise per 12). */
+export const MAX_ROOF_PITCH = 24;
+
+/** Why a stored roof cannot be used, or null when it can (also used by the store). */
+export function roofProblem(r: Pick<Roof, 'outline' | 'pitch' | 'overhang' | 'thickness' | 'fascia' | 'ridgeAngle' | 'bearingOffset'>): string | null {
+  if (!Array.isArray(r.outline) || r.outline.length < 3 || !r.outline.every(isPoint)) return 'needs an outline of at least 3 points';
+  let area = 0;
+  for (let i = 0; i < r.outline.length; i++) {
+    const p = r.outline[i];
+    const q = r.outline[(i + 1) % r.outline.length];
+    area += p.x * q.y - q.x * p.y;
+  }
+  if (!(Math.abs(area / 2) >= 1)) return 'outline encloses no area';
+  if (!isNum(r.pitch) || r.pitch < 0 || r.pitch > MAX_ROOF_PITCH) return `pitch must be 0 to ${MAX_ROOF_PITCH}`;
+  if (!isNum(r.overhang) || r.overhang < 0) return 'overhang must not be negative';
+  if (!isNum(r.thickness) || r.thickness <= 0) return 'thickness must be positive';
+  if (!isNum(r.fascia) || r.fascia < 0) return 'fascia must not be negative';
+  if (!isNum(r.ridgeAngle) || !isNum(r.bearingOffset)) return 'needs a numeric ridge angle and bearing offset';
+  return null;
+}
+
+/**
+ * Roofs read field by field: an unknown shape, an unusable outline or an out-of-range size drops
+ * the roof (with a console warning naming it); a missing phase or finish gets its default.
+ */
+function migrateRoofs(raw: Json, where: string): Level['roofs'] {
+  const out: Level['roofs'] = {};
+  for (const [rid, r] of Object.entries(raw)) {
+    const drop = (why: string) => console.warn(`HomePlan: ${where}: dropped roof ${rid}: ${why}`);
+    if (!isObject(r)) {
+      drop('not an object');
+      continue;
+    }
+    if (typeof r.shape !== 'string' || !ROOF_SHAPES.has(r.shape)) {
+      drop(`unknown shape ${String(r.shape)}`);
+      continue;
+    }
+    const problem = roofProblem(r as unknown as Roof);
+    if (problem) {
+      drop(problem);
+      continue;
+    }
+    const roof = pick(r, ROOF_KEYS);
+    roof.id = rid;
+    roof.shape = r.shape as RoofShape;
+    roof.outline = (r.outline as Vec2[]).map((p) => ({ x: p.x, y: p.y }));
+    roof.phase = phaseOf(r.phase);
+    roof.finish = r.finish === 'shingle' ? 'shingle' : 'metal';
+    out[rid] = roof as unknown as Roof;
+  }
+  return out;
+}
+
+/** The plan's site: north angle, grade points and columns (broken entries are dropped). */
+function migrateSite(raw: unknown): Site {
+  const src = isObject(raw) ? raw : {};
+  const site = pick(src, SITE_KEYS);
+  site.northAngle = isNum(src.northAngle) ? src.northAngle : 0;
+  const points: Record<Id, GradePoint> = {};
+  for (const [id, g] of Object.entries(isObject(src.gradePoints) ? src.gradePoints : {})) {
+    if (!isObject(g) || !isPoint(g.at) || !isNum(g.elevation)) continue;
+    const gp = pick(g, GRADE_POINT_KEYS);
+    gp.id = id;
+    gp.at = { x: g.at.x, y: g.at.y };
+    points[id] = gp as unknown as GradePoint;
+  }
+  site.gradePoints = points;
+  const columns: Record<Id, Column> = {};
+  for (const [id, c] of Object.entries(isObject(src.columns) ? src.columns : {})) {
+    if (!isObject(c) || !isPoint(c.at) || !isNum(c.width) || c.width <= 0 || !isNum(c.depth) || c.depth <= 0) continue;
+    if (!isNum(c.base) || !isNum(c.top) || c.top <= c.base) continue;
+    const col = pick(c, COLUMN_KEYS);
+    col.id = id;
+    col.at = { x: c.at.x, y: c.at.y };
+    col.rotation = isNum(c.rotation) ? c.rotation : 0;
+    col.kind = c.kind === 'chimney' ? 'chimney' : 'post';
+    col.phase = phaseOf(c.phase);
+    columns[id] = col as unknown as Column;
+  }
+  site.columns = columns;
+  return site as unknown as Site;
+}
+
 /**
  * An underlay with a usable image and placement; missing opacity, rotation and lock get defaults.
  * A broken one is dropped rather than failing the whole file.
@@ -506,6 +611,7 @@ function migrateLevel(raw: unknown, id: string): Level {
   level.openings = migrateOpenings(record(raw.openings, `${where} openings`), walls);
   level.rooms = migrateRooms(record(raw.rooms, `${where} rooms`));
   level.stairs = migrateStairs(record(raw.stairs, `${where} stairs`));
+  level.roofs = migrateRoofs(record(raw.roofs, `${where} roofs`), where);
   put(level, 'underlay', migrateUnderlay(raw.underlay));
   return level as unknown as Level;
 }
@@ -559,6 +665,7 @@ export function migrate(json: unknown): Plan {
   plan.levels = levels;
   plan.baseFloorElevation = isNum(doc.baseFloorElevation) ? doc.baseFloorElevation : 0;
   plan.settings = migrateSettings(record(doc.settings, 'settings'));
+  plan.site = migrateSite(doc.site);
   plan.modifiedAt = typeof doc.modifiedAt === 'string' ? doc.modifiedAt : new Date().toISOString();
   return plan as unknown as Plan;
 }

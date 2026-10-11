@@ -1,12 +1,16 @@
 import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Vector2 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Id, Level, Opening, Phase, Plan, Stairs, Vec2, ViewMode, Wall, WallKind } from '../model/types';
+import type { Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Stairs, Vec2, ViewMode, Wall, WallKind } from '../model/types';
 import { getFootprints, type Footprint } from './footprint';
 import { getOpeningsByWall, openingSymbol } from './openings';
 import { isOpeningVisible, isVisible } from './phase';
-import { getFaces, insetPolygon, selfIntersects, type FaceSet } from './rooms';
+import { getFaces, slabOutlines, type FaceSet } from './rooms';
+import { profileAt, roofBearing, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { floorToFloor, stairsFrame, stairsOutline, stairsPoint, stairSteps } from './stairs';
+
+/** Moved to rooms.ts (the 2D editor uses it for "Fit to walls"); re-exported for the 3D code. */
+export { slabOutlines };
 
 // 3D meshes (DESIGN.md "Openings in 3D", "3D"). Pure: no React, no renderer, testable in node.
 //
@@ -75,6 +79,19 @@ export function prism(
   g.setAttribute('position', new Float32BufferAttribute(prismPositions(polygon, y0, y1, holes, opts), 3));
   g.computeVertexNormals(); // non-indexed: one face normal per triangle
   return g;
+}
+
+/** A non-indexed geometry with flat normals from a position array. */
+function geometryFrom(positions: number[]): BufferGeometry {
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** prism() between two height fields (roofs.ts slopedPrismPositions): sloped tops and bottoms. */
+export function slopedPrism(polygon: readonly Vec2[], zb: (p: Vec2) => number, zt: (p: Vec2) => number, opts: SlopedPrismOptions = {}): BufferGeometry {
+  return geometryFrom(slopedPrismPositions(polygon, zb, zt, opts));
 }
 
 function prismPositions(
@@ -297,6 +314,31 @@ export interface WallContext {
   buttHeights?: { a: number; b: number };
   /** Neighbours' corners lying on this wall's outline edges (see splitPointsFor). */
   splitPoints?: readonly Vec2[];
+  /**
+   * The wall's top under the level's roofs (roofs.ts wallRoofProfile): where it rises above the
+   * wall height, the wall is cut at every station of the profile and the part above the wall
+   * height is built with a sloped top.
+   */
+  roofTop?: WallProfile | null;
+  /**
+   * At each end, a collinear neighbour of the same thickness and class is raised by the same roof,
+   * so the join face above the wall height is internal.
+   */
+  raisedJoin?: { a: boolean; b: boolean };
+}
+
+/** Split spans at the given centerline positions (each piece keeps its solid ranges). */
+function splitSpans(spans: WallSpan[], cuts: readonly number[]): WallSpan[] {
+  let out = spans;
+  for (const c of cuts) {
+    const next: WallSpan[] = [];
+    for (const sp of out) {
+      if (c > sp.from + 1e-7 && c < sp.to - 1e-7) next.push({ from: sp.from, to: c, solid: sp.solid }, { from: c, to: sp.to, solid: sp.solid });
+      else next.push(sp);
+    }
+    out = next;
+  }
+  return out;
 }
 
 /**
@@ -317,7 +359,9 @@ export function buildWallGeometry(
   ctx: WallContext = {},
 ): BufferGeometry {
   const H = wallHeight;
-  const spans = wallSpans(fp, wall, openings, H, viewMode);
+  const profile = ctx.roofTop ?? null;
+  let spans = wallSpans(fp, wall, openings, H, viewMode);
+  if (profile) spans = splitSpans(spans, profile.s.slice(1, -1));
   const a0 = dot(fp.dir, fp.a);
   let src: readonly Vec2[] = fp.poly;
   for (const s of spans) {
@@ -342,6 +386,9 @@ export function buildWallGeometry(
   };
   const along = (p: Vec2) => dot(sub(p, fp.a), fp.dir);
   const off = (p: Vec2) => dot(sub(p, fp.a), fp.normal);
+  // Roof: the top above the wall height, and which pieces rise above it.
+  const roofTop = (p: Vec2) => (profile ? Math.max(H, profileAt(profile, along(p))) : H);
+  const raised = pieces.map((pc) => !!profile && !!pc.poly && pc.poly.some((p) => roofTop(p) > H + 1e-6));
   const h = fp.thickness / 2;
   const onSeg = (p: Vec2, [u, v]: readonly [Vec2, Vec2]) => {
     const d = sub(v, u);
@@ -393,38 +440,37 @@ export function buildWallGeometry(
         return y1 > end + 1e-7;
       };
       const bottom = k === 0 || !solidAt(i, ys[k - 1], y0);
-      const top = k + 2 >= ys.length || !solidAt(i, y1, ys[k + 2]);
+      // Under a raised top the band's top is internal.
+      const top = (k + 2 >= ys.length || !solidAt(i, y1, ys[k + 2])) && !(raised[i] && Math.abs(y1 - H) < 1e-7);
       parts.push(prism(poly, y0, y1, [], { bottom, top, side }));
     }
+    if (!raised[i]) return;
+    // The part above the wall height, up to the roof: sloped top, vertical sides. Faces against a
+    // raised neighbouring piece, or a collinear neighbour raised by the same roof, are internal.
+    const below = ys.length >= 2 && solidAt(i, ys[ys.length - 2], H);
+    const side = (p: Vec2, q: Vec2): boolean => {
+      const sp = along(p);
+      const sq = along(q);
+      if (Math.abs(sp - sq) < 1e-7) {
+        if (Number.isFinite(span.from) && Math.abs(sp - span.from) < 1e-7) return !raised[i - 1];
+        if (Number.isFinite(span.to) && Math.abs(sp - span.to) < 1e-7) return !raised[i + 1];
+      }
+      const op = off(p);
+      const oq = off(q);
+      if ((Math.abs(op - h) < 1e-6 && Math.abs(oq - h) < 1e-6) || (Math.abs(op + h) < 1e-6 && Math.abs(oq + h) < 1e-6)) return true;
+      if (isCapEdge(p, q)) return true;
+      const atA = (sp + sq) / 2 < fp.length / 2;
+      if (atA ? ctx.raisedJoin?.a : ctx.raisedJoin?.b) return false;
+      const end = atA ? endHeights.a : endHeights.b;
+      return end < Math.max(roofTop(p), roofTop(q)) - 1e-7;
+    };
+    parts.push(slopedPrism(poly, () => H, roofTop, { bottom: !below, top: true, side }));
   });
   return mergeAll(parts);
 }
 
 // ---------------------------------------------------------------------------------------------
 // Floors and stairs
-
-/**
- * The slab polygons of a level: each outer face (DESIGN.md "Rooms"), pushed out to the exterior
- * wall faces by half of each edge's wall thickness (the centerline polygon if that fails). Outer
- * faces of components that sit inside another component (a closet island) are skipped: the
- * enclosing slab already covers them.
- */
-export function slabOutlines(faces: Pick<FaceSet, 'outerFaces' | 'outerFaceThickness'>, toWallFaces = true): Vec2[][] {
-  const out: Vec2[][] = [];
-  faces.outerFaces.forEach((poly, k) => {
-    const nested = faces.outerFaces.some((other, j) => j !== k && Math.abs(polygonSignedArea(other)) > Math.abs(polygonSignedArea(poly)) && pointInPolygon(poly[0], other));
-    if (nested) return;
-    const th = faces.outerFaceThickness?.[k];
-    if (!toWallFaces || !th || th.length !== poly.length) {
-      out.push(poly);
-      return;
-    }
-    const grown = insetPolygon(poly, th.map((t) => -t / 2));
-    const ok = polygonSignedArea(grown) > polygonSignedArea(poly) && !selfIntersects(grown);
-    out.push(ok ? grown : poly);
-  });
-  return out;
-}
 
 /** True when the hole lies strictly inside the outline and does not touch any accepted hole. */
 function holeFits(hole: readonly Vec2[], outline: readonly Vec2[], accepted: readonly (readonly Vec2[])[]): boolean {
@@ -526,6 +572,18 @@ export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' 
 }
 
 // ---------------------------------------------------------------------------------------------
+// Roofs
+
+/**
+ * A roof as one geometry (level-local, like walls): the slab over the overhang outline with its
+ * fascia and rake boards (roofs.ts roofSolid). Each part is a closed solid.
+ */
+export function buildRoofGeometry(roof: Roof, bearingHeight: number): BufferGeometry {
+  const { slab, boards } = roofSolid(roof, bearingHeight);
+  return geometryFrom(boards.reduce((all, b) => all.concat(b), slab));
+}
+
+// ---------------------------------------------------------------------------------------------
 // Memoized level meshes
 
 export interface WallMesh {
@@ -541,11 +599,20 @@ export interface StairsMesh {
   phase: Phase;
 }
 
+export interface RoofMesh {
+  id: Id;
+  geometry: BufferGeometry;
+  phase: Phase;
+  finish: RoofFinish;
+}
+
 export interface LevelMeshes {
   walls: WallMesh[];
   /** The slab under this level (level-local Y from -floorThickness to 0). */
   floor?: BufferGeometry;
   stairs: StairsMesh[];
+  /** The level's roofs visible in the view mode (level-local, like the walls). */
+  roofs: RoofMesh[];
 }
 
 interface WallEntry {
@@ -573,6 +640,12 @@ interface StairsEntry {
   geometry: BufferGeometry;
 }
 
+interface RoofEntry {
+  roof: Roof;
+  bearing: number;
+  geometry: BufferGeometry;
+}
+
 interface LevelEntry {
   level: Level;
   belowStairs: Level['stairs'] | undefined;
@@ -588,6 +661,7 @@ export const isSeeThrough = (phase: Phase): boolean => phase === 'demo';
 const wallCache = new Map<string, Map<Id, WallEntry>>();
 const floorCache = new Map<string, FloorEntry>();
 const stairsCache = new Map<string, Map<Id, StairsEntry>>();
+const roofCache = new Map<string, Map<Id, RoofEntry>>();
 const levelCache = new Map<string, LevelEntry>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
@@ -627,10 +701,12 @@ function pruneCaches(plan: Plan): void {
     e.geometry?.dispose();
     floorCache.delete(key);
   }
-  for (const [key, m] of stairsCache) {
-    if (alive(key)) continue;
-    for (const e of m.values()) e.geometry.dispose();
-    stairsCache.delete(key);
+  for (const cache of [stairsCache, roofCache]) {
+    for (const [key, m] of cache) {
+      if (alive(key)) continue;
+      for (const e of m.values()) e.geometry.dispose();
+      cache.delete(key);
+    }
   }
   for (const key of levelCache.keys()) if (!alive(key)) levelCache.delete(key);
 }
@@ -644,7 +720,7 @@ function pruneCaches(plan: Plan): void {
  */
 export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): LevelMeshes {
   const level = plan.levels[levelId];
-  if (!level) return { walls: [], stairs: [] };
+  if (!level) return { walls: [], stairs: [], roofs: [] };
   const key = `${levelId}|${viewMode}`;
   const idx = plan.levelOrder.indexOf(levelId);
   const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
@@ -673,13 +749,26 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   // Heights of the visible walls at each node, for the join faces. Only a neighbour drawn the same
   // way covers a join: through a translucent (demolished) wall you would see into an opaque wall
   // whose join face was left out, so mixed joins keep their faces.
-  const atNode = new Map<Id, { id: Id; h: number; seeThrough: boolean; dir: Vec2 }[]>();
+  // Roofs visible in the view mode raise the exterior walls under them (roofs.ts wallRoofProfile).
+  const roofsOnLevel: RoofOnLevel[] = Object.values(level.roofs ?? {})
+    .filter((r) => isVisible(r.phase, viewMode))
+    .map((roof) => ({ roof, bearing: roofBearing(level.wallHeight, roof) }));
+  const profiles = new Map<Id, WallProfile>();
+  if (roofsOnLevel.length) {
+    for (const w of Object.values(level.walls)) {
+      const fp = fps.get(w.id);
+      if (!fp || w.kind !== 'exterior') continue;
+      const pr = wallRoofProfile(fp, heightOf(w), roofsOnLevel);
+      if (pr) profiles.set(w.id, pr);
+    }
+  }
+  const atNode = new Map<Id, { id: Id; h: number; seeThrough: boolean; dir: Vec2; t: number }[]>();
   for (const w of Object.values(level.walls)) {
     const fp = fps.get(w.id);
     if (!fp) continue;
     for (const n of [w.a, w.b]) {
       const list = atNode.get(n);
-      const item = { id: w.id, h: heightOf(w), seeThrough: isSeeThrough(w.phase), dir: fp.dir };
+      const item = { id: w.id, h: heightOf(w), seeThrough: isSeeThrough(w.phase), dir: fp.dir, t: w.thickness };
       if (list) list.push(item);
       else atNode.set(n, [item]);
     }
@@ -703,7 +792,23 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const endHeights = { a: lowestOther(wall.a, wall), b: lowestOther(wall.b, wall) };
     const buttHeights = { a: buttCover(wall.a, wall, fp.dir), b: buttCover(wall.b, wall, fp.dir) };
     const splitPoints = splitPointsFor(fp, fps.values());
-    const ctxKey = [bandsKey, endHeights.a, endHeights.b, buttHeights.a, buttHeights.b, splitPoints.map((p) => `${p.x},${p.y}`).join(';')].join('|');
+    const roofTop = profiles.get(wall.id) ?? null;
+    // A collinear neighbour raised by the roof too (same thickness and class) covers the join above the plate.
+    const raisedAt = (nodeId: Id) =>
+      !!roofTop &&
+      (atNode.get(nodeId) ?? []).some(
+        (x) => x.id !== wall.id && Math.abs(cross(x.dir, fp.dir)) < 1e-6 && x.seeThrough === isSeeThrough(wall.phase) && Math.abs(x.t - wall.thickness) < 1e-9 && profiles.has(x.id),
+      );
+    const raisedJoin = { a: raisedAt(wall.a), b: raisedAt(wall.b) };
+    const ctxKey = [
+      bandsKey,
+      endHeights.a,
+      endHeights.b,
+      buttHeights.a,
+      buttHeights.b,
+      splitPoints.map((p) => `${p.x},${p.y}`).join(';'),
+      roofTop ? `${roofTop.s.join(',')}/${roofTop.h.join(',')}/${raisedJoin.a}/${raisedJoin.b}` : '',
+    ].join('|');
     const old = prevWalls?.get(wall.id);
     const entry =
       old && old.fp === fp && old.wall === wall && old.openings === openings && old.height === height && old.ctxKey === ctxKey
@@ -714,7 +819,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
             openings,
             height,
             ctxKey,
-            geometry: buildWallGeometry(fp, wall, openings ?? [], height, viewMode, { bands, endHeights, buttHeights, splitPoints }),
+            geometry: buildWallGeometry(fp, wall, openings ?? [], height, viewMode, { bands, endHeights, buttHeights, splitPoints, roofTop, raisedJoin }),
           };
     nextWalls.set(wall.id, entry);
     walls.push({ id: wall.id, geometry: entry.geometry, phase: wall.phase, kind: wall.kind });
@@ -766,7 +871,20 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   if (prevStairs) for (const [id, e] of prevStairs) if (nextStairs.get(id) !== e) e.geometry.dispose();
   stairsCache.set(key, nextStairs);
 
-  const result: LevelMeshes = { walls, stairs, ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  // Roofs: rebuilt only when the roof object or its bearing height changes.
+  const prevRoofs = roofCache.get(key);
+  const nextRoofs = new Map<Id, RoofEntry>();
+  const roofs: RoofMesh[] = [];
+  for (const { roof, bearing } of roofsOnLevel) {
+    const old = prevRoofs?.get(roof.id);
+    const entry = old && old.roof === roof && old.bearing === bearing ? old : { roof, bearing, geometry: buildRoofGeometry(roof, bearing) };
+    nextRoofs.set(roof.id, entry);
+    roofs.push({ id: roof.id, geometry: entry.geometry, phase: roof.phase, finish: roof.finish });
+  }
+  if (prevRoofs) for (const [id, e] of prevRoofs) if (nextRoofs.get(id) !== e) e.geometry.dispose();
+  roofCache.set(key, nextRoofs);
+
+  const result: LevelMeshes = { walls, stairs, roofs, ...(floor.geometry ? { floor: floor.geometry } : {}) };
   levelCache.set(key, { level, belowStairs, ftf, result });
   return result;
 }
@@ -776,6 +894,8 @@ export function clearMeshCache(): void {
   for (const m of wallCache.values()) for (const e of m.values()) e.geometry.dispose();
   for (const e of floorCache.values()) e.geometry?.dispose();
   for (const m of stairsCache.values()) for (const e of m.values()) e.geometry.dispose();
+  for (const m of roofCache.values()) for (const e of m.values()) e.geometry.dispose();
+  roofCache.clear();
   wallCache.clear();
   floorCache.clear();
   stairsCache.clear();

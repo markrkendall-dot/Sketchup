@@ -18,7 +18,7 @@ import { getFaces } from '../derive/rooms';
 import { floorToFloor, stairsOutline, stairSteps } from '../derive/stairs';
 import { clipHalfPlane, halfPlaneCrossings, polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, createLevel } from '../model/plan';
-import type { Level, Opening, Phase, Plan, Stairs, Vec2, Wall } from '../model/types';
+import type { Level, Opening, Phase, Plan, Roof, Stairs, Vec2, Wall } from '../model/types';
 
 type V3 = [number, number, number];
 
@@ -608,3 +608,157 @@ describe('getLevelMeshes memoization', () => {
   });
 });
 
+
+describe('walls under a roof', () => {
+  /** The 20' box on First Floor with a gable roof over its outside faces, ridge along x. */
+  function roofedBox(over: Partial<Roof> = {}, divider = false) {
+    const { plan, first } = boxPlan();
+    if (divider) {
+      first.nodes.m = { id: 'm', x: 0, y: 120 };
+      first.nodes.n = { id: 'n', x: 240, y: 120 };
+      first.walls.w1 = { ...first.walls.w1, b: 'n' };
+      first.walls.w1b = { ...first.walls.w1, id: 'w1b', a: 'n', b: 'c' };
+      first.walls.w3 = { ...first.walls.w3, b: 'm' };
+      first.walls.w3b = { ...first.walls.w3, id: 'w3b', a: 'm', b: 'a' };
+      first.walls.div = { id: 'div', a: 'm', b: 'n', thickness: 4.5, kind: 'interior', phase: 'existing' };
+    }
+    const r: Roof = {
+      id: 'roof1',
+      shape: 'gable',
+      outline: [
+        { x: -3.25, y: -3.25 },
+        { x: 243.25, y: -3.25 },
+        { x: 243.25, y: 243.25 },
+        { x: -3.25, y: 243.25 },
+      ],
+      ridgeAngle: 0,
+      pitch: 8,
+      overhang: 24,
+      bearingOffset: 0,
+      thickness: 8,
+      fascia: 6,
+      phase: 'existing',
+      finish: 'metal',
+      ...over,
+    };
+    first.roofs[r.id] = r;
+    return { plan, first, roof: r };
+  }
+  const RIDGE = 96 + (246.5 / 2) * (8 / 12);
+  const wallGeo = (m: ReturnType<typeof getLevelMeshes>, id: string) => m.walls.find((w) => w.id === id)!.geometry;
+
+  it('a gable-end wall rises to the ridge: one peak, its highest vertex at the ridge height', () => {
+    const { plan, first } = roofedBox();
+    const m = getLevelMeshes(plan, first.id, 'all');
+    expect(m.roofs).toHaveLength(1);
+    const g = wallGeo(m, 'w1'); // b (240, 0) -> c (240, 240): the east gable end
+    expect(bbox(g).max[1]).toBeCloseTo(RIDGE, 3);
+    // The top profile along the outside face (x = 243.25): rising to one peak at the ridge, then falling.
+    const top = new Map<number, number>();
+    const p = g.getAttribute('position');
+    for (let i = 0; i < p.count; i++) {
+      if (Math.abs(p.getX(i) - 243.25) > 1e-3 || p.getY(i) < 96 - 1e-3) continue;
+      const z = Math.round(p.getZ(i) * 1000) / 1000;
+      top.set(z, Math.max(top.get(z) ?? -Infinity, p.getY(i)));
+    }
+    const profile = [...top.entries()].sort((a, b) => a[0] - b[0]);
+    const peaks = profile.filter(([, y], i) => i > 0 && i < profile.length - 1 && y > profile[i - 1][1] + 1e-3 && y > profile[i + 1][1] + 1e-3);
+    expect(peaks).toHaveLength(1);
+    expect(peaks[0][0]).toBeCloseTo(120, 3);
+    expect(peaks[0][1]).toBeCloseTo(RIDGE, 3);
+    expect(profile[0][1]).toBeCloseTo(96, 3);
+    expect(profile[profile.length - 1][1]).toBeCloseTo(96, 3);
+    // Under the ridge the wall is solid up to just below the roof, open above it.
+    expect(inside(g, [240, RIDGE - 1, 120])).toBe(true);
+    expect(inside(g, [240, RIDGE + 1, 120])).toBe(false);
+    expect(inside(g, [240, 100, 10])).toBe(true);
+  });
+
+  it('an eave wall is unchanged by the roof', () => {
+    const { plan, first } = roofedBox();
+    const bare = boxPlan();
+    const withRoof = wallGeo(getLevelMeshes(plan, first.id, 'all'), 'w0');
+    const without = wallGeo(getLevelMeshes(bare.plan, bare.first.id, 'all'), 'w0');
+    expect(bbox(withRoof)).toEqual(bbox(without));
+    expect(triangleCount(withRoof)).toBe(triangleCount(without));
+    expect(bbox(withRoof).max[1]).toBe(96);
+  });
+
+  it('the walls with gable ends are closed: cut heights are shared with the eave neighbours', () => {
+    for (const divider of [false, true]) {
+      const { plan, first } = roofedBox({}, divider);
+      first.openings.win = opening('w0', { id: 'win', offset: 100 });
+      const m = getLevelMeshes(plan, first.id, 'all');
+      const all = mergeAll(m.walls.map((w) => w.geometry.clone()));
+      expect(closedEdges(all), `divider: ${divider}`).toBe(true);
+      // Above the plate: the roof underside over the gable walls' footprints (east and west), linear
+      // in y on each side of the ridge.
+      const fps = computeFootprints(first, 'all');
+      const area = [...fps.values()].reduce((sum, f) => sum + Math.abs(polygonSignedArea(f.poly)), 0);
+      const rise = (y: number) => (Math.min(y + 3.25, 243.25 - y) * 8) / 12;
+      let gables = 0;
+      for (const f of fps.values()) {
+        if (Math.abs(f.dir.x) > 1e-9) continue; // eave walls run along x
+        for (const half of [clipHalfPlane(f.poly, { x: 0, y: 1 }, 120), clipHalfPlane(f.poly, { x: 0, y: -1 }, -120)]) {
+          // A linear function integrates over a triangle as its area times the value at the centroid.
+          for (let i = 1; i + 1 < half.length; i++) {
+            const t = [half[0], half[i], half[i + 1]];
+            gables += Math.abs(polygonSignedArea(t)) * rise((t[0].y + t[1].y + t[2].y) / 3);
+          }
+        }
+      }
+      expect(volume(all)).toBeCloseTo(area * 96 - 36 * 48 * 6.5 + gables, 0);
+      // No face lies inside the union.
+      for (const t of triangles(all)) {
+        const c = centroid3(t);
+        const n = faceNormal(t);
+        const len = Math.hypot(...n);
+        const out: V3 = [c[0] + (n[0] / len) * 0.05, c[1] + (n[1] / len) * 0.05, c[2] + (n[2] / len) * 0.05];
+        expect(inside(all, out)).toBe(false);
+      }
+    }
+  });
+
+  it('a ridge across the middle of a wall piece cuts it there; a window keeps its height', () => {
+    // Ridge along y (90): the north and south walls are the gable ends; one has a window.
+    const { plan, first } = roofedBox({ ridgeAngle: 90 });
+    first.openings.win = opening('w0', { id: 'win', offset: 120, sill: 40, height: 50 });
+    const m = getLevelMeshes(plan, first.id, 'all');
+    const g = wallGeo(m, 'w0');
+    expect(bbox(g).max[1]).toBeCloseTo(RIDGE, 3);
+    expect(inside(g, [120, 60, 0])).toBe(false); // the window hole
+    expect(inside(g, [120, 95, 0])).toBe(true); // header up to the plate
+    expect(inside(g, [120, RIDGE - 2, 0])).toBe(true);
+    expect(closedEdges(mergeAll(m.walls.map((w) => w.geometry.clone())))).toBe(true);
+    // The east and west walls are now eaves.
+    expect(bbox(wallGeo(m, 'w1')).max[1]).toBe(96);
+  });
+
+  it('a demolished roof does not raise walls in the proposed view, and does in the existing view', () => {
+    const { plan, first } = roofedBox({ phase: 'demo' });
+    const proposed = getLevelMeshes(plan, first.id, 'proposed');
+    expect(proposed.roofs).toHaveLength(0);
+    for (const w of proposed.walls) expect(bbox(w.geometry).max[1]).toBe(96);
+    const existing = getLevelMeshes(plan, first.id, 'existing');
+    expect(existing.roofs).toHaveLength(1);
+    expect(bbox(wallGeo(existing, 'w1')).max[1]).toBeCloseTo(RIDGE, 3);
+  });
+
+  it('roof geometry is cached per roof object; editing the roof rebuilds it and the walls under it', () => {
+    const { plan, first } = roofedBox();
+    const m1 = getLevelMeshes(plan, first.id, 'all');
+    const steeper = produce(plan, (d) => {
+      d.levels[first.id].roofs.roof1.pitch = 12;
+    });
+    const m2 = getLevelMeshes(steeper, first.id, 'all');
+    expect(m2.roofs[0].geometry).not.toBe(m1.roofs[0].geometry);
+    expect(wallGeo(m2, 'w1')).not.toBe(wallGeo(m1, 'w1'));
+    expect(wallGeo(m2, 'w0')).toBe(wallGeo(m1, 'w0'));
+    expect(bbox(wallGeo(m2, 'w1')).max[1]).toBeCloseTo(96 + 246.5 / 2, 3);
+    // Moving a wall far from the roof keeps the roof geometry.
+    const moved = produce(steeper, (d) => {
+      d.levels[first.id].nodes.zz = { id: 'zz', x: 900, y: 900 };
+    });
+    expect(getLevelMeshes(moved, first.id, 'all').roofs[0].geometry).toBe(m2.roofs[0].geometry);
+  });
+});

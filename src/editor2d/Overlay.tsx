@@ -69,6 +69,18 @@ function SnapMarker({ snap, v }: { snap: SnapResult; v: Viewport }) {
         />
       );
       break;
+    case 'face-corner':
+      // A square turned to the corner: an outside (or inside) corner of a wall face.
+      marker = (
+        <g>
+          <rect className="snap-marker" x={p.x - 6} y={p.y - 6} width={12} height={12} />
+          <circle className="snap-marker" cx={p.x} cy={p.y} r={2} />
+        </g>
+      );
+      break;
+    case 'face-edge':
+      marker = <path className="snap-marker" d={`M${p.x - 7} ${p.y + 5}L${p.x} ${p.y - 6}L${p.x + 7} ${p.y + 5}Z`} />;
+      break;
     case 'guide':
       marker = <path className="snap-marker" d={`M${p.x - 5} ${p.y - 5}L${p.x + 5} ${p.y + 5}M${p.x - 5} ${p.y + 5}L${p.x + 5} ${p.y - 5}`} />;
       break;
@@ -307,6 +319,23 @@ function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number
   );
 }
 
+/** Roof tool: the corners clicked so far, the edge to the cursor and the closing edge (dashed). */
+function RoofDraft({ points, cursor, v }: { points: Vec2[]; cursor: Vec2 | null; v: Viewport }) {
+  const sp = points.map((p) => worldToScreen(v, p));
+  const c = cursor ? worldToScreen(v, cursor) : null;
+  const line = c ? [...sp, c] : sp;
+  const closable = points.length >= 3 && !!c && Math.hypot(c.x - sp[0].x, c.y - sp[0].y) <= 10;
+  return (
+    <g className="roof-draft">
+      {line.length >= 2 && <polyline className="roof-draft-line" points={pts(line)} />}
+      {line.length >= 3 && !closable && <line className="roof-draft-close" x1={line[line.length - 1].x} y1={line[line.length - 1].y} x2={sp[0].x} y2={sp[0].y} />}
+      {sp.map((p, i) => (
+        <circle key={i} className={`roof-draft-point${i === 0 ? ' first' : ''}${i === 0 && closable ? ' closable' : ''}`} cx={p.x} cy={p.y} r={i === 0 ? 6 : 4} />
+      ))}
+    </g>
+  );
+}
+
 export const Overlay = memo(function Overlay() {
   const draft = useUiStore((s) => s.draft);
   const v = useUiStore((s) => s.viewport);
@@ -325,6 +354,7 @@ export const Overlay = memo(function Overlay() {
       {draft.wallPreview && <RubberBand preview={draft.wallPreview} v={v} denom={denom} />}
       {draft.openingPreview && <OpeningGhost preview={draft.openingPreview} v={v} denom={denom} />}
       {draft.stairsPreview && <StairsGhost origin={draft.stairsPreview.origin} direction={draft.stairsPreview.direction} v={v} />}
+      {tool === 'roof' && draft.roofPoints.length > 0 && <RoofDraft points={draft.roofPoints} cursor={draft.snap?.point ?? draft.cursor} v={v} />}
       {draft.snap && <SnapMarker snap={draft.snap} v={v} />}
       {box && (
         <rect

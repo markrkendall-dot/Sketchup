@@ -3,7 +3,7 @@ import type { WallGeom } from '../derive/openings';
 import type { Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | 'underlay' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | 'roof' | 'underlay' | OpeningToolName;
 /** Underlay tool modes: drag the image, or calibrate its scale / rotation from two clicked points. */
 export type UnderlayMode = 'move' | 'scale' | 'rotate';
 /** Which views the workspace shows. */
@@ -29,6 +29,8 @@ export type SnapKind =
   | 'wall'
   | 'ghost-node'
   | 'ghost-wall'
+  | 'face-corner'
+  | 'face-edge'
   | 'guide'
   | 'angle'
   | 'grid'
@@ -117,6 +119,8 @@ export interface Draft {
   stairsDirection: number;
   /** Underlay tool, scale / rotate modes: the calibration points clicked so far (world). */
   underlayPoints: Vec2[];
+  /** Roof tool: the outline corners clicked so far (world). */
+  roofPoints: Vec2[];
 }
 
 export interface Selection {
@@ -125,6 +129,7 @@ export interface Selection {
   openings: Id[];
   rooms: Id[];
   stairs: Id[];
+  roofs: Id[];
 }
 
 /** The inline room name editor (RoomNameEditor). */
@@ -302,13 +307,14 @@ export const emptyDraft = (): Draft => ({
   stairsPreview: null,
   stairsDirection: 0,
   underlayPoints: [],
+  roofPoints: [],
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length;
 
 /** Split ratio bounds, so neither view collapses. */
 export const MIN_SPLIT = 0.2;

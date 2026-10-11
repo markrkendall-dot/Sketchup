@@ -405,3 +405,29 @@ export function roomDimensions(netPolygon: readonly Vec2[]): RoomDimensions {
   }
   return { edges, corners, rect };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Slabs
+
+/**
+ * The slab polygons of a level: each outer face (DESIGN.md "Rooms"), pushed out to the exterior
+ * wall faces by half of each edge's wall thickness (the centerline polygon if that fails). Outer
+ * faces of components that sit inside another component (a closet island) are skipped: the
+ * enclosing slab already covers them.
+ */
+export function slabOutlines(faces: Pick<FaceSet, 'outerFaces' | 'outerFaceThickness'>, toWallFaces = true): Vec2[][] {
+  const out: Vec2[][] = [];
+  faces.outerFaces.forEach((poly, k) => {
+    const nested = faces.outerFaces.some((other, j) => j !== k && Math.abs(polygonSignedArea(other)) > Math.abs(polygonSignedArea(poly)) && pointInPolygon(poly[0], other));
+    if (nested) return;
+    const th = faces.outerFaceThickness?.[k];
+    if (!toWallFaces || !th || th.length !== poly.length) {
+      out.push(poly);
+      return;
+    }
+    const grown = insetPolygon(poly, th.map((t) => -t / 2));
+    const ok = polygonSignedArea(grown) > polygonSignedArea(poly) && !selfIntersects(grown);
+    out.push(ok ? grown : poly);
+  });
+  return out;
+}

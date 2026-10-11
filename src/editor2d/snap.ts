@@ -1,5 +1,6 @@
 import { add, cross, dist, dot, midpoint, projectPointToSegment, scale, sub } from '../model/geometry';
 import { isVisible, visibleNodeIds } from '../derive/phase';
+import type { Footprint } from '../derive/footprint';
 import type { Id, Level, Vec2, ViewMode } from '../model/types';
 import type { Guide, SnapResult } from '../store/uiStore';
 
@@ -255,4 +256,108 @@ export function snapPoint(raw: Vec2, ctx: SnapContext): SnapResult {
     };
   }
   return { point: { ...raw }, kind: 'none', guides: [] };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Wall faces (the roof tool): outline corners and outside / inside face lines of the footprints.
+
+/** Corners and long face edges of a level's wall footprints. */
+export interface FaceSnapSources {
+  corners: Vec2[];
+  edges: [Vec2, Vec2][];
+}
+
+const faceSourceCache = new WeakMap<object, WeakMap<object, FaceSnapSources>>();
+
+/**
+ * The fill outline points and long face edges of the given footprints, plus the corners where two
+ * exterior walls' face lines meet just past the end of one of them (cached per walls record and
+ * footprint map).
+ */
+export function faceSnapSources(fps: ReadonlyMap<Id, Pick<Footprint, 'poly' | 'edge'>>, walls?: Level['walls']): FaceSnapSources {
+  const key = walls ?? faceSourceCache;
+  let byFps = faceSourceCache.get(key);
+  if (!byFps) faceSourceCache.set(key, (byFps = new WeakMap()));
+  let hit = byFps.get(fps);
+  if (!hit) {
+    const corners: Vec2[] = [];
+    const seen = new Set<string>();
+    const edges: [Vec2, Vec2][] = [];
+    const exterior: [Vec2, Vec2][] = [];
+    for (const [id, fp] of fps) {
+      for (const p of fp.poly) {
+        const key = `${p.x.toFixed(6)},${p.y.toFixed(6)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        corners.push(p);
+      }
+      const [la, lb, rb, ra] = fp.edge;
+      edges.push([la, lb], [ra, rb]);
+      if (walls?.[id]?.kind === 'exterior') exterior.push([la, lb], [ra, rb]);
+    }
+    // Where two exterior face lines meet just past the end of one of them: the outside corner of a
+    // block whose face runs on past it (a porch wall continuing the house's end wall), which no
+    // single footprint has as a corner.
+    for (let i = 0; i < exterior.length; i++) {
+      for (let j = i + 1; j < exterior.length; j++) {
+        const x = faceLineCorner(exterior[i], exterior[j]);
+        if (!x) continue;
+        const key = `${x.x.toFixed(6)},${x.y.toFixed(6)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        corners.push(x);
+      }
+    }
+    hit = { corners, edges };
+    byFps.set(fps, hit);
+  }
+  return hit;
+}
+
+/** How far past the end of a face its line still makes a corner with another face (inches). */
+const FACE_CORNER_REACH = 12;
+
+/** The crossing of two face lines when it lies on (or within FACE_CORNER_REACH of) both faces. */
+function faceLineCorner([a, b]: [Vec2, Vec2], [c, d]: [Vec2, Vec2]): Vec2 | null {
+  const r = sub(b, a);
+  const s = sub(d, c);
+  const lr = Math.hypot(r.x, r.y);
+  const ls = Math.hypot(s.x, s.y);
+  if (lr < 1e-9 || ls < 1e-9) return null;
+  const denom = cross(r, s);
+  if (Math.abs(denom) < 1e-9 * lr * ls) return null;
+  const t = cross(sub(c, a), s) / denom;
+  const u = cross(sub(c, a), r) / denom;
+  const reachR = FACE_CORNER_REACH / lr;
+  const reachS = FACE_CORNER_REACH / ls;
+  if (t < -reachR || t > 1 + reachR || u < -reachS || u > 1 + reachS) return null;
+  return add(a, scale(r, t));
+}
+
+/** The nearest wall-outline corner within the node radius, as a 'face-corner' snap. */
+export function snapFaceCorner(raw: Vec2, src: FaceSnapSources, k: number): SnapResult | null {
+  let best: Vec2 | null = null;
+  let bestD = SNAP_RADIUS_PX.node / k;
+  for (const c of src.corners) {
+    const d = dist(c, raw);
+    if (d <= bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return best ? { point: { x: best.x, y: best.y }, kind: 'face-corner', guides: [] } : null;
+}
+
+/** The nearest point on a wall face within the wall radius, as a 'face-edge' snap. */
+export function snapFaceEdge(raw: Vec2, src: FaceSnapSources, k: number): SnapResult | null {
+  let best: Vec2 | null = null;
+  let bestD = SNAP_RADIUS_PX.wall / k;
+  for (const [a, b] of src.edges) {
+    const pr = projectPointToSegment(raw, a, b);
+    if (pr.distance <= bestD) {
+      bestD = pr.distance;
+      best = pr.point;
+    }
+  }
+  return best ? { point: best, kind: 'face-edge', guides: [] } : null;
 }

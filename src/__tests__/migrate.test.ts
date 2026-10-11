@@ -49,9 +49,49 @@ const V0_FILE = {
   author: 'someone',
 };
 
+/** A file as saved by the v1 editor (before roofs and the site): it must keep loading. */
+const V1_FILE = {
+  schemaVersion: 1,
+  id: 'v1-plan',
+  name: 'Saved in v1',
+  levelOrder: ['b', 'f'],
+  levels: {
+    b: { id: 'b', name: 'Basement', wallHeight: 96, floorThickness: 4, nodes: {}, walls: {}, openings: {}, rooms: {}, stairs: {} },
+    f: {
+      id: 'f',
+      name: 'First Floor',
+      wallHeight: 96,
+      floorThickness: 12,
+      nodes: { n1: { id: 'n1', x: 0, y: 0 }, n2: { id: 'n2', x: 240, y: 0 } },
+      walls: { w1: { id: 'w1', a: 'n1', b: 'n2', thickness: 6.5, kind: 'exterior', phase: 'existing' } },
+      openings: {},
+      rooms: {},
+      stairs: {},
+    },
+  },
+  baseFloorElevation: -100,
+  settings: { snapGrid: 1, displayGrid: 12, precisionDenominator: 16, defaultExteriorThickness: 6.5, defaultInteriorThickness: 4.5 },
+  modifiedAt: '2026-01-01T00:00:00.000Z',
+};
+
 beforeEach(() => {
   store().setPlan(createEmptyPlan());
   clearHistory();
+});
+
+describe('migrate from schemaVersion 1', () => {
+  it('adds empty roofs to every level and the default site, keeping everything else', () => {
+    const plan = migrate(structuredClone(V1_FILE));
+    expect(plan.schemaVersion).toBe(2);
+    expect(plan.levels.b.roofs).toEqual({});
+    expect(plan.levels.f.roofs).toEqual({});
+    expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {} });
+    expect(plan.levels.f.walls.w1).toEqual(V1_FILE.levels.f.walls.w1);
+    expect(plan.settings).toEqual(V1_FILE.settings);
+    // The upgraded plan round-trips byte for byte from then on.
+    const text = JSON.stringify(plan);
+    expect(JSON.stringify(migrate(JSON.parse(text)))).toBe(text);
+  });
 });
 
 describe('migrate from schemaVersion 0', () => {
@@ -139,11 +179,56 @@ describe('migrate a current file', () => {
     });
     s.updateSettings({ defaultInteriorThickness: 5.5 });
     s.copyWallsFromLevel(lid, store().plan.levelOrder[2]);
-    return store().plan;
+    const top = store().plan.levelOrder[2];
+    s.addRoof(top, {
+      shape: 'gable',
+      outline: [
+        { x: -3.25, y: -3.25 },
+        { x: 243.25, y: -3.25 },
+        { x: 243.25, y: 183.25 },
+        { x: -3.25, y: 183.25 },
+      ],
+      ridgeAngle: 0,
+      pitch: 8,
+      overhang: 24,
+      bearingOffset: 0,
+      thickness: 8,
+      fascia: 6,
+      phase: 'existing',
+      finish: 'metal',
+    });
+    s.addRoof(lid, {
+      shape: 'shed',
+      outline: [
+        { x: 0, y: -100 },
+        { x: 96, y: -100 },
+        { x: 96, y: -3.25 },
+        { x: 0, y: -3.25 },
+      ],
+      ridgeAngle: 270,
+      pitch: 3,
+      overhang: 12,
+      bearingOffset: -2,
+      thickness: 6,
+      fascia: 4,
+      phase: 'new',
+      finish: 'shingle',
+    });
+    // The site (M9 edits it; the file already carries it).
+    const plan = structuredClone(store().plan);
+    plan.site = {
+      northAngle: 12.5,
+      gradePoints: { g1: { id: 'g1', at: { x: 0, y: 0 }, elevation: -12 } },
+      columns: { c1: { id: 'c1', at: { x: 120, y: -6 }, width: 24, depth: 40, rotation: 0, base: -100, top: 400, kind: 'chimney', phase: 'existing' } },
+    };
+    return plan;
   }
 
-  it('is byte-identical after JSON.stringify', () => {
-    const text = JSON.stringify(richPlan(), null, 2);
+  it('is byte-identical after JSON.stringify (a v2 file with roofs and site data)', () => {
+    const plan = richPlan();
+    expect(plan.schemaVersion).toBe(2);
+    expect(Object.values(plan.levels).reduce((n, l) => n + Object.keys(l.roofs).length, 0)).toBe(2);
+    const text = JSON.stringify(plan, null, 2);
     expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
   });
 
@@ -167,10 +252,13 @@ describe('migrate a current file', () => {
     plan.extra = 1;
     plan.settings.extra = 1;
     plan.levels[lid].extra = 1;
-    for (const k of ['nodes', 'walls', 'openings', 'rooms', 'stairs']) {
+    for (const k of ['nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs']) {
       for (const e of Object.values(plan.levels[lid][k]) as Record<string, unknown>[]) e.extra = 1;
     }
     plan.levels[lid].underlay.extra = 1;
+    plan.site.extra = 1;
+    plan.site.gradePoints.g1.extra = 1;
+    plan.site.columns.c1.extra = 1;
     const text = JSON.stringify(migrate(plan));
     expect(text).not.toContain('"extra"');
     expect(text).toBe(clean);

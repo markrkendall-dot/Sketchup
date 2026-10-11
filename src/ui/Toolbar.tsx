@@ -18,10 +18,12 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
   { name: 'window', label: 'Window', key: 'N' },
   { name: 'passage', label: 'Passage', short: 'Opening', key: 'P' },
   { name: 'stairs', label: 'Stairs', key: 'T' },
+  { name: 'roof', label: 'Roof', key: 'K' },
   { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
 ];
 
 const TOOL_TITLE: Partial<Record<ToolName, string>> = {
+  roof: 'Roof (K): click the outline corners on the outside wall faces, close on the first corner or Enter',
   underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
 };
 

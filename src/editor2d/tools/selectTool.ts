@@ -1,14 +1,16 @@
 import { getFootprints } from '../../derive/footprint';
+import { roofOutlineWithOverhang } from '../../derive/roofs';
 import { hitOpening } from '../../derive/openings';
 import { hitStairs } from '../../derive/stairs';
 import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase';
-import { add, dist, dot, projectPointToSegment, sub } from '../../model/geometry';
+import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../../model/geometry';
 import type { Id, Level, Vec2, ViewMode } from '../../model/types';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection } from '../../store/uiStore';
 import { hitRoomLabel } from '../roomLabels';
 import { SNAP_RADIUS_PX } from '../snap';
 import type { Tool, ToolContext } from './index';
+import { roofSnap } from './roofTool';
 import { endRoomDrag, moveRoomDrag, startRename, startRoomDrag, type RoomDrag } from './roomTool';
 import { confirmRemoveUnderlay, endUnderlayDrag, moveUnderlayDrag, nudgeUnderlay, startUnderlayDrag } from './underlayTool';
 
@@ -24,13 +26,36 @@ export type Hit =
   | { kind: 'wall'; id: Id }
   | { kind: 'room'; id: Id }
   | { kind: 'stairs'; id: Id }
+  | { kind: 'roof'; id: Id }
   | null;
 
-const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs' } as const;
+const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', roof: 'roofs' } as const;
+
+/** Pick radius of a selected roof's outline corner handles, in screen px. */
+const ROOF_HANDLE_PX = 8;
+
+/** The outline corner of one of the selected roofs under p (handles win over everything else). */
+export function hitRoofHandle(level: Level, roofIds: readonly Id[], p: Vec2, k: number): { id: Id; index: number } | null {
+  let best: { id: Id; index: number } | null = null;
+  let bestD = ROOF_HANDLE_PX / k;
+  for (const id of roofIds) {
+    const roof = level.roofs[id];
+    if (!roof) continue;
+    roof.outline.forEach((q, index) => {
+      const d = dist(q, p);
+      if (d <= bestD) {
+        bestD = d;
+        best = { id, index };
+      }
+    });
+  }
+  return best;
+}
 
 /**
- * Priority: nodes within 10px, then opening symbols, then walls, then room labels, then stairs.
- * Elements hidden in `viewMode` are never hit.
+ * Priority: nodes within 10px, then opening symbols, then walls, then room labels, then stairs, then
+ * roofs (inside the outline grown by the overhang; the most recently added on top). Elements
+ * hidden in `viewMode` are never hit.
  */
 export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all'): Hit {
   let best: Hit = null;
@@ -72,7 +97,11 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   // Topmost (last drawn) stairs first.
   const stairs = Object.values(level.stairs).reverse();
   const st = stairs.find((s) => isVisible(s.phase, viewMode) && hitStairs(s, p, 2 / k));
-  return st ? { kind: 'stairs', id: st.id } : null;
+  if (st) return { kind: 'stairs', id: st.id };
+  const roof = Object.values(level.roofs ?? {})
+    .reverse()
+    .find((r) => isVisible(r.phase, viewMode) && pointInPolygon(p, roofOutlineWithOverhang(r)));
+  return roof ? { kind: 'roof', id: roof.id } : null;
 }
 
 type DragState =
@@ -95,6 +124,8 @@ type DragState =
     }
   | ({ kind: 'room' } & RoomDrag)
   | { kind: 'stairs'; id: Id; grab: Vec2; origin: Vec2; startScreen: Vec2; started: boolean }
+  /** An outline corner of a selected roof. */
+  | { kind: 'roof-vertex'; id: Id; index: number; startScreen: Vec2; started: boolean }
   | { kind: 'box'; a: Vec2; additive: boolean }
   /** Moving the image underlay (state kept by underlayTool.ts). */
   | { kind: 'underlay' };
@@ -128,8 +159,9 @@ function pruneSelection(ctx: ToolContext): void {
   const openings = sel.openings.filter((id) => level.openings[id]);
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
   const stairs = sel.stairs.filter((id) => level.stairs[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ nodes, walls, openings, rooms, stairs });
+  const roofs = sel.roofs.filter((id) => level.roofs[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ nodes, walls, openings, rooms, stairs, roofs });
   }
 }
 
@@ -139,7 +171,7 @@ function finishDrag(ctx: ToolContext): void {
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
     resumeHistory();
     pruneSelection(ctx);
-  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs') && drag.started) {
+  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs' || drag?.kind === 'roof-vertex') && drag.started) {
     resumeHistory();
   } else if (drag?.kind === 'room') {
     endRoomDrag(drag);
@@ -166,8 +198,14 @@ export const selectTool: Tool = {
     if (e.button !== 0) return;
     const ui = ctx.ui();
     const level = ctx.level();
-    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode);
     const sel = ui.selection;
+    // A selected roof's corner handle: drag it (snapping like the roof tool).
+    const handle = e.shiftKey ? null : hitRoofHandle(level, sel.roofs, e.world, ui.viewport.k);
+    if (handle) {
+      drag = { kind: 'roof-vertex', id: handle.id, index: handle.index, startScreen: e.screen, started: false };
+      return;
+    }
+    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode);
 
     if (!hit) {
       // An unlocked underlay under the cursor is selected and dragged; Shift still box-selects.
@@ -190,6 +228,10 @@ export const selectTool: Tool = {
     if (hit.kind === 'room') {
       const rd = startRoomDrag(ctx, hit.id, e);
       drag = rd ? { kind: 'room', ...rd } : null;
+      return;
+    }
+    if (hit.kind === 'roof') {
+      drag = null;
       return;
     }
     if (hit.kind === 'stairs') {
@@ -257,6 +299,26 @@ export const selectTool: Tool = {
       ui.patchDraft({ cursor: e.world, snap: null });
       ctx.actions.updateStairs(ctx.levelId, drag.id, { origin: add(drag.origin, { x: round(d.x), y: round(d.y) }) });
       if (!drag.started) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
+
+    if (drag.kind === 'roof-vertex') {
+      const roof = ctx.level().roofs[drag.id];
+      if (!roof) return;
+      const n = roof.outline.length;
+      // Ortho from the previous corner, like drawing it.
+      const snap = roofSnap(ctx, e.world, e.shiftKey, roof.outline[(drag.index + n - 1) % n]);
+      ui.patchDraft({ cursor: e.world, snap });
+      const index = drag.index;
+      const outline = roof.outline.map((p, i) => (i === index ? snap.point : p));
+      const before = ctx.plan();
+      ctx.actions.updateRoof(ctx.levelId, drag.id, { outline });
+      // The first step that changes the roof is the tracked one (the corner snap can hold the
+      // first few moves in place; pausing before a change would leave the drag out of the history).
+      if (!drag.started && ctx.plan() !== before) {
         drag.started = true;
         pauseHistory();
       }
