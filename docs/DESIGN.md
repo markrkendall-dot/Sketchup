@@ -189,8 +189,14 @@ heights, split points) are unchanged, and disposes geometry that drops out of th
 ## 2D editor
 
 One `<svg>` with a single `<g transform="translate(tx ty) scale(k)">`. Transient state (cursor, snap,
-rubber band, length buffer, drag preview) lives in `uiStore.draft` and only `Overlay.tsx` subscribes.
-Entity components are `React.memo` and select their entity by id. `vector-effect="non-scaling-stroke"`.
+rubber band, length buffer, drag preview) lives in `uiStore.draft` and only `Overlay.tsx` subscribes
+(plus the status bar's small readouts, each selecting one value). The overlay `<g>` has
+`will-change: transform`, its own compositing layer, so a pointer move re-rasters only the overlay.
+Entity components are `React.memo` and select their entity by id; layers select their id lists with
+`useShallow`, so a drag step re-renders only the entities it changed (room fills and labels select
+per face id). The merged wall paths depend on the walls, footprints and openings only, never on
+hover or selection: `WallHighlightLayer` redraws just the hovered and selected walls on top (fills
+between the merged fills and outlines, selected outlines last). `vector-effect="non-scaling-stroke"`.
 Text that must stay constant on screen uses `scale(1/k)` from one `useViewport()` subscription.
 Native `addEventListener('wheel', h, {passive:false})` via ref; `setPointerCapture` on pointerdown;
 `touch-action: none; user-select: none`. Screen->world = `((clientX - rect.left) - tx) / k`, from our

@@ -64,9 +64,37 @@ function underlayHint(hasImage: boolean, locked: boolean, mode: UnderlayMode, po
   return 'Drag the image to move it; arrow keys nudge 1" (Shift: 1\'). Use Scale by two points in the panel, then lock it and trace with W.';
 }
 
+// The parts that change on every pointer move (cursor, snap, rubber band length) are their own
+// small components, each selecting only its value, so a mouse move re-renders those and the
+// overlay, not the whole bar.
+
+/** Cursor position readout (the snapped point while snapping). */
+function CursorCoords({ denom }: { denom: number }) {
+  const p = useUiStore((s) => s.draft.snap?.point ?? s.draft.cursor);
+  return (
+    <span className="coords" title="Cursor position">
+      {p ? `x ${formatLength(p.x, denom)}  y ${formatLength(p.y, denom)}` : ' '}
+    </span>
+  );
+}
+
+function SnapKindLabel() {
+  const kind = useUiStore((s) => s.draft.snap?.kind);
+  return kind ? <span className="snap">Snap: {SNAP_LABEL[kind]}</span> : null;
+}
+
+function PreviewLength({ denom }: { denom: number }) {
+  const length = useUiStore((s) => s.draft.wallPreview?.length);
+  return length !== undefined ? <span>Length: {formatLength(length, denom)}</span> : null;
+}
+
 export function StatusBar() {
   const tool = useUiStore((s) => s.activeTool);
-  const draft = useUiStore((s) => s.draft);
+  const lengthBuffer = useUiStore((s) => s.draft.lengthBuffer);
+  const error = useUiStore((s) => s.draft.error);
+  const message = useUiStore((s) => s.draft.message);
+  const drawing = useUiStore((s) => s.draft.wallStart !== null || s.draft.lengthBuffer !== '');
+  const underlayPoints = useUiStore((s) => s.draft.underlayPoints.length);
   const kind = useUiStore((s) => s.nextWallKind);
   const levelId = useUiStore((s) => s.activeLevelId);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
@@ -96,25 +124,21 @@ export function StatusBar() {
   const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
   const underlayMode = useUiStore((s) => s.underlayMode);
   const notice = useUiStore((s) => s.notice);
-  const p = draft.snap?.point ?? draft.cursor;
-  const drawing = draft.wallStart !== null || draft.lengthBuffer !== '';
 
   return (
     <footer className="statusbar">
-      <span className="coords" title="Cursor position">
-        {p ? `x ${formatLength(p.x, denom)}  y ${formatLength(p.y, denom)}` : ' '}
-      </span>
-      {draft.snap && <span className="snap">Snap: {SNAP_LABEL[draft.snap.kind]}</span>}
-      {draft.wallPreview && <span>Length: {formatLength(draft.wallPreview.length, denom)}</span>}
-      {draft.lengthBuffer && (
-        <span className={draft.error ? 'buffer error' : 'buffer'}>
-          Typed: <code>{draft.lengthBuffer}</code>
+      <CursorCoords denom={denom} />
+      <SnapKindLabel />
+      <PreviewLength denom={denom} />
+      {lengthBuffer && (
+        <span className={error ? 'buffer error' : 'buffer'}>
+          Typed: <code>{lengthBuffer}</code>
         </span>
       )}
-      <span className={draft.error ? 'hint error' : 'hint'}>
-        {draft.message ??
+      <span className={error ? 'hint error' : 'hint'}>
+        {message ??
           (tool === 'underlay'
-            ? underlayHint(hasUnderlay, underlayLocked, underlayMode, draft.underlayPoints.length)
+            ? underlayHint(hasUnderlay, underlayLocked, underlayMode, underlayPoints)
             : drawing
               ? HINTS[tool].busy
               : HINTS[tool].idle)}

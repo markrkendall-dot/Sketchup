@@ -374,6 +374,15 @@ kbd {
 
 /* Overlay ------------------------------------------------------------------------------------ */
 
+/* The overlay (snap marker, rubber band, ghosts) changes on every pointer move. Its own compositing
+   layer keeps those changes from invalidating the plan layer, which would otherwise be re-rastered
+   under the marker on each move (slow for a big plan, especially with MSAA in software GL). The
+   overlay is drawn in screen space with no transform, so the layer never needs re-rastering at
+   another scale. */
+.overlay {
+  will-change: transform;
+}
+
 .snap-marker {
   fill: none;
   stroke: #ea580c;
