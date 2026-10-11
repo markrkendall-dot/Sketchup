@@ -59,6 +59,30 @@ describe('parseLength: synonyms, spacing, case, sign', () => {
   });
 });
 
+describe('parseLength: feet and inches without unit marks', () => {
+  const cases: [string, number][] = [
+    ['12 6', 150],
+    ['12  6', 150],
+    ['0 6', 6],
+    ['12 0', 144],
+    ['12 11', 155],
+    ['12 6 1/2', 150.5],
+    ['-12 6', -150],
+    ['150 1/2', 150.5],
+    ['12f', 144],
+    ['12f 6i', 150],
+    ['12 f 6 i', 150],
+    ['6i', 6],
+  ];
+  it.each(cases)('%s -> %d', (input, expected) => {
+    expect(parseLength(input)).toBe(expected);
+  });
+
+  it('says why 12 13 is rejected', () => {
+    expect(() => parseLength('12 13')).toThrow(/under 12/);
+  });
+});
+
 describe('parseLength: errors', () => {
   const bad = [
     '',
@@ -70,7 +94,6 @@ describe('parseLength: errors', () => {
     '-',
     '--5',
     'abc',
-    '12 6',
     "12'-",
     '1/2/3',
     '6 1/2 1/4',
@@ -78,6 +101,18 @@ describe('parseLength: errors', () => {
     '1.5.5',
     '6 1.5/2',
     '12x',
+    '1e3',
+    '1E3',
+    '12,5',
+    '1,000',
+    '12 13',
+    '12 12',
+    '12 6.5',
+    '12.5 6',
+    '3 4 5',
+    '12 6 1/2 1/4',
+    '12 x',
+    '5m',
     '1/',
     '/2',
     '12--6',

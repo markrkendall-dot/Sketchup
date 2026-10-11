@@ -7,7 +7,7 @@ import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planSto
 import { useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
 import { visible3dLevels } from '../view3d/visibility';
 import { choosePlanFile, newPlan, savePlan, zoomToFit } from './fileActions';
-import { releaseFocus } from './focus';
+import { focusCanvas, releaseFocus } from './focus';
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
@@ -136,6 +136,12 @@ function PlanName() {
   );
 }
 
+/** Run a toolbar button's action, then give the keyboard back to the plan. */
+const afterAction = (fn: () => void): void => {
+  fn();
+  focusCanvas();
+};
+
 /** Blur a select after a choice so the plan's hotkeys work again straight away. */
 const blurAfter = (e: ChangeEvent<HTMLSelectElement>) => e.currentTarget.blur();
 
@@ -143,15 +149,16 @@ export function Toolbar() {
   const activeTool = useUiStore((s) => s.activeTool);
   const showGrid = useUiStore((s) => s.showGrid);
   const toggleGrid = useUiStore((s) => s.toggleGrid);
-  const orthoLock = usePlanStore((s) => s.plan.settings.orthoLock);
-  const measureTo = usePlanStore((s) => s.plan.settings.measureTo);
+  const orthoLock = useUiStore((s) => s.orthoLock);
+  const measureTo = useUiStore((s) => s.measureTo);
+  const setOrthoLock = useUiStore((s) => s.setOrthoLock);
+  const setMeasureTo = useUiStore((s) => s.setMeasureTo);
   const viewMode = useUiStore((s) => s.viewMode);
   const drawPhase = useUiStore((s) => s.drawPhase);
   const setDrawPhase = useUiStore((s) => s.setDrawPhase);
   const layout = useUiStore((s) => s.layout);
   const setLayout = useUiStore((s) => s.setLayout);
   const helpOpen = useUiStore((s) => s.helpOpen);
-  const updateSettings = usePlanStore((s) => s.updateSettings);
   const { canUndo, canRedo } = useTemporal();
 
   return (
@@ -166,7 +173,10 @@ export function Toolbar() {
               className={viewMode === m ? `active view-${m}` : `view-${m}`}
               aria-pressed={viewMode === m}
               title="View mode (V cycles): Existing shows existing + demolished, Proposed shows existing + new, All shows everything"
-              onClick={() => setViewMode(m)}
+              onClick={() => {
+                setViewMode(m);
+                focusCanvas();
+              }}
             >
               {VIEW_MODE_LABEL[m]}
             </button>
@@ -179,7 +189,10 @@ export function Toolbar() {
               className={layout === b.layout ? 'active' : ''}
               aria-pressed={layout === b.layout}
               title="Layout: 2D plan, plan and 3D side by side, or 3D model (` cycles)"
-              onClick={() => setLayout(b.layout)}
+              onClick={() => {
+                setLayout(b.layout);
+                focusCanvas();
+              }}
             >
               {b.label}
             </button>
@@ -187,21 +200,35 @@ export function Toolbar() {
         </div>
         <div className="spacer" />
         <div className="group" role="group" aria-label="History">
-          <button disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)">
+          <button
+            disabled={!canUndo}
+            onClick={() => {
+              undo();
+              focusCanvas();
+            }}
+            title="Undo (Ctrl+Z)"
+          >
             Undo
           </button>
-          <button disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)">
+          <button
+            disabled={!canRedo}
+            onClick={() => {
+              redo();
+              focusCanvas();
+            }}
+            title="Redo (Ctrl+Shift+Z)"
+          >
             Redo
           </button>
         </div>
         <div className="group" role="group" aria-label="File">
-          <button onClick={newPlan} title="Start a new, empty plan">
+          <button onClick={() => afterAction(newPlan)} title="Start a new, empty plan">
             New
           </button>
-          <button onClick={choosePlanFile} title="Open a plan file (Ctrl+O); replaces this plan">
+          <button onClick={() => afterAction(choosePlanFile)} title="Open a plan file (Ctrl+O); replaces this plan">
             Open
           </button>
-          <button onClick={savePlan} title="Download the plan as a JSON file (Ctrl+S)">
+          <button onClick={() => afterAction(savePlan)} title="Download the plan as a JSON file (Ctrl+S)">
             Save
           </button>
         </div>
@@ -211,7 +238,10 @@ export function Toolbar() {
           aria-pressed={helpOpen}
           title="Keyboard shortcuts (?)"
           aria-label="Keyboard shortcuts"
-          onClick={() => useUiStore.getState().setHelpOpen(!helpOpen)}
+          onClick={() => {
+            useUiStore.getState().setHelpOpen(!helpOpen);
+            focusCanvas();
+          }}
         >
           ?
         </button>
@@ -224,7 +254,11 @@ export function Toolbar() {
               className={activeTool === t.name ? 'active' : ''}
               aria-pressed={activeTool === t.name}
               title={TOOL_TITLE[t.name] ?? `${t.label} (${t.key})`}
-              onClick={() => (t.name === 'underlay' ? activateUnderlayTool() : switchTool(t.name))}
+              onClick={() => {
+                if (t.name === 'underlay') activateUnderlayTool();
+                else switchTool(t.name);
+                focusCanvas();
+              }}
             >
               {t.label} <kbd>{t.key}</kbd>
             </button>
@@ -251,7 +285,7 @@ export function Toolbar() {
             aria-label="Typed wall lengths measure to"
             value={measureTo}
             onChange={(e) => {
-              updateSettings({ measureTo: e.target.value as MeasureTo });
+              setMeasureTo(e.target.value as MeasureTo);
               blurAfter(e);
             }}
           >
@@ -262,18 +296,23 @@ export function Toolbar() {
         </label>
         <div className="spacer" />
         <div className="group" role="group" aria-label="Plan view">
-          <button className={showGrid ? 'active' : ''} aria-pressed={showGrid} onClick={toggleGrid} title="Grid (G)">
+          <button
+            className={showGrid ? 'active' : ''}
+            aria-pressed={showGrid}
+            onClick={() => afterAction(toggleGrid)}
+            title="Grid (G)"
+          >
             Grid
           </button>
           <button
             className={orthoLock ? 'active' : ''}
             aria-pressed={orthoLock}
-            onClick={() => updateSettings({ orthoLock: !orthoLock })}
+            onClick={() => afterAction(() => setOrthoLock(!orthoLock))}
             title="Ortho lock (O); hold Shift to invert"
           >
             Ortho {orthoLock ? 'on' : 'off'}
           </button>
-          <button onClick={zoomToFit} title="Zoom the plan to fit (Z)">
+          <button onClick={() => afterAction(zoomToFit)} title="Zoom the plan to fit (Z)">
             Fit
           </button>
         </div>

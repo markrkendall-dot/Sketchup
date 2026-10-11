@@ -7,6 +7,10 @@ import type { Degrees, Id, Plan, Stairs, Vec2 } from '../model/types';
 // The flight climbs from this level's floor top to the next level's floor top.
 
 export const STAIRS_DEFAULTS = { width: 36, run: 120 } as const;
+/** Sizes the store accepts: width 24" to 96", run 3' to 30'. */
+export const STAIRS_LIMITS = { minWidth: 24, maxWidth: 96, minRun: 36, maxRun: 360 } as const;
+export const stairsWidthOk = (w: number): boolean => w >= STAIRS_LIMITS.minWidth && w <= STAIRS_LIMITS.maxWidth;
+export const stairsRunOk = (r: number): boolean => r >= STAIRS_LIMITS.minRun && r <= STAIRS_LIMITS.maxRun;
 /** Riser height the step count aims for. */
 export const TARGET_RISE = 7.5;
 

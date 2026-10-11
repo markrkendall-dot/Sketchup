@@ -3,10 +3,17 @@ import { add, cross, dist, length, normalize, scale, sub } from '../../model/geo
 import { MERGE_EPS } from '../../model/plan';
 import type { Id, MeasureTo, PlanSettings, Vec2, WallKind } from '../../model/types';
 import { tryParseLength } from '../../model/units';
-import type { Draft, WallPreview, WallStart } from '../../store/uiStore';
+import { onHistoryStep } from '../../store/planStore';
+import { useUiStore, type Draft, type WallPreview, type WallStart } from '../../store/uiStore';
 import { SNAP_RADIUS_PX } from '../snap';
-import type { Tool, ToolContext, ToolPointerEvent } from './index';
+import { makeToolContext, type Tool, type ToolContext, type ToolPointerEvent } from './index';
 import { applyBufferKey } from './lengthBuffer';
+
+/** What a typed length of zero or less gets, here and in the panel's size fields. */
+export const MUST_BE_POSITIVE = 'Must be greater than 0.';
+
+/** Shown when undo takes away the wall a chain was drawn from. */
+export const UNDID_CHAIN_MESSAGE = 'Undid the last wall. Click to start again.';
 
 export function thicknessFor(kind: WallKind, settings: PlanSettings): number {
   return kind === 'exterior' ? settings.defaultExteriorThickness : settings.defaultInteriorThickness;
@@ -70,7 +77,7 @@ function typedToCenterline(ctx: ToolContext, d: Draft, typed: number): number {
   const { settings } = ctx.plan();
   const thickness = thicknessFor(ctx.ui().nextWallKind, settings);
   const join = startJoin(ctx, d);
-  return adjustTypedLength(typed, settings.measureTo, thickness, d.direction, join.dir, join.thickness);
+  return adjustTypedLength(typed, ctx.ui().measureTo, thickness, d.direction, join.dir, join.thickness);
 }
 
 function startRef(ctx: ToolContext, start: WallStart): Vec2 | Id {
@@ -84,7 +91,7 @@ function computePreview(ctx: ToolContext, d: Draft): WallPreview | null {
   const thickness = thicknessFor(ctx.ui().nextWallKind, settings);
   if (d.lengthBuffer) {
     const typed = tryParseLength(d.lengthBuffer);
-    if (typed === null || typed === 0) return null;
+    if (typed === null || typed <= 0) return null;
     const len = typedToCenterline(ctx, d, typed);
     return { a: start.point, b: add(start.point, scale(d.direction, len)), thickness, length: Math.abs(len), typed: true };
   }
@@ -112,7 +119,28 @@ function endChain(ctx: ToolContext, message: string | null = null): void {
   });
 }
 
+/**
+ * End the chain when the node it continues from is gone (undo removed the wall that made it).
+ * Returns true when it did.
+ */
+function endChainIfStartGone(ctx: ToolContext): boolean {
+  const start = ctx.ui().draft.wallStart;
+  if (!start?.nodeId || ctx.level().nodes[start.nodeId]) return false;
+  endChain(ctx, UNDID_CHAIN_MESSAGE);
+  return true;
+}
+
+/** Undo / redo run while the wall tool is mid-chain: do not leave a rubber band anchored to nothing. */
+export function checkChainAfterHistory(): void {
+  if (useUiStore.getState().activeTool !== 'wall') return;
+  const ctx = makeToolContext();
+  if (ctx) endChainIfStartGone(ctx);
+}
+
+onHistoryStep(checkChainAfterHistory);
+
 function updateCursor(e: ToolPointerEvent, ctx: ToolContext): void {
+  endChainIfStartGone(ctx);
   const d = ctx.ui().draft;
   const start = d.wallStart;
   const snap = ctx.snap(e.world, { from: start?.point ?? null, shift: e.shiftKey });
@@ -166,8 +194,12 @@ function commitTyped(ctx: ToolContext): void {
   const start = d.wallStart;
   if (!start) return;
   const typed = tryParseLength(d.lengthBuffer);
+  if (typed !== null && typed <= 0) {
+    patch(ctx, { error: true, message: MUST_BE_POSITIVE });
+    return;
+  }
   const len = typed === null ? 0 : typedToCenterline(ctx, d, typed);
-  if (typed === null || Math.abs(len) < MERGE_EPS || Math.sign(len) !== Math.sign(typed)) {
+  if (typed === null || len < MERGE_EPS) {
     patch(ctx, { error: true, message: `Can't read "${d.lengthBuffer}" as a length.` });
     return;
   }
@@ -227,6 +259,7 @@ export const wallTool: Tool = {
 
   onKeyDown(e, ctx) {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    endChainIfStartGone(ctx);
     const d = ctx.ui().draft;
     const drawing = d.wallStart !== null;
     const key = e.key;

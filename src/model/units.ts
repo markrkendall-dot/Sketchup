@@ -8,11 +8,14 @@
 //
 // Bare number = inches. A dash between two plain numbers is the architectural feet-inch
 // separator (`12-6` = 12'-6"), while a dash before a fraction joins whole and fractional
-// inches (`6-1/2"`). A leading `-` negates. Never rounds on parse.
+// inches (`6-1/2"`). Two whole numbers separated by a space with no unit marks are feet then
+// inches (`12 6` = 12'-6", `12 6 1/2` = 12'-6 1/2") when the second is under 12. A leading `-`
+// negates (the caller decides whether a negative is acceptable). The only letters allowed are
+// the unit tokens `ft`, `in`, `f` and `i`; anything else, including a comma, is an error.
+// Never rounds on parse.
 
-type Token =
-  | { t: 'num'; v: number; int: boolean; spaceBefore: boolean }
-  | { t: 'ft' | 'in' | 'slash' | 'dash' };
+type NumToken = { t: 'num'; v: number; int: boolean; spaceBefore: boolean };
+type Token = NumToken | { t: 'ft' | 'in' | 'slash' | 'dash' };
 
 const INVALID = 'Not a length';
 
@@ -43,6 +46,12 @@ function tokenize(input: string): Token[] {
     } else if (s.startsWith('in', i)) {
       out.push({ t: 'in' });
       i += 2;
+    } else if (c === 'f') {
+      out.push({ t: 'ft' });
+      i++;
+    } else if (c === 'i') {
+      out.push({ t: 'in' });
+      i++;
     } else if (c === "'") {
       out.push({ t: 'ft' });
       i++;
@@ -152,6 +161,14 @@ export function parseLength(input: string): number {
   } else if (first?.t === 'num' && p.is('dash', 1) && p.isNum(2) && !p.atFraction(2)) {
     // Architectural `12-6`: dash between two plain numbers separates feet and inches.
     p.next();
+    p.next();
+    const inches = p.inches();
+    if (inches === null) throw new Error(INVALID);
+    total = first.v * 12 + inches;
+  } else if (first?.t === 'num' && first.int && p.isNum(1) && !p.atFraction(1) && (p.peek(1) as NumToken).spaceBefore) {
+    // `12 6` and `12 6 1/2`: whole feet then whole inches, no unit marks.
+    const second = p.peek(1) as NumToken;
+    if (!second.int || second.v >= 12) throw new Error(`${INVALID}: inches after feet must be a whole number under 12`);
     p.next();
     const inches = p.inches();
     if (inches === null) throw new Error(INVALID);

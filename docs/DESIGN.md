@@ -82,9 +82,10 @@ export interface PlanSettings {
   displayGrid: Inches;       // 12
   precisionDenominator: 1 | 2 | 4 | 8 | 16;
   defaultExteriorThickness: Inches; defaultInteriorThickness: Inches;
-  orthoLock: boolean;
-  measureTo: 'center' | 'inside' | 'outside';   // what a typed wall length refers to
 }
+// Ortho lock and "Lengths to" (center | inside | outside, what a typed wall length refers to) are
+// editor preferences, not plan data: they live in uiStore, persist in localStorage and never enter
+// undo. migrate() ignores them in older files.
 
 export interface Plan {
   schemaVersion: 1; id: Id; name: string;
@@ -216,7 +217,7 @@ right-click.
    status bar; the rubber band previews the typed length along the current direction. Backspace edits,
    Esc clears the buffer (second Esc cancels drawing).
 4. Enter or Tab: parse; on failure flash red and keep the buffer. On success end = start + dir*len,
-   adjusted for `settings.measureTo` (inside/outside face: add or subtract half the thickness of the
+   adjusted for the `measureTo` preference (inside/outside face: add or subtract half the thickness of the
    walls at each end along the direction so the typed number is the face-to-face distance; v1 may
    approximate with the new wall's own thickness). If end is within node-snap radius of an existing
    node, use that node and tell the user in the status bar. One `addWall` set. New end node becomes

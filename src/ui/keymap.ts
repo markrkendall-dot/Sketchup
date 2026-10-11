@@ -2,7 +2,7 @@
 // (HelpOverlay.tsx) lists, so the two cannot drift apart. Rows without `combos` are keys the active
 // tool or the 3D walk view handles itself; they are here so the help lists them.
 import { activateUnderlayTool, cycleViewMode, switchLevelByIndex, switchTool } from '../editor2d/tools';
-import { redo, undo, usePlanStore } from '../store/planStore';
+import { redo, undo } from '../store/planStore';
 import { LAYOUTS, useUiStore, type ToolName } from '../store/uiStore';
 import { choosePlanFile, savePlan, zoomToFit } from './fileActions';
 
@@ -99,8 +99,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     group: 'View',
     combos: ['o'],
     run: () => {
-      const { plan, updateSettings } = usePlanStore.getState();
-      updateSettings({ orthoLock: !plan.settings.orthoLock });
+      const ui = useUiStore.getState();
+      ui.setOrthoLock(!ui.orthoLock);
     },
   },
   { keys: 'G', label: 'Grid on or off', group: 'View', combos: ['g'], run: () => useUiStore.getState().toggleGrid() },

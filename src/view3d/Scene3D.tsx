@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { getLevelElevations } from '../derive/levels';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
+import { focusCanvas } from '../ui/focus';
 import { Controls } from './Controls';
 import { LevelMeshes } from './LevelMeshes';
 import { visible3dLevels } from './visibility';
@@ -115,13 +116,21 @@ function View3dToolbar() {
         Only active level and below
       </label>
       <span className="sep" />
-      <button onClick={requestFit3d} disabled={walking} title="Frame the visible levels in the 3D view">
+      <button
+        onClick={() => {
+          requestFit3d();
+          focusCanvas();
+        }}
+        disabled={walking} title="Frame the visible levels in the 3D view">
         Fit 3D
       </button>
       <button
         className={walking ? 'active' : ''}
         aria-pressed={walking}
-        onClick={() => setCameraMode(walking ? 'orbit' : 'walk')}
+        onClick={() => {
+          setCameraMode(walking ? 'orbit' : 'walk');
+          focusCanvas();
+        }}
         title="Walk through the model in first person (F); Esc returns to orbit"
       >
         Walk <kbd>F</kbd>

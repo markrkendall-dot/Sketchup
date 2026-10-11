@@ -109,6 +109,32 @@ describe('stairs store actions', () => {
     expect(store().plan).toBe(plan);
   });
 
+  it('holds width to 24"-96" and run to 3\'-30\'', () => {
+    for (const bad of [{ width: 23 }, { width: 97 }, { width: 500 }, { run: 35 }, { run: 361 }, { run: 600 }]) {
+      expect(store().addStairs(levelId(), flight(bad))).toBeNull();
+    }
+    expect(Object.keys(level().stairs)).toHaveLength(0);
+    const lo = store().addStairs(levelId(), flight({ width: 24, run: 36 }));
+    const hi = store().addStairs(levelId(), flight({ width: 96, run: 360, origin: { x: 500, y: 0 } }));
+    expect(lo && hi).toBeTruthy();
+    const plan = store().plan;
+    for (const bad of [{ width: 500 }, { width: 10 }, { run: 600 }, { run: 12 }]) {
+      store().updateStairs(levelId(), lo!, bad);
+      expect(store().plan).toBe(plan);
+    }
+    store().updateStairs(levelId(), lo!, { width: 48, run: 200 });
+    expect(level().stairs[lo!]).toMatchObject({ width: 48, run: 200 });
+  });
+
+  it('an older flight outside the limits can still change phase', () => {
+    const id = store().addStairs(levelId(), flight())!;
+    usePlanStore.setState((s) => {
+      s.plan.levels[levelId()].stairs[id].width = 120;
+    });
+    store().updateStairs(levelId(), id, { phase: 'demo' });
+    expect(level().stairs[id]).toMatchObject({ width: 120, phase: 'demo' });
+  });
+
   it('deleteEntities and setPhase include stairs; other stairs keep their identity', () => {
     const a = store().addStairs(levelId(), flight())!;
     const b = store().addStairs(levelId(), flight({ origin: { x: 300, y: 200 } }))!;

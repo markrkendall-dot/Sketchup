@@ -5,6 +5,7 @@ import type { Id } from '../model/types';
 import { formatLength } from '../model/units';
 import { getPlan, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
+import { focusCanvas } from './focus';
 
 function LevelTab({ levelId, index }: { levelId: Id; index: number }) {
   const name = usePlanStore((s) => s.plan.levels[levelId]?.name ?? '');
@@ -45,7 +46,10 @@ function LevelTab({ levelId, index }: { levelId: Id; index: number }) {
       aria-pressed={active}
       data-level-id={levelId}
       title={`${name}${hotkey ? ` (${hotkey})` : ''}. Double-click to rename.`}
-      onClick={() => switchLevel(levelId)}
+      onClick={() => {
+        switchLevel(levelId);
+        focusCanvas();
+      }}
       onDoubleClick={() => setEditing(name)}
     >
       <span className="level-name">{name}</span>
@@ -114,7 +118,10 @@ export function LevelBar() {
         className="level-copy"
         disabled={!belowId || belowWalls === 0}
         title={belowName ? `Copy the walls of ${belowName} onto this level (openings are not copied)` : 'No level below'}
-        onClick={() => belowId && copyWallsFromBelow(activeId, belowId)}
+        onClick={() => {
+          if (belowId) copyWallsFromBelow(activeId, belowId);
+          focusCanvas();
+        }}
       >
         Copy walls from level below
       </button>

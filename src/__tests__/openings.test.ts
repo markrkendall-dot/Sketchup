@@ -392,3 +392,74 @@ describe('opening geometry', () => {
     expect(after.get(w2)).not.toBe(before.get(w2));
   });
 });
+
+describe('opening height limits', () => {
+  it('rejects an opening taller than the wall, level height or wall override', () => {
+    const w = addStraightWall(0, 240);
+    // Level wall height is 96.
+    expect(store().addOpening(levelId(), door(w, 60, { height: 240 }))).toBeNull();
+    expect(store().addOpening(levelId(), door(w, 60, { height: 80, sill: 20 }))).toBeNull();
+    expect(openings()).toHaveLength(0);
+    expect(store().addOpening(levelId(), door(w, 60, { height: 96 }))).not.toBeNull();
+    store().updateWalls(levelId(), [w], { heightOverride: 72 });
+    // The override clamped the 96" door.
+    expect(openings()[0].height).toBe(72);
+    expect(store().addOpening(levelId(), door(w, 150, { height: 80 }))).toBeNull();
+    expect(store().addOpening(levelId(), door(w, 150, { height: 72 }))).not.toBeNull();
+  });
+
+  it('rejects a taller update without an undo step, and accepts one that fits', () => {
+    const w = addStraightWall(0, 240);
+    const id = store().addOpening(levelId(), door(w, 60))!;
+    const plan = store().plan;
+    store().updateOpening(levelId(), id, { height: 240 });
+    expect(store().plan).toBe(plan);
+    store().updateOpening(levelId(), id, { sill: 20 });
+    expect(store().plan).toBe(plan);
+    store().updateOpening(levelId(), id, { sill: 16, height: 80 });
+    expect(level().openings[id]).toMatchObject({ sill: 16, height: 80 });
+  });
+
+  it('other edits to an already too tall opening still work', () => {
+    const w = addStraightWall(0, 240);
+    const id = store().addOpening(levelId(), door(w, 60))!;
+    usePlanStore.setState((s) => {
+      s.plan.levels[levelId()].openings[id].height = 200;
+    });
+    store().updateOpening(levelId(), id, { width: 30 });
+    expect(level().openings[id]).toMatchObject({ width: 30, height: 200 });
+  });
+
+  it('lowering the level wall height pulls openings down with it', () => {
+    const w = addStraightWall(0, 480);
+    const d = store().addOpening(levelId(), door(w, 60))!;
+    const win = store().addOpening(levelId(), { ...door(w, 200), type: 'window', height: 48, sill: 36, swing: undefined })!;
+    const high = store().addOpening(levelId(), { ...door(w, 340), type: 'window', height: 20, sill: 70, swing: undefined })!;
+    store().updateLevel(levelId(), { wallHeight: 84 });
+    expect(level().openings[d]).toMatchObject({ sill: 0, height: 80 });
+    expect(level().openings[win]).toMatchObject({ sill: 36, height: 48 });
+    // Sill 70 leaves 14" above it: shortened.
+    expect(level().openings[high]).toMatchObject({ sill: 70, height: 14 });
+    store().updateLevel(levelId(), { wallHeight: 60 });
+    expect(level().openings[d]).toMatchObject({ sill: 0, height: 60 });
+    expect(level().openings[win]).toMatchObject({ sill: 36, height: 24 });
+    // Sill 70 is now within 12" of the top (or above it): the opening keeps 14" and drops its sill.
+    expect(level().openings[high]).toMatchObject({ sill: 46, height: 14 });
+    for (const o of openings()) expect(o.sill + o.height).toBeLessThanOrEqual(60);
+    undo();
+    expect(level().openings[d].height).toBe(80);
+  });
+
+  it('a wall with its own height ignores the level change; updateWall clamps too', () => {
+    const w = addStraightWall(0, 240);
+    store().updateWalls(levelId(), [w], { heightOverride: 120 });
+    const id = store().addOpening(levelId(), door(w, 60, { height: 110 }))!;
+    store().updateLevel(levelId(), { wallHeight: 72 });
+    expect(level().openings[id].height).toBe(110);
+    store().updateWall(levelId(), w, { heightOverride: 90 });
+    expect(level().openings[id].height).toBe(90);
+    // Clearing the override falls back to the level height.
+    store().updateWalls(levelId(), [w], { heightOverride: undefined });
+    expect(level().openings[id].height).toBe(72);
+  });
+});

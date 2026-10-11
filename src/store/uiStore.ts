@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { WallGeom } from '../derive/openings';
-import type { Id, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
+import type { Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
 export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | 'underlay' | OpeningToolName;
@@ -136,7 +136,41 @@ export interface Notice {
   error: boolean;
 }
 
+/** localStorage keys of the editor preferences that are not plan data (so not undoable). */
+export const ORTHO_LOCK_KEY = 'homeplan:orthoLock';
+export const MEASURE_TO_KEY = 'homeplan:measureTo';
+const MEASURE_TO_VALUES: readonly MeasureTo[] = ['center', 'inside', 'outside'];
+
+function readPref(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePref(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Private window or blocked storage: the preference just lasts for this session.
+  }
+}
+
+export function loadOrthoLock(): boolean {
+  return readPref(ORTHO_LOCK_KEY) !== 'false';
+}
+
+export function loadMeasureTo(): MeasureTo {
+  const v = readPref(MEASURE_TO_KEY);
+  return MEASURE_TO_VALUES.find((m) => m === v) ?? 'center';
+}
+
 export interface UiState {
+  /** Ortho lock for the wall tool (O); Shift inverts it while held. Persisted, never in undo. */
+  orthoLock: boolean;
+  /** What a typed wall length refers to. Persisted, never in undo. */
+  measureTo: MeasureTo;
   activeTool: ToolName;
   activeLevelId: Id;
   selection: Selection;
@@ -179,6 +213,8 @@ export interface UiState {
   /** The keyboard help overlay is open. */
   helpOpen: boolean;
   notice: Notice | null;
+  setOrthoLock: (on: boolean) => void;
+  setMeasureTo: (measureTo: MeasureTo) => void;
   setTool: (tool: ToolName) => void;
   setActiveLevel: (id: Id) => void;
   setSelection: (sel: Selection) => void;
@@ -248,6 +284,8 @@ export const MIN_SPLIT = 0.2;
 export const MAX_SPLIT = 0.8;
 
 export const useUiStore = create<UiState>()((set) => ({
+  orthoLock: loadOrthoLock(),
+  measureTo: loadMeasureTo(),
   activeTool: 'wall',
   activeLevelId: '',
   selection: EMPTY_SELECTION,
@@ -275,6 +313,14 @@ export const useUiStore = create<UiState>()((set) => ({
   walkLocked: false,
   helpOpen: false,
   notice: null,
+  setOrthoLock: (orthoLock) => {
+    writePref(ORTHO_LOCK_KEY, String(orthoLock));
+    set({ orthoLock });
+  },
+  setMeasureTo: (measureTo) => {
+    writePref(MEASURE_TO_KEY, measureTo);
+    set({ measureTo });
+  },
   setTool: (activeTool) =>
     set((s) => ({
       activeTool,

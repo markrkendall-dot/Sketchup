@@ -3,12 +3,12 @@ import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
 import { getFaces, roomDimensions, type Face } from '../derive/rooms';
-import { floorToFloor, stairSteps } from '../derive/stairs';
+import { floorToFloor, STAIRS_LIMITS, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool } from '../editor2d/tools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
 import { pointInPolygon } from '../model/geometry';
-import { OPENING_DEFAULTS, OPENING_LABEL, type OpeningType } from '../model/openings';
+import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
 import { wallLength } from '../model/plan';
 import type { Id, Level, Opening, Phase, Room, Stairs, Wall, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
@@ -56,6 +56,9 @@ function LengthField({ label, value, onCommit, bound = 'positive', allowEmpty, p
   useEffect(() => {
     if (!focused) setText(value === undefined ? '' : formatLength(value, denom));
   }, [value, denom, focused]);
+  // A rejected value's message belongs to the field while it is focused and holds that text; a new
+  // bound value (an edit elsewhere, undo) makes it stale.
+  useEffect(() => setError(null), [value]);
 
   /** Returns true when the field holds a committed (or unchanged) value. */
   const commit = (): boolean => {
@@ -115,7 +118,11 @@ function LengthField({ label, value, onCommit, bound = 'positive', allowEmpty, p
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => {
-          if (!skipBlur.current) commit();
+          // A value that does not commit is dropped on the way out, with its message.
+          if (!skipBlur.current && !commit()) {
+            setText(fmt(value));
+            setError(null);
+          }
           skipBlur.current = false;
           setFocused(false);
         }}
@@ -314,6 +321,8 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const wall = level.walls[opening.wallId];
   const L = wall ? wallLength(level, wall) : 0;
+  const wallH = wall ? wallHeightOf(level, wall) : level.wallHeight;
+  const tooTall = `Taller than the wall (${formatLength(wallH, denom)})`;
   // Jamb distances run from the core interval ends (the inside faces of the corners), as a tape
   // measure along the wall would; the interval is the one the store clamps to.
   const interval = coreInterval(level, opening.wallId, opening.phase, liveFootprints(level)) ?? [0, L];
@@ -361,7 +370,10 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
         label="Height"
         value={opening.height}
         onCommit={(v) => {
-          if (v !== null) updateOpening(levelId, opening.id, { height: v });
+          if (v === null) return null;
+          if (!openingFitsHeight({ sill: opening.sill, height: v }, wallH)) return tooTall;
+          updateOpening(levelId, opening.id, { height: v });
+          return null;
         }}
       />
       {opening.type === 'window' && (
@@ -370,7 +382,10 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
           value={opening.sill}
           bound="nonnegative"
           onCommit={(v) => {
-            if (v !== null) updateOpening(levelId, opening.id, { sill: v });
+            if (v === null) return null;
+            if (!openingFitsHeight({ sill: v, height: opening.height }, wallH)) return tooTall;
+            updateOpening(levelId, opening.id, { sill: v });
+            return null;
           }}
           hint="Above the floor."
         />
@@ -550,14 +565,20 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         label="Width"
         value={stairs.width}
         onCommit={(v) => {
-          if (v !== null) updateStairs(level.id, stairs.id, { width: v });
+          if (v === null) return null;
+          if (!stairsWidthOk(v)) return `Between ${formatLength(STAIRS_LIMITS.minWidth, denom)} and ${formatLength(STAIRS_LIMITS.maxWidth, denom)}`;
+          updateStairs(level.id, stairs.id, { width: v });
+          return null;
         }}
       />
       <LengthField
         label="Run"
         value={stairs.run}
         onCommit={(v) => {
-          if (v !== null) updateStairs(level.id, stairs.id, { run: v });
+          if (v === null) return null;
+          if (!stairsRunOk(v)) return `Between ${formatLength(STAIRS_LIMITS.minRun, denom)} and ${formatLength(STAIRS_LIMITS.maxRun, denom)}`;
+          updateStairs(level.id, stairs.id, { run: v });
+          return null;
         }}
         hint="Horizontal length of the flight."
       />
@@ -642,6 +663,7 @@ function DegreesField({ label, value, onCommit, disabled }: { label: string; val
   useEffect(() => {
     if (!focused) setText(fmt(value));
   }, [value, focused]);
+  useEffect(() => setError(null), [value]);
   const skipBlur = useRef(false);
   const commit = (): boolean => {
     const v = Number(text.trim().replace(/°$/, ''));
@@ -668,7 +690,10 @@ function DegreesField({ label, value, onCommit, disabled }: { label: string; val
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => {
-          if (!skipBlur.current) commit();
+          if (!skipBlur.current && !commit()) {
+            setText(fmt(value));
+            setError(null);
+          }
           skipBlur.current = false;
           setFocused(false);
         }}
@@ -978,7 +1003,7 @@ export function PropertiesPanel() {
     body = <OpeningProps key={openings[0].id} level={level} opening={openings[0]} />;
   else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
   else if (total === 1 && stairs.length === 1) body = <StairsProps key={stairs[0].id} level={level} stairs={stairs[0]} />;
-  else if (total === walls.length) body = <MultiWallProps levelId={level.id} walls={walls} />;
+  else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
   else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} />;
 
   return (

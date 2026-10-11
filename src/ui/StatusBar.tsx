@@ -91,7 +91,7 @@ export function StatusBar() {
     const level = s.plan.levels[levelId];
     return level ? getFaces(level, viewMode).openEnds.length : 0;
   });
-  const measureTo = usePlanStore((s) => s.plan.settings.measureTo);
+  const measureTo = useUiStore((s) => s.measureTo);
   const hasUnderlay = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
   const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
   const underlayMode = useUiStore((s) => s.underlayMode);

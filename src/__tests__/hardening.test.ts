@@ -93,3 +93,84 @@ describe('autosave', () => {
     expect(autosaveFailureReason('odd')).toBe('odd');
   });
 });
+
+describe('autosave flush on leaving the page', () => {
+  type Handler = (e?: unknown) => void;
+  let docHandlers: Record<string, Handler>;
+  let winHandlers: Record<string, Handler>;
+  let visibility: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    docHandlers = {};
+    winHandlers = {};
+    visibility = 'visible';
+    vi.stubGlobal('document', {
+      addEventListener: (t: string, h: Handler) => void (docHandlers[t] = h),
+      removeEventListener: (t: string) => void delete docHandlers[t],
+      get visibilityState() {
+        return visibility;
+      },
+    });
+    vi.stubGlobal('window', {
+      addEventListener: (t: string, h: Handler) => void (winHandlers[t] = h),
+      removeEventListener: (t: string) => void delete winHandlers[t],
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('saves the pending plan at once when the page is hidden, not 300 ms later', () => {
+    const save = vi.fn(async () => {});
+    const stop = startAutosave(usePlanStore, { save });
+    store().renamePlan('Last edit');
+    expect(save).not.toHaveBeenCalled();
+    visibility = 'visible';
+    docHandlers.visibilitychange();
+    expect(save).not.toHaveBeenCalled(); // still visible: keep debouncing
+    visibility = 'hidden';
+    docHandlers.visibilitychange();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect((save.mock.calls[0] as unknown as [string, Plan])[1].name).toBe('Last edit');
+    // The debounce timer was cancelled: no second save, and nothing pending to flush again.
+    vi.advanceTimersByTime(1000);
+    winHandlers.pagehide();
+    expect(save).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('saves the pending plan on pagehide', () => {
+    const save = vi.fn(async () => {});
+    const stop = startAutosave(usePlanStore, { save });
+    store().renamePlan('Closing the tab');
+    winHandlers.pagehide();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect((save.mock.calls[0] as unknown as [string, Plan])[1].name).toBe('Closing the tab');
+    stop();
+  });
+
+  it('coalesces quick edits into one save carrying the latest plan', () => {
+    const save = vi.fn(async () => {});
+    const stop = startAutosave(usePlanStore, { save });
+    store().renamePlan('One');
+    store().renamePlan('Two');
+    vi.advanceTimersByTime(299);
+    expect(save).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(2);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect((save.mock.calls[0] as unknown as [string, Plan])[1].name).toBe('Two');
+    stop();
+  });
+
+  it('removes its page listeners when stopped (and flushes first)', () => {
+    const save = vi.fn(async () => {});
+    const stop = startAutosave(usePlanStore, { save });
+    store().renamePlan('Pending at stop');
+    stop();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(docHandlers.visibilitychange).toBeUndefined();
+    expect(winHandlers.pagehide).toBeUndefined();
+  });
+});

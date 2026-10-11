@@ -7,7 +7,7 @@ const store = () => usePlanStore.getState();
 
 /**
  * A hand-written file in the hypothetical pre-release format (schemaVersion 0): the entity
- * collections of a level are arrays, settings has no measureTo, and there are fields this version
+ * collections of a level are arrays, settings has orthoLock (an editor preference now), and there are fields this version
  * does not know (they must not leak into the plan).
  */
 const V0_FILE = {
@@ -76,10 +76,11 @@ describe('migrate from schemaVersion 0', () => {
     expect(g.openings.o1.swing).toEqual({ hinge: 'a', side: 'left' });
     expect(g.rooms.r1).toEqual({ id: 'r1', name: 'Living', anchor: { x: 120, y: 90 } });
     expect(g.stairs).toEqual({});
-    expect(plan.settings).toEqual({ ...DEFAULT_SETTINGS, snapGrid: 1, measureTo: 'center' });
+    expect(plan.settings).toEqual({ ...DEFAULT_SETTINGS, snapGrid: 1 });
     expect('color' in g).toBe(false);
     expect('author' in plan).toBe(false);
     expect('theme' in plan.settings).toBe(false);
+    expect('orthoLock' in plan.settings).toBe(false);
   });
 
   it('accepts levels as an array without levelOrder', () => {
@@ -136,7 +137,7 @@ describe('migrate a current file', () => {
       opacity: 0.6,
       locked: true,
     });
-    s.updateSettings({ measureTo: 'inside' });
+    s.updateSettings({ defaultInteriorThickness: 5.5 });
     s.copyWallsFromLevel(lid, store().plan.levelOrder[2]);
     return store().plan;
   }
@@ -144,6 +145,19 @@ describe('migrate a current file', () => {
   it('is byte-identical after JSON.stringify', () => {
     const text = JSON.stringify(richPlan(), null, 2);
     expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
+  });
+
+  it('accepts and ignores orthoLock and measureTo from files saved before they left the plan', () => {
+    const plan = JSON.parse(JSON.stringify(richPlan()));
+    plan.settings.orthoLock = false;
+    plan.settings.measureTo = 'inside';
+    const loaded = migrate(plan);
+    expect('orthoLock' in loaded.settings).toBe(false);
+    expect('measureTo' in loaded.settings).toBe(false);
+    expect(loaded.settings).toEqual(richPlan().settings);
+    // Not an error, whatever the stale values were.
+    plan.settings.measureTo = 'sideways';
+    expect(() => migrate(plan)).not.toThrow();
   });
 
   it('drops unknown fields at every level of a current file', () => {

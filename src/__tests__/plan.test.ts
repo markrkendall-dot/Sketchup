@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getFootprints } from '../derive/footprint';
 import { getGraph } from '../derive/graph';
 import { adjustTypedLength } from '../editor2d/tools/wallTool';
@@ -6,12 +6,14 @@ import { createEmptyPlan, defaultLevelId, floorTops, migrate, SCHEMA_VERSION } f
 import type { Level, Opening } from '../model/types';
 import {
   clearHistory,
+  onHistoryStep,
   pauseHistory,
   redo,
   resumeHistory,
   undo,
   usePlanStore,
 } from '../store/planStore';
+import { loadMeasureTo, loadOrthoLock, useUiStore } from '../store/uiStore';
 
 const opts = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;
 const store = () => usePlanStore.getState();
@@ -46,8 +48,6 @@ describe('createEmptyPlan', () => {
       precisionDenominator: 16,
       defaultExteriorThickness: 6.5,
       defaultInteriorThickness: 4.5,
-      orthoLock: true,
-      measureTo: 'center',
     });
     expect(defaultLevelId(plan)).toBe(plan.levelOrder[1]);
     expect(floorTops(plan)).toEqual([-100, 8, 116]);
@@ -114,7 +114,7 @@ describe('planStore', () => {
   it('every mutating action sets modifiedAt', async () => {
     const before = store().plan.modifiedAt;
     await new Promise((res) => setTimeout(res, 5));
-    store().updateSettings({ orthoLock: false });
+    store().updateSettings({ snapGrid: 2 });
     expect(store().plan.modifiedAt).not.toBe(before);
   });
 
@@ -237,5 +237,99 @@ describe('wall tool measureTo adjustment', () => {
   it('no adjustment when continuing straight or at an angle', () => {
     expect(adjustTypedLength(360, 'inside', 6.5, right, right)).toBe(360);
     expect(adjustTypedLength(360, 'inside', 6.5, right, { x: Math.SQRT1_2, y: Math.SQRT1_2 })).toBe(360);
+  });
+});
+
+describe('editor preferences are not plan data', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('ortho and measureTo changes are no undo step and leave the plan alone', () => {
+    store().addWall(levelId(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts);
+    const plan = store().plan;
+    const orthoBefore = useUiStore.getState().orthoLock;
+    useUiStore.getState().setOrthoLock(!orthoBefore);
+    useUiStore.getState().setMeasureTo('inside');
+    expect(store().plan).toBe(plan);
+    undo();
+    // The undo removed the wall; the toggles stayed.
+    expect(Object.keys(level().walls)).toHaveLength(0);
+    expect(useUiStore.getState().orthoLock).toBe(!orthoBefore);
+    expect(useUiStore.getState().measureTo).toBe('inside');
+    useUiStore.getState().setOrthoLock(true);
+    useUiStore.getState().setMeasureTo('center');
+  });
+
+  it('persist in localStorage and load back, ignoring junk and a missing storage', () => {
+    const mem = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, v),
+    });
+    useUiStore.getState().setOrthoLock(false);
+    useUiStore.getState().setMeasureTo('outside');
+    expect(mem.get('homeplan:orthoLock')).toBe('false');
+    expect(mem.get('homeplan:measureTo')).toBe('outside');
+    expect(loadOrthoLock()).toBe(false);
+    expect(loadMeasureTo()).toBe('outside');
+    mem.set('homeplan:measureTo', 'sideways');
+    expect(loadMeasureTo()).toBe('center');
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    });
+    expect(loadOrthoLock()).toBe(true);
+    expect(loadMeasureTo()).toBe('center');
+    expect(() => useUiStore.getState().setOrthoLock(true)).not.toThrow();
+    useUiStore.getState().setMeasureTo('center');
+  });
+});
+
+describe('undo and redo on another level', () => {
+  const second = () => store().plan.levelOrder[2];
+  const first = () => store().plan.levelOrder[1];
+
+  beforeEach(() => {
+    useUiStore.getState().setActiveLevel(second());
+    useUiStore.getState().setNotice(null);
+  });
+
+  it('switches to the level that changed and says so', () => {
+    store().addWall(second(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts);
+    useUiStore.getState().setActiveLevel(first());
+    undo();
+    expect(Object.keys(store().plan.levels[second()].walls)).toHaveLength(0);
+    expect(useUiStore.getState().activeLevelId).toBe(second());
+    expect(useUiStore.getState().notice).toEqual({ text: 'Undid a change on Second Floor', error: false });
+    useUiStore.getState().setActiveLevel(first());
+    redo();
+    expect(Object.keys(store().plan.levels[second()].walls)).toHaveLength(1);
+    expect(useUiStore.getState().activeLevelId).toBe(second());
+    expect(useUiStore.getState().notice?.text).toBe('Redid a change on Second Floor');
+  });
+
+  it('stays quiet when the change was on the active level or on no level', () => {
+    store().addWall(second(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts);
+    undo();
+    expect(useUiStore.getState().notice).toBeNull();
+    store().renamePlan('Elsewhere');
+    useUiStore.getState().setActiveLevel(first());
+    undo();
+    expect(useUiStore.getState().activeLevelId).toBe(first());
+    expect(useUiStore.getState().notice).toBeNull();
+  });
+
+  it('tells wall tool listeners after the step', () => {
+    const seen: string[] = [];
+    const off = onHistoryStep((k) => seen.push(k));
+    store().addWall(second(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts);
+    undo();
+    redo();
+    off();
+    undo();
+    expect(seen).toEqual(['undo', 'redo']);
   });
 });

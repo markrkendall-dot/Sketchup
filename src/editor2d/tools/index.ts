@@ -85,7 +85,7 @@ export function makeToolContext(): ToolContext | null {
         level: plan.levels[levelId],
         k: useUiStore.getState().viewport.k,
         snapGrid: plan.settings.snapGrid,
-        orthoLock: plan.settings.orthoLock,
+        orthoLock: useUiStore.getState().orthoLock,
         shift: opts.shift,
         from: opts.from,
         excludeNodeIds: opts.excludeNodeIds,

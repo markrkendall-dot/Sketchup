@@ -3,7 +3,7 @@ import { immer } from 'zustand/middleware/immer';
 import { temporal } from 'zundo';
 import { dist } from '../model/geometry';
 import { coreInterval, draftFootprints } from '../derive/openings';
-import { clampOpeningOffset } from '../model/openings';
+import { clampOpeningHeight, clampOpeningOffset, openingFitsHeight, wallHeightOf } from '../model/openings';
 import {
   clampOpenings,
   createEmptyPlan,
@@ -14,7 +14,8 @@ import {
   wallLength,
 } from '../model/plan';
 import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
-import { normalizeDegrees } from '../derive/stairs';
+import { normalizeDegrees, stairsRunOk, stairsWidthOk } from '../derive/stairs';
+import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
 
 export interface AddWallOptions {
@@ -170,7 +171,24 @@ function deleteInPlace(
   for (const id of Object.keys(level.nodes)) if (!used.has(id)) delete level.nodes[id];
 }
 
-const validStairs = (s: Omit<Stairs, 'id'>): boolean =>
+/** Pull the openings of the given walls (all walls when omitted) under their wall height. */
+function clampOpeningHeights(level: Level, wallIds?: Set<Id>): void {
+  for (const o of Object.values(level.openings)) {
+    const w = level.walls[o.wallId];
+    if (!w || (wallIds && !wallIds.has(w.id))) continue;
+    const H = wallHeightOf(level, w);
+    if (openingFitsHeight(o, H)) continue;
+    clampOpeningHeight(o, H);
+  }
+}
+
+/**
+ * Stairs the editor can draw. On an edit only the sizes being changed are held to the size limits,
+ * so an older file's odd flight can still change phase or move.
+ */
+const validStairs = (s: Omit<Stairs, 'id'>, limits: { width: boolean; run: boolean } = { width: true, run: true }): boolean =>
+  (!limits.width || stairsWidthOk(s.width)) &&
+  (!limits.run || stairsRunOk(s.run)) &&
   s.width > 0 &&
   s.run > 0 &&
   Number.isFinite(s.width) &&
@@ -306,6 +324,7 @@ export const usePlanStore = create<PlanState>()(
             if (!w) return false;
             Object.assign(w, patch);
             if (patch.a !== undefined || patch.b !== undefined) normalizeLevel(level);
+            if ('heightOverride' in patch) clampOpeningHeights(level, new Set([id]));
           }),
 
         updateWalls: (levelId, ids, patch) =>
@@ -323,6 +342,8 @@ export const usePlanStore = create<PlanState>()(
             }
             // Thickness and phase change the corner joins, so the core intervals of neighbours.
             if (patch.thickness !== undefined || patch.phase !== undefined) clampOpenings(level);
+            // A lower wall takes its openings down with it.
+            if ('heightOverride' in patch) clampOpeningHeights(level, new Set(ids));
           }),
 
         setWallKind: (levelId, ids, kind) =>
@@ -371,6 +392,7 @@ export const usePlanStore = create<PlanState>()(
             if (!wall) return false;
             if (!(input.width > 0) || !(input.height > 0) || !(input.sill >= 0)) return false;
             if (!Number.isFinite(input.offset)) return false;
+            if (!openingFitsHeight(input, wallHeightOf(level, wall))) return false;
             const [s0, s1] = coreInterval(level, wall.id, input.phase, draftFootprints(level))!;
             if (s1 - s0 < input.width) return false;
             const opening: Opening = {
@@ -394,6 +416,11 @@ export const usePlanStore = create<PlanState>()(
             if (patch.sill !== undefined && !(patch.sill >= 0)) return false;
             if (patch.offset !== undefined && !Number.isFinite(patch.offset)) return false;
             if (patch.wallId !== undefined && !level.walls[patch.wallId]) return false;
+            if (patch.height !== undefined || patch.sill !== undefined || patch.wallId !== undefined) {
+              const target = level.walls[patch.wallId ?? o.wallId];
+              const next = { height: patch.height ?? o.height, sill: patch.sill ?? o.sill };
+              if (target && !openingFitsHeight(next, wallHeightOf(level, target))) return false;
+            }
             for (const [key, value] of Object.entries(patch) as [keyof Opening, unknown][]) {
               if (value === undefined) {
                 if (key === 'swing') delete o.swing;
@@ -467,7 +494,7 @@ export const usePlanStore = create<PlanState>()(
             const st = level.stairs[id];
             if (!st) return false;
             const next = { ...st, ...patch };
-            if (!validStairs(next)) return false;
+            if (!validStairs(next, { width: patch.width !== undefined, run: patch.run !== undefined })) return false;
             if (patch.origin) st.origin = { x: patch.origin.x, y: patch.origin.y };
             if (patch.direction !== undefined) st.direction = normalizeDegrees(patch.direction);
             if (patch.width !== undefined) st.width = patch.width;
@@ -543,7 +570,9 @@ export const usePlanStore = create<PlanState>()(
             if (patch.wallHeight !== undefined && !(patch.wallHeight > 0)) return false;
             if (patch.floorThickness !== undefined && !(patch.floorThickness >= 0)) return false;
             if (patch.name !== undefined && !patch.name.trim()) return false;
+            const lowered = patch.wallHeight !== undefined && patch.wallHeight < level.wallHeight;
             Object.assign(level, patch);
+            if (lowered) clampOpeningHeights(level);
           }),
 
         setBaseFloorElevation: (elevation) =>
@@ -599,8 +628,46 @@ export const usePlanStore = create<PlanState>()(
 
 const temporalStore = () => usePlanStore.temporal.getState();
 
-export const undo = () => temporalStore().undo();
-export const redo = () => temporalStore().redo();
+type HistoryListener = (kind: 'undo' | 'redo') => void;
+const historyListeners = new Set<HistoryListener>();
+
+/** Be told after every undo or redo made through undo() / redo(). Returns an unsubscribe function. */
+export function onHistoryStep(fn: HistoryListener): () => void {
+  historyListeners.add(fn);
+  return () => void historyListeners.delete(fn);
+}
+
+let historyNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Undo or redo, then make a change on another level visible: when the step changed a level that
+ * is not the active one, switch to it and say so in the status bar.
+ */
+function stepHistory(kind: 'undo' | 'redo'): void {
+  const before = getPlan();
+  if (kind === 'undo') temporalStore().undo();
+  else temporalStore().redo();
+  const after = getPlan();
+  if (after !== before) {
+    const ui = useUiStore.getState();
+    const changed = after.levelOrder.filter((id) => before.levels[id] !== after.levels[id]);
+    if (changed.length > 0 && !changed.includes(ui.activeLevelId)) {
+      const id = changed[0];
+      ui.setActiveLevel(id);
+      const text = `${kind === 'undo' ? 'Undid' : 'Redid'} a change on ${after.levels[id].name}`;
+      useUiStore.getState().setNotice({ text, error: false });
+      if (historyNoticeTimer) clearTimeout(historyNoticeTimer);
+      historyNoticeTimer = setTimeout(() => {
+        historyNoticeTimer = null;
+        if (useUiStore.getState().notice?.text === text) useUiStore.getState().setNotice(null);
+      }, 4000);
+    }
+  }
+  for (const fn of historyListeners) fn(kind);
+}
+
+export const undo = () => stepHistory('undo');
+export const redo = () => stepHistory('redo');
 export const clearHistory = () => temporalStore().clear();
 /** Drag grouping: call after the first (tracked) set of a drag. */
 export const pauseHistory = () => temporalStore().pause();

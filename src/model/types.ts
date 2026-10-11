@@ -89,8 +89,6 @@ export interface PlanSettings {
   precisionDenominator: 1 | 2 | 4 | 8 | 16;
   defaultExteriorThickness: Inches;
   defaultInteriorThickness: Inches;
-  orthoLock: boolean;
-  measureTo: MeasureTo; // what a typed wall length refers to
 }
 
 export interface Plan {

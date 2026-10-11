@@ -2,12 +2,13 @@ import { getFootprints, type Footprint } from '../../derive/footprint';
 import { coreInterval, displayCenter, jambDistances, liveFootprints, openingsOnWall, wallPoint } from '../../derive/openings';
 import { isVisible, phasesCoexist } from '../../derive/phase';
 import { dist, dot, sub } from '../../model/geometry';
-import { clampOpeningOffset, OPENING_DEFAULTS, OPENING_LABEL } from '../../model/openings';
+import { clampOpeningOffset, OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf } from '../../model/openings';
 import type { Id, Opening, Vec2 } from '../../model/types';
 import { formatLength, tryParseLength } from '../../model/units';
 import type { Draft, OpeningPreview, OpeningToolName } from '../../store/uiStore';
 import type { Tool, ToolContext } from './index';
 import { applyBufferKey } from './lengthBuffer';
+import { MUST_BE_POSITIVE } from './wallTool';
 
 /** A wall is hovered when the cursor is within this many screen px of its body. */
 export const OPENING_HOVER_PX = 12;
@@ -64,7 +65,7 @@ function computePreview(ctx: ToolContext, type: OpeningToolName, d: Draft): Open
   let problem: string | null = null;
   if (d.lengthBuffer) {
     const v = tryParseLength(d.lengthBuffer);
-    if (v !== null && v >= 0) {
+    if (v !== null && v > 0) {
       // Typed: distance from the nearer corner's inside face to the near jamb.
       want = nearEnd === 'a' ? s0 + v + w / 2 : s1 - v - w / 2;
       typed = true;
@@ -72,7 +73,10 @@ function computePreview(ctx: ToolContext, type: OpeningToolName, d: Draft): Open
   }
   const center = clampOpeningOffset(want, w, s0, s1);
   const denom = ctx.plan().settings.precisionDenominator;
-  if (s1 - s0 < w) {
+  const wallHeight = wallHeightOf(ctx.level(), ctx.level().walls[fp.wallId]);
+  if (!openingFitsHeight(def, wallHeight)) {
+    problem = `Taller than the wall (${formatLength(wallHeight, denom)})`;
+  } else if (s1 - s0 < w) {
     problem = `This wall is too short for a ${formatLength(w, denom)} ${type}.`;
   } else if (typed && Math.abs(center - want) > 1e-6) {
     problem = `Too far: at most ${formatLength(Math.max(0, s1 - s0 - w), denom)} from this corner.`;
@@ -190,8 +194,12 @@ function makeOpeningTool(type: OpeningToolName): Tool {
       if (key === 'Enter') {
         if (!d.lengthBuffer) return d.openingPreview ? (place(ctx), true) : false;
         const v = tryParseLength(d.lengthBuffer);
-        if (v === null || v < 0) {
+        if (v === null) {
           refresh(ctx, { error: true, message: `Can't read "${d.lengthBuffer}" as a distance.` });
+          return true;
+        }
+        if (v <= 0) {
+          refresh(ctx, { error: true, message: MUST_BE_POSITIVE });
           return true;
         }
         place(ctx);

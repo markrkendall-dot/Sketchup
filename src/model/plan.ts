@@ -17,8 +17,6 @@ export const DEFAULT_SETTINGS: PlanSettings = {
   precisionDenominator: 16,
   defaultExteriorThickness: 6.5,
   defaultInteriorThickness: 4.5,
-  orthoLock: true,
-  measureTo: 'center',
 };
 
 export function createLevel(name: string, wallHeight: number, floorThickness: number): Level {
@@ -391,7 +389,6 @@ const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'modifiedAt'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
-const MEASURE_TO = new Set(['center', 'inside', 'outside']);
 
 function migrateNodes(raw: Json, where: string): Level['nodes'] {
   const out: Level['nodes'] = {};
@@ -525,8 +522,8 @@ function migrateSettings(raw: Json): PlanSettings {
   num('precisionDenominator', (v) => [1, 2, 4, 8, 16].includes(v));
   num('defaultExteriorThickness', (v) => v > 0);
   num('defaultInteriorThickness', (v) => v > 0);
-  out.orthoLock = typeof raw.orthoLock === 'boolean' ? raw.orthoLock : d.orthoLock;
-  out.measureTo = typeof raw.measureTo === 'string' && MEASURE_TO.has(raw.measureTo) ? raw.measureTo : d.measureTo;
+  // Older files also carry orthoLock and measureTo; those are editor preferences now (uiStore),
+  // so they are not in SETTINGS_KEYS and drop out here.
   return out as unknown as PlanSettings;
 }
 
