@@ -230,7 +230,7 @@ and the plan's north angle is 0.
 - **Main roof**: gable over the Second Floor, ridge east-west, 8:12, 24" overhang, metal
   `#6e6259`. **Chimney** against the north wall, centred.
 - **Windows and doors** on the four faces, each with lites; shutters on the two west windows.
-- **Terrain**: fourteen grade points, see below.
+- **Terrain**: fifteen grade points, see below.
 - No interior partitions and no stairs: those are the next job (below).
 - Not modelled: the deck and its stairs, the concrete retaining wall, the lot, the entry porch
   floor and steps, the foundation under the wing and porches (the ground meets them where the
@@ -242,7 +242,7 @@ With the lake to the south and the road to the north, east is on your left when 
 the road and look at the house. Photos 1 and 9 (from the lake) and photo 6 (from the road) put
 the wing and its roof on the **east** side, and photos 7 and 8 put the entry porch with the
 number 146 and the shuttered window on the **west** face. The owner confirmed that photo 8 was
-taken facing east, so its left side is north. The owner's sketch agrees once you
+taken facing east (its left side is north) and that photo 3 shows the east face (its left side is south). The owner's sketch agrees once you
 read it with north at the bottom: its top-left extension is the south-east wing and its small
 box on the right is the north-west porch. The starter follows that. If your own measuring says
 otherwise, mirror the plan (the `x` coordinates in the script) before you refine it.
@@ -269,10 +269,10 @@ from the main block's outside corners (north-west corner = 0, 0).
 | South windows, second floor | 88 x 48 at x 115" and 64 x 48 at x 256" (6 x 3 lites), sill 30 | Same |
 | West windows | first floor three-sash 96 x 40, sill 47 (head above the door head), at y 203"; second floor 48 x 28, 4 x 2 lites, sill 50, at y 200"; both with shutters | Jamb to the north corner |
 | North windows | first floor 72 x 48 at x 96" and 48 x 36 at x 234"; second floor 48 x 40 at x 78" and x 240" | Jamb to the west corner |
-| East windows | second floor two 48 x 40 at y 96" and y 216"; first floor 36 x 40 at y 150" | Jamb to the north corner |
-| Wing windows | east end 60 x 48; north face 48 x 40; south face 36 x 36 | Rough openings |
+| East windows | second floor two 46 x 44 (4 x 3 lites, sill 34) at y 98" and y 222"; first floor 40 x 40, sill 42, at y 152" | Jamb to the north corner |
+| Wing windows | east end 56 x 44, 6 x 3 lites; north face 48 x 40; south face 36 x 36 | Rough openings |
 | Basement double door | 60 x 80 on the wing's south wall | Jamb to jamb |
-| Roof pitches | main 8:12, wing 8:12, entry porch 5:12 | A level and a tape against the rafter or the gable |
+| Roof pitches | main 6:12, wing 7:12, entry porch 5:12 (photos 3 and 8) | A level and a tape against the rafter or the gable |
 | Roof overhangs | main 24", wing 18", entry porch 18" | Eave to the wall face |
 | Roof thickness, fascia | 8", 6" | Fascia board |
 | Grade points | see below | Spot levels from the floor top down |
@@ -280,7 +280,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 Grade points (absolute elevation in inches; the first floor top is +2", the basement floor -100"):
 north corners of the main block -4, the porch's north-west corner -4 and south-west corner -8, middle of the north wall
 -4, middle of the west wall -8, south-west corner -14, south-east corner -88, the wing's south-east
-corner -100 and north-east corner -70, a point 10' south of the south wall at its middle -100 and
+corner -100 and north-east corner -20, a point 6' east of the main block's east wall -6, a point 10' south of the south wall at its middle -100 and
 another 10' south of the wing -100 (the terrace in front of the doors), and two points 30' north of
 the house at +6 (the road is slightly higher). Measure them down from the first-floor sill with a
 level and a tape or a laser, and edit them in the Site tab.

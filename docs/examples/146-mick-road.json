@@ -495,10 +495,10 @@
         "f-o12": {
           "wallId": "f-w2",
           "type": "window",
-          "offset": 146.75,
-          "width": 36,
+          "offset": 148.75,
+          "width": 40,
           "height": 40,
-          "sill": 30,
+          "sill": 42,
           "phase": "existing",
           "lites": {
             "cols": 4,
@@ -510,12 +510,12 @@
           "wallId": "f-w7",
           "type": "window",
           "offset": 56.75,
-          "width": 60,
-          "height": 48,
+          "width": 56,
+          "height": 44,
           "sill": 30,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 6,
             "rows": 3
           },
           "id": "f-o13"
@@ -598,7 +598,7 @@
             }
           ],
           "ridgeAngle": 0,
-          "pitch": 8,
+          "pitch": 7,
           "overhang": 18,
           "bearingOffset": 0,
           "thickness": 8,
@@ -785,10 +785,10 @@
         "s-o6": {
           "wallId": "s-w2",
           "type": "window",
-          "offset": 92.75,
-          "width": 48,
-          "height": 40,
-          "sill": 30,
+          "offset": 94.75,
+          "width": 46,
+          "height": 44,
+          "sill": 34,
           "phase": "existing",
           "lites": {
             "cols": 4,
@@ -799,10 +799,10 @@
         "s-o7": {
           "wallId": "s-w2",
           "type": "window",
-          "offset": 212.75,
-          "width": 48,
-          "height": 40,
-          "sill": 30,
+          "offset": 218.75,
+          "width": 46,
+          "height": 44,
+          "sill": 34,
           "phase": "existing",
           "lites": {
             "cols": 4,
@@ -844,7 +844,7 @@
             }
           ],
           "ridgeAngle": 0,
-          "pitch": 8,
+          "pitch": 6,
           "overhang": 24,
           "bearingOffset": 0,
           "thickness": 8,
@@ -946,20 +946,20 @@
           "x": 462,
           "y": 186
         },
-        "elevation": -70
+        "elevation": -20
       },
       "grade-11": {
         "id": "grade-11",
         "at": {
-          "x": 159,
-          "y": 426
+          "x": 390,
+          "y": 96
         },
-        "elevation": -100
+        "elevation": -6
       },
       "grade-12": {
         "id": "grade-12",
         "at": {
-          "x": 390,
+          "x": 159,
           "y": 426
         },
         "elevation": -100
@@ -967,13 +967,21 @@
       "grade-13": {
         "id": "grade-13",
         "at": {
+          "x": 390,
+          "y": 426
+        },
+        "elevation": -100
+      },
+      "grade-14": {
+        "id": "grade-14",
+        "at": {
           "x": 79.5,
           "y": -360
         },
         "elevation": 6
       },
-      "grade-14": {
-        "id": "grade-14",
+      "grade-15": {
+        "id": "grade-15",
         "at": {
           "x": 238.5,
           "y": -360
@@ -992,8 +1000,8 @@
         "width": 24,
         "depth": 40,
         "rotation": 0,
-        "base": -16.94,
-        "top": 364,
+        "base": -16.81,
+        "top": 338.5,
         "id": "column-1"
       }
     }

@@ -208,7 +208,10 @@ export function buildExamplePlan(): Plan {
   gp(MAIN.x0, MAIN.y1, -14);
   gp(MAIN.x1, MAIN.y1, -88);
   gp(WING.x1, WING.y1, -100);
-  gp(WING.x1, WING.y0, -70);
+  // The lawn reaches nearly to the first floor at the wing's north-east corner and drops under the
+  // deck toward the lake (photo 3).
+  gp(WING.x1, WING.y0, -20);
+  gp(MAIN.x1 + ft(6), ft(8), -6);
   gp(MAIN.x1 / 2, MAIN.y1 + ft(10), -100);
   gp((WING.x0 + WING.x1) / 2, WING.y1 + ft(10), -100);
   gp(MAIN.x1 / 4, MAIN.y0 - ft(30), 6);
@@ -243,20 +246,24 @@ export function buildExamplePlan(): Plan {
   win(fId, { x: ft(19.5), y: north }, 48, 36, 2, 1);
   win(sId, { x: ft(6.5), y: north }, 48, 40, 4, 3);
   win(sId, { x: ft(20), y: north }, 48, 40, 4, 3);
-  // East face: two upstairs, a small one on the first floor north of the wing.
-  win(sId, { x: east, y: ft(8) }, 48, 40, 4, 3);
-  win(sId, { x: east, y: ft(18) }, 48, 40, 4, 3);
-  win(fId, { x: east, y: ft(12.5) }, 36, 40, 4, 3);
+  // East face (photo 3, taken facing west): two double-sash windows upstairs, the south one just
+  // north of where the wing's ridge meets the wall, and one set high on the first floor north of the
+  // wing.
+  win(sId, { x: east, y: 98 }, 46, 44, 4, 3, { sill: 34 });
+  win(sId, { x: east, y: 222 }, 46, 44, 4, 3, { sill: 34 });
+  win(fId, { x: east, y: 152 }, 40, 40, 4, 3, { sill: 42 });
   // The wing: its east gable end, north and south faces.
-  win(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 }, 60, 48, 4, 3);
+  win(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 }, 56, 44, 6, 3);
   win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y0 }, 48, 40, 4, 3);
   win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, 36, 36, 2, 2);
   // The walkout double door below the wing's south window.
   addOpeningAt(bId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, { type: 'door', width: 60, height: 80, lites: { cols: 1, rows: 1 } });
 
   // ---- Roofs.
-  roof(sId, { shape: 'gable', outline: outline(MAIN), ridgeAngle: 0, pitch: 8, overhang: 24 });
-  roof(fId, { shape: 'gable', outline: outline(WING), ridgeAngle: 0, pitch: 8, overhang: 18 });
+  // Main roof about 6:12 (photos 3 and 8 both read 5.5 to 7); the wing's ridge meets the main east
+  // wall just under the upstairs south window (photo 3), about 7:12.
+  roof(sId, { shape: 'gable', outline: outline(MAIN), ridgeAngle: 0, pitch: 6, overhang: 24 });
+  roof(fId, { shape: 'gable', outline: outline(WING), ridgeAngle: 0, pitch: 7, overhang: 18 });
   // Entry porch: a gable with its ridge east-west, so the gable faces west over the entry (photo 8;
   // about 5:12, eaves well past the knee walls). The porch's west wall rises into the gable.
   roof(fId, { shape: 'gable', outline: outline(PORCH), ridgeAngle: 0, pitch: 5, overhang: 18 });
