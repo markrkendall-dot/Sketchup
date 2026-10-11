@@ -192,8 +192,8 @@ so a plan with photos can be a few megabytes.
 
 `docs/examples/146-mick-road.json` is a starter plan of the owner's house, made from the site
 sketch and nine photos (`docs/photos/`) so that the 3D model already reads as the same house:
-the gable roof with deep eaves, the east wing with its own gable, the screened and entry porches
-with their roofs and posts, the brick chimney, shingle below and clapboard above, the multi-lite
+the gable roof with deep eaves, the east wing with its own gable, the entry porch with its knee
+walls and west-facing gable, the brick chimney, shingle below and clapboard above, the multi-lite
 windows, the green shutters and the walkout basement on the lake side. It is a **starter, not a
 survey**: only two things in it are measured, the main block's 26.5' x 25.5' outside size (from
 the sketch) and the wall thickness defaults. Everything else is an estimate from the photos, and
@@ -222,13 +222,15 @@ and the plan's north angle is 0.
   faces and shingle on the north and west faces (photos 1, 3, 6 and 8), all `#5a3a35`.
 - **East wing**, First Floor over a walkout basement bump, flush with the south face, with its own
   gable roof (ridge east-west) and the double door below it.
-- **Screened porch** (screen walls, shed roof sloping north) and **entry porch** (open: two posts,
-  a gable facing west, the entry door in the house wall behind it) on the west face, the screened
-  part reaching 4' north of the north wall, as photos 6, 7 and 8 show.
+- **Entry porch** on the west face at its north end, flush with the north face (photo 8, taken
+  facing east; photos 6 and 7 show the same porch from the road): shingled walls with openings above
+  a 36" knee wall, glazed on its north side and in the front's north bay, open in the front's south
+  bay and on its south side, the entry in line with the house door, and a gable facing west. The
+  wall pieces between the openings stand in for the posts.
 - **Main roof**: gable over the Second Floor, ridge east-west, 8:12, 24" overhang, metal
   `#6e6259`. **Chimney** against the north wall, centred.
 - **Windows and doors** on the four faces, each with lites; shutters on the two west windows.
-- **Terrain**: thirteen grade points, see below.
+- **Terrain**: fourteen grade points, see below.
 - No interior partitions and no stairs: those are the next job (below).
 - Not modelled: the deck and its stairs, the concrete retaining wall, the lot, the entry porch
   floor and steps, the foundation under the wing and porches (the ground meets them where the
@@ -239,7 +241,8 @@ and the plan's north angle is 0.
 With the lake to the south and the road to the north, east is on your left when you stand on
 the road and look at the house. Photos 1 and 9 (from the lake) and photo 6 (from the road) put
 the wing and its roof on the **east** side, and photos 7 and 8 put the entry porch with the
-number 146 and the shuttered window on the **west** face. The owner's sketch agrees once you
+number 146 and the shuttered window on the **west** face. The owner confirmed that photo 8 was
+taken facing east, so its left side is north. The owner's sketch agrees once you
 read it with north at the bottom: its top-left extension is the south-east wing and its small
 box on the right is the north-west porch. The starter follows that. If your own measuring says
 otherwise, mirror the plan (the `x` coordinates in the script) before you refine it.
@@ -258,24 +261,24 @@ from the main block's outside corners (north-west corner = 0, 0).
 | First-floor height above the basement floor | basement floor -100", first floor top +2" | Basement floor to first floor |
 | East wing size and place | 12' east-west x 10' north-south, flush with the south face | Outside, at the foundation |
 | Wing north wall | 10' from the south face (y 186") | From the south-east corner |
-| Screened porch | 8' deep x 8' long, 4' north of the north wall | Outside faces, at the floor |
-| Entry porch | 6' deep x 8' long, starts 8" south of the screened porch | Outside faces, at the floor |
-| Entry door | 36 x 80, centred 8'-8" from the north corner (y 104") | Jamb to the corner |
+| Entry porch | 5'-6" out x 8' along the wall, flush with the north face | Outside faces, at the floor |
+| Porch openings | knee walls 36"; front: glazed bay 18" wide, entry 36", open bay 18"; north side glazed 44"; south side open 44" | Jamb to jamb, knee wall height |
+| Entry door | 36 x 80, centred 4' from the north corner (y 48") | Jamb to the corner |
 | Chimney | 24 x 40, centred on the north wall (x 159") | Width, projection, position |
 | South windows, first floor | 140 x 60 at x 105" and 96 x 60 at x 260" (6 x 2 lites), sill 30 | Jamb to corner, rough opening |
 | South windows, second floor | 88 x 48 at x 115" and 64 x 48 at x 256" (6 x 3 lites), sill 30 | Same |
-| West windows | first floor 96 x 48, sill 30, shutters; second floor 48 x 36, sill 36, shutters; both at y 204" | Jamb to the north corner |
+| West windows | first floor three-sash 96 x 40, sill 47 (head above the door head), at y 203"; second floor 48 x 28, 4 x 2 lites, sill 50, at y 200"; both with shutters | Jamb to the north corner |
 | North windows | first floor 72 x 48 at x 96" and 48 x 36 at x 234"; second floor 48 x 40 at x 78" and x 240" | Jamb to the west corner |
 | East windows | second floor two 48 x 40 at y 96" and y 216"; first floor 36 x 40 at y 150" | Jamb to the north corner |
 | Wing windows | east end 60 x 48; north face 48 x 40; south face 36 x 36 | Rough openings |
 | Basement double door | 60 x 80 on the wing's south wall | Jamb to jamb |
-| Roof pitches | main 8:12, wing 8:12, screened porch 3:12, entry porch 6:12 | A level and a tape against the rafter or the gable |
-| Roof overhangs | main 24", wing 18", porches 12" | Eave to the wall face |
+| Roof pitches | main 8:12, wing 8:12, entry porch 5:12 | A level and a tape against the rafter or the gable |
+| Roof overhangs | main 24", wing 18", entry porch 18" | Eave to the wall face |
 | Roof thickness, fascia | 8", 6" | Fascia board |
 | Grade points | see below | Spot levels from the floor top down |
 
 Grade points (absolute elevation in inches; the first floor top is +2", the basement floor -100"):
-north corners of the main block -4, north-west of the screened porch -4, middle of the north wall
+north corners of the main block -4, the porch's north-west corner -4 and south-west corner -8, middle of the north wall
 -4, middle of the west wall -8, south-west corner -14, south-east corner -88, the wing's south-east
 corner -100 and north-east corner -70, a point 10' south of the south wall at its middle -100 and
 another 10' south of the wing -100 (the terrace in front of the doors), and two points 30' north of
@@ -287,7 +290,7 @@ level and a tape or a laser, and edit them in the Site tab.
 1. **The exterior perimeter and the wall thickness first.** Outside, at the foundation or the
    first-floor sill, corner to corner; thickness at a jamb. Set "Lengths to: outside face". Fix the
    main block if it is not square, then the basement walls.
-2. **The wing and the porches**, outside faces: size, where each starts, and where its roof
+2. **The wing and the porch**, outside faces: size, where each starts, and where its roof
    meets the wall. Move their walls by selecting the walls and typing positions in the panel; drag
    the roof outline's corners to match, or press "Fit to walls".
 3. **The windows and doors, by jamb distance** from the nearer corner's inside face to the near
@@ -307,9 +310,9 @@ Set the view to **All** and **Draw as: new**, then:
   outside faces, joining the house at T junctions, then add a roof (`K`, still *new*) with its
   own pitch and overhang. Windows and doors in those walls are *new* too. Where the new wall
   replaces an existing wall or window, select the old one and **Mark demolish**.
-- **The porch.** Select the existing porch roof and both posts, **Mark demolish**. Draw the larger
-  porch as new: posts (Site tab, `C`, Tab for a post, with Draw as *new*), its roof, and any
-  walls. The entry door stays unless you change it.
+- **The porch.** Select the existing porch's three walls and its roof, **Mark demolish**. Draw the
+  larger porch as new: its walls (with openings above the knee walls, or posts from the Site tab,
+  `C`, Tab for a post), its roof, and any steps. The entry door stays unless you change it.
 - **The garage.** From the sketch: 24' x 26', 55' west of the house and 20' from the road. Draw its
   walls on the First Floor as *new*, outside the house (the retaining walls themselves are not
   modelled).

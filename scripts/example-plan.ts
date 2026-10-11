@@ -6,8 +6,7 @@
 // Coordinates: inches, plan x east, y south (down the screen), north is the road side. Everything is
 // laid out from the OUTSIDE faces of the walls, the way the owner's tape reads, and the centerlines
 // are set 3.25" (half of 6.5") inside them, which is what "Lengths to: outside face" does by hand.
-import { columnDefaults, groundAt } from '../src/derive/site';
-import { getLevelElevations } from '../src/derive/levels';
+import { columnDefaults } from '../src/derive/site';
 import { dist } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import type { Id, Opening, Phase, Plan, Roof, Vec2 } from '../src/model/types';
@@ -28,11 +27,14 @@ const CL = { x0: MAIN.x0 + HALF, x1: MAIN.x1 - HALF, y0: MAIN.y0 + HALF, y1: MAI
 // East wing (estimated 12' x 10'), one storey with its own gable, on the east wall at the south end,
 // its south face flush with the main block's (photos 1, 3, 9; the owner's sketch puts it there too).
 const WING = { x0: MAIN.x1, x1: MAIN.x1 + ft(12), y0: MAIN.y1 - ft(10), y1: MAIN.y1 };
-// Screened porch on the west face at its north end (estimated 8' deep, 8' long), reaching 4' north
-// of the main block's north face as in photos 6 and 7.
-const SCREEN = { x0: -ft(8), x1: MAIN.x0, y0: -ft(4), y1: ft(4) };
-// Entry porch: open, 8' along the west face by 6' out, south of the screened porch.
-const ENTRY = { x0: -ft(6), x1: MAIN.x0, y0: ft(4) + 8, y1: ft(4) + 8 + ft(8) };
+// Entry porch: one structure on the west face at its north end, flush with the north face (photo 8,
+// taken facing east; photos 6 and 7 show the same porch from the road). Estimated 8' along the wall
+// by 5'6" out. Shingled knee walls with a glazed panel on its north side and the front's north bay,
+// open bays above the knee walls elsewhere, the entry opening in line with the house door, and its own
+// gable facing west.
+const PORCH = { x0: -66, x1: MAIN.x0, y0: MAIN.y0, y1: ft(8) };
+/** The house door and the porch entry share this line (photo 8). */
+const ENTRY_Y = ft(4);
 
 const FINISH_COLOR = '#5a3a35';
 const BLOCK_COLOR = '#8a8580';
@@ -168,16 +170,16 @@ export function buildExamplePlan(): Plan {
   drawWalls(bId, [{ x: CL.x1, y: wing.y0 }, { x: wing.x1, y: wing.y0 }, { x: wing.x1, y: wing.y1 }, { x: CL.x1, y: wing.y1 }], TB);
   store().updateWalls(bId, Object.keys(level(bId).walls), { finish: 'plain', color: BLOCK_COLOR });
 
-  // ---- First Floor: the block, the east wing and the screened porch on the west face.
+  // ---- First Floor: the block, the east wing and the entry porch on the west face. The porch's north
+  // wall continues the house's north wall in a straight line.
   drawWalls(fId, ring(CL), T, true);
   const wingWalls = drawWalls(fId, [{ x: CL.x1, y: wing.y0 }, { x: wing.x1, y: wing.y0 }, { x: wing.x1, y: wing.y1 }, { x: CL.x1, y: wing.y1 }], T);
-  const sc = centerline(SCREEN, HALF);
-  const screenWalls = drawWalls(fId, [{ x: CL.x0, y: CL.y0 }, { x: CL.x0, y: sc.y0 }, { x: sc.x0, y: sc.y0 }, { x: sc.x0, y: sc.y1 }, { x: CL.x0, y: sc.y1 }], T);
+  const pc = centerline(PORCH, HALF);
+  drawWalls(fId, [{ x: CL.x0, y: CL.y0 }, { x: pc.x0, y: pc.y0 }, { x: pc.x0, y: pc.y1 }, { x: CL.x0, y: pc.y1 }], T);
   store().updateWalls(fId, Object.keys(level(fId).walls), { finish: 'shingle', color: FINISH_COLOR });
   // The wing's east gable end is clapboard (photo 3).
   const fl = level(fId);
   store().updateWalls(fId, wingWalls.filter((id) => fl.nodes[fl.walls[id].a].x === wing.x1 && fl.nodes[fl.walls[id].b].x === wing.x1), { finish: 'clapboard' });
-  store().updateWalls(fId, screenWalls, { finish: 'screen' });
 
   // ---- Second Floor: the block. Clapboard on the south and east faces, shingle on the north and
   // west ones (photos 1, 3, 6, 8).
@@ -199,7 +201,8 @@ export function buildExamplePlan(): Plan {
   };
   gp(MAIN.x0, MAIN.y0, -4);
   gp(MAIN.x1, MAIN.y0, -4);
-  gp(SCREEN.x0, SCREEN.y0, -4);
+  gp(PORCH.x0, PORCH.y0, -4);
+  gp(PORCH.x0, PORCH.y1, -8);
   gp(MAIN.x1 / 2, MAIN.y0, -4);
   gp(MAIN.x0, MAIN.y1 / 2, -8);
   gp(MAIN.x0, MAIN.y1, -14);
@@ -221,10 +224,20 @@ export function buildExamplePlan(): Plan {
   win(fId, { x: 260, y: south }, 96, 60, 6, 2);
   win(sId, { x: 115, y: south }, 88, 48, 6, 3);
   win(sId, { x: 256, y: south }, 64, 48, 6, 3);
-  // West face (the entry): the door in the porch, the shuttered windows.
-  addOpeningAt(fId, { x: west, y: (ENTRY.y0 + ENTRY.y1) / 2 }, { type: 'door', width: 36, height: 80, lites: { cols: 1, rows: 1 } });
-  win(fId, { x: west, y: ft(17) }, 96, 48, 6, 3, { shutters: true });
-  win(sId, { x: west, y: ft(17) }, 48, 36, 4, 3, { shutters: true, sill: 36 });
+  // West face (the entry, photo 8): the door inside the porch, a three-sash window set high (its head
+  // above the door head) and a 4 x 2 lite window upstairs, both with shutters.
+  addOpeningAt(fId, { x: west, y: ENTRY_Y }, { type: 'door', width: 36, height: 80, lites: { cols: 1, rows: 1 } });
+  win(fId, { x: west, y: 203 }, 96, 40, 3, 1, { shutters: true, sill: 47 });
+  win(sId, { x: west, y: 200 }, 48, 28, 4, 2, { shutters: true, sill: 50 });
+  // The porch: knee walls 36" high. Its front has a glazed north bay, the entry in line with the
+  // house door and an open south bay; its north side is glazed and its south side open above the
+  // knee wall (the south side is not in the photos: estimate).
+  const knee = 36;
+  win(fId, { x: (PORCH.x0 + 6.5) / 2, y: pc.y0 }, 44, 40, 3, 1, { sill: knee });
+  win(fId, { x: pc.x0, y: 17.5 }, 18, 40, 1, 2, { sill: knee });
+  addOpeningAt(fId, { x: pc.x0, y: ENTRY_Y }, { type: 'passage', width: 36, height: 80, sill: 0 });
+  addOpeningAt(fId, { x: pc.x0, y: 78.5 }, { type: 'passage', width: 18, height: 44, sill: knee });
+  addOpeningAt(fId, { x: (PORCH.x0 + 6.5) / 2, y: pc.y1 }, { type: 'passage', width: 44, height: 44, sill: knee });
   // North face (the road): first floor either side of the chimney, second floor two windows.
   win(fId, { x: ft(8), y: north }, 72, 48, 6, 3);
   win(fId, { x: ft(19.5), y: north }, 48, 36, 2, 1);
@@ -244,24 +257,18 @@ export function buildExamplePlan(): Plan {
   // ---- Roofs.
   roof(sId, { shape: 'gable', outline: outline(MAIN), ridgeAngle: 0, pitch: 8, overhang: 24 });
   roof(fId, { shape: 'gable', outline: outline(WING), ridgeAngle: 0, pitch: 8, overhang: 18 });
-  // Screened porch: a shed sloping down to the north (ridgeAngle is the downhill direction).
-  roof(fId, { shape: 'shed', outline: outline(SCREEN), ridgeAngle: 270, pitch: 3, overhang: 12 });
-  roof(fId, { shape: 'gable', outline: outline(ENTRY), ridgeAngle: 0, pitch: 6, overhang: 12 });
+  // Entry porch: a gable with its ridge east-west, so the gable faces west over the entry (photo 8;
+  // about 5:12, eaves well past the knee walls). The porch's west wall rises into the gable.
+  roof(fId, { shape: 'gable', outline: outline(PORCH), ridgeAngle: 0, pitch: 5, overhang: 18 });
 
-  // ---- Chimney against the north wall, and the entry porch posts (6 x 6, grade to 96 above the first floor).
+  // ---- Chimney against the middle of the north wall (photo 6; photo 8 shows it at the same spot in
+  // perspective). The porch posts are the wall pieces between its openings, so no separate posts.
   const chimneyAt = { x: MAIN.x1 / 2, y: MAIN.y0 - 20 };
   const chimneyHeights = () => {
     const d = columnDefaults(getPlan(), 'chimney', chimneyAt);
     return { ...d, base: round2(d.base), top: round2(d.top) };
   };
   if (!store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights() })) throw new Error('chimney rejected');
-  const firstTop = getLevelElevations(getPlan())[fId].floorTop;
-  for (const at of [
-    { x: ENTRY.x0 + 3, y: ENTRY.y0 + 3 },
-    { x: ENTRY.x0 + 3, y: ENTRY.y1 - 3 },
-  ]) {
-    if (!store().addColumn({ at, width: 6, depth: 6, rotation: 0, base: round2(groundAt(getPlan(), at)), top: firstTop + 96, kind: 'post', phase: PHASE })) throw new Error('post rejected');
-  }
 
   // ---- Room labels, one per area (names say where a number is an estimate).
   const label = (levelId: Id, name: string, at: Vec2) => {
@@ -271,7 +278,7 @@ export function buildExamplePlan(): Plan {
   label(bId, 'Basement (unpartitioned, est.)', mid);
   label(fId, 'First floor (interior not measured)', mid);
   label(fId, 'East wing (est.)', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 });
-  label(fId, 'Screened porch (est.)', { x: (SCREEN.x0 + SCREEN.x1) / 2, y: (SCREEN.y0 + SCREEN.y1) / 2 });
+  label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
   label(sId, 'Second floor (interior not measured)', mid);
 
   return getPlan();

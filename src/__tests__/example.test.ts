@@ -58,12 +58,16 @@ describe('docs/examples/146-mick-road.json', () => {
 
   it('has the roofs, columns, windows, doors and terrain of the house', () => {
     const roofs = plan.levelOrder.flatMap((id) => Object.values(plan.levels[id].roofs));
-    expect(roofs).toHaveLength(4);
+    // Main gable, east wing gable, and the entry porch gable (one porch on the west face, photo 8).
+    expect(roofs).toHaveLength(3);
     expect(roofs.every((r) => r.finish === 'metal' && r.color === '#6e6259')).toBe(true);
-    expect(Object.values(plan.site.columns).map((c) => c.kind).sort()).toEqual(['chimney', 'post', 'post']);
+    expect(Object.values(plan.site.columns).map((c) => c.kind)).toEqual(['chimney']);
     const openings = plan.levelOrder.flatMap((id) => Object.values(plan.levels[id].openings));
-    expect(openings.filter((o) => o.type === 'window').length).toBeGreaterThanOrEqual(14);
+    expect(openings.filter((o) => o.type === 'window').length).toBeGreaterThanOrEqual(16);
     expect(openings.filter((o) => o.type === 'door')).toHaveLength(2);
+    // The porch's entry and its two open bays above the knee walls.
+    expect(openings.filter((o) => o.type === 'passage')).toHaveLength(3);
+    expect(Object.values(plan.levels[plan.levelOrder[1]].rooms).some((r) => r.name === 'Entry porch (est.)')).toBe(true);
     expect(Object.keys(plan.site.gradePoints).length).toBeGreaterThanOrEqual(8);
     expect(plan.site.northAngle).toBe(0);
   });
@@ -77,7 +81,7 @@ describe('docs/examples/146-mick-road.json', () => {
     const root = buildExportScene(plan, 'all', visibility);
     const names = new Set<string>();
     root.traverse((o) => names.add(o.name.replace(/ \d+.*$/, '')));
-    for (const n of ['Roof', 'Chimney', 'Post', 'Terrain', 'Window', 'Door', 'Floor']) expect(names, n).toContain(n);
+    for (const n of ['Roof', 'Chimney', 'Terrain', 'Window', 'Door', 'Floor']) expect(names, n).toContain(n);
     const box = new Box3().setFromObject(root);
     // The chimney and the main ridge are the tallest things: well above the second floor.
     expect(box.max.y / 0.0254).toBeGreaterThan(plan.baseFloorElevation + 2 * 96 + 100);
