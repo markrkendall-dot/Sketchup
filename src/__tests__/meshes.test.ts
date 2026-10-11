@@ -762,3 +762,88 @@ describe('walls under a roof', () => {
     expect(getLevelMeshes(moved, first.id, 'all').roofs[0].geometry).toBe(m2.roofs[0].geometry);
   });
 });
+
+describe('platform framing: exterior walls run up through the slab above', () => {
+  /** The 20' box on the basement (8" walls), First Floor and Second Floor (6.5" walls). */
+  function threeStories(): { plan: Plan; ids: string[] } {
+    const plan = createEmptyPlan();
+    const t = [8, 6.5, 6.5];
+    plan.levelOrder.forEach((id, i) => {
+      const l = plan.levels[id];
+      const nodes = { a: { x: 0, y: 0 }, b: { x: 240, y: 0 }, c: { x: 240, y: 240 }, d: { x: 0, y: 240 } };
+      for (const [nid, p] of Object.entries(nodes)) l.nodes[nid] = { id: nid, ...p };
+      (['ab', 'bc', 'cd', 'da'] as const).forEach((pair, k) => {
+        l.walls[`w${k}`] = { id: `w${k}`, a: pair[0], b: pair[1], thickness: t[i], kind: 'exterior', phase: 'existing' };
+      });
+    });
+    return { plan, ids: plan.levelOrder };
+  }
+
+  it('an exterior wall with a level above is that level floorThickness taller; the top level is not', () => {
+    const { plan, ids } = threeStories();
+    const [b, f, s] = ids.map((id) => getLevelMeshes(plan, id, 'all'));
+    // Basement wall 96 + the First Floor slab 12; First Floor wall 96 + the Second Floor slab 12.
+    for (const w of b.walls) expect(bbox(w.geometry).max[1]).toBeCloseTo(96 + 12, 6);
+    for (const w of f.walls) expect(bbox(w.geometry).max[1]).toBeCloseTo(96 + 12, 6);
+    for (const w of s.walls) expect(bbox(w.geometry).max[1]).toBeCloseTo(96, 6);
+    // A closed solid still.
+    expect(closedEdges(mergeAll(f.walls.map((w) => w.geometry.clone())))).toBe(true);
+    expect(closedEdges(mergeAll(b.walls.map((w) => w.geometry.clone())))).toBe(true);
+  });
+
+  it('interior walls and walls the level above does not cover keep their height', () => {
+    const { plan, ids } = threeStories();
+    const first = plan.levels[ids[1]];
+    first.nodes.m = { id: 'm', x: 0, y: 120 };
+    first.nodes.n = { id: 'n', x: 240, y: 120 };
+    first.walls.div = { id: 'div', a: 'm', b: 'n', thickness: 4.5, kind: 'interior', phase: 'existing' };
+    // A wing outside the Second Floor's outline.
+    first.nodes.p = { id: 'p', x: -120, y: 60 };
+    first.nodes.q = { id: 'q', x: -120, y: 180 };
+    first.nodes.r = { id: 'r', x: 0, y: 60 };
+    first.nodes.s = { id: 's', x: 0, y: 180 };
+    first.walls.wn = { id: 'wn', a: 'p', b: 'r', thickness: 6.5, kind: 'exterior', phase: 'existing' };
+    first.walls.ww = { id: 'ww', a: 'q', b: 'p', thickness: 6.5, kind: 'exterior', phase: 'existing' };
+    first.walls.ws = { id: 'ws', a: 's', b: 'q', thickness: 6.5, kind: 'exterior', phase: 'existing' };
+    const m = getLevelMeshes(plan, ids[1], 'all');
+    const top = (id: string) => bbox(m.walls.find((w) => w.id === id)!.geometry).max[1];
+    expect(top('div')).toBeCloseTo(96, 6);
+    expect(top('wn')).toBeCloseTo(96, 6);
+    expect(top('ww')).toBeCloseTo(96, 6);
+    expect(top('w0')).toBeCloseTo(108, 6);
+  });
+
+  it('openings stay clamped to the wall height', () => {
+    const { plan, ids } = threeStories();
+    const first = plan.levels[ids[1]];
+    first.openings.win = opening('w0', { id: 'win', offset: 120, sill: 40, height: 56 });
+    const g = getLevelMeshes(plan, ids[1], 'all').walls.find((w) => w.id === 'w0')!.geometry;
+    expect(inside(g, [120, 60, 0])).toBe(false); // the hole
+    expect(inside(g, [120, 100, 0])).toBe(true); // header up to the plate and on up through the slab
+    expect(inside(g, [120, 106, 0])).toBe(true);
+  });
+
+  it('the slab stops at the inside face of the walls that run up through it', () => {
+    const { plan, ids } = threeStories();
+    const faces = getFaces(plan.levels[ids[1]], 'all');
+    // Every edge on its own wall's inside face: 240 - 6.5 square.
+    expect(Math.abs(polygonSignedArea(slabOutlines(faces, true, true)[0]))).toBeCloseTo(233.5 * 233.5, 6);
+    // The First Floor slab sits on the 8" basement walls: edges at 4" in, the basement wall's inside face.
+    const first = getLevelMeshes(plan, ids[1], 'all');
+    expect(first.floor).toBeDefined();
+    expect(bbox(first.floor!)).toEqual({ min: [4, -12, 4], max: [236, 0, 236] });
+    expect(upArea(first.floor!)).toBeCloseTo(232 * 232, 6);
+    // The Second Floor slab sits on the 6.5" First Floor walls.
+    const second = getLevelMeshes(plan, ids[2], 'all');
+    expect(bbox(second.floor!)).toEqual({ min: [3.25, -12, 3.25], max: [236.75, 0, 236.75] });
+    // The Basement has no walls below it: its slab still reaches the outside faces.
+    const base = getLevelMeshes(plan, ids[0], 'all');
+    expect(bbox(base.floor!)).toEqual({ min: [-4, -4, -4], max: [244, 0, 244] });
+  });
+
+  it('a slab with no wall below it still reaches the outside face', () => {
+    const { plan, first } = boxPlan();
+    const m = getLevelMeshes(plan, first.id, 'all');
+    expect(bbox(m.floor!)).toEqual({ min: [-3.25, -12, -3.25], max: [243.25, 0, 243.25] });
+  });
+});

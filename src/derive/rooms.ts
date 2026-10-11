@@ -414,8 +414,17 @@ export function roomDimensions(netPolygon: readonly Vec2[]): RoomDimensions {
  * wall faces by half of each edge's wall thickness (the centerline polygon if that fails). Outer
  * faces of components that sit inside another component (a closet island) are skipped: the
  * enclosing slab already covers them.
+ *
+ * `inside` is for slabs under platform framing, where the walls below run up through the slab
+ * (DESIGN.md "Platform framing"): `true` stops every edge at the inside face of its wall (an inset
+ * of half the thickness instead of an outset); an array (per outer face, per edge) gives the inside
+ * distance of each edge, 0 meaning the edge still reaches the wall's outside face.
  */
-export function slabOutlines(faces: Pick<FaceSet, 'outerFaces' | 'outerFaceThickness'>, toWallFaces = true): Vec2[][] {
+export function slabOutlines(
+  faces: Pick<FaceSet, 'outerFaces' | 'outerFaceThickness'>,
+  toWallFaces = true,
+  inside: boolean | readonly (readonly number[])[] = false,
+): Vec2[][] {
   const out: Vec2[][] = [];
   faces.outerFaces.forEach((poly, k) => {
     const nested = faces.outerFaces.some((other, j) => j !== k && Math.abs(polygonSignedArea(other)) > Math.abs(polygonSignedArea(poly)) && pointInPolygon(poly[0], other));
@@ -425,8 +434,15 @@ export function slabOutlines(faces: Pick<FaceSet, 'outerFaces' | 'outerFaceThick
       out.push(poly);
       return;
     }
-    const grown = insetPolygon(poly, th.map((t) => -t / 2));
-    const ok = polygonSignedArea(grown) > polygonSignedArea(poly) && !selfIntersects(grown);
+    // Per edge, how far it moves inward from the centerline: negative reaches the outside face.
+    const insets = th.map((t, j) => {
+      if (inside === true) return t / 2;
+      const d = inside ? inside[k]?.[j] ?? 0 : 0;
+      return d > 0 ? d : -t / 2;
+    });
+    const grown = insetPolygon(poly, insets);
+    const area = polygonSignedArea(grown);
+    const ok = insets.every((d) => d < 0) ? area > polygonSignedArea(poly) && !selfIntersects(grown) : area > 0 && !selfIntersects(grown);
     out.push(ok ? grown : poly);
   });
   return out;

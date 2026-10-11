@@ -6,7 +6,7 @@ import type { MeasureTo } from '../model/types';
 import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planStore';
 import { isSiteModeTool, SITE_MODE_TOOL_HINT, useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
 import { visible3dLevels } from '../view3d/visibility';
-import { choosePlanFile, newPlan, savePlan, zoomToFit } from './fileActions';
+import { choosePlanFile, newPlan, openExample, savePlan, zoomToFit } from './fileActions';
 import { focusCanvas, releaseFocus } from './focus';
 
 /** `short` replaces the label below 1100 px (index.css hides one of the two spans). */
@@ -242,6 +242,14 @@ export function Toolbar() {
           </button>
           <button onClick={() => afterAction(choosePlanFile)} title="Open a plan file (Ctrl+O); replaces this plan">
             Open
+          </button>
+          <button
+            aria-label="Open example"
+            onClick={() => afterAction(() => void openExample())}
+            title="Open the 146 Mick Road starter plan (estimates flagged); replaces this plan"
+          >
+            <span className="lbl-long">Open example</span>
+            <span className="lbl-short">Example</span>
           </button>
           <button onClick={() => afterAction(savePlan)} title="Download the plan as a JSON file (Ctrl+S)">
             Save

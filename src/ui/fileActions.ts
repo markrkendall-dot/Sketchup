@@ -4,7 +4,7 @@ import { siteGhostLevelId } from '../derive/site';
 import { cancelActiveTool } from '../editor2d/tools';
 import { fitLevel, initialViewport } from '../editor2d/viewport';
 import { downloadPlan, planFileName, readPlanFile } from '../io/file';
-import { createEmptyPlan, defaultLevelId } from '../model/plan';
+import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
 import type { Plan } from '../model/types';
 import { clearHistory, getPlan, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
@@ -90,6 +90,28 @@ export function newPlan(): void {
   }
   replacePlan(createEmptyPlan());
   showNotice('Started a new plan.');
+}
+
+/**
+ * Open the bundled 146 Mick Road starter plan (docs/examples), after confirming when the current
+ * plan has content. The JSON loads on demand, so it is not part of the first download.
+ */
+export async function openExample(): Promise<void> {
+  const current = getPlan();
+  if (
+    planHasContent(current) &&
+    !window.confirm(`Open the 146 Mick Road example? "${current.name}" will be replaced and Undo cannot bring it back. Use Save first to keep a copy.`)
+  ) {
+    return;
+  }
+  try {
+    const { default: example } = await import('../../docs/examples/146-mick-road.json');
+    const plan = migrate(example);
+    replacePlan(plan);
+    showNotice(`Opened the example: ${plan.name}. Replace its estimates with your measurements.`, false, 8000);
+  } catch (err) {
+    showNotice(`Could not open the example: ${err instanceof Error ? err.message : String(err)}`, true);
+  }
 }
 
 /** Load a chosen plan file, replacing the current plan. Errors are reported, not thrown. */

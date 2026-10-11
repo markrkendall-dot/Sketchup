@@ -1,0 +1,1010 @@
+{
+  "schemaVersion": 2,
+  "id": "plan-146-mick-road",
+  "name": "146 Mick Road (starter, estimates flagged)",
+  "levelOrder": [
+    "level-b",
+    "level-f",
+    "level-s"
+  ],
+  "levels": {
+    "level-b": {
+      "id": "level-b",
+      "name": "Basement",
+      "wallHeight": 90,
+      "floorThickness": 4,
+      "nodes": {
+        "b-n1": {
+          "id": "b-n1",
+          "x": 3.25,
+          "y": 3.25
+        },
+        "b-n2": {
+          "id": "b-n2",
+          "x": 314.75,
+          "y": 3.25
+        },
+        "b-n3": {
+          "id": "b-n3",
+          "x": 314.75,
+          "y": 302.75
+        },
+        "b-n4": {
+          "id": "b-n4",
+          "x": 3.25,
+          "y": 302.75
+        },
+        "b-n5": {
+          "id": "b-n5",
+          "x": 314.75,
+          "y": 189.25
+        },
+        "b-n6": {
+          "id": "b-n6",
+          "x": 458.75,
+          "y": 189.25
+        },
+        "b-n7": {
+          "id": "b-n7",
+          "x": 458.75,
+          "y": 302.75
+        }
+      },
+      "walls": {
+        "b-w1": {
+          "id": "b-w1",
+          "a": "b-n1",
+          "b": "b-n2",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        },
+        "b-w2": {
+          "id": "b-w2",
+          "a": "b-n2",
+          "b": "b-n5",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        },
+        "b-w3": {
+          "id": "b-w3",
+          "a": "b-n3",
+          "b": "b-n4",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        },
+        "b-w4": {
+          "id": "b-w4",
+          "a": "b-n4",
+          "b": "b-n1",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        },
+        "b-w5": {
+          "id": "b-w5",
+          "a": "b-n5",
+          "b": "b-n6",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        },
+        "b-w6": {
+          "id": "b-w6",
+          "a": "b-n5",
+          "b": "b-n3",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        },
+        "b-w7": {
+          "id": "b-w7",
+          "a": "b-n6",
+          "b": "b-n7",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        },
+        "b-w8": {
+          "id": "b-w8",
+          "a": "b-n7",
+          "b": "b-n3",
+          "thickness": 8,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#8a8580"
+        }
+      },
+      "openings": {
+        "b-o1": {
+          "wallId": "b-w8",
+          "type": "door",
+          "offset": 68.75,
+          "width": 60,
+          "height": 80,
+          "sill": 0,
+          "phase": "existing",
+          "swing": {
+            "hinge": "a",
+            "side": "left"
+          },
+          "lites": {
+            "cols": 1,
+            "rows": 1
+          },
+          "id": "b-o1"
+        }
+      },
+      "rooms": {
+        "b-r1": {
+          "name": "Basement (unpartitioned, est.)",
+          "anchor": {
+            "x": 159,
+            "y": 153
+          },
+          "id": "b-r1"
+        }
+      },
+      "stairs": {},
+      "roofs": {}
+    },
+    "level-f": {
+      "id": "level-f",
+      "name": "First Floor",
+      "wallHeight": 96,
+      "floorThickness": 12,
+      "nodes": {
+        "f-n1": {
+          "id": "f-n1",
+          "x": 3.25,
+          "y": 3.25
+        },
+        "f-n2": {
+          "id": "f-n2",
+          "x": 314.75,
+          "y": 3.25
+        },
+        "f-n3": {
+          "id": "f-n3",
+          "x": 314.75,
+          "y": 302.75
+        },
+        "f-n4": {
+          "id": "f-n4",
+          "x": 3.25,
+          "y": 302.75
+        },
+        "f-n5": {
+          "id": "f-n5",
+          "x": 314.75,
+          "y": 189.25
+        },
+        "f-n6": {
+          "id": "f-n6",
+          "x": 458.75,
+          "y": 189.25
+        },
+        "f-n7": {
+          "id": "f-n7",
+          "x": 458.75,
+          "y": 302.75
+        },
+        "f-n8": {
+          "id": "f-n8",
+          "x": 3.25,
+          "y": -44.75
+        },
+        "f-n9": {
+          "id": "f-n9",
+          "x": -92.75,
+          "y": -44.75
+        },
+        "f-n10": {
+          "id": "f-n10",
+          "x": -92.75,
+          "y": 44.75
+        },
+        "f-n11": {
+          "id": "f-n11",
+          "x": 3.25,
+          "y": 44.75
+        }
+      },
+      "walls": {
+        "f-w1": {
+          "id": "f-w1",
+          "a": "f-n1",
+          "b": "f-n2",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w2": {
+          "id": "f-w2",
+          "a": "f-n2",
+          "b": "f-n5",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w3": {
+          "id": "f-w3",
+          "a": "f-n3",
+          "b": "f-n4",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w4": {
+          "id": "f-w4",
+          "a": "f-n4",
+          "b": "f-n11",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w5": {
+          "id": "f-w5",
+          "a": "f-n5",
+          "b": "f-n6",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w6": {
+          "id": "f-w6",
+          "a": "f-n5",
+          "b": "f-n3",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w7": {
+          "id": "f-w7",
+          "a": "f-n6",
+          "b": "f-n7",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "clapboard",
+          "color": "#5a3a35"
+        },
+        "f-w8": {
+          "id": "f-w8",
+          "a": "f-n7",
+          "b": "f-n3",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w9": {
+          "id": "f-w9",
+          "a": "f-n1",
+          "b": "f-n8",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "screen",
+          "color": "#5a3a35"
+        },
+        "f-w10": {
+          "id": "f-w10",
+          "a": "f-n8",
+          "b": "f-n9",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "screen",
+          "color": "#5a3a35"
+        },
+        "f-w11": {
+          "id": "f-w11",
+          "a": "f-n9",
+          "b": "f-n10",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "screen",
+          "color": "#5a3a35"
+        },
+        "f-w12": {
+          "id": "f-w12",
+          "a": "f-n10",
+          "b": "f-n11",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "screen",
+          "color": "#5a3a35"
+        },
+        "f-w13": {
+          "id": "f-w13",
+          "a": "f-n11",
+          "b": "f-n1",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        }
+      },
+      "openings": {
+        "f-o1": {
+          "wallId": "f-w3",
+          "type": "window",
+          "offset": 209.75,
+          "width": 140,
+          "height": 60,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 6,
+            "rows": 2
+          },
+          "id": "f-o1"
+        },
+        "f-o2": {
+          "wallId": "f-w3",
+          "type": "window",
+          "offset": 54.75,
+          "width": 96,
+          "height": 60,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 6,
+            "rows": 2
+          },
+          "id": "f-o2"
+        },
+        "f-o3": {
+          "wallId": "f-w4",
+          "type": "door",
+          "offset": 198.75,
+          "width": 36,
+          "height": 80,
+          "sill": 0,
+          "phase": "existing",
+          "swing": {
+            "hinge": "a",
+            "side": "left"
+          },
+          "lites": {
+            "cols": 1,
+            "rows": 1
+          },
+          "id": "f-o3"
+        },
+        "f-o4": {
+          "wallId": "f-w4",
+          "type": "window",
+          "offset": 98.75,
+          "width": 96,
+          "height": 48,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 6,
+            "rows": 3
+          },
+          "shutters": true,
+          "id": "f-o4"
+        },
+        "f-o5": {
+          "wallId": "f-w1",
+          "type": "window",
+          "offset": 92.75,
+          "width": 72,
+          "height": 48,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 6,
+            "rows": 3
+          },
+          "id": "f-o5"
+        },
+        "f-o6": {
+          "wallId": "f-w1",
+          "type": "window",
+          "offset": 230.75,
+          "width": 48,
+          "height": 36,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 2,
+            "rows": 1
+          },
+          "id": "f-o6"
+        },
+        "f-o7": {
+          "wallId": "f-w2",
+          "type": "window",
+          "offset": 146.75,
+          "width": 36,
+          "height": 40,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "id": "f-o7"
+        },
+        "f-o8": {
+          "wallId": "f-w7",
+          "type": "window",
+          "offset": 56.75,
+          "width": 60,
+          "height": 48,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "id": "f-o8"
+        },
+        "f-o9": {
+          "wallId": "f-w5",
+          "type": "window",
+          "offset": 75.25,
+          "width": 48,
+          "height": 40,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "id": "f-o9"
+        },
+        "f-o10": {
+          "wallId": "f-w8",
+          "type": "window",
+          "offset": 68.75,
+          "width": 36,
+          "height": 36,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 2,
+            "rows": 2
+          },
+          "id": "f-o10"
+        }
+      },
+      "rooms": {
+        "f-r1": {
+          "name": "First floor (interior not measured)",
+          "anchor": {
+            "x": 159,
+            "y": 153
+          },
+          "id": "f-r1"
+        },
+        "f-r2": {
+          "name": "East wing (est.)",
+          "anchor": {
+            "x": 390,
+            "y": 246
+          },
+          "id": "f-r2"
+        },
+        "f-r3": {
+          "name": "Screened porch (est.)",
+          "anchor": {
+            "x": -48,
+            "y": 0
+          },
+          "id": "f-r3"
+        }
+      },
+      "stairs": {},
+      "roofs": {
+        "f-k1": {
+          "shape": "gable",
+          "outline": [
+            {
+              "x": 318,
+              "y": 186
+            },
+            {
+              "x": 462,
+              "y": 186
+            },
+            {
+              "x": 462,
+              "y": 306
+            },
+            {
+              "x": 318,
+              "y": 306
+            }
+          ],
+          "ridgeAngle": 0,
+          "pitch": 8,
+          "overhang": 18,
+          "bearingOffset": 0,
+          "thickness": 8,
+          "fascia": 6,
+          "phase": "existing",
+          "finish": "metal",
+          "color": "#6e6259",
+          "id": "f-k1"
+        },
+        "f-k2": {
+          "shape": "shed",
+          "outline": [
+            {
+              "x": -96,
+              "y": -48
+            },
+            {
+              "x": 0,
+              "y": -48
+            },
+            {
+              "x": 0,
+              "y": 48
+            },
+            {
+              "x": -96,
+              "y": 48
+            }
+          ],
+          "ridgeAngle": 270,
+          "pitch": 3,
+          "overhang": 12,
+          "bearingOffset": 0,
+          "thickness": 8,
+          "fascia": 6,
+          "phase": "existing",
+          "finish": "metal",
+          "color": "#6e6259",
+          "id": "f-k2"
+        },
+        "f-k3": {
+          "shape": "gable",
+          "outline": [
+            {
+              "x": -72,
+              "y": 56
+            },
+            {
+              "x": 0,
+              "y": 56
+            },
+            {
+              "x": 0,
+              "y": 152
+            },
+            {
+              "x": -72,
+              "y": 152
+            }
+          ],
+          "ridgeAngle": 0,
+          "pitch": 6,
+          "overhang": 12,
+          "bearingOffset": 0,
+          "thickness": 8,
+          "fascia": 6,
+          "phase": "existing",
+          "finish": "metal",
+          "color": "#6e6259",
+          "id": "f-k3"
+        }
+      }
+    },
+    "level-s": {
+      "id": "level-s",
+      "name": "Second Floor",
+      "wallHeight": 96,
+      "floorThickness": 12,
+      "nodes": {
+        "s-n1": {
+          "id": "s-n1",
+          "x": 3.25,
+          "y": 3.25
+        },
+        "s-n2": {
+          "id": "s-n2",
+          "x": 314.75,
+          "y": 3.25
+        },
+        "s-n3": {
+          "id": "s-n3",
+          "x": 314.75,
+          "y": 302.75
+        },
+        "s-n4": {
+          "id": "s-n4",
+          "x": 3.25,
+          "y": 302.75
+        }
+      },
+      "walls": {
+        "s-w1": {
+          "id": "s-w1",
+          "a": "s-n1",
+          "b": "s-n2",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "s-w2": {
+          "id": "s-w2",
+          "a": "s-n2",
+          "b": "s-n3",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "clapboard",
+          "color": "#5a3a35"
+        },
+        "s-w3": {
+          "id": "s-w3",
+          "a": "s-n3",
+          "b": "s-n4",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "clapboard",
+          "color": "#5a3a35"
+        },
+        "s-w4": {
+          "id": "s-w4",
+          "a": "s-n4",
+          "b": "s-n1",
+          "thickness": 6.5,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        }
+      },
+      "openings": {
+        "s-o1": {
+          "wallId": "s-w3",
+          "type": "window",
+          "offset": 199.75,
+          "width": 88,
+          "height": 48,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 6,
+            "rows": 3
+          },
+          "id": "s-o1"
+        },
+        "s-o2": {
+          "wallId": "s-w3",
+          "type": "window",
+          "offset": 58.75,
+          "width": 64,
+          "height": 48,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 6,
+            "rows": 3
+          },
+          "id": "s-o2"
+        },
+        "s-o3": {
+          "wallId": "s-w4",
+          "type": "window",
+          "offset": 98.75,
+          "width": 48,
+          "height": 36,
+          "sill": 36,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "shutters": true,
+          "id": "s-o3"
+        },
+        "s-o4": {
+          "wallId": "s-w1",
+          "type": "window",
+          "offset": 74.75,
+          "width": 48,
+          "height": 40,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "id": "s-o4"
+        },
+        "s-o5": {
+          "wallId": "s-w1",
+          "type": "window",
+          "offset": 236.75,
+          "width": 48,
+          "height": 40,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "id": "s-o5"
+        },
+        "s-o6": {
+          "wallId": "s-w2",
+          "type": "window",
+          "offset": 92.75,
+          "width": 48,
+          "height": 40,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "id": "s-o6"
+        },
+        "s-o7": {
+          "wallId": "s-w2",
+          "type": "window",
+          "offset": 212.75,
+          "width": 48,
+          "height": 40,
+          "sill": 30,
+          "phase": "existing",
+          "lites": {
+            "cols": 4,
+            "rows": 3
+          },
+          "id": "s-o7"
+        }
+      },
+      "rooms": {
+        "s-r1": {
+          "name": "Second floor (interior not measured)",
+          "anchor": {
+            "x": 159,
+            "y": 153
+          },
+          "id": "s-r1"
+        }
+      },
+      "stairs": {},
+      "roofs": {
+        "s-k1": {
+          "shape": "gable",
+          "outline": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 318,
+              "y": 0
+            },
+            {
+              "x": 318,
+              "y": 306
+            },
+            {
+              "x": 0,
+              "y": 306
+            }
+          ],
+          "ridgeAngle": 0,
+          "pitch": 8,
+          "overhang": 24,
+          "bearingOffset": 0,
+          "thickness": 8,
+          "fascia": 6,
+          "phase": "existing",
+          "finish": "metal",
+          "color": "#6e6259",
+          "id": "s-k1"
+        }
+      }
+    }
+  },
+  "baseFloorElevation": -100,
+  "settings": {
+    "snapGrid": 1,
+    "displayGrid": 12,
+    "precisionDenominator": 16,
+    "defaultExteriorThickness": 6.5,
+    "defaultInteriorThickness": 4.5
+  },
+  "site": {
+    "northAngle": 0,
+    "gradePoints": {
+      "grade-1": {
+        "id": "grade-1",
+        "at": {
+          "x": 0,
+          "y": 0
+        },
+        "elevation": -4
+      },
+      "grade-2": {
+        "id": "grade-2",
+        "at": {
+          "x": 318,
+          "y": 0
+        },
+        "elevation": -4
+      },
+      "grade-3": {
+        "id": "grade-3",
+        "at": {
+          "x": -96,
+          "y": -48
+        },
+        "elevation": -4
+      },
+      "grade-4": {
+        "id": "grade-4",
+        "at": {
+          "x": 159,
+          "y": 0
+        },
+        "elevation": -4
+      },
+      "grade-5": {
+        "id": "grade-5",
+        "at": {
+          "x": 0,
+          "y": 153
+        },
+        "elevation": -8
+      },
+      "grade-6": {
+        "id": "grade-6",
+        "at": {
+          "x": 0,
+          "y": 306
+        },
+        "elevation": -14
+      },
+      "grade-7": {
+        "id": "grade-7",
+        "at": {
+          "x": 318,
+          "y": 306
+        },
+        "elevation": -88
+      },
+      "grade-8": {
+        "id": "grade-8",
+        "at": {
+          "x": 462,
+          "y": 306
+        },
+        "elevation": -100
+      },
+      "grade-9": {
+        "id": "grade-9",
+        "at": {
+          "x": 462,
+          "y": 186
+        },
+        "elevation": -70
+      },
+      "grade-10": {
+        "id": "grade-10",
+        "at": {
+          "x": 159,
+          "y": 426
+        },
+        "elevation": -100
+      },
+      "grade-11": {
+        "id": "grade-11",
+        "at": {
+          "x": 390,
+          "y": 426
+        },
+        "elevation": -100
+      },
+      "grade-12": {
+        "id": "grade-12",
+        "at": {
+          "x": 79.5,
+          "y": -360
+        },
+        "elevation": 6
+      },
+      "grade-13": {
+        "id": "grade-13",
+        "at": {
+          "x": 238.5,
+          "y": -360
+        },
+        "elevation": 6
+      }
+    },
+    "columns": {
+      "column-1": {
+        "at": {
+          "x": 159,
+          "y": -20
+        },
+        "kind": "chimney",
+        "phase": "existing",
+        "width": 24,
+        "depth": 40,
+        "rotation": 0,
+        "base": -16.92,
+        "top": 364,
+        "id": "column-1"
+      },
+      "column-2": {
+        "at": {
+          "x": -69,
+          "y": 59
+        },
+        "width": 6,
+        "depth": 6,
+        "rotation": 0,
+        "base": -9.95,
+        "top": 98,
+        "kind": "post",
+        "phase": "existing",
+        "id": "column-2"
+      },
+      "column-3": {
+        "at": {
+          "x": -69,
+          "y": 149
+        },
+        "width": 6,
+        "depth": 6,
+        "rotation": 0,
+        "base": -13.07,
+        "top": 98,
+        "kind": "post",
+        "phase": "existing",
+        "id": "column-3"
+      }
+    }
+  },
+  "modifiedAt": "2026-01-01T00:00:00.000Z"
+}

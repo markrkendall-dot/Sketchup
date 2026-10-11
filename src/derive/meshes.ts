@@ -7,6 +7,7 @@ import { DEFAULT_TRIM, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible } from './phase';
+import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, type FaceSet } from './rooms';
 import { columnOutline, planTerrain, type TerrainGrid } from './site';
 import { roofColorOf } from '../model/finish';
@@ -195,13 +196,14 @@ export function wallSpans(
   openings: readonly Opening[],
   wallHeight: number,
   viewMode: ViewMode = 'all',
+  openingTop: number = wallHeight,
 ): WallSpan[] {
   const holes: Hole[] = [];
   for (const o of openings) {
     if (o.wallId !== wall.id || !isOpeningVisible(o, wall, viewMode)) continue;
     const sym = openingSymbol(fp, o);
     const bottom = Math.max(0, o.sill);
-    const top = Math.min(wallHeight, o.sill + o.height);
+    const top = Math.min(openingTop, o.sill + o.height);
     if (sym.j1 - sym.j0 > 1e-6 && top - bottom > 1e-6) holes.push({ j0: sym.j0, j1: sym.j1, bottom, top });
   }
   const cuts = [...new Set(holes.flatMap((h) => [h.j0, h.j1]))].sort((p, q) => p - q);
@@ -329,6 +331,11 @@ export interface WallContext {
    * so the join face above the wall height is internal.
    */
   raisedJoin?: { a: boolean; b: boolean };
+  /**
+   * Height openings are clamped to when the wall is taller than its level's wall height (an
+   * exterior wall running up through the slab above). Default: the wall height.
+   */
+  openingTop?: number;
 }
 
 /** Split spans at the given centerline positions (each piece keeps its solid ranges). */
@@ -364,7 +371,7 @@ export function buildWallGeometry(
 ): BufferGeometry {
   const H = wallHeight;
   const profile = ctx.roofTop ?? null;
-  let spans = wallSpans(fp, wall, openings, H, viewMode);
+  let spans = wallSpans(fp, wall, openings, H, viewMode, ctx.openingTop ?? H);
   if (profile) spans = splitSpans(spans, profile.s.slice(1, -1));
   const a0 = dot(fp.dir, fp.a);
   let src: readonly Vec2[] = fp.poly;
@@ -558,9 +565,10 @@ export function buildFloorGeometry(
   faces: Pick<FaceSet, 'outerFaces' | 'outerFaceThickness'>,
   holes: readonly (readonly Vec2[])[],
   thickness: number,
+  inside: boolean | readonly (readonly number[])[] = false,
 ): BufferGeometry | null {
   if (!(thickness > EPS)) return null;
-  const outlines = slabOutlines(faces);
+  const outlines = slabOutlines(faces, true, inside);
   if (outlines.length === 0) return null;
   const parts = outlines.map((outline) => {
     const inside: (readonly Vec2[])[] = [];
@@ -747,6 +755,8 @@ interface WallEntry {
 interface FloorEntry {
   outerFaces: FaceSet['outerFaces'];
   outerFaceThickness: FaceSet['outerFaceThickness'];
+  /** Per outer-face edge, the inside distance of the wall below that runs up through the slab (slabInsets). */
+  insets: number[][] | null;
   belowStairs: Level['stairs'] | undefined;
   thickness: number;
   geometry: BufferGeometry | null;
@@ -779,6 +789,9 @@ interface LevelEntry {
   level: Level;
   belowStairs: Level['stairs'] | undefined;
   ftf: number;
+  /** The neighbours the platform framing reads: walls through the slab above, slab inset by the walls below. */
+  above: Level | undefined;
+  below: Level | undefined;
   result: LevelMeshes;
 }
 
@@ -865,8 +878,9 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const idx = plan.levelOrder.indexOf(levelId);
   const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
   const ftf = floorToFloor(plan, levelId);
+  const aboveLevel = idx >= 0 ? plan.levels[plan.levelOrder[idx + 1]] : undefined;
   const hit = levelCache.get(key);
-  if (hit && hit.level === level && hit.belowStairs === below?.stairs && hit.ftf === ftf) return hit.result;
+  if (hit && hit.level === level && hit.belowStairs === below?.stairs && hit.ftf === ftf && hit.above === aboveLevel && hit.below === below) return hit.result;
   pruneCaches(plan);
 
   // Walls.
@@ -876,9 +890,12 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const nextWalls = new Map<Id, WallEntry>();
   const walls: WallMesh[] = [];
   const heightOf = (w: Wall) => w.heightOverride ?? level.wallHeight;
+  // Platform framing: an exterior wall under the slab of the level above runs up through it.
+  const extensions = wallExtensions(plan, levelId, viewMode);
+  const topOf = (w: Wall) => heightOf(w) + (extensions.get(w.id) ?? 0);
   // Level-wide band heights: every visible sill and head, every wall height.
   const bandSet = new Set<number>();
-  for (const w of Object.values(level.walls)) if (fps.has(w.id)) bandSet.add(heightOf(w));
+  for (const w of Object.values(level.walls)) if (fps.has(w.id)) bandSet.add(topOf(w));
   for (const o of Object.values(level.openings)) {
     if (!fps.has(o.wallId) || !isOpeningVisible(o, level.walls[o.wallId], viewMode)) continue;
     bandSet.add(Math.max(0, o.sill));
@@ -898,7 +915,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     for (const w of Object.values(level.walls)) {
       const fp = fps.get(w.id);
       if (!fp || w.kind !== 'exterior') continue;
-      const pr = wallRoofProfile(fp, heightOf(w), roofsOnLevel);
+      const pr = wallRoofProfile(fp, topOf(w), roofsOnLevel);
       if (pr) profiles.set(w.id, pr);
     }
   }
@@ -908,7 +925,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     if (!fp) continue;
     for (const n of [w.a, w.b]) {
       const list = atNode.get(n);
-      const item = { id: w.id, h: heightOf(w), seeThrough: isSeeThrough(w.phase), dir: fp.dir, t: w.thickness };
+      const item = { id: w.id, h: topOf(w), seeThrough: isSeeThrough(w.phase), dir: fp.dir, t: w.thickness };
       if (list) list.push(item);
       else atNode.set(n, [item]);
     }
@@ -928,7 +945,8 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const fp = fps.get(wall.id);
     if (!fp) continue;
     const openings = byWall.get(wall.id);
-    const height = heightOf(wall);
+    const openingTop = heightOf(wall);
+    const height = topOf(wall);
     const endHeights = { a: lowestOther(wall.a, wall), b: lowestOther(wall.b, wall) };
     const buttHeights = { a: buttCover(wall.a, wall, fp.dir), b: buttCover(wall.b, wall, fp.dir) };
     const splitPoints = splitPointsFor(fp, fps.values());
@@ -959,7 +977,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
             openings,
             height,
             ctxKey,
-            geometry: buildWallGeometry(fp, wall, openings ?? [], height, viewMode, { bands, endHeights, buttHeights, splitPoints, roofTop, raisedJoin }),
+            geometry: buildWallGeometry(fp, wall, openings ?? [], height, viewMode, { bands, endHeights, buttHeights, splitPoints, roofTop, raisedJoin, openingTop }),
           };
     nextWalls.set(wall.id, entry);
     walls.push({ id: wall.id, geometry: entry.geometry, phase: wall.phase, kind: wall.kind, finish: wallFinishOf(wall), color: wallColorOf(wall) });
@@ -970,12 +988,14 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   // Floor slab.
   const faces = getFaces(level, viewMode);
   const belowStairs = below?.stairs;
+  const insets = slabInsets(plan, levelId, viewMode);
   const prevFloor = floorCache.get(key);
   let floor: FloorEntry;
   if (
     prevFloor &&
     sameRings(prevFloor.outerFaces, faces.outerFaces) &&
     sameRings(prevFloor.outerFaceThickness, faces.outerFaceThickness) &&
+    sameRings(prevFloor.insets ?? [], insets ?? []) &&
     prevFloor.belowStairs === belowStairs &&
     prevFloor.thickness === level.floorThickness
   ) {
@@ -986,9 +1006,10 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     floor = {
       outerFaces: faces.outerFaces,
       outerFaceThickness: faces.outerFaceThickness,
+      insets,
       belowStairs,
       thickness: level.floorThickness,
-      geometry: buildFloorGeometry(faces, holes, level.floorThickness),
+      geometry: buildFloorGeometry(faces, holes, level.floorThickness, insets ?? false),
     };
     floorCache.set(key, floor);
   }
@@ -1051,7 +1072,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   openingCache.set(key, nextFills);
 
   const result: LevelMeshes = { walls, stairs, roofs, openings: openingMeshes, ...(floor.geometry ? { floor: floor.geometry } : {}) };
-  levelCache.set(key, { level, belowStairs, ftf, result });
+  levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, result });
   return result;
 }
 

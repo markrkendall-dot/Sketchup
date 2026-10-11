@@ -2,6 +2,10 @@
 
 ## Context
 
+> Correction after M11: the compass reading below has east and west swapped. The one-story wing
+> is on the east side (flush with the south face) and the entry porch and screened porch are on
+> the west. The photo file names in `docs/photos/` were renamed to match.
+
 HomePlan v1 draws walls, openings, rooms, stairs, three stacked levels, and a 3D model with
 existing/proposed phases, export to SketchUp, and a walkthrough. MK wants an accurate current-state
 model of his house, and v1 cannot render it: the house has a gable roof with deep overhangs, a

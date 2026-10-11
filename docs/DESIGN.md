@@ -206,7 +206,9 @@ instead). Then:
 - Floor slab: each outer face polygon (reversed, positive), pushed out by half of each edge's wall
   thickness to the exterior faces (`outerFaceThickness` from rooms.ts), with holes for stairs on the
   level below that have `cutsFloorAbove` (only holes that fit strictly inside). Outer faces nested in
-  another component are skipped. If a level has no closed outer face, draw no slab.
+  another component are skipped. If a level has no closed outer face, draw no slab. Where the walls
+  of the level below run up through the slab, the edge stops at their inside face instead (see
+  "Platform framing").
 - Stairs: one solid, the stepped side profile extruded across the width (`risers` =
   round(floor-to-floor / 7.5")), the last step flush with the floor above.
 
@@ -269,6 +271,35 @@ Close on the first corner, a double-click or Enter. Defaults: gable, ridge along
 the bounding box, 8:12, 24" overhang, 8" thick, 6" fascia, metal, the toolbar's "Draw as" phase.
 "Fit to walls" in the panel sets the outline to the level's outer-face polygon when the walls close
 exactly one ring.
+
+## Platform framing (`derive/platform.ts`)
+
+The exterior walls of a level run up through the floor slab of the level above, and that slab stops
+at their inside face, so the siding is continuous from one storey to the next (without it a band of
+bare slab edge shows between the shingles and the clapboard).
+
+- **`wallExtensions(plan, levelId, viewMode)`**: for each visible exterior wall of the level, the
+  floor thickness of the level above, when the middle of the wall's centerline lies on, or inside,
+  an outer outline (`FaceSet.outerFaces`, the centerline polygon of a component) of the level above,
+  within 1" (that level has a slab there for the wall to run through). A wing or porch the level above
+  does not cover, interior walls, the top level and levels whose upper neighbour has no closed outer
+  face get nothing. Memoized per level object and per upper `outerFaces`.
+- **Walls**: in `getLevelMeshes` the wall's height is `heightOverride ?? wallHeight` plus its
+  extension (`topOf`), for the bands, the join heights, the roof profile base and the built geometry.
+  `wallRoofProfile` takes the extended height as its base, so a roof on the level still bears at
+  `wallHeight + bearingOffset` and only the flat part of the top is raised: the profile is
+  `max(extended height, roof underside)`. Openings are still clamped to the level's wall height
+  (`WallContext.openingTop`, `wallSpans`' `openingTop`), and the opening fills use the unextended
+  height. The top level's walls get nothing, so roofs on the top level are unaffected.
+- **Slabs**: `slabInsets(plan, levelId, viewMode)` gives, per outer-face edge of the level, half the
+  thickness of the extended wall below whose centerline coincides with the edge (parallel, midpoint
+  within 1"), 0 where none does. `slabOutlines(faces, toWallFaces, inside)` takes it as `inside`
+  (`true` insets every edge by half its own wall's thickness; an array gives the distances per face
+  and edge; 0 keeps the edge on the outside face, as for a wing built on its own slab). The slab
+  edge therefore meets the inside face of the wall below exactly: no overlap and no coplanar caps
+  (a basement wall thicker than the wall above leaves a ledge on top, which is the point of a
+  foundation). The floor cache also depends on the insets, and `levelCache` entries on the level
+  above and below.
 
 ## Site and terrain (`derive/site.ts`, `editor2d/tools/siteTools.ts`)
 
@@ -601,6 +632,17 @@ without spaces), disposed after
 export. glTF: `GLTFExporter`, `binary: true`, `trs: true`. OBJ: `OBJExporter` on the same group with
 the scale reset to 1 (inches; SketchUp asks for units) and each mesh name prefixed with its level,
 since OBJ objects are flat. Only what the current view mode and level visibility show is exported.
+
+## The starter plan (`scripts/example-plan.ts`, `docs/examples/146-mick-road.json`)
+
+A plan of 146 Mick Road for the owner to refine, built by script through the store actions (so it
+passes `normalizeLevel`, clamping and validation) and written by `npm run build:example`
+(`scripts/run-ts.mjs` loads the script through Vite, so it can import the app's extensionless
+TypeScript; ids are renamed to stable ones and the date is fixed, so a second run changes nothing).
+`example.test.ts` loads the file through `migrate()` and checks it against the script's output. The
+toolbar's "Open example" (`fileActions.openExample`) loads it with a dynamic import (a separate
+chunk), after the same confirmation as New when the plan has content. Dimensions and the estimates
+are in the README ("Modelling 146 Mick Road").
 
 ## Risks
 
