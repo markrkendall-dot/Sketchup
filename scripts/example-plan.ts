@@ -8,7 +8,7 @@
 // are set 3.5" (half of 7") inside them, which is what "Lengths to: outside face" does by hand. The
 // First Floor interior is the owner's tape measurements (face to face), set out from the inside faces.
 import { columnDefaults } from '../src/derive/site';
-import { dist } from '../src/model/geometry';
+import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import type { Id, Opening, Phase, Plan, Roof, Vec2 } from '../src/model/types';
 import { getPlan, usePlanStore } from '../src/store/planStore';
@@ -23,14 +23,16 @@ const TI = 5;
 const TB = 8;
 const HALF = T / 2;
 
-// Main block: outside faces x 0..318 (26'6"), y 0..304 (25'4"); centerlines HALF inside. Along the lake
-// wall the measured interior is 11'6" + 5" + 13'5" = 25'4" between 7" walls, 26'6" outside.
-const MAIN = { x0: 0, x1: ft(26.5), y0: 0, y1: ft(25) + 4 };
+// Main block: outside faces x 0..318 (26'6") and y 0..315 (26'3"); centerlines HALF inside. Along the lake
+// wall the measured interior is 11'6" + 5" + 13'5" = 25'4" between 7" walls, 26'6" outside. North-south
+// the inside is 301": the upstairs west side (Bunk 90 + 5 + stair strip 33 + 5 + Master 168), which the
+// First Floor shares (hall 90 + 5 + strip 33 + 5 + Living 168), so 301 + 14 = 315 outside.
+const MAIN = { x0: 0, x1: ft(26.5), y0: 0, y1: ft(26) + 3 };
 const CL = { x0: MAIN.x0 + HALF, x1: MAIN.x1 - HALF, y0: MAIN.y0 + HALF, y1: MAIN.y1 - HALF };
 
 // East wing (the Utility), one storey with its own gable, on the east wall at the south end, its south
 // face flush with the main block's (photos 1, 3, 9; the owner's sketch puts it there too). Interior
-// measured 11'6" x 9'5", so outside x 318..463, y 177..304 (its west side is the main block's east wall).
+// measured 11'6" x 9'5", so outside x 318..463, y 188..315 (its west side is the main block's east wall).
 const UTILITY = { w: ft(11.5), d: ft(9) + 5 };
 const WING = { x0: MAIN.x1, x1: MAIN.x1 + UTILITY.w + T, y0: MAIN.y1 - UTILITY.d - 2 * T, y1: MAIN.y1 };
 // Entry porch: one structure on the west face at its north end, flush with the north face (photo 8,
@@ -102,10 +104,21 @@ interface OpeningSpec {
   lites?: { cols: number; rows: number };
   shutters?: boolean;
   swing?: NonNullable<Opening['swing']>;
+  /** Doors: the direction the leaf swings toward (picks the swing side from the wall's direction). */
+  into?: Vec2;
 }
 
 function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
   const { wallId, offset } = wallAt(levelId, p);
+  let swing = o.swing;
+  if (o.type === 'door' && o.into) {
+    const lvl = level(levelId);
+    const w = lvl.walls[wallId];
+    const dir = normalize(sub(lvl.nodes[w.b], lvl.nodes[w.a]));
+    // 'left' is the wall's left normal (perpLeft of its direction); pick the side facing `into`.
+    const left = perpLeft(dir);
+    swing = { hinge: 'a', side: left.x * o.into.x + left.y * o.into.y > 0 ? 'left' : 'right' };
+  }
   const id = store().addOpening(levelId, {
     wallId,
     type: o.type,
@@ -114,7 +127,7 @@ function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
     height: o.height,
     sill: o.sill ?? (o.type === 'door' ? 0 : 30),
     phase: PHASE,
-    ...(o.type === 'door' ? { swing: o.swing ?? { hinge: 'a' as const, side: 'left' as const } } : {}),
+    ...(o.type === 'door' ? { swing: swing ?? { hinge: 'a' as const, side: 'left' as const } } : {}),
     ...(o.lites ? { lites: o.lites } : {}),
     ...(o.shutters ? { shutters: true } : {}),
   });
@@ -196,23 +209,22 @@ export function buildExamplePlan(): Plan {
   store().updateWalls(fId, wingWalls.filter((id) => fl.nodes[fl.walls[id].a].x === wing.x1 && fl.nodes[fl.walls[id].b].x === wing.x1), { finish: 'clapboard' });
 
   // ---- First Floor interior (the owner's tape, face to face; see the README). Centerlines are half a
-  // partition (2.5") off the measured faces. Every partition ends on a wall or another partition, so
-  // the joints split them automatically.
-  //   Kitchen/Living partition x 170.5 (faces 168..173) from the lake wall up to the Kitchen's north wall.
-  //   Kitchen north wall y 99.5 (faces 97..102), east wall to that partition.
-  //   Bath west wall x 194.5 (faces 192..197), the Kitchen's north wall up to the north wall.
-  //   Stair south wall y 125.5 (faces 123..128), the partition to the west wall.
-  //   Stair north wall y 84.5 (faces 82..87), the west wall to x 132: its east end is free (the stair's
-  //   open end, so the status bar shows one open wall end).
-  const PART = { kl: 170.5, kitchenNorth: 99.5, bathWest: 194.5, stairSouth: 125.5, stairNorth: 84.5, stairEnd: 132 };
-  partition(fId, { x: PART.kl, y: CL.y1 }, { x: PART.kl, y: PART.kitchenNorth });
-  partition(fId, { x: CL.x1, y: PART.kitchenNorth }, { x: PART.kl, y: PART.kitchenNorth });
-  partition(fId, { x: PART.bathWest, y: PART.kitchenNorth }, { x: PART.bathWest, y: CL.y0 });
+  // partition (2.5") off the measured faces. The north-south bands are shared with the Second Floor:
+  // north band y 7..97, wall y 99.5 (97..102), stair strip y 102..135, wall y 137.5 (135..140), south
+  // band y 140..308. Every partition ends on a wall or another partition, so there are no open ends.
+  //   y 99.5 line (faces 97..102), east wall to west wall: the Kitchen's north wall and the hall's south wall.
+  //   Kitchen/Living partition x 170.5 (faces 168..173) from the lake wall up to that line.
+  //   Bath west wall x 194.5 (faces 192..197), that line up to the north wall.
+  //   Stair south wall y 137.5 (faces 135..140), the west wall to the partition.
+  const PART = { kl: 170.5, line: 99.5, bathWest: 194.5, stairSouth: 137.5 };
+  partition(fId, { x: CL.x1, y: PART.line }, { x: CL.x0, y: PART.line });
+  partition(fId, { x: PART.kl, y: CL.y1 }, { x: PART.kl, y: PART.line });
+  partition(fId, { x: PART.bathWest, y: PART.line }, { x: PART.bathWest, y: CL.y0 });
   partition(fId, { x: PART.kl, y: PART.stairSouth }, { x: CL.x0, y: PART.stairSouth });
-  partition(fId, { x: CL.x0, y: PART.stairNorth }, { x: PART.stairEnd, y: PART.stairNorth });
-  // The stair climbs west from (132, 105) to the west wall's inside face, 36" wide between the stair
-  // walls (y 87..123), and cuts the Second Floor's floor.
-  if (!store().addStairs(fId, { origin: { x: PART.stairEnd, y: 105 }, direction: 180, width: 36, run: 125, phase: PHASE, cutsFloorAbove: true })) throw new Error('stairs rejected');
+  // The stair climbs east from the west wall's inside face (x 7) to x 132, 33" wide (the whole strip,
+  // y 102..135), under the Second Floor's landing, and cuts the Second Floor's floor.
+  const STRIP_MID = 118.5;
+  if (!store().addStairs(fId, { origin: { x: CL.x0 + HALF, y: STRIP_MID }, direction: 0, width: 33, run: 125, phase: PHASE, cutsFloorAbove: true })) throw new Error('stairs rejected');
 
   // ---- Second Floor: the block. Clapboard on the south and east faces, shingle on the north and
   // west ones (photos 1, 3, 6, 8).
@@ -225,6 +237,19 @@ export function buildExamplePlan(): Plan {
     return (a.y === CL.y0 && b.y === CL.y0) || (a.x === CL.x0 && b.x === CL.x0);
   });
   store().updateWalls(sId, shingled, { finish: 'shingle' });
+
+  // ---- Second Floor interior (the owner's sketch; partitions 5", existing). Same bands as the First
+  // Floor. East-west the west side is Bunk/Master x 7..169, wall x 171.5 (169..174), the east side
+  // x 174..311. The x 171.5 line has a gap at y 102..135 where the landing opens east to the hall.
+  const UP = { line: 99.5, strip: 137.5, ew: 171.5, closet: 39.5, bathEast: 220.5, bathSouth: 83.5, guestNorth: 152.5 };
+  partition(sId, { x: CL.x0, y: UP.line }, { x: UP.ew, y: UP.line }); // Bunk south wall
+  partition(sId, { x: UP.ew, y: CL.y0 }, { x: UP.ew, y: UP.line }); // Bunk east wall
+  partition(sId, { x: CL.x0, y: UP.strip }, { x: UP.ew, y: UP.strip }); // Master north wall
+  partition(sId, { x: UP.ew, y: UP.strip }, { x: UP.ew, y: CL.y1 }); // Master/Guest partition
+  partition(sId, { x: UP.closet, y: UP.line }, { x: UP.closet, y: UP.strip }); // Closet east wall
+  partition(sId, { x: UP.bathEast, y: CL.y0 }, { x: UP.bathEast, y: UP.bathSouth }); // Bath east wall
+  partition(sId, { x: UP.ew, y: UP.bathSouth }, { x: UP.bathEast, y: UP.bathSouth }); // Bath south wall
+  partition(sId, { x: UP.ew, y: UP.guestNorth }, { x: CL.x1, y: UP.guestNorth }); // Guest north wall
 
   // ---- Terrain (all estimates, see the README): the road side meets the first floor, the west end of
   // the south face is nearly at grade, and the ground falls away to the basement floor at the east
@@ -275,17 +300,32 @@ export function buildExamplePlan(): Plan {
   addOpeningAt(fId, { x: pc.x0, y: 78.5 }, { type: 'passage', width: 18, height: 44, sill: knee });
   addOpeningAt(fId, { x: (PORCH.x0 + T) / 2, y: pc.y1 }, { type: 'passage', width: 44, height: 44, sill: knee });
   // First Floor passages and the Bath door (centres from the jambs). Kitchen/Living: 48", south jamb 6' from
-  // the lake wall's inside face (y 177..225). Stair south wall's east end: 36" (x 132..168, up to the
-  // partition's west face). Bath: 30" x 80" door, north jamb 6" from the north wall's inside face (y 13..43,
-  // an estimate), swinging into the hall.
-  addOpeningAt(fId, { x: PART.kl, y: 201 }, { type: 'passage', width: 48, height: 80, sill: 0 });
+  // the lake wall's inside face (y 188..236). Hall to Stair strip (y 99.5 line) and Stair strip to Living
+  // (y 137.5 wall): 36" each at x 132..168, up to the partition's west face. The stair's bottom opens to
+  // Living by a 30" opening at x 7..37. Bath: 30" x 80" door, north jamb 6" from the north wall's inside
+  // face (y 13..43, an estimate), swinging into the hall.
+  const WEST = { x: -1, y: 0 };
+  const NORTH = { x: 0, y: -1 };
+  const SOUTH = { x: 0, y: 1 };
+  addOpeningAt(fId, { x: PART.kl, y: 212 }, { type: 'passage', width: 48, height: 80, sill: 0 });
+  addOpeningAt(fId, { x: 150, y: PART.line }, { type: 'passage', width: 36, height: 80, sill: 0 });
   addOpeningAt(fId, { x: 150, y: PART.stairSouth }, { type: 'passage', width: 36, height: 80, sill: 0 });
-  addOpeningAt(fId, { x: PART.bathWest, y: 28 }, { type: 'door', width: 30, height: 80, lites: { cols: 1, rows: 1 } });
+  addOpeningAt(fId, { x: 22, y: PART.stairSouth }, { type: 'passage', width: 30, height: 80, sill: 0 });
+  addOpeningAt(fId, { x: PART.bathWest, y: 28 }, { type: 'door', width: 30, height: 80, lites: { cols: 1, rows: 1 }, into: WEST });
+  // Second Floor doors and openings (the sketch): Bunk and Master doors 28" off the landing, closet
+  // opening 24", Bath door 24" swinging out into the hall, Guest door 30" into the Guest.
+  addOpeningAt(sId, { x: 150, y: UP.line }, { type: 'door', width: 28, height: 80, into: NORTH });
+  addOpeningAt(sId, { x: 150, y: UP.strip }, { type: 'door', width: 28, height: 80, into: SOUTH });
+  addOpeningAt(sId, { x: 22, y: UP.strip }, { type: 'passage', width: 24, height: 80, sill: 0 });
+  addOpeningAt(sId, { x: 196, y: UP.bathSouth }, { type: 'door', width: 24, height: 80, into: SOUTH });
+  addOpeningAt(sId, { x: 196, y: UP.guestNorth }, { type: 'door', width: 30, height: 80, into: SOUTH });
   // North face (the road): first floor either side of the chimney, second floor two windows.
   win(fId, { x: ft(8), y: north }, 72, 48, 6, 3);
   win(fId, { x: ft(19.5), y: north }, 48, 36, 2, 1);
   win(sId, { x: ft(6.5), y: north }, 48, 40, 4, 3);
-  win(sId, { x: ft(20), y: north }, 48, 40, 4, 3);
+  // The east one was centred x 240, which put its west jamb across the Bath's east wall (x 220.5, face
+  // 223); it sits in the Office, so it moves east to x 248 (jambs 224..272).
+  win(sId, { x: 248, y: north }, 48, 40, 4, 3);
   // East face (photo 3, taken facing west): two double-sash windows upstairs, the south one just
   // north of where the wing's ridge meets the wall, and one set high on the first floor north of the
   // wing.
@@ -323,14 +363,21 @@ export function buildExamplePlan(): Plan {
   };
   const mid = { x: MAIN.x1 / 2, y: MAIN.y1 / 2 };
   label(bId, 'Basement (unpartitioned, est.)', mid);
-  label(fId, 'Kitchen', { x: (PART.kl + 2.5 + (CL.x1 - HALF)) / 2, y: (PART.kitchenNorth + 2.5 + (CL.y1 - HALF)) / 2 });
+  // First Floor: one label in each face (anchors well inside the faces).
+  label(fId, 'Entry hall', { x: 100, y: 52 });
+  label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: 52 });
+  label(fId, 'Kitchen (17\'2" adjusted: re-measure)', { x: (PART.kl + 2.5 + (CL.x1 - HALF)) / 2, y: (PART.line + 2.5 + (CL.y1 - HALF)) / 2 });
   label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 });
-  label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: (CL.y0 + HALF + (PART.kitchenNorth - 2.5)) / 2 });
-  // The hall is the north-west room plus the stair well (open at the stair's east end); label its north part.
-  label(fId, 'Entry hall (6\'3" adjusted)', { x: 100, y: 40 });
+  label(fId, 'Stair', { x: 100, y: STRIP_MID });
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 });
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
-  label(sId, 'Second floor (interior not measured)', mid);
+  // Second Floor. The Office / hall is one face with the landing and the stair well.
+  label(sId, 'Bunk', { x: 90, y: 52 });
+  label(sId, 'Bath', { x: (UP.ew + 2.5 + (UP.bathEast - 2.5)) / 2, y: 45 });
+  label(sId, 'Master closet', { x: (CL.x0 + HALF + (UP.closet - 2.5)) / 2, y: STRIP_MID });
+  label(sId, 'Master', { x: 90, y: 225 });
+  label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 });
+  label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 });
 
   return getPlan();
 }

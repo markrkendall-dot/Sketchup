@@ -195,11 +195,13 @@ sketch and nine photos (`docs/photos/`) so that the 3D model already reads as th
 the gable roof with deep eaves, the east wing with its own gable, the entry porch with its knee
 walls and west-facing gable, the brick chimney, shingle below and clapboard above, the multi-lite
 windows, the green shutters and the walkout basement on the lake side. It is a **starter, not a
-survey**. The First Floor interior is measured (the owner's tape, face to face): the five rooms
-below, the 5" partitions and the stair. The exterior wall thickness (7") is derived from those
-measurements. Everything else (the second floor, the basement, the windows, the roofs, the
-porch, the terrain) is an estimate from the photos, and every room name that depends on one says
-"(est.)" or "not measured". The plan's name says so too.
+survey**. Both floors' interiors come from the owner's tape and sketches (face to face): the First
+Floor's rooms, 5" partitions and stair, and the Second Floor's rooms and partitions. The exterior
+wall thickness (7") and the outside size are derived from those measurements. Everything else (the
+basement, the windows, the roofs, the porch, the terrain) is an estimate from the photos, and every
+room name that depends on one says "(est.)" or "not measured". A room name that says "adjusted"
+is a measurement that disagreed with a neighbour and was changed to make the house close (see
+below). The plan's name says so too.
 
 Open it with **Open example**. Replace the estimates one by one with tape measurements, in the
 order below, then draw the renovation on top.
@@ -217,13 +219,13 @@ and the plan's north angle is 0.
 - **Levels**: Basement (wall height 90", slab 4"), First Floor (96", 12"), Second Floor (96",
   12"); the basement floor is at -100" so that the road side meets the first floor and the lake
   side falls to the basement floor.
-- **Main block**, on all three levels: outside faces x 0 to 318 (26'6"), y 0 to 304 (25'4"). The wall
+- **Main block**, on all three levels: outside faces x 0 to 318 (26'6"), y 0 to 315 (26'3"). The wall
   centerlines are placed 3 1/2" inside those faces by hand, which is what "Lengths to: outside
   face" does for you when you draw. Exterior walls 7"; the basement's concrete-block walls are
   8", plain grey (`#8a8580`). First Floor shingle, Second Floor clapboard on the south and east
   faces and shingle on the north and west faces (photos 1, 3, 6 and 8), all `#5a3a35`.
 - **East wing** (the Utility), First Floor over a walkout basement bump, flush with the south face,
-  interior 11'6" x 9'5" so outside x 318 to 463, y 177 to 304, with its own gable roof (ridge east-west) and the double door below it.
+  interior 11'6" x 9'5" so outside x 318 to 463, y 188 to 315, with its own gable roof (ridge east-west) and the double door below it.
 - **Entry porch** on the west face at its north end, flush with the north face (photo 8, taken
   facing east; photos 6 and 7 show the same porch from the road): shingled walls with openings above
   a 36" knee wall, glazed on its north side and in the front's north bay, open in the front's south
@@ -233,17 +235,33 @@ and the plan's north angle is 0.
   `#6e6259`. **Chimney** against the north wall, centred.
 - **Windows and doors** on the four faces, each with lites; shutters on the two west windows.
 - **Terrain**: fifteen grade points, see below.
-- **First Floor interior** (measured, face to face; partitions 5", existing): the Kitchen/Living
-  partition (x 170.5 centerline) with a 48" passage, the Kitchen's north wall, the Bath's west
-  wall with a 30" x 80" door, and the two stair walls (y 125.5 and y 84.5), with a 36" passage at
-  the south one's east end. The stair climbs west from x 132 to the west wall, 36" wide, and cuts
-  the Second Floor's floor. Rooms, east-west x north-south: Kitchen 11'6" x 16'3", Living
-  13'5" x 14'1", Bath 9'6" x 7'6", Entry hall 15'5" x 6'3" (adjusted, see below), Utility
-  11'6" x 9'5".
-- **One open wall end is expected** on the First Floor (the status bar says "1 open wall end"):
-  the stair's north wall stops at x 132, which is the stair's open end. Leave it; it is not a
-  drawing mistake.
-- The Second Floor and the basement have no partitions yet.
+- **The two floors share three north-south bands** (inside faces, from the north wall): the north
+  band y 7 to 97 (7'6"), a 5" wall (centerline y 99.5), the stair strip y 102 to 135 (2'9"), a 5"
+  wall (centerline y 137.5), and the south band y 140 to 308. The north-south inside length is 301",
+  which is the upstairs west side (Bunk 90 + 5 + strip 33 + 5 + Master 168).
+- **First Floor interior** (measured, face to face; partitions 5", existing): the y 99.5 line from
+  the east wall to the west wall (the Kitchen's north wall and the hall's south wall) with a 36"
+  passage at x 132 to 168; the Kitchen/Living partition (x 170.5) with a 48" passage (y 188 to
+  236, south jamb 6' from the lake wall); the Bath's west wall (x 194.5) with a 30" x 80" door;
+  and the stair's south wall (y 137.5) with a 36" passage at x 132 to 168 and a 30" opening at
+  x 7 to 37 (the stair's bottom, from Living). The stair climbs **east** from the west wall's
+  inside face (x 7) to x 132, 33" wide (the whole 2'9" strip), under the Second Floor's landing,
+  and cuts the Second Floor's floor. Rooms, east-west x north-south: Entry hall 15'5" x 7'6",
+  Bath 9'6" x 7'6", Kitchen 11'6" x 17'2" (adjusted, see below), Living 13'5" x 14'0", Stair
+  13'5" x 2'9" (the strip), Utility 11'6" x 9'5". There are **no open wall ends** on this floor.
+- **Second Floor interior** (the owner's sketch, face to face; partitions 5", existing): the Bunk's
+  south wall (y 99.5) and east wall (x 171.5), the Master's north wall (y 137.5) and the
+  Master/Guest partition (x 171.5), the closet's east wall (x 39.5), the Bath's east (x 220.5) and
+  south (y 83.5) walls, and the Guest's north wall (y 152.5). The x 171.5 line has a gap at y 102
+  to 135: the landing (x 131 to 169) opens east to the hall in front of the Bath and the Office.
+  Doors: Bunk 28" and Master 28" (centred x 150, off the landing, swinging into the Bunk and the
+  Master), Bath 24" (centred x 196, swinging out into the hall), Guest 30" (centred x 196,
+  swinging into the Guest); the Master closet is a 24" opening (centred x 22). Rooms: Bunk
+  13'6" x 7'6", Bath 3'8" x 6'2", Master closet 2'6" x 2'9", Master 13'6" x 14'0", Guest 11'5" x
+  12'9" (adjusted), Office / hall 7'4" x 11'11" (adjusted). The Office / hall is one face with the
+  landing and the stair well, with no wall between them, so its net bounding box is wide
+  (x 42 to 311) and its panel lists the sides of the L. Also no open wall ends.
+- The basement has no partitions yet.
 - Not modelled: the deck and its stairs, the concrete retaining wall, the lot, the entry porch
   floor and steps, the foundation under the wing and porches (the ground meets them where the
   grade points say it does).
@@ -267,15 +285,19 @@ from the main block's outside corners (north-west corner = 0, 0).
 | What | Starter value (estimate) | Measure |
 | --- | --- | --- |
 | Wall thickness, exterior | 7" (derived: the measured interior 11'6" + 5" + 13'5" = 25'4" against the sketch's 26'6" outside) | At a door jamb |
-| Outside size of the main block | 26'6" x 25'4" (the site sketch's 25.5' was rounded) | Corner to corner, outside |
+| Outside size of the main block | **26'6" x 26'3"** (derived: 25'4" inside east-west, 301" inside north-south from the upstairs west side, plus two 7" walls each way; the site sketch's 25.5' was rounded). **Worth one outside tape measurement** | Corner to corner, outside, at the first-floor sill |
 | Basement wall thickness | 8" (block) | At the basement door jamb |
-| First Floor rooms | measured, face to face: Kitchen 11'6" x 16'3", Living 13'5" x 14'1", Bath 9'6" x 7'6", Utility 11'6" x 9'5" | Re-check any that look wrong |
-| Entry hall | 15'5" x 6'3", **adjusted: re-measure the north-west room and the stair.** The north-west room's measured length did not add up to the others, so it takes the 1'3" difference | Hall north-south between the north wall and the stair's north wall, and the stair's own width and run |
+| First Floor rooms | measured, face to face: Entry hall 15'5" x 7'6", Bath 9'6" x 7'6", Living 13'5" x 14'0" (measured 14'1"), Utility 11'6" x 9'5" | Re-check any that look wrong |
+| Kitchen | 11'6" x 17'2", **adjusted: re-measure.** MK measured 16'3"; the upstairs wins, and the first-floor mistake is suspected near the bottom of the stairs | Kitchen north-south, between the lake wall and the y 99.5 wall |
 | Interior partition thickness | 5" (measured) | At a jamb |
-| Stair | 36" wide, 125" run climbing west to the west wall, cuts the Second Floor floor; the 3' strip on the sketch | Width, run, riser count |
-| Bath door | 30" x 80" in the Bath's west wall, north jamb 6" from the north wall's inside face (y 13 to 43); **position is an estimate** | Jamb to the north wall |
-| Kitchen/Living passage | 48" wide, south jamb 6' from the lake wall (y 177 to 225), sill 0, 80" high | Jamb to jamb |
-| Stair-wall passage | 36" wide at the east end of the stair's south wall (x 132 to 168) | Jamb to jamb |
+| Stair | 33" wide, 125" run climbing east from the west wall to x 132 (under the upstairs landing), cuts the Second Floor floor; the 2'9" strip | Width, run, riser count |
+| Bath door (First Floor) | 30" x 80" in the Bath's west wall, north jamb 6" from the north wall's inside face (y 13 to 43); **position is an estimate** | Jamb to the north wall |
+| Kitchen/Living passage | 48" wide, south jamb 6' from the lake wall (y 188 to 236), sill 0, 80" high | Jamb to jamb |
+| Hall and Living passages | 36" wide at x 132 to 168 in the y 99.5 line and the y 137.5 wall; 30" opening at x 7 to 37 (the stair's bottom, from Living) | Jamb to jamb |
+| Second Floor rooms | Bunk 13'6" x 7'6", Bath 3'8" x 6'2", Master closet 2'6" x 2'9", Master 13'6" x 14'0" (sketch) | Face to face |
+| Guest | 11'5" x 12'9", **adjusted:** MK measured 11'8" east-west; the north side adds up to Bath 3'8" + 5" + Office 7'4" = 11'5", so the Guest takes 3" less | Guest east-west, between the Master/Guest partition and the east wall |
+| Office / hall | 7'4" x 11'11", **adjusted:** MK measured 11'6" north-south; the 301" inside length less the Guest's 12'9" and a 5" wall leaves 11'11" | North wall to the Guest's north wall, at the east wall |
+| Second Floor doors | Bunk 28" and Master 28" (x 150), Bath 24" and Guest 30" (x 196, swing directions from the sketch), closet opening 24" (x 22); **positions are estimates** | Jamb to jamb |
 | Wall heights | basement 90", first 96", second 96" | Floor to floor, minus the framing |
 | Floor thickness | basement slab 4", floors 12" | Joists plus subfloor, at a stair opening |
 | First-floor height above the basement floor | basement floor -100", first floor top +2" | Basement floor to first floor |
@@ -288,7 +310,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | South windows, first floor | 130 x 60 at x 100" (narrowed from 140 so it clears the Kitchen/Living partition) and 96 x 60 at x 260" (6 x 2 lites), sill 30 | Jamb to corner, rough opening |
 | South windows, second floor | 88 x 48 at x 115" and 64 x 48 at x 256" (6 x 3 lites), sill 30 | Same |
 | West windows | first floor three-sash 96 x 40, sill 47 (head above the door head), at y 203"; second floor 48 x 28, 4 x 2 lites, sill 50, at y 200"; both with shutters | Jamb to the north corner |
-| North windows | first floor 72 x 48 at x 96" and 48 x 36 at x 234"; second floor 48 x 40 at x 78" and x 240" | Jamb to the west corner |
+| North windows | first floor 72 x 48 at x 96" and 48 x 36 at x 234"; second floor 48 x 40 at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office) | Jamb to the west corner |
 | East windows | second floor two 46 x 44 (4 x 3 lites, sill 34) at y 98" and y 222"; first floor 40 x 40, sill 42, at y 152" | Jamb to the north corner |
 | Wing windows | east end 56 x 44, 6 x 3 lites; north face 48 x 40; south face 36 x 36 | Rough openings |
 | Basement double door | 60 x 80 on the wing's south wall | Jamb to jamb |
@@ -319,9 +341,9 @@ level and a tape or a laser, and edit them in the Site tab.
 4. **The roofs and the chimney**: pitch, overhang, ridge position; the chimney's width and
    projection; the grade points last.
 5. **Interior partitions and stairs**, room by room, face to face: `X` for interior walls, `T` for
-   stairs, `R` to name the rooms. The First Floor is done (re-measure the Entry hall and the stair
-   first); the basement and the Second Floor are still to do (delete their "unpartitioned" and
-   "interior not measured" labels as you go).
+   stairs, `R` to name the rooms. The First Floor and the Second Floor are done (re-measure the
+   rooms marked "adjusted" first: the Kitchen, the Guest and the Office / hall, and the bottom of
+   the stair); the basement is still to do (delete its "unpartitioned" label as you go).
 
 ### Drawing the renovation on top of it
 
@@ -345,6 +367,9 @@ parts green. Export from Existing and from Proposed to give the contractor or Sk
 
 ## Known limitations
 
+- **Stairs cut their whole footprint out of the floor above.** The First Floor stair's hole in the
+  Second Floor is the full stair rectangle (x 7 to 132, y 102 to 135), so it also removes the floor
+  under the Master closet, which really sits over the low end of the stair.
 - **Roofs**: no valleys or dormers; roofs that meet (a wing roof running into the main wall,
   porch roofs) simply overlap, and the walls only follow the roofs on their own level. A hip roof
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
