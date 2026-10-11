@@ -1,15 +1,23 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type RefObject } from 'react';
 import { PlanCanvas } from './editor2d/PlanCanvas';
 import { RoomNameEditor } from './editor2d/RoomNameEditor';
 import { cycleViewMode, dispatchKey, dispatchShift, switchLevelByIndex, switchTool } from './editor2d/tools';
 import { redo, undo, usePlanStore } from './store/planStore';
-import { useUiStore, type ToolName } from './store/uiStore';
+import { LAYOUTS, useUiStore, type ToolName } from './store/uiStore';
 import { LevelBar } from './ui/LevelBar';
 import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
 
-const TOOL_KEYS: Record<string, ToolName> = { s: 'select', w: 'wall', r: 'room', d: 'door', n: 'window', p: 'passage' };
+// The 3D view (three, fiber, drei) loads on first use, so the 2D editor starts fast.
+const Scene3D = lazy(() => import('./view3d/Scene3D'));
+
+function cycleLayout(): void {
+  const ui = useUiStore.getState();
+  ui.setLayout(LAYOUTS[(LAYOUTS.indexOf(ui.layout) + 1) % LAYOUTS.length]);
+}
+
+const TOOL_KEYS: Record<string, ToolName> = { s: 'select', w: 'wall', r: 'room', d: 'door', n: 'window', p: 'passage', t: 'stairs' };
 
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -46,6 +54,11 @@ function onKeyDown(e: KeyboardEvent): void {
     return;
   }
   if (e.altKey || mod || e.repeat) return;
+  if (e.key === '`') {
+    cycleLayout();
+    e.preventDefault();
+    return;
+  }
   if (Object.hasOwn(TOOL_KEYS, key)) {
     switchTool(TOOL_KEYS[key]);
     e.preventDefault();
@@ -73,6 +86,59 @@ function onBlur(): void {
   dispatchShift(false);
 }
 
+/** Drag handle between the 2D plan and the 3D view; double-click resets to half and half. */
+function SplitHandle({ container }: { container: RefObject<HTMLDivElement | null> }) {
+  const [dragging, setDragging] = useState(false);
+  const setRatio = (clientX: number) => {
+    const el = container.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.width > 0) useUiStore.getState().setSplitRatio((clientX - r.left) / r.width);
+  };
+  return (
+    <div
+      className={`split-handle${dragging ? ' dragging' : ''}`}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the 2D and 3D views"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDragging(true);
+      }}
+      onPointerMove={(e) => dragging && setRatio(e.clientX)}
+      onPointerUp={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+        setDragging(false);
+      }}
+      onDoubleClick={() => useUiStore.getState().setSplitRatio(0.5)}
+    />
+  );
+}
+
+/**
+ * The 2D plan and/or the 3D model. The plan stays mounted (hidden in the 3D layout) so its
+ * viewport and tool state survive layout switches; the 3D canvas mounts only when shown.
+ */
+function Views() {
+  const layout = useUiStore((s) => s.layout);
+  const ratio = useUiStore((s) => s.splitRatio);
+  const ref = useRef<HTMLDivElement>(null);
+  return (
+    <div ref={ref} className={`views layout-${layout}`}>
+      <main className="canvas-host" style={layout === 'split' ? { flex: `0 0 ${ratio * 100}%` } : undefined}>
+        <PlanCanvas />
+        <RoomNameEditor />
+      </main>
+      {layout === 'split' && <SplitHandle container={ref} />}
+      {layout !== '2d' && (
+        <Suspense fallback={<section className="view3d-host" aria-label="3D view" aria-busy="true" />}>
+          <Scene3D />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
 export function App() {
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown);
@@ -90,10 +156,7 @@ export function App() {
       <Toolbar />
       <div className="workspace">
         <LevelBar />
-        <main className="canvas-host">
-          <PlanCanvas />
-          <RoomNameEditor />
-        </main>
+        <Views />
         <PropertiesPanel />
       </div>
       <StatusBar />

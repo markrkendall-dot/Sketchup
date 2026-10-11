@@ -3,6 +3,7 @@ import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { getFaces, type FaceSet } from '../derive/rooms';
+import { floorToFloor, stairsSymbol, stairSteps, type StairsSymbol } from '../derive/stairs';
 import { add, midpoint, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Opening, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
@@ -242,6 +243,51 @@ function useNodeIds(levelId: Id): Id[] {
   return useMemo(() => (nodes ? Object.keys(nodes) : []), [nodes]);
 }
 
+function useStairsIds(levelId: Id): Id[] {
+  const stairs = usePlanStore((s) => s.plan.levels[levelId]?.stairs);
+  return useMemo(() => (stairs ? Object.keys(stairs) : []), [stairs]);
+}
+
+/** Stairs symbol: outline, nosing lines, and an UP arrow pointing the way the flight climbs. */
+export function StairsGlyph({ sym, k, className, id }: { sym: StairsSymbol; k: number; className: string; id?: Id }) {
+  return (
+    <g className={className} data-stairs-id={id}>
+      <path className="stairs-body" d={polyPath(sym.outline)} vectorEffect="non-scaling-stroke" />
+      {sym.treads.length > 0 && <path className="stairs-tread" d={segPath(sym.treads)} vectorEffect="non-scaling-stroke" />}
+      <path className="stairs-arrow" d={segPath([sym.shaft])} vectorEffect="non-scaling-stroke" />
+      <path className="stairs-arrow-head" d={`M${pt(sym.head[0])}L${pt(sym.head[1])}L${pt(sym.head[2])}`} vectorEffect="non-scaling-stroke" />
+      <g transform={`translate(${sym.label.x} ${sym.label.y}) rotate(${sym.labelAngle}) scale(${1 / k})`}>
+        <text className="stairs-label" textAnchor="middle" dominantBaseline="central">
+          UP
+        </text>
+      </g>
+    </g>
+  );
+}
+
+const StairsShape = memo(function StairsShape({ levelId, stairsId }: { levelId: Id; stairsId: Id }) {
+  const st = usePlanStore((s) => s.plan.levels[levelId]?.stairs[stairsId]);
+  const ftf = usePlanStore((s) => floorToFloor(s.plan, levelId));
+  const viewMode = useUiStore((s) => s.viewMode);
+  const selected = useUiStore((s) => s.selection.stairs.includes(stairsId));
+  const k = useViewportScale();
+  const sym = useMemo(() => (st ? stairsSymbol(st, stairSteps(ftf).risers) : null), [st, ftf]);
+  if (!st || !sym || !isVisible(st.phase, viewMode)) return null;
+  return <StairsGlyph sym={sym} k={k} id={stairsId} className={`stairs phase-${st.phase}${selected ? ' is-selected' : ''}`} />;
+});
+
+const StairsLayer = memo(function StairsLayer({ levelId }: { levelId: Id }) {
+  const ids = useStairsIds(levelId);
+  if (ids.length === 0) return null;
+  return (
+    <g className="layer-stairs" pointerEvents="none">
+      {ids.map((id) => (
+        <StairsShape key={id} levelId={levelId} stairsId={id} />
+      ))}
+    </g>
+  );
+});
+
 function useOpeningIds(levelId: Id): Id[] {
   const openings = usePlanStore((s) => s.plan.levels[levelId]?.openings);
   return useMemo(() => (openings ? Object.keys(openings) : []), [openings]);
@@ -393,6 +439,7 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
     <>
       <PatternDefs />
       <RoomFillsLayer levelId={levelId} />
+      <StairsLayer levelId={levelId} />
       <WallsLayer levelId={levelId} />
       <OpeningsLayer levelId={levelId} />
       <RoomLabelsLayer levelId={levelId} />

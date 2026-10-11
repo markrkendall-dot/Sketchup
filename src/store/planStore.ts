@@ -13,7 +13,8 @@ import {
   normalizeLevel,
   wallLength,
 } from '../model/plan';
-import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Vec2, Wall, WallKind } from '../model/types';
+import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Stairs, Vec2, Wall, WallKind } from '../model/types';
+import { normalizeDegrees } from '../derive/stairs';
 
 export interface AddWallOptions {
   kind: WallKind;
@@ -36,6 +37,8 @@ export type OpeningPatch = Partial<Omit<Opening, 'id'>>;
 export type NewOpening = Omit<Opening, 'id'> & { id?: Id };
 export type RoomPatch = Partial<Omit<Room, 'id'>>;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
+export type StairsPatch = Partial<Omit<Stairs, 'id'>>;
+export type NewStairs = Omit<Stairs, 'id'> & { id?: Id };
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** Which end of a wall stays put when its length is edited. */
 export type LengthAnchor = 'start' | 'end';
@@ -45,6 +48,7 @@ export interface EntitySelection {
   walls: Id[];
   openings?: Id[];
   rooms?: Id[];
+  stairs?: Id[];
 }
 
 export interface PlanState {
@@ -84,8 +88,13 @@ export interface PlanState {
   /** Rename or move a room. A blank name or non-finite anchor is ignored. */
   updateRoom: (levelId: Id, id: Id, patch: RoomPatch) => void;
   deleteRooms: (levelId: Id, ids: Id[]) => void;
-  /** Set the phase of walls and openings together (e.g. "Mark demolish"). */
-  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[] }, phase: Phase) => void;
+  /** Add stairs; returns the id, or null when the size or position is not usable. */
+  addStairs: (levelId: Id, stairs: NewStairs) => Id | null;
+  /** Patch stairs; invalid sizes are rejected, the direction is normalized to [0, 360). */
+  updateStairs: (levelId: Id, id: Id, patch: StairsPatch) => void;
+  deleteStairs: (levelId: Id, ids: Id[]) => void;
+  /** Set the phase of walls, openings and stairs together (e.g. "Mark demolish"). */
+  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[] }, phase: Phase) => void;
   /**
    * Copy the nodes and walls (not openings) of one level into another, merged with whatever is
    * there, in one undo step. Returns the number of walls copied.
@@ -127,9 +136,17 @@ function moveNodesInPlace(level: Level, positions: Record<Id, Vec2>): void {
   }
 }
 
-function deleteInPlace(level: Level, nodeIds: Id[], wallIds: Id[], openingIds: Id[] = [], roomIds: Id[] = []): void {
+function deleteInPlace(
+  level: Level,
+  nodeIds: Id[],
+  wallIds: Id[],
+  openingIds: Id[] = [],
+  roomIds: Id[] = [],
+  stairsIds: Id[] = [],
+): void {
   for (const id of openingIds) delete level.openings[id];
   for (const id of roomIds) delete level.rooms[id];
+  for (const id of stairsIds) delete level.stairs[id];
   const walls = new Set(wallIds);
   const nodes = new Set(nodeIds);
   for (const w of Object.values(level.walls)) if (nodes.has(w.a) || nodes.has(w.b)) walls.add(w.id);
@@ -143,6 +160,15 @@ function deleteInPlace(level: Level, nodeIds: Id[], wallIds: Id[], openingIds: I
   }
   for (const id of Object.keys(level.nodes)) if (!used.has(id)) delete level.nodes[id];
 }
+
+const validStairs = (s: Omit<Stairs, 'id'>): boolean =>
+  s.width > 0 &&
+  s.run > 0 &&
+  Number.isFinite(s.width) &&
+  Number.isFinite(s.run) &&
+  Number.isFinite(s.direction) &&
+  Number.isFinite(s.origin.x) &&
+  Number.isFinite(s.origin.y);
 
 /** Walls lying along the straight path a..b, following the graph after splits. */
 function wallsAlong(level: Level, a: Id, b: Id): Id[] {
@@ -260,7 +286,7 @@ export const usePlanStore = create<PlanState>()(
 
         deleteEntities: (levelId, sel) =>
           editLevel(levelId, (level) => {
-            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms);
+            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs);
             // Removing walls changes the corner joins of their neighbours.
             if (sel.nodes.length || sel.walls.length) clampOpenings(level);
           }),
@@ -411,8 +437,48 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete level.rooms[id];
           }),
 
+        addStairs: (levelId, input) => {
+          let id: Id | null = null;
+          editLevel(levelId, (level) => {
+            if (!validStairs(input)) return false;
+            const stairs: Stairs = {
+              ...input,
+              id: input.id ?? newId(),
+              origin: { x: input.origin.x, y: input.origin.y },
+              direction: normalizeDegrees(input.direction),
+            };
+            level.stairs[stairs.id] = stairs;
+            id = stairs.id;
+          });
+          return id;
+        },
+
+        updateStairs: (levelId, id, patch) =>
+          editLevel(levelId, (level) => {
+            const st = level.stairs[id];
+            if (!st) return false;
+            const next = { ...st, ...patch };
+            if (!validStairs(next)) return false;
+            if (patch.origin) st.origin = { x: patch.origin.x, y: patch.origin.y };
+            if (patch.direction !== undefined) st.direction = normalizeDegrees(patch.direction);
+            if (patch.width !== undefined) st.width = patch.width;
+            if (patch.run !== undefined) st.run = patch.run;
+            if (patch.phase !== undefined) st.phase = patch.phase;
+            if (patch.cutsFloorAbove !== undefined) st.cutsFloorAbove = patch.cutsFloorAbove;
+          }),
+
+        deleteStairs: (levelId, ids) =>
+          editLevel(levelId, (level) => {
+            if (!ids.some((id) => level.stairs[id])) return false;
+            for (const id of ids) delete level.stairs[id];
+          }),
+
         setPhase: (levelId, sel, phase) =>
           editLevel(levelId, (level) => {
+            for (const id of sel.stairs ?? []) {
+              const st = level.stairs[id];
+              if (st && st.phase !== phase) st.phase = phase;
+            }
             for (const id of sel.walls) {
               const w = level.walls[id];
               if (w && w.phase !== phase) w.phase = phase;

@@ -3,7 +3,10 @@ import type { WallGeom } from '../derive/openings';
 import type { Id, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'room' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | OpeningToolName;
+/** Which views the workspace shows. */
+export type Layout = '2d' | 'split' | '3d';
+export const LAYOUTS: readonly Layout[] = ['2d', 'split', '3d'];
 /** Phases the drawing tools can create; demo is applied to existing elements instead. */
 export type DrawPhase = Extract<Phase, 'existing' | 'new'>;
 
@@ -90,6 +93,10 @@ export interface Draft {
   swingFlip: boolean;
   /** Opening tools: Shift+Tab flips the hinge from the a side to the b side. */
   hingeFlip: boolean;
+  /** Stairs tool: ghost of the flight about to be placed (origin = middle of the bottom edge). */
+  stairsPreview: { origin: Vec2; direction: number } | null;
+  /** Stairs tool: direction of travel chosen by the last mouse movement (0, 90, 180, 270). */
+  stairsDirection: number;
 }
 
 export interface Selection {
@@ -97,6 +104,7 @@ export interface Selection {
   walls: Id[];
   openings: Id[];
   rooms: Id[];
+  stairs: Id[];
 }
 
 /** The inline room name editor (RoomNameEditor). */
@@ -135,6 +143,16 @@ export interface UiState {
   spaceHeld: boolean;
   /** Size of the plan canvas in px, kept by PlanCanvas. */
   canvasSize: { width: number; height: number };
+  /** 2D plan, 3D model, or both side by side. */
+  layout: Layout;
+  /** Split layout: fraction of the width given to the 2D plan. */
+  splitRatio: number;
+  /** 3D view: levels the user unchecked. */
+  hidden3dLevels: Id[];
+  /** 3D view: show only the active level and the ones below it. */
+  only3dActiveAndBelow: boolean;
+  /** Bumped to ask the 3D view to re-fit the camera to the plan. */
+  fit3dRequest: number;
   setTool: (tool: ToolName) => void;
   setActiveLevel: (id: Id) => void;
   setSelection: (sel: Selection) => void;
@@ -154,6 +172,11 @@ export interface UiState {
   /** Drawing new elements while in the existing view switches to the proposed view. */
   setDrawPhase: (phase: DrawPhase) => void;
   toggleShowLevelBelow: () => void;
+  setLayout: (layout: Layout) => void;
+  setSplitRatio: (ratio: number) => void;
+  toggle3dLevel: (id: Id) => void;
+  setOnly3dActiveAndBelow: (on: boolean) => void;
+  requestFit3d: () => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -172,13 +195,19 @@ export const emptyDraft = (): Draft => ({
   openingPreview: null,
   swingFlip: false,
   hingeFlip: false,
+  stairsPreview: null,
+  stairsDirection: 0,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length;
+
+/** Split ratio bounds, so neither view collapses. */
+export const MIN_SPLIT = 0.2;
+export const MAX_SPLIT = 0.8;
 
 export const useUiStore = create<UiState>()((set) => ({
   activeTool: 'wall',
@@ -195,6 +224,11 @@ export const useUiStore = create<UiState>()((set) => ({
   showLevelBelow: false,
   spaceHeld: false,
   canvasSize: { width: 0, height: 0 },
+  layout: '2d',
+  splitRatio: 0.5,
+  hidden3dLevels: [],
+  only3dActiveAndBelow: false,
+  fit3dRequest: 0,
   setTool: (activeTool) =>
     set((s) => ({
       activeTool,
@@ -232,6 +266,14 @@ export const useUiStore = create<UiState>()((set) => ({
       viewMode: drawPhase === 'new' && s.viewMode === 'existing' ? 'proposed' : s.viewMode,
     })),
   toggleShowLevelBelow: () => set((s) => ({ showLevelBelow: !s.showLevelBelow })),
+  setLayout: (layout) => set({ layout }),
+  setSplitRatio: (ratio) => set({ splitRatio: Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, ratio)) }),
+  toggle3dLevel: (id) =>
+    set((s) => ({
+      hidden3dLevels: s.hidden3dLevels.includes(id) ? s.hidden3dLevels.filter((x) => x !== id) : [...s.hidden3dLevels, id],
+    })),
+  setOnly3dActiveAndBelow: (only3dActiveAndBelow) => set({ only3dActiveAndBelow }),
+  requestFit3d: () => set((s) => ({ fit3dRequest: s.fit3dRequest + 1 })),
 }));
 
 export const useViewport = () => useUiStore((s) => s.viewport);

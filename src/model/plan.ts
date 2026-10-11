@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { dist, projectPointToSegment } from './geometry';
 import { clampOpeningOffset } from './openings';
-import type { Id, Level, Plan, PlanSettings, Vec2, Wall } from './types';
+import type { Id, Level, Phase, Plan, PlanSettings, Vec2, Wall } from './types';
 
 export const SCHEMA_VERSION = 1 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
@@ -287,8 +287,29 @@ function migrateLevel(raw: unknown, id: string): Level {
     walls: walls as Level['walls'],
     openings: record(raw.openings, `level ${id} openings`) as Level['openings'],
     rooms: record(raw.rooms, `level ${id} rooms`) as Level['rooms'],
-    stairs: record(raw.stairs, `level ${id} stairs`) as Level['stairs'],
+    stairs: migrateStairs(record(raw.stairs, `level ${id} stairs`)),
   };
+}
+
+const PHASES = new Set(['existing', 'demo', 'new']);
+
+/** Keep stairs with a usable position and size; fill in phase and cutsFloorAbove when missing. */
+function migrateStairs(raw: Json): Level['stairs'] {
+  const out: Level['stairs'] = {};
+  for (const [sid, st] of Object.entries(raw)) {
+    if (!isObject(st) || !isObject(st.origin) || !isNum(st.origin.x) || !isNum(st.origin.y)) continue;
+    if (!isNum(st.width) || st.width <= 0 || !isNum(st.run) || st.run <= 0) continue;
+    out[sid] = {
+      id: sid,
+      origin: { x: st.origin.x, y: st.origin.y },
+      direction: isNum(st.direction) ? st.direction : 0,
+      width: st.width,
+      run: st.run,
+      phase: typeof st.phase === 'string' && PHASES.has(st.phase) ? (st.phase as Phase) : 'existing',
+      cutsFloorAbove: typeof st.cutsFloorAbove === 'boolean' ? st.cutsFloorAbove : true,
+    };
+  }
+  return out;
 }
 
 /** Validate (loosely) and upgrade a parsed JSON document to the current Plan schema. */

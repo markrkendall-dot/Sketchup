@@ -125,3 +125,58 @@ export function boundsOf(points: Iterable<Vec2>): Bounds | null {
   }
   return b;
 }
+
+/**
+ * Clip a polygon to the half-plane dot(n, p) <= c (one Sutherland-Hodgman pass). Exact for convex
+ * polygons, and for any simple polygon whose boundary the line crosses at most twice (see
+ * `halfPlaneCrossings`). Points on the line are kept; consecutive duplicates are dropped.
+ */
+export function clipHalfPlane(poly: readonly Vec2[], n: Vec2, c: number, eps = 1e-9): Vec2[] {
+  const out: Vec2[] = [];
+  const push = (p: Vec2) => {
+    const last = out[out.length - 1];
+    if (!last || Math.abs(last.x - p.x) > eps || Math.abs(last.y - p.y) > eps) out.push(p);
+  };
+  const k = poly.length;
+  for (let i = 0; i < k; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % k];
+    const dp = dot(n, p) - c;
+    const dq = dot(n, q) - c;
+    const pIn = dp <= eps;
+    const qIn = dq <= eps;
+    if (pIn) push(p);
+    if (pIn !== qIn && Math.abs(dp - dq) > 1e-15) {
+      // Strict crossing: the intersection lies between p and q.
+      if ((dp < -eps && dq > eps) || (dp > eps && dq < -eps)) push(lerp(p, q, dp / (dp - dq)));
+    }
+  }
+  if (out.length > 1) {
+    const f = out[0];
+    const l = out[out.length - 1];
+    if (Math.abs(f.x - l.x) <= eps && Math.abs(f.y - l.y) <= eps) out.pop();
+  }
+  return out.length >= 3 ? out : [];
+}
+
+/** How many times the closed polygon's boundary crosses the line dot(n, p) = c (strictly). */
+export function halfPlaneCrossings(poly: readonly Vec2[], n: Vec2, c: number, eps = 1e-9): number {
+  // Classify vertices; vertices on the line take the side of the previous off-line vertex, so a
+  // boundary that touches the line without crossing it does not count.
+  const side = poly.map((p) => {
+    const d = dot(n, p) - c;
+    return d > eps ? 1 : d < -eps ? -1 : 0;
+  });
+  const start = side.findIndex((s) => s !== 0);
+  if (start < 0) return 0;
+  let count = 0;
+  let prev = side[start];
+  for (let i = 1; i <= poly.length; i++) {
+    const s = side[(start + i) % poly.length];
+    if (s !== 0 && s !== prev) {
+      count++;
+      prev = s;
+    }
+  }
+  return count;
+}

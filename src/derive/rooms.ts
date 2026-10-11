@@ -38,6 +38,8 @@ export interface FaceSet {
   faces: Face[];
   /** Outer boundary of each component that encloses at least one face, positive (clockwise on screen). */
   outerFaces: Vec2[][];
+  /** Thickness of the wall along each edge outerFaces[k][i] -> [i + 1] (for slabs out to the wall faces). */
+  outerFaceThickness: number[][];
   /** Nodes with exactly one visible wall. */
   openEnds: Id[];
   /** Rooms whose anchor is in no face, or in a face another room already labels. */
@@ -47,6 +49,7 @@ export interface FaceSet {
 interface Geometry {
   faces: Omit<Face, 'roomId' | 'labelPoint'>[];
   outerFaces: Vec2[][];
+  outerFaceThickness: number[][];
   openEnds: Id[];
 }
 
@@ -195,6 +198,7 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
   const visited = new Uint8Array(H);
   const faces: Geometry['faces'] = [];
   const outerFaces: Vec2[][] = [];
+  const outerFaceThickness: number[][] = [];
   const usedIds = new Set<string>();
   for (let start = 0; start < H; start++) {
     if (visited[start]) continue;
@@ -223,7 +227,12 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
     const polygon = nodeIds.map((id) => ({ x: level.nodes[id].x, y: level.nodes[id].y }));
     const area = polygonSignedArea(polygon);
     if (area < 0) {
-      if (-area >= MIN_FACE_AREA) outerFaces.push([...polygon].reverse());
+      if (-area >= MIN_FACE_AREA) {
+        outerFaces.push([...polygon].reverse());
+        // Reversed edge j runs node k-1-j -> k-2-j, which is traced edge k-2-j backwards.
+        const k = cycle.length;
+        outerFaceThickness.push(cycle.map((_, j) => thickness[cycle[(2 * k - 2 - j) % k]]));
+      }
       continue;
     }
     if (area < MIN_FACE_AREA) continue;
@@ -241,7 +250,7 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
     usedIds.add(id);
     faces.push({ id, nodeIds, wallIds: cycle.map((e) => wallOf[e]), polygon, netPolygon, grossArea: area, netArea });
   }
-  return { faces, outerFaces, openEnds };
+  return { faces, outerFaces, outerFaceThickness, openEnds };
 }
 
 /** Label rooms: each room's anchor goes to the smallest face containing it; first come, first served. */
@@ -266,7 +275,7 @@ export function labelFaces(geo: Geometry, rooms: Level['rooms']): FaceSet {
     const labelPoint = pointInPolygon(c, f.netPolygon) ? c : roomId ? anchorOf.get(roomId)! : interiorPoint(f.polygon);
     return roomId ? { ...f, roomId, labelPoint } : { ...f, labelPoint };
   });
-  return { faces, outerFaces: geo.outerFaces, openEnds: geo.openEnds, orphanRoomIds };
+  return { faces, outerFaces: geo.outerFaces, outerFaceThickness: geo.outerFaceThickness, openEnds: geo.openEnds, orphanRoomIds };
 }
 
 // Geometry depends on nodes and walls only; labels also on rooms. Both records keep their identity

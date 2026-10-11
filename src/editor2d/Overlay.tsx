@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
+import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
 import { add, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
 import type { Vec2 } from '../model/types';
 import { formatLengthCompact } from '../model/units';
@@ -11,6 +12,7 @@ import {
   type Viewport,
   type WallPreview,
 } from '../store/uiStore';
+import { StairsGlyph } from './PlanLayers';
 import { worldToScreen } from './viewport';
 
 // Transient editor feedback, drawn in screen space. The only component that subscribes to
@@ -197,6 +199,18 @@ function LengthBox({ text, at, error }: { text: string; at: Vec2; error: boolean
   );
 }
 
+/** Ghost of the stairs about to be placed, drawn in world space like the real symbol. */
+function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number; v: Viewport }) {
+  const levelId = useUiStore((s) => s.activeLevelId);
+  const ftf = usePlanStore((s) => floorToFloor(s.plan, levelId));
+  const sym = stairsSymbol({ origin, direction, ...STAIRS_DEFAULTS }, stairSteps(ftf).risers);
+  return (
+    <g transform={`translate(${v.tx} ${v.ty}) scale(${v.k})`}>
+      <StairsGlyph sym={sym} k={v.k} className="stairs stairs-ghost" />
+    </g>
+  );
+}
+
 export const Overlay = memo(function Overlay() {
   const draft = useUiStore((s) => s.draft);
   const v = useUiStore((s) => s.viewport);
@@ -209,6 +223,7 @@ export const Overlay = memo(function Overlay() {
     <g className="overlay" pointerEvents="none">
       {draft.wallPreview && <RubberBand preview={draft.wallPreview} v={v} denom={denom} />}
       {draft.openingPreview && <OpeningGhost preview={draft.openingPreview} v={v} denom={denom} />}
+      {draft.stairsPreview && <StairsGhost origin={draft.stairsPreview.origin} direction={draft.stairsPreview.direction} v={v} />}
       {draft.snap && <SnapMarker snap={draft.snap} v={v} />}
       {box && (
         <rect

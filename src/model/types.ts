@@ -49,10 +49,10 @@ export interface Room {
 
 export interface Stairs {
   id: Id;
-  origin: Vec2;
-  direction: Degrees;
+  origin: Vec2; // middle of the bottom edge of the flight
+  direction: Degrees; // plan angle of travel going up: 0 = +x, 90 = +y (down the screen)
   width: Inches;
-  run: Inches;
+  run: Inches; // horizontal length; the flight climbs to the next level's floor top
   phase: Phase;
   cutsFloorAbove: boolean;
 }

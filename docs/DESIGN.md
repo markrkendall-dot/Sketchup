@@ -55,7 +55,9 @@ export interface Opening {
 export interface Room { id: Id; name: string; anchor: Vec2; ceilingOverride?: Inches }
 
 export interface Stairs {
-  id: Id; origin: Vec2; direction: Degrees; width: Inches; run: Inches;
+  id: Id; origin: Vec2;      // middle of the bottom edge of the flight
+  direction: Degrees;        // plan angle of travel going up: 0 = +x, 90 = +y (down the screen)
+  width: Inches; run: Inches; // run = horizontal length; climbs to the next level's floor top
   phase: Phase; cutsFloorAbove: boolean;
 }
 
@@ -152,12 +154,34 @@ Detection runs on the walls visible in the current ViewMode.
 
 ## Openings in 3D (`derive/meshes.ts`)
 
-No CSG. `prism(polygon: Vec2[], y0, y1)` triangulates the cap with `ShapeUtils.triangulateShape`,
-emits side quads, uses flat per-face normals (non-indexed). A wall = start cap wedge (full height) +
-each solid gap between openings + for each opening: under-sill piece (0..sill, if sill > 0) and header
-piece (sill+height..wallHeight, if positive) + end cap wedge. Merge with
-`BufferGeometryUtils.mergeGeometries`. Floor slab: outer face polygon reversed, with stair holes.
-If a level has no closed outer face, draw no slab.
+No CSG. `prism(polygon, y0, y1, holes?, opts?)` triangulates the cap with `ShapeUtils.triangulateShape`,
+emits side quads, uses flat per-face normals (non-indexed); it normalizes winding itself (outer ring
+positive, holes negative, each cap triangle oriented by its own area), and `opts` can drop the top,
+the bottom or individual side faces. A wall is split along its direction into spans at every jamb:
+start region (keeps the footprint's corner and cap points), solid gaps, under-sill and header per
+opening, end region; each span's piece is the footprint `poly` clipped by half-planes perpendicular to
+the wall (`clipHalfPlane`; if a cut line crosses the poly more than twice, the quad is clipped
+instead). Then:
+
+- Only faces on the outside of the union are emitted. Coincident internal faces (a wall's mitre or
+  butt end at a join, the cut between two pieces) win the depth test along the seam and show as
+  hairlines. A join face is internal up to the lowest same-class neighbour at that node (a
+  translucent demolished wall does not hide an opaque wall's join, and vice versa); the stretch of a
+  through wall's face under a butt wall is internal up to the butt walls' height.
+- Every wall on a level is cut into the same horizontal bands (all visible sills and heads, all wall
+  heights), and neighbours' corners that land on an outline edge are inserted as vertices, so
+  adjacent faces always share vertices: no T-junctions to crack. The walls of a level together form a
+  closed, consistently wound surface (tested).
+- Floor slab: each outer face polygon (reversed, positive), pushed out by half of each edge's wall
+  thickness to the exterior faces (`outerFaceThickness` from rooms.ts), with holes for stairs on the
+  level below that have `cutsFloorAbove` (only holes that fit strictly inside). Outer faces nested in
+  another component are skipped. If a level has no closed outer face, draw no slab.
+- Stairs: one solid, the stepped side profile extruded across the width (`risers` =
+  round(floor-to-floor / 7.5")), the last step flush with the floor above.
+
+`getLevelMeshes(plan, levelId, viewMode)` memoizes per level and view mode, reuses each wall's
+geometry while its footprint object, wall, openings list, height and context (bands, neighbour
+heights, split points) are unchanged, and disposes geometry that drops out of the cache.
 
 ## 2D editor
 
@@ -234,10 +258,17 @@ geometry in effect cleanup.
 
 ## 3D
 
-r3f `<Canvas frameloop="demand">`, invalidate on store change. One `<group>` per level at its
-elevation. Orbit (drei OrbitControls) by default; first-person = PointerLockControls + WASD in
-useFrame with delta time, eye height 66", `frameloop="always"` while active, mount only one controls
-component at a time, listen to `unlock` to return to orbit. Camera near 1, far 20000 (scene in inches).
+r3f `<Canvas frameloop="demand">` (lazy-loaded chunk), invalidate on plan changes and on the UI
+settings the 3D view uses (not on the 2D draft). One `<group>` per level at its floor top; meshes use
+the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat shading, FrontSide:
+existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior a
+little darker; floors tan, stairs grey. Hemisphere + one directional light, no shadows. drei `<Grid>`
+(12" cells, 10' sections) at the lowest slab's bottom. Orbit (drei OrbitControls, makeDefault)
+framing the plan's bounding box on first mount; Fit re-frames the visible levels. Overlay toolbar:
+level checkboxes and "Only active level and below". Layout (uiStore): 2D, split (draggable divider,
+ratio in uiStore) or 3D, toolbar buttons and backtick to cycle; the 2D canvas stays mounted (hidden
+in 3D), the 3D canvas mounts only when shown. First-person (PointerLockControls + WASD, eye height
+66", `frameloop="always"` while active) is still to come. Camera near 1, far 20000 (scene in inches).
 No collision in v1.
 
 ## Persistence and export

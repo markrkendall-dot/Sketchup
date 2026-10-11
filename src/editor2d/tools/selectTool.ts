@@ -1,5 +1,6 @@
 import { getFootprints } from '../../derive/footprint';
 import { hitOpening } from '../../derive/openings';
+import { hitStairs } from '../../derive/stairs';
 import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase';
 import { add, dist, dot, projectPointToSegment, sub } from '../../model/geometry';
 import type { Id, Level, Vec2, ViewMode } from '../../model/types';
@@ -21,13 +22,14 @@ export type Hit =
   | { kind: 'opening'; id: Id }
   | { kind: 'wall'; id: Id }
   | { kind: 'room'; id: Id }
+  | { kind: 'stairs'; id: Id }
   | null;
 
-const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms' } as const;
+const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs' } as const;
 
 /**
- * Priority: nodes within 10px, then opening symbols, then walls, then room labels. Elements
- * hidden in `viewMode` are never hit.
+ * Priority: nodes within 10px, then opening symbols, then walls, then room labels, then stairs.
+ * Elements hidden in `viewMode` are never hit.
  */
 export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all'): Hit {
   let best: Hit = null;
@@ -65,7 +67,11 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   }
   if (best) return best;
   const room = hitRoomLabel(level, viewMode, p, k);
-  return room ? { kind: 'room', id: room } : null;
+  if (room) return { kind: 'room', id: room };
+  // Topmost (last drawn) stairs first.
+  const stairs = Object.values(level.stairs).reverse();
+  const st = stairs.find((s) => isVisible(s.phase, viewMode) && hitStairs(s, p, 2 / k));
+  return st ? { kind: 'stairs', id: st.id } : null;
 }
 
 type DragState =
@@ -87,6 +93,7 @@ type DragState =
       started: boolean;
     }
   | ({ kind: 'room' } & RoomDrag)
+  | { kind: 'stairs'; id: Id; grab: Vec2; origin: Vec2; startScreen: Vec2; started: boolean }
   | { kind: 'box'; a: Vec2; additive: boolean };
 
 let drag: DragState | null = null;
@@ -117,8 +124,9 @@ function pruneSelection(ctx: ToolContext): void {
   const walls = sel.walls.filter((id) => level.walls[id]);
   const openings = sel.openings.filter((id) => level.openings[id]);
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ nodes, walls, openings, rooms });
+  const stairs = sel.stairs.filter((id) => level.stairs[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ nodes, walls, openings, rooms, stairs });
   }
 }
 
@@ -128,7 +136,7 @@ function finishDrag(ctx: ToolContext): void {
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
     resumeHistory();
     pruneSelection(ctx);
-  } else if (drag?.kind === 'opening' && drag.started) {
+  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs') && drag.started) {
     resumeHistory();
   } else if (drag?.kind === 'room') {
     endRoomDrag(drag);
@@ -172,6 +180,11 @@ export const selectTool: Tool = {
     if (hit.kind === 'room') {
       const rd = startRoomDrag(ctx, hit.id, e);
       drag = rd ? { kind: 'room', ...rd } : null;
+      return;
+    }
+    if (hit.kind === 'stairs') {
+      const st = level.stairs[hit.id];
+      drag = { kind: 'stairs', id: hit.id, grab: e.world, origin: { ...st.origin }, startScreen: e.screen, started: false };
       return;
     }
     if (hit.kind === 'opening') {
@@ -223,6 +236,19 @@ export const selectTool: Tool = {
     }
     if (!drag.started && dist(e.screen, drag.startScreen) < DRAG_THRESHOLD_PX) return;
 
+    if (drag.kind === 'stairs') {
+      const grid = ctx.plan().settings.snapGrid;
+      const round = (v: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
+      const d = sub(e.world, drag.grab);
+      ui.patchDraft({ cursor: e.world, snap: null });
+      ctx.actions.updateStairs(ctx.levelId, drag.id, { origin: add(drag.origin, { x: round(d.x), y: round(d.y) }) });
+      if (!drag.started) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
+
     if (drag.kind === 'opening') {
       const s = alongWall(ctx, drag.id, e.world);
       if (s === null) return;
@@ -266,7 +292,7 @@ export const selectTool: Tool = {
 
   onPointerUp(e, ctx) {
     const ui = ctx.ui();
-    if (drag?.kind === 'move' || drag?.kind === 'opening' || drag?.kind === 'room') finishDrag(ctx);
+    if (drag?.kind === 'move' || drag?.kind === 'opening' || drag?.kind === 'room' || drag?.kind === 'stairs') finishDrag(ctx);
     else if (drag?.kind === 'box') {
       const a = drag.a;
       const b = e.world;

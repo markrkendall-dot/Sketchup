@@ -3,10 +3,11 @@ import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
 import { getFaces } from '../derive/rooms';
+import { floorToFloor, stairSteps } from '../derive/stairs';
 import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, type OpeningType } from '../model/openings';
 import { wallLength } from '../model/plan';
-import type { Id, Level, Opening, Phase, Room, Wall, WallKind } from '../model/types';
+import type { Id, Level, Opening, Phase, Room, Stairs, Wall, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -180,14 +181,14 @@ function common<T, V>(items: T[], get: (t: T) => V): V | null {
 
 // ---------------------------------------------------------------------------------------------
 
-function SelectionActions({ levelId, walls, openings }: { levelId: Id; walls: Wall[]; openings: Opening[] }) {
+function SelectionActions({ levelId, walls, openings, stairs }: { levelId: Id; walls: Wall[]; openings: Opening[]; stairs: Stairs[] }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const items = [...walls, ...openings];
+  const items = [...walls, ...openings, ...stairs];
   if (items.length === 0 && selectionSize(selection) === 0) return null;
   const allDemo = items.length > 0 && items.every((i) => i.phase === 'demo');
-  const ids = { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id) };
+  const ids = { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id) };
   return (
     <div className="panel-actions">
       {items.length > 0 && (
@@ -448,14 +449,98 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
   );
 }
 
-function MixedProps({ levelId, sel, walls, openings }: { levelId: Id; sel: Selection; walls: Wall[]; openings: Opening[] }) {
+const DIRECTION_OPTIONS: { value: string; label: string }[] = [
+  { value: '0', label: 'Right (+x)' },
+  { value: '90', label: 'Down (+y)' },
+  { value: '180', label: 'Left (-x)' },
+  { value: '270', label: 'Up (-y)' },
+];
+
+function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
+  const updateStairs = usePlanStore((s) => s.updateStairs);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const ftf = usePlanStore((s) => floorToFloor(s.plan, level.id));
+  const aboveName = usePlanStore((s) => {
+    const i = s.plan.levelOrder.indexOf(level.id);
+    return s.plan.levels[s.plan.levelOrder[i + 1]]?.name ?? null;
+  });
+  const { risers, rise } = stairSteps(ftf);
+  const tread = stairs.run / risers;
+  const dir = String(stairs.direction);
+  const options = DIRECTION_OPTIONS.some((o) => o.value === dir)
+    ? DIRECTION_OPTIONS
+    : [...DIRECTION_OPTIONS, { value: dir, label: `${dir}°` }];
+  return (
+    <>
+      <h3>Stairs</h3>
+      <LengthField
+        label="Width"
+        value={stairs.width}
+        onCommit={(v) => {
+          if (v !== null) updateStairs(level.id, stairs.id, { width: v });
+        }}
+      />
+      <LengthField
+        label="Run"
+        value={stairs.run}
+        onCommit={(v) => {
+          if (v !== null) updateStairs(level.id, stairs.id, { run: v });
+        }}
+        hint="Horizontal length of the flight."
+      />
+      <SelectField
+        label="Goes up toward"
+        value={dir}
+        options={options}
+        onChange={(v) => updateStairs(level.id, stairs.id, { direction: Number(v) })}
+      />
+      <SelectField
+        label="Phase"
+        value={stairs.phase}
+        options={phaseOptions}
+        onChange={(p) => updateStairs(level.id, stairs.id, { phase: p })}
+      />
+      <label className="check-row">
+        <input
+          type="checkbox"
+          aria-label="Cuts the floor above"
+          checked={stairs.cutsFloorAbove}
+          onChange={(e) => updateStairs(level.id, stairs.id, { cutsFloorAbove: e.target.checked })}
+        />
+        Cuts the floor above{aboveName ? ` (${aboveName})` : ''}
+      </label>
+      <ReadOnly label="Risers">
+        {risers} x {formatLength(rise, denom)}
+      </ReadOnly>
+      <ReadOnly label="Step depth">{formatLength(tread, denom)}</ReadOnly>
+      <p className="panel-note">
+        Rises {formatLength(ftf, denom)}, floor top to floor top. Drag with the select tool to move.
+      </p>
+    </>
+  );
+}
+
+function MixedProps({
+  levelId,
+  sel,
+  walls,
+  openings,
+  stairs,
+}: {
+  levelId: Id;
+  sel: Selection;
+  walls: Wall[];
+  openings: Opening[];
+  stairs: Stairs[];
+}) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const parts: string[] = [];
   if (walls.length) parts.push(`${walls.length} ${walls.length === 1 ? 'wall' : 'walls'}`);
   if (openings.length) parts.push(`${openings.length} ${openings.length === 1 ? 'opening' : 'openings'}`);
+  if (stairs.length) parts.push(`${stairs.length} stairs`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const items = [...walls, ...openings];
+  const items = [...walls, ...openings, ...stairs];
   return (
     <>
       <h3>{parts.join(', ')}</h3>
@@ -464,7 +549,9 @@ function MixedProps({ levelId, sel, walls, openings }: { levelId: Id; sel: Selec
           label="Phase"
           value={common(items, (i) => i.phase)}
           options={phaseOptions}
-          onChange={(p) => setPhase(levelId, { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id) }, p)}
+          onChange={(p) =>
+            setPhase(levelId, { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id) }, p)
+          }
         />
       )}
       {items.length === 0 && <p className="panel-note">Drag corners with the select tool to move them.</p>}
@@ -550,11 +637,13 @@ export function PropertiesPanel() {
   const openings = sel.openings.map((id) => level.openings[id]).filter(Boolean);
   const nodes = sel.nodes.filter((id) => level.nodes[id]);
   const rooms = sel.rooms.map((id) => level.rooms[id]).filter(Boolean);
+  const stairs = sel.stairs.map((id) => level.stairs[id]).filter(Boolean);
   const live: Selection = {
     nodes,
     walls: walls.map((w) => w.id),
     openings: openings.map((o) => o.id),
     rooms: rooms.map((r) => r.id),
+    stairs: stairs.map((st) => st.id),
   };
   const total = selectionSize(live);
 
@@ -564,15 +653,16 @@ export function PropertiesPanel() {
   else if (total === 1 && openings.length === 1)
     body = <OpeningProps key={openings[0].id} level={level} opening={openings[0]} />;
   else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
+  else if (total === 1 && stairs.length === 1) body = <StairsProps key={stairs[0].id} level={level} stairs={stairs[0]} />;
   else if (total === walls.length) body = <MultiWallProps levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} />}
       </div>
     </aside>
   );

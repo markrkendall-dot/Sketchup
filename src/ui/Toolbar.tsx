@@ -7,7 +7,7 @@ import { downloadPlan, readPlanFile } from '../io/file';
 import { createEmptyPlan, defaultLevelId } from '../model/plan';
 import type { MeasureTo, Plan } from '../model/types';
 import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planStore';
-import { useUiStore, type DrawPhase, type ToolName } from '../store/uiStore';
+import { useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
@@ -16,6 +16,13 @@ const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'door', label: 'Door', key: 'D' },
   { name: 'window', label: 'Window', key: 'N' },
   { name: 'passage', label: 'Passage', key: 'P' },
+  { name: 'stairs', label: 'Stairs', key: 'T' },
+];
+
+const LAYOUT_BUTTONS: { layout: Layout; label: string }[] = [
+  { layout: '2d', label: '2D' },
+  { layout: 'split', label: 'Split' },
+  { layout: '3d', label: '3D' },
 ];
 
 function zoomToFit(): void {
@@ -69,6 +76,8 @@ export function Toolbar() {
   const viewMode = useUiStore((s) => s.viewMode);
   const drawPhase = useUiStore((s) => s.drawPhase);
   const setDrawPhase = useUiStore((s) => s.setDrawPhase);
+  const layout = useUiStore((s) => s.layout);
+  const setLayout = useUiStore((s) => s.setLayout);
   const updateSettings = usePlanStore((s) => s.updateSettings);
   const { canUndo, canRedo } = useTemporal();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -168,6 +177,19 @@ export function Toolbar() {
         </select>
       </label>
       <div className="spacer" />
+      <div className="group" role="group" aria-label="Layout">
+        {LAYOUT_BUTTONS.map((b) => (
+          <button
+            key={b.layout}
+            className={layout === b.layout ? 'active' : ''}
+            aria-pressed={layout === b.layout}
+            title="Layout: 2D plan, plan and 3D side by side, or 3D model (` cycles)"
+            onClick={() => setLayout(b.layout)}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
       <div className="group" role="group" aria-label="File">
         <button onClick={onNew}>New</button>
         <button onClick={() => fileInput.current?.click()}>Open</button>

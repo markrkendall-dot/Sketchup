@@ -167,6 +167,7 @@ export function PlanCanvas() {
     ui.setHover({});
     // Opening tools: no ghost while the pointer is off the canvas.
     if (ui.draft.openingPreview) ui.patchDraft({ openingPreview: null });
+    if (ui.draft.stairsPreview) ui.patchDraft({ stairsPreview: null });
   };
 
   const cursor = panRef.current || spaceHeld ? 'grab' : activeTool === 'select' ? 'default' : 'crosshair';

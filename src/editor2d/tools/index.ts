@@ -6,6 +6,7 @@ import { snapPoint } from '../snap';
 import { doorTool, passageTool, windowTool } from './openingTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
+import { stairsTool } from './stairsTool';
 import { wallTool } from './wallTool';
 
 export interface ToolPointerEvent {
@@ -55,6 +56,7 @@ const tools: Record<ToolName, Tool> = {
   door: doorTool,
   window: windowTool,
   passage: passageTool,
+  stairs: stairsTool,
 };
 
 export const getTool = (name: ToolName): Tool => tools[name];
@@ -146,8 +148,9 @@ export function pruneSelection(): void {
     return o && isOpeningVisible(o, level.walls[o.wallId], vm);
   });
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings, rooms });
+  const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms, stairs });
   }
   // An inline rename of a room that undo removed has nothing left to edit.
   const edit = ui.roomEdit;

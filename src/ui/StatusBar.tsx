@@ -36,6 +36,10 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: "Point at a wall. Click to place, or type the distance from the nearer corner's inside face and Enter.",
     busy: "Type the distance from the nearer corner's inside face to the window edge, then Enter.",
   },
+  stairs: {
+    idle: 'Move the mouse the way the stairs go up, then click to place the bottom step. Tab turns 90°. Edit the size in the properties panel.',
+    busy: 'Move the mouse the way the stairs go up, then click to place the bottom step. Tab turns 90°. Edit the size in the properties panel.',
+  },
   passage: {
     idle: "Point at a wall. Click to place, or type the distance from the nearer corner's inside face and Enter.",
     busy: "Type the distance from the nearer corner's inside face to the opening edge, then Enter.",
