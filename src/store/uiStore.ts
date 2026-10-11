@@ -3,7 +3,9 @@ import type { WallGeom } from '../derive/openings';
 import type { Id, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | 'underlay' | OpeningToolName;
+/** Underlay tool modes: drag the image, or calibrate its scale / rotation from two clicked points. */
+export type UnderlayMode = 'move' | 'scale' | 'rotate';
 /** Which views the workspace shows. */
 export type Layout = '2d' | 'split' | '3d';
 export const LAYOUTS: readonly Layout[] = ['2d', 'split', '3d'];
@@ -97,6 +99,8 @@ export interface Draft {
   stairsPreview: { origin: Vec2; direction: number } | null;
   /** Stairs tool: direction of travel chosen by the last mouse movement (0, 90, 180, 270). */
   stairsDirection: number;
+  /** Underlay tool, scale / rotate modes: the calibration points clicked so far (world). */
+  underlayPoints: Vec2[];
 }
 
 export interface Selection {
@@ -153,6 +157,11 @@ export interface UiState {
   only3dActiveAndBelow: boolean;
   /** Bumped to ask the 3D view to re-fit the camera to the plan. */
   fit3dRequest: number;
+  /** Draw the active level's image underlay (a temporary hide; the plan keeps it). */
+  showUnderlay: boolean;
+  /** The active level's underlay is selected (exclusive with the entity selection). */
+  underlaySelected: boolean;
+  underlayMode: UnderlayMode;
   setTool: (tool: ToolName) => void;
   setActiveLevel: (id: Id) => void;
   setSelection: (sel: Selection) => void;
@@ -177,6 +186,11 @@ export interface UiState {
   toggle3dLevel: (id: Id) => void;
   setOnly3dActiveAndBelow: (on: boolean) => void;
   requestFit3d: () => void;
+  toggleShowUnderlay: () => void;
+  /** Select the underlay (clears the entity selection) or deselect it. */
+  selectUnderlay: (on: boolean) => void;
+  /** Change the underlay tool mode; drops any half-made calibration. */
+  setUnderlayMode: (mode: UnderlayMode) => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -197,6 +211,7 @@ export const emptyDraft = (): Draft => ({
   hingeFlip: false,
   stairsPreview: null,
   stairsDirection: 0,
+  underlayPoints: [],
 });
 
 export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [] };
@@ -229,17 +244,32 @@ export const useUiStore = create<UiState>()((set) => ({
   hidden3dLevels: [],
   only3dActiveAndBelow: false,
   fit3dRequest: 0,
+  showUnderlay: true,
+  underlaySelected: false,
+  underlayMode: 'move',
   setTool: (activeTool) =>
     set((s) => ({
       activeTool,
+      underlayMode: 'move',
       draft: { ...emptyDraft(), cursor: s.draft.cursor },
       hover: NO_HOVER,
       roomEdit: null,
     })),
   setActiveLevel: (activeLevelId) =>
-    set({ activeLevelId, selection: EMPTY_SELECTION, draft: emptyDraft(), hover: NO_HOVER, roomEdit: null }),
-  setSelection: (selection) => set({ selection }),
-  clearSelection: () => set((s) => (selectionSize(s.selection) ? { selection: EMPTY_SELECTION } : s)),
+    set({
+      activeLevelId,
+      selection: EMPTY_SELECTION,
+      underlaySelected: false,
+      draft: emptyDraft(),
+      hover: NO_HOVER,
+      roomEdit: null,
+    }),
+  setSelection: (selection) =>
+    set((s) => ({ selection, underlaySelected: selectionSize(selection) ? false : s.underlaySelected })),
+  clearSelection: () =>
+    set((s) =>
+      selectionSize(s.selection) || s.underlaySelected ? { selection: EMPTY_SELECTION, underlaySelected: false } : s,
+    ),
   setHover: (h) =>
     set((s) => {
       const hover: Hover = { nodeId: h.nodeId ?? null, wallId: h.wallId ?? null, openingId: h.openingId ?? null };
@@ -274,6 +304,16 @@ export const useUiStore = create<UiState>()((set) => ({
     })),
   setOnly3dActiveAndBelow: (only3dActiveAndBelow) => set({ only3dActiveAndBelow }),
   requestFit3d: () => set((s) => ({ fit3dRequest: s.fit3dRequest + 1 })),
+  toggleShowUnderlay: () => set((s) => ({ showUnderlay: !s.showUnderlay })),
+  selectUnderlay: (on) =>
+    set((s) =>
+      on ? { underlaySelected: true, selection: EMPTY_SELECTION } : s.underlaySelected ? { underlaySelected: false } : s,
+    ),
+  setUnderlayMode: (underlayMode) =>
+    set((s) => ({
+      underlayMode,
+      draft: { ...s.draft, underlayPoints: [], lengthBuffer: '', error: false, message: null },
+    })),
 }));
 
 export const useViewport = () => useUiStore((s) => s.viewport);

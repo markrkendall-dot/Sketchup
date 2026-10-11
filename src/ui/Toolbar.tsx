@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
-import { setViewMode, switchTool } from '../editor2d/tools';
+import { activateUnderlayTool, setViewMode, switchTool } from '../editor2d/tools';
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import { fitLevel, initialViewport } from '../editor2d/viewport';
 import { downloadPlan, readPlanFile } from '../io/file';
@@ -17,7 +17,12 @@ const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'window', label: 'Window', key: 'N' },
   { name: 'passage', label: 'Passage', key: 'P' },
   { name: 'stairs', label: 'Stairs', key: 'T' },
+  { name: 'underlay', label: 'Underlay', key: 'U' },
 ];
+
+const TOOL_TITLE: Partial<Record<ToolName, string>> = {
+  underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
+};
 
 const LAYOUT_BUTTONS: { layout: Layout; label: string }[] = [
   { layout: '2d', label: '2D' },
@@ -29,7 +34,7 @@ function zoomToFit(): void {
   const ui = useUiStore.getState();
   const level = getPlan().levels[ui.activeLevelId];
   if (!level || ui.canvasSize.width === 0) return;
-  ui.setViewport(fitLevel(level, ui.canvasSize) ?? initialViewport(ui.canvasSize));
+  ui.setViewport(fitLevel(level, ui.canvasSize, ui.showUnderlay) ?? initialViewport(ui.canvasSize));
 }
 
 /** Replace the whole plan (New/Open); undoable like any other edit. */
@@ -109,8 +114,8 @@ export function Toolbar() {
             key={t.name}
             className={activeTool === t.name ? 'active' : ''}
             aria-pressed={activeTool === t.name}
-            title={`${t.label} (${t.key})`}
-            onClick={() => switchTool(t.name)}
+            title={TOOL_TITLE[t.name] ?? `${t.label} (${t.key})`}
+            onClick={() => (t.name === 'underlay' ? activateUnderlayTool() : switchTool(t.name))}
           >
             {t.label} <kbd>{t.key}</kbd>
           </button>

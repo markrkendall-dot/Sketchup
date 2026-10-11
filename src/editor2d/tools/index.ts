@@ -1,12 +1,20 @@
 import { isOpeningVisible, isVisible, VIEW_MODES, visibleNodeIds } from '../../derive/phase';
 import { getPlan, usePlanStore, type PlanState } from '../../store/planStore';
-import { selectionSize, useUiStore, type SnapResult, type ToolName, type UiState } from '../../store/uiStore';
+import {
+  selectionSize,
+  useUiStore,
+  type SnapResult,
+  type ToolName,
+  type UiState,
+  type UnderlayMode,
+} from '../../store/uiStore';
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint } from '../snap';
 import { doorTool, passageTool, windowTool } from './openingTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
 import { stairsTool } from './stairsTool';
+import { requestUnderlayImage, underlayTool } from './underlayTool';
 import { wallTool } from './wallTool';
 
 export interface ToolPointerEvent {
@@ -57,6 +65,7 @@ const tools: Record<ToolName, Tool> = {
   window: windowTool,
   passage: passageTool,
   stairs: stairsTool,
+  underlay: underlayTool,
 };
 
 export const getTool = (name: ToolName): Tool => tools[name];
@@ -138,6 +147,7 @@ export function pruneSelection(): void {
   const ui = useUiStore.getState();
   const level = getPlan().levels[ui.activeLevelId];
   const sel = ui.selection;
+  if (level && ui.underlaySelected && !level.underlay) ui.selectUnderlay(false);
   if (!level || selectionSize(sel) === 0) return;
   const vm = ui.viewMode;
   const shownNodes = visibleNodeIds(level, vm);
@@ -184,4 +194,25 @@ export function setViewMode(mode: ViewMode): void {
 export function cycleViewMode(): void {
   const i = VIEW_MODES.indexOf(useUiStore.getState().viewMode);
   setViewMode(VIEW_MODES[(i + 1) % VIEW_MODES.length]);
+}
+
+/**
+ * Switch to the underlay tool in a mode and select the image. With no image on the active level,
+ * opens the file picker instead (the "Place" step).
+ */
+export function activateUnderlayTool(mode: UnderlayMode = 'move'): void {
+  const ui = useUiStore.getState();
+  const level = getPlan().levels[ui.activeLevelId];
+  if (!level) return;
+  if (ui.activeTool !== 'underlay') switchTool('underlay');
+  if (!level.underlay) {
+    requestUnderlayImage(level.id);
+    return;
+  }
+  const after = useUiStore.getState();
+  after.setUnderlayMode(mode);
+  after.selectUnderlay(true);
+  if (mode !== 'move' && level.underlay.locked) {
+    after.patchDraft({ error: true, message: 'The image is locked. Unlock it in the properties panel first.' });
+  }
 }

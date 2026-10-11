@@ -13,8 +13,9 @@ import {
   normalizeLevel,
   wallLength,
 } from '../model/plan';
-import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Stairs, Vec2, Wall, WallKind } from '../model/types';
+import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { normalizeDegrees } from '../derive/stairs';
+import { isValidUnderlay, normalizeRotation } from '../model/underlay';
 
 export interface AddWallOptions {
   kind: WallKind;
@@ -39,6 +40,7 @@ export type RoomPatch = Partial<Omit<Room, 'id'>>;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 export type StairsPatch = Partial<Omit<Stairs, 'id'>>;
 export type NewStairs = Omit<Stairs, 'id'> & { id?: Id };
+export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** Which end of a wall stays put when its length is edited. */
 export type LengthAnchor = 'start' | 'end';
@@ -104,6 +106,13 @@ export interface PlanState {
   renameLevel: (levelId: Id, name: string) => void;
   updateLevel: (levelId: Id, patch: LevelPatch) => void;
   setBaseFloorElevation: (elevation: number) => void;
+  /** Put an image under a level, replacing any there, or remove it (undefined). One undo step. */
+  setUnderlay: (levelId: Id, underlay: Underlay | undefined) => void;
+  /**
+   * Patch the level's underlay (placement, opacity, lock). Invalid values are rejected; the
+   * rotation is normalized to [0, 360). No-op without an underlay. One undo step.
+   */
+  updateUnderlay: (levelId: Id, patch: UnderlayPatch) => void;
 }
 
 const touch = (plan: Plan) => {
@@ -542,6 +551,38 @@ export const usePlanStore = create<PlanState>()(
             if (!Number.isFinite(elevation)) return;
             s.plan.baseFloorElevation = elevation;
             touch(s.plan);
+          }),
+
+        setUnderlay: (levelId, underlay) =>
+          editLevel(levelId, (level) => {
+            if (!underlay) {
+              if (!level.underlay) return false;
+              delete level.underlay;
+              return;
+            }
+            const next: Underlay = {
+              ...underlay,
+              origin: { x: underlay.origin.x, y: underlay.origin.y },
+              rotation: normalizeRotation(underlay.rotation),
+            };
+            if (!isValidUnderlay(next)) return false;
+            level.underlay = next;
+          }),
+
+        updateUnderlay: (levelId, patch) =>
+          editLevel(levelId, (level) => {
+            const u = level.underlay;
+            if (!u) return false;
+            const next: Underlay = { ...u, ...patch };
+            if (patch.origin) next.origin = { x: patch.origin.x, y: patch.origin.y };
+            if (patch.rotation !== undefined) next.rotation = normalizeRotation(patch.rotation);
+            if (!isValidUnderlay(next)) return false;
+            const keys = Object.keys(patch) as (keyof Underlay)[];
+            const changed = keys.some((k) =>
+              k === 'origin' ? next.origin.x !== u.origin.x || next.origin.y !== u.origin.y : next[k] !== u[k],
+            );
+            if (!changed) return false;
+            for (const k of keys) (u as unknown as Record<string, unknown>)[k] = next[k];
           }),
       };
     }),

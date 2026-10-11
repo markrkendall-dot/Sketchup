@@ -293,13 +293,68 @@ function useOpeningIds(levelId: Id): Id[] {
   return useMemo(() => (openings ? Object.keys(openings) : []), [openings]);
 }
 
+/** The level has an underlay and it is not hidden. */
+function useUnderlayShown(levelId: Id): boolean {
+  const has = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
+  const show = useUiStore((s) => s.showUnderlay);
+  return has && show;
+}
+
+/**
+ * The level's image underlay, below everything else on the level: image pixel (0,0) at `origin`,
+ * each pixel `scale` inches, turned by `rotation`. Picking is done by the tools (hitUnderlay), so
+ * the image only takes pointer events (for the cursor) while it can be moved: the underlay tool is
+ * active, or it is selected and unlocked. Never in the wall tool, and snapping ignores it.
+ */
+const UnderlayLayer = memo(function UnderlayLayer({ levelId }: { levelId: Id }) {
+  const u = usePlanStore((s) => s.plan.levels[levelId]?.underlay);
+  const show = useUiStore((s) => s.showUnderlay);
+  const tool = useUiStore((s) => s.activeTool);
+  const selected = useUiStore((s) => s.underlaySelected);
+  if (!u || !show) return null;
+  const interactive = !u.locked && (tool === 'underlay' || (selected && tool === 'select'));
+  const transform = `translate(${u.origin.x} ${u.origin.y}) rotate(${u.rotation}) scale(${u.scale})`;
+  return (
+    <g
+      className={`layer-underlay${selected ? ' is-selected' : ''}${u.locked ? ' is-locked' : ''}`}
+      pointerEvents={interactive ? 'auto' : 'none'}
+      data-underlay-level={levelId}
+    >
+      <image
+        className="underlay-image"
+        href={u.image}
+        x={0}
+        y={0}
+        width={u.pixelWidth}
+        height={u.pixelHeight}
+        preserveAspectRatio="none"
+        opacity={u.opacity}
+        transform={transform}
+      />
+      {selected && (
+        <rect
+          className="underlay-outline"
+          x={0}
+          y={0}
+          width={u.pixelWidth}
+          height={u.pixelHeight}
+          transform={transform}
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </g>
+  );
+});
+
 /** Light tint under every enclosed area (net polygon), below the walls. */
 const RoomFillsLayer = memo(function RoomFillsLayer({ levelId }: { levelId: Id }) {
   const set = useFaceSet(levelId);
   const selected = useUiStore((s) => s.selection.rooms);
+  // Over an underlay the tints go translucent so the image still shows through traced rooms.
+  const overUnderlay = useUnderlayShown(levelId);
   if (!set || set.faces.length === 0) return null;
   return (
-    <g className="layer-room-fills" pointerEvents="none">
+    <g className={`layer-room-fills${overUnderlay ? ' over-underlay' : ''}`} pointerEvents="none">
       {set.faces.map((f, i) => (
         <path
           key={f.id}
@@ -438,6 +493,7 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
   return (
     <>
       <PatternDefs />
+      <UnderlayLayer levelId={levelId} />
       <RoomFillsLayer levelId={levelId} />
       <StairsLayer levelId={levelId} />
       <WallsLayer levelId={levelId} />

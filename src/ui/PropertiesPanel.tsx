@@ -1,15 +1,18 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
 import { getFaces } from '../derive/rooms';
 import { floorToFloor, stairSteps } from '../derive/stairs';
+import { activateUnderlayTool } from '../editor2d/tools';
+import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
+import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
 import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, type OpeningType } from '../model/openings';
 import { wallLength } from '../model/plan';
 import type { Id, Level, Opening, Phase, Room, Stairs, Wall, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
-import { usePlanStore, type LengthAnchor } from '../store/planStore';
+import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 
 const PHASES: Phase[] = ['existing', 'demo', 'new'];
@@ -559,6 +562,217 @@ function MixedProps({
   );
 }
 
+/** A number input in degrees: commits on Enter or blur, Escape reverts. */
+function DegreesField({ label, value, onCommit, disabled }: { label: string; value: number; onCommit: (v: number) => void; disabled?: boolean }) {
+  const fmt = (v: number) => String(Math.round(v * 100) / 100);
+  const [text, setText] = useState(fmt(value));
+  const [focused, setFocused] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!focused) setText(fmt(value));
+  }, [value, focused]);
+  const commit = () => {
+    const v = Number(text.trim().replace(/°$/, ''));
+    if (text.trim() === '' || !Number.isFinite(v)) {
+      setError('Enter an angle in degrees.');
+      return;
+    }
+    setError(null);
+    if (Math.abs(v - value) > 1e-9) onCommit(v);
+  };
+  return (
+    <div className={`field${error ? ' has-error' : ''}`}>
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        aria-label={label}
+        inputMode="decimal"
+        value={text}
+        disabled={disabled}
+        onChange={(e) => {
+          setText(e.target.value);
+          setError(null);
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          commit();
+          setFocused(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          else if (e.key === 'Escape') {
+            setText(fmt(value));
+            setError(null);
+            e.currentTarget.blur();
+          }
+        }}
+      />
+      {error && <div className="field-error" role="alert">{error}</div>}
+      {!error && <div className="field-hint">Clockwise, about the image centre.</div>}
+    </div>
+  );
+}
+
+/**
+ * Opacity slider. A drag (or a run of arrow keys) is one undo step: the first change is tracked,
+ * the rest are folded into it until the pointer or key is released.
+ */
+function OpacitySlider({ levelId, value }: { levelId: Id; value: number }) {
+  const updateUnderlay = usePlanStore((s) => s.updateUnderlay);
+  const grouping = useRef(false);
+  const end = () => {
+    if (!grouping.current) return;
+    grouping.current = false;
+    resumeHistory();
+  };
+  useEffect(() => end, []);
+  return (
+    <div className="field">
+      <label htmlFor="underlay-opacity">Opacity</label>
+      <div className="slider-row">
+        <input
+          id="underlay-opacity"
+          type="range"
+          aria-label="Opacity"
+          min={0.1}
+          max={1}
+          step={0.05}
+          value={value}
+          onChange={(e) => {
+            updateUnderlay(levelId, { opacity: Number(e.target.value) });
+            if (!grouping.current) {
+              grouping.current = true;
+              pauseHistory();
+            }
+          }}
+          onPointerUp={end}
+          onKeyUp={end}
+          onBlur={end}
+        />
+        <span className="slider-value">{Math.round(value * 100)}%</span>
+      </div>
+    </div>
+  );
+}
+
+function UnderlayProps({ level }: { level: Level }) {
+  const u = level.underlay;
+  const updateUnderlay = usePlanStore((s) => s.updateUnderlay);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const tool = useUiStore((s) => s.activeTool);
+  const mode = useUiStore((s) => s.underlayMode);
+  if (!u) {
+    return (
+      <>
+        <h3>Underlay</h3>
+        <p className="panel-note">
+          No image under {level.name}. Load a photo or scan of a floor plan or sketch (JPEG, PNG or WebP), scale it by
+          two points of known distance, then trace the walls over it.
+        </p>
+        <div className="panel-buttons">
+          <button className="primary" onClick={() => requestUnderlayImage(level.id)}>
+            Load image...
+          </button>
+        </div>
+        <p className="panel-note">PDF? Export the page as an image first.</p>
+      </>
+    );
+  }
+  const center = underlayCenter(u);
+  const width = u.pixelWidth * u.scale;
+  const active = (m: string) => tool === 'underlay' && mode === m;
+  return (
+    <>
+      <h3>Underlay</h3>
+      <div className="panel-buttons calibrate-buttons">
+        <button
+          className={active('scale') ? 'active' : ''}
+          aria-pressed={active('scale')}
+          disabled={u.locked}
+          title="Click two points on the image, then type the real distance between them"
+          onClick={() => activateUnderlayTool(active('scale') ? 'move' : 'scale')}
+        >
+          Scale by two points
+        </button>
+        <button
+          className={active('rotate') ? 'active' : ''}
+          aria-pressed={active('rotate')}
+          disabled={u.locked}
+          title="Click two points that should line up horizontally (or vertically)"
+          onClick={() => activateUnderlayTool(active('rotate') ? 'move' : 'rotate')}
+        >
+          Rotate by two points
+        </button>
+      </div>
+      <ReadOnly label="Image">
+        {u.pixelWidth} x {u.pixelHeight} px
+      </ReadOnly>
+      <ReadOnly label="Scale">{formatPxScale(u.scale)}</ReadOnly>
+      {u.locked ? (
+        <ReadOnly label="Image width">{formatLength(width, denom)}</ReadOnly>
+      ) : (
+        <LengthField
+          label="Image width"
+          value={width}
+          onCommit={(v) => {
+            if (v !== null) updateUnderlay(level.id, scaleAbout(u, v / u.pixelWidth, center));
+          }}
+          hint="Width the whole image spans on the plan."
+        />
+      )}
+      <DegreesField
+        label="Rotation"
+        value={u.rotation}
+        disabled={u.locked}
+        onCommit={(v) => updateUnderlay(level.id, rotateAbout(u, v, center))}
+      />
+      <OpacitySlider levelId={level.id} value={u.opacity} />
+      <label className="check-row">
+        <input
+          type="checkbox"
+          aria-label="Locked"
+          checked={u.locked}
+          onChange={(e) => {
+            updateUnderlay(level.id, { locked: e.target.checked });
+            if (e.target.checked && useUiStore.getState().underlayMode !== 'move') useUiStore.getState().setUnderlayMode('move');
+          }}
+        />
+        Locked (can't be moved or picked)
+      </label>
+      <div className="panel-actions">
+        <button onClick={() => requestUnderlayImage(level.id, true)}>Replace image...</button>
+        <button className="danger" onClick={() => confirmRemoveUnderlay(level.id)}>
+          Remove
+        </button>
+      </div>
+      <p className="panel-note">
+        {u.locked
+          ? 'Locked: trace walls over it with the wall tool (W). Unlock to move or recalibrate it.'
+          : 'Drag the image to move it; arrow keys nudge 1" (Shift: 1\'). Lock it before tracing.'}
+      </p>
+    </>
+  );
+}
+
+function UnderlayRow({ level }: { level: Level }) {
+  const u = level.underlay;
+  return (
+    <div className="field readonly underlay-row">
+      <span className="label">Underlay</span>
+      <span className="value">
+        {u ? `loaded (${u.locked ? 'locked' : 'unlocked'})` : 'none'}
+        <button
+          className="inline-button"
+          onClick={() => (u ? useUiStore.getState().selectUnderlay(true) : requestUnderlayImage(level.id))}
+        >
+          {u ? 'Select' : 'Load image...'}
+        </button>
+      </span>
+    </div>
+  );
+}
+
 function LevelProps({ level }: { level: Level }) {
   const { updateLevel, setBaseFloorElevation } = usePlanStore.getState();
   const base = usePlanStore((s) => s.plan.baseFloorElevation);
@@ -615,6 +829,7 @@ function LevelProps({ level }: { level: Level }) {
           <ReadOnly label="Ceiling">{formatLength(ceiling, denom)}</ReadOnly>
         </>
       )}
+      <UnderlayRow level={level} />
       <ReadOnly label="Rooms">{roomCount}</ReadOnly>
       <ReadOnly label="Unlabeled areas">{unlabeled}</ReadOnly>
       {faces && faces.openEnds.length > 0 && (
@@ -631,6 +846,8 @@ function LevelProps({ level }: { level: Level }) {
 export function PropertiesPanel() {
   const levelId = useUiStore((s) => s.activeLevelId);
   const sel = useUiStore((s) => s.selection);
+  const underlaySelected = useUiStore((s) => s.underlaySelected);
+  const underlayTool = useUiStore((s) => s.activeTool === 'underlay');
   const level = usePlanStore((s) => s.plan.levels[levelId]);
   if (!level) return <aside className="side-panel" />;
   const walls = sel.walls.map((id) => level.walls[id]).filter(Boolean);
@@ -648,7 +865,8 @@ export function PropertiesPanel() {
   const total = selectionSize(live);
 
   let body: ReactNode;
-  if (total === 0) body = <LevelProps key={level.id} level={level} />;
+  if (total === 0 && (underlayTool || (underlaySelected && level.underlay))) body = <UnderlayProps key={level.id} level={level} />;
+  else if (total === 0) body = <LevelProps key={level.id} level={level} />;
   else if (total === 1 && walls.length === 1) body = <WallProps key={walls[0].id} level={level} wall={walls[0]} />;
   else if (total === 1 && openings.length === 1)
     body = <OpeningProps key={openings[0].id} level={level} opening={openings[0]} />;

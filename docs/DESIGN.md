@@ -256,6 +256,23 @@ wall's new footprint with the previous one by value and returns the previous obj
 `<WallMesh3D>` can `useMemo` on the footprint reference and rebuild only changed walls. Dispose old
 geometry in effect cleanup.
 
+### Image underlay (`model/underlay.ts`, `tools/underlayTool.ts`)
+
+One optional `Underlay` per level: plan = origin + R(rotation) * (pixel * scale), the SVG transform
+`translate(origin) rotate(rotation) scale(scale)` on an `<image>` drawn first on its own level only
+(not on the ghost level below; uiStore `showUnderlay` hides it temporarily). Import
+(`io/image.ts`) decodes with `createImageBitmap` (falls back to `<img>`), downscales to <= 2048 px
+and stores a JPEG (0.85) data URL; PDFs are refused with a message. A new image is centred in the
+view at a provisional 40' width, opacity 0.6, unlocked. Calibration is pure math the tool calls:
+`calibrateScale(u, p1, p2, real)` sets scale = real / pixel distance and keeps p1 fixed;
+`calibrateRotation(u, p1, p2)` turns about p1 so p1->p2 is axis-aligned (nearest axis). Underlay
+tool (U) modes: move (drag, arrows 1", Shift 12"), scale by two points (click, click, type the
+distance in the length buffer, Enter), rotate by two points. The select tool also drags an unlocked
+image where nothing else is hit (Shift still box-selects). Picking is by `hitUnderlay` in the tools;
+a locked image is never hit and never moves. The image is not part of snapping. The underlay
+selection is `uiStore.underlaySelected`, exclusive with the entity selection. Store actions
+`setUnderlay` / `updateUnderlay` are one undo step each; drags and opacity slides are grouped.
+
 ## 3D
 
 r3f `<Canvas frameloop="demand">` (lazy-loaded chunk), invalidate on plan changes and on the UI

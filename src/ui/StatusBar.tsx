@@ -3,7 +3,7 @@ import { getFaces } from '../derive/rooms';
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import { formatLength } from '../model/units';
 import { usePlanStore } from '../store/planStore';
-import { useUiStore, type SnapKind, type ToolName } from '../store/uiStore';
+import { useUiStore, type SnapKind, type ToolName, type UnderlayMode } from '../store/uiStore';
 
 const SNAP_LABEL: Record<SnapKind, string> = {
   node: 'corner',
@@ -44,7 +44,25 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: "Point at a wall. Click to place, or type the distance from the nearer corner's inside face and Enter.",
     busy: "Type the distance from the nearer corner's inside face to the opening edge, then Enter.",
   },
+  // Replaced by underlayHint(); kept for the Record type.
+  underlay: { idle: '', busy: '' },
 };
+
+/** Status hint for the underlay tool's modes and calibration steps. */
+function underlayHint(hasImage: boolean, locked: boolean, mode: UnderlayMode, points: number): string {
+  if (!hasImage) return 'Click to load an image of a floor plan, sketch or photo (JPEG, PNG or WebP). PDF: export the page as an image first.';
+  if (locked) return 'The image is locked. Unlock it in the properties panel to move or calibrate it. Draw walls over it with W.';
+  if (mode === 'scale') {
+    if (points === 0) return 'Scale: click the first of two points a known distance apart, e.g. the ends of a dimensioned wall.';
+    if (points === 1) return 'Scale: click the second point. Esc starts over.';
+    return "Type the real distance between the two points, like 20' or 12'6, then Enter. Esc starts over.";
+  }
+  if (mode === 'rotate') {
+    if (points === 0) return 'Rotate: click the first of two points that should line up horizontally (or vertically).';
+    return 'Rotate: click the second point. The image turns about the first point so the line is level. Esc starts over.';
+  }
+  return 'Drag the image to move it; arrow keys nudge 1" (Shift: 1\'). Use Scale by two points in the panel, then lock it and trace with W.';
+}
 
 export function StatusBar() {
   const tool = useUiStore((s) => s.activeTool);
@@ -74,6 +92,9 @@ export function StatusBar() {
     return level ? getFaces(level, viewMode).openEnds.length : 0;
   });
   const measureTo = usePlanStore((s) => s.plan.settings.measureTo);
+  const hasUnderlay = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
+  const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
+  const underlayMode = useUiStore((s) => s.underlayMode);
   const p = draft.snap?.point ?? draft.cursor;
   const drawing = draft.wallStart !== null || draft.lengthBuffer !== '';
 
@@ -90,7 +111,12 @@ export function StatusBar() {
         </span>
       )}
       <span className={draft.error ? 'hint error' : 'hint'}>
-        {draft.message ?? (drawing ? HINTS[tool].busy : HINTS[tool].idle)}
+        {draft.message ??
+          (tool === 'underlay'
+            ? underlayHint(hasUnderlay, underlayLocked, underlayMode, draft.underlayPoints.length)
+            : drawing
+              ? HINTS[tool].busy
+              : HINTS[tool].idle)}
       </span>
       <span className="spacer" />
       {openEnds > 0 && (

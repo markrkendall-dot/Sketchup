@@ -84,6 +84,9 @@ export function LevelBar() {
   const belowId = index > 0 ? order[index - 1] : null;
   const belowName = usePlanStore((s) => (belowId ? s.plan.levels[belowId]?.name : null));
   const belowWalls = usePlanStore((s) => (belowId ? Object.keys(s.plan.levels[belowId]?.walls ?? {}).length : 0));
+  const hasUnderlay = usePlanStore((s) => !!s.plan.levels[activeId]?.underlay);
+  const showUnderlay = useUiStore((s) => s.showUnderlay);
+  const toggleShowUnderlay = useUiStore((s) => s.toggleShowUnderlay);
 
   return (
     <nav className="level-bar" aria-label="Levels">
@@ -99,6 +102,13 @@ export function LevelBar() {
       <label className="level-option" title={belowName ? `Draw ${belowName} faintly under this level` : 'No level below'}>
         <input type="checkbox" checked={showBelow} disabled={!belowId} onChange={toggleShowBelow} />
         Show level below
+      </label>
+      <label
+        className="level-option"
+        title={hasUnderlay ? 'Hide the image under this level for a moment (it stays in the plan)' : 'No image under this level (Underlay tool, U)'}
+      >
+        <input type="checkbox" checked={showUnderlay} disabled={!hasUnderlay} onChange={toggleShowUnderlay} />
+        Show underlay
       </label>
       <button
         className="level-copy"

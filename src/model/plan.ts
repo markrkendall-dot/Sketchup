@@ -2,7 +2,8 @@ import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { dist, projectPointToSegment } from './geometry';
 import { clampOpeningOffset } from './openings';
-import type { Id, Level, Phase, Plan, PlanSettings, Vec2, Wall } from './types';
+import type { Id, Level, Phase, Plan, PlanSettings, Underlay, Vec2, Wall } from './types';
+import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 1 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
@@ -277,7 +278,7 @@ function migrateLevel(raw: unknown, id: string): Level {
     if (!(w.a in nodes) || !(w.b in nodes)) fail(`wall ${wid} references a missing node`);
     if (!isNum(w.thickness) || w.thickness <= 0) fail(`wall ${wid} needs a positive thickness`);
   }
-  return {
+  const level: Level = {
     ...(raw as unknown as Level),
     id,
     name: typeof raw.name === 'string' ? raw.name : 'Level',
@@ -289,6 +290,29 @@ function migrateLevel(raw: unknown, id: string): Level {
     rooms: record(raw.rooms, `level ${id} rooms`) as Level['rooms'],
     stairs: migrateStairs(record(raw.stairs, `level ${id} stairs`)),
   };
+  const underlay = migrateUnderlay(raw.underlay);
+  if (underlay) level.underlay = underlay;
+  else delete level.underlay;
+  return level;
+}
+
+/**
+ * An underlay with a usable image and placement; missing opacity, rotation and lock get defaults.
+ * A broken one is dropped rather than failing the whole file.
+ */
+function migrateUnderlay(raw: unknown): Underlay | undefined {
+  if (!isObject(raw) || !isObject(raw.origin)) return undefined;
+  const u: Underlay = {
+    image: raw.image as string,
+    pixelWidth: raw.pixelWidth as number,
+    pixelHeight: raw.pixelHeight as number,
+    origin: { x: raw.origin.x as number, y: raw.origin.y as number },
+    scale: raw.scale as number,
+    rotation: isNum(raw.rotation) ? normalizeRotation(raw.rotation) : 0,
+    opacity: isNum(raw.opacity) ? Math.min(1, Math.max(0, raw.opacity)) : 0.6,
+    locked: typeof raw.locked === 'boolean' ? raw.locked : false,
+  };
+  return isValidUnderlay(u) ? u : undefined;
 }
 
 const PHASES = new Set(['existing', 'demo', 'new']);

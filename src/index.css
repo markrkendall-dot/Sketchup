@@ -1008,3 +1008,123 @@ button.danger {
   align-self: stretch;
   background: var(--border);
 }
+
+/* Image underlay ----------------------------------------------------------------------------- */
+
+.underlay-image {
+  image-rendering: auto;
+}
+
+.underlay-outline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+/* Traced rooms over an image: keep the tints faint so the drawing shows through. */
+.layer-room-fills.over-underlay .room-fill {
+  fill-opacity: 0.35;
+}
+
+.calib-line {
+  stroke: #c026d3;
+  stroke-width: 1.5;
+}
+
+.calib-marker circle {
+  fill: rgba(192, 38, 211, 0.15);
+  stroke: #c026d3;
+  stroke-width: 1.75;
+}
+
+.calib-marker path {
+  stroke: #c026d3;
+  stroke-width: 1;
+}
+
+.calib-marker text {
+  font-size: 12px;
+  font-weight: 700;
+  fill: #86198f;
+  stroke: #fff;
+  stroke-width: 3px;
+  paint-order: stroke;
+}
+
+.calib-readout rect {
+  fill: #fff;
+  stroke: #e879f9;
+  stroke-width: 1;
+}
+
+.calib-readout text {
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  fill: #86198f;
+}
+
+.length-box .length-placeholder {
+  fill: var(--muted);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+}
+
+.panel-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.panel-buttons button {
+  font-size: 12.5px;
+  padding: 5px 8px;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-row input[type='range'] {
+  flex: 1;
+  padding: 0;
+  border: none;
+}
+
+.slider-value {
+  width: 36px;
+  text-align: right;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.underlay-row .value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inline-button {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.calibrate-buttons button {
+  flex: 1 1 100%;
+}

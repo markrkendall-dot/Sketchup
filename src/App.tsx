@@ -1,13 +1,14 @@
 import { lazy, Suspense, useEffect, useRef, useState, type RefObject } from 'react';
 import { PlanCanvas } from './editor2d/PlanCanvas';
 import { RoomNameEditor } from './editor2d/RoomNameEditor';
-import { cycleViewMode, dispatchKey, dispatchShift, switchLevelByIndex, switchTool } from './editor2d/tools';
+import { activateUnderlayTool, cycleViewMode, dispatchKey, dispatchShift, switchLevelByIndex, switchTool } from './editor2d/tools';
 import { redo, undo, usePlanStore } from './store/planStore';
 import { LAYOUTS, useUiStore, type ToolName } from './store/uiStore';
 import { LevelBar } from './ui/LevelBar';
 import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
+import { UnderlayFileInput } from './ui/UnderlayImport';
 
 // The 3D view (three, fiber, drei) loads on first use, so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D'));
@@ -17,7 +18,16 @@ function cycleLayout(): void {
   ui.setLayout(LAYOUTS[(LAYOUTS.indexOf(ui.layout) + 1) % LAYOUTS.length]);
 }
 
-const TOOL_KEYS: Record<string, ToolName> = { s: 'select', w: 'wall', r: 'room', d: 'door', n: 'window', p: 'passage', t: 'stairs' };
+const TOOL_KEYS: Record<string, ToolName> = {
+  s: 'select',
+  w: 'wall',
+  r: 'room',
+  d: 'door',
+  n: 'window',
+  p: 'passage',
+  t: 'stairs',
+  u: 'underlay',
+};
 
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -60,11 +70,15 @@ function onKeyDown(e: KeyboardEvent): void {
     return;
   }
   if (Object.hasOwn(TOOL_KEYS, key)) {
-    switchTool(TOOL_KEYS[key]);
+    // The underlay tool opens the image picker when the level has no image yet.
+    if (TOOL_KEYS[key] === 'underlay') activateUnderlayTool();
+    else switchTool(TOOL_KEYS[key]);
     e.preventDefault();
     return;
   }
-  const drawing = ui.activeTool === 'wall' && ui.draft.wallStart !== null;
+  const drawing =
+    (ui.activeTool === 'wall' && ui.draft.wallStart !== null) ||
+    (ui.activeTool === 'underlay' && ui.draft.underlayPoints.length > 0);
   if (drawing) return;
   if (key === 'o') {
     const { plan, updateSettings } = usePlanStore.getState();
@@ -160,6 +174,7 @@ export function App() {
         <PropertiesPanel />
       </div>
       <StatusBar />
+      <UnderlayFileInput />
     </div>
   );
 }

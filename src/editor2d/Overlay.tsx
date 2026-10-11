@@ -2,12 +2,15 @@ import { memo } from 'react';
 import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
 import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
 import { add, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
-import type { Vec2 } from '../model/types';
-import { formatLengthCompact } from '../model/units';
+import type { Underlay, Vec2 } from '../model/types';
+import { formatPxScale, nearestAxis, pixelDistance } from '../model/underlay';
+import { formatLength, formatLengthCompact, parseLength } from '../model/units';
 import { usePlanStore } from '../store/planStore';
 import {
   useUiStore,
+  type Draft,
   type OpeningPreview,
+  type UnderlayMode,
   type SnapResult,
   type Viewport,
   type WallPreview,
@@ -186,15 +189,90 @@ function OpeningGhost({ preview, v, denom }: { preview: OpeningPreview; v: Viewp
   );
 }
 
-function LengthBox({ text, at, error }: { text: string; at: Vec2; error: boolean }) {
-  const width = Math.max(48, text.length * 8.5 + 20);
+function LengthBox({ text, at, error, placeholder }: { text: string; at: Vec2; error: boolean; placeholder?: string }) {
+  const shown = text || placeholder || '';
+  const width = Math.max(48, shown.length * (text ? 8.5 : 7) + 20);
   return (
     <g className={error ? 'length-box error' : 'length-box'} transform={`translate(${at.x + 16} ${at.y + 18})`}>
       <rect width={width} height={24} rx={4} />
       <text x={10} y={12} dominantBaseline="central">
         {text}
         <tspan className="caret">|</tspan>
+        {!text && placeholder && <tspan className="length-placeholder">{placeholder}</tspan>}
       </text>
+    </g>
+  );
+}
+
+/** A label on a pill, centred on a screen point. */
+function Pill({ at, text, className }: { at: Vec2; text: string; className: string }) {
+  const w = text.length * 6.9 + 16;
+  return (
+    <g className={className} transform={`translate(${at.x} ${at.y})`}>
+      <rect x={-w / 2} y={-10} width={w} height={20} rx={10} />
+      <text textAnchor="middle" dominantBaseline="central">
+        {text}
+      </text>
+    </g>
+  );
+}
+
+function CalibrationMarker({ p, label }: { p: Vec2; label: string }) {
+  return (
+    <g className="calib-marker">
+      <circle cx={p.x} cy={p.y} r={7} />
+      <path d={`M${p.x - 11} ${p.y}H${p.x + 11}M${p.x} ${p.y - 11}V${p.y + 11}`} />
+      <text x={p.x + 9} y={p.y - 9}>
+        {label}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * Underlay tool, scale / rotate by two points: the clicked markers, the line to the second point
+ * (or the cursor), a live readout of the pixel distance and what it means, and the typed distance.
+ */
+function UnderlayCalibration({ u, mode, draft, v, denom }: { u: Underlay; mode: UnderlayMode; draft: Draft; v: Viewport; denom: number }) {
+  const pts = draft.underlayPoints;
+  if (pts.length === 0) return null;
+  const w1 = pts[0];
+  const w2 = pts[1] ?? draft.cursor;
+  const a = worldToScreen(v, w1);
+  const b = w2 ? worldToScreen(v, w2) : null;
+  let readout = '';
+  if (w2) {
+    if (mode === 'scale') {
+      const px = pixelDistance(u, w1, w2);
+      readout = `${px.toFixed(0)} px = ${formatLengthCompact(px * u.scale, denom)} now`;
+      if (pts.length === 2 && draft.lengthBuffer) {
+        try {
+          const real = parseLength(draft.lengthBuffer);
+          if (real > 0 && px > 0) readout = `${px.toFixed(0)} px = ${formatLength(real, denom)}: ${formatPxScale(real / px)}`;
+        } catch {
+          // Keep the live readout while the buffer is incomplete.
+        }
+      }
+    } else {
+      const { target, turn } = nearestAxis(w1, w2);
+      readout = `turn ${turn >= 0 ? '+' : ''}${turn.toFixed(1)}° to ${target % 180 === 0 ? 'horizontal' : 'vertical'}`;
+    }
+  }
+  const mid = b ? midpoint(a, b) : a;
+  const along = b ? sub(b, a) : { x: 1, y: 0 };
+  const len = Math.hypot(along.x, along.y);
+  const n = len > 1e-6 ? perpLeft(scale(along, 1 / len)) : { x: 0, y: -1 };
+  // Keep the readout above the line on screen.
+  const off = scale(n.y > 0 ? scale(n, -1) : n, 20);
+  return (
+    <g className={`calibration calibration-${mode}`}>
+      {b && <line className="calib-line" x1={a.x} y1={a.y} x2={b.x} y2={b.y} />}
+      <CalibrationMarker p={a} label="1" />
+      {pts.length === 2 && b && <CalibrationMarker p={b} label="2" />}
+      {readout && <Pill at={add(mid, off)} text={readout} className="calib-readout" />}
+      {mode === 'scale' && pts.length === 2 && b && (
+        <LengthBox text={draft.lengthBuffer} at={b} error={draft.error} placeholder="type the real distance" />
+      )}
     </g>
   );
 }
@@ -215,6 +293,11 @@ export const Overlay = memo(function Overlay() {
   const draft = useUiStore((s) => s.draft);
   const v = useUiStore((s) => s.viewport);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const tool = useUiStore((s) => s.activeTool);
+  const underlayMode = useUiStore((s) => s.underlayMode);
+  const levelId = useUiStore((s) => s.activeLevelId);
+  const underlay = usePlanStore((s) => s.plan.levels[levelId]?.underlay);
+  const calibrating = tool === 'underlay' && underlayMode !== 'move' && !!underlay;
   const cursor = draft.cursor ? worldToScreen(v, draft.cursor) : null;
   const box = draft.box
     ? { a: worldToScreen(v, draft.box.a), b: worldToScreen(v, draft.box.b) }
@@ -234,7 +317,8 @@ export const Overlay = memo(function Overlay() {
           height={Math.abs(box.b.y - box.a.y)}
         />
       )}
-      {cursor && draft.lengthBuffer && <LengthBox text={draft.lengthBuffer} at={cursor} error={draft.error} />}
+      {calibrating && <UnderlayCalibration u={underlay} mode={underlayMode} draft={draft} v={v} denom={denom} />}
+      {cursor && draft.lengthBuffer && !calibrating && <LengthBox text={draft.lengthBuffer} at={cursor} error={draft.error} />}
     </g>
   );
 });

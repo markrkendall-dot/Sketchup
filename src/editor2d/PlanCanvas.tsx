@@ -71,6 +71,7 @@ export function PlanCanvas() {
   const size = useUiStore((s) => s.canvasSize);
   const spaceHeld = useUiStore((s) => s.spaceHeld);
   const activeTool = useUiStore((s) => s.activeTool);
+  const underlayMode = useUiStore((s) => s.underlayMode);
   const showBelow = useUiStore((s) => s.showLevelBelow);
   const belowId = usePlanStore((s) => {
     const i = s.plan.levelOrder.indexOf(levelId);
@@ -91,7 +92,7 @@ export function PlanCanvas() {
       if (!initialized.current && next.width > 0 && next.height > 0) {
         initialized.current = true;
         const level = getPlan().levels[ui.activeLevelId];
-        ui.setViewport((level && fitLevel(level, next)) ?? initialViewport(next));
+        ui.setViewport((level && fitLevel(level, next, ui.showUnderlay)) ?? initialViewport(next));
       }
     };
     measure();
@@ -170,7 +171,14 @@ export function PlanCanvas() {
     if (ui.draft.stairsPreview) ui.patchDraft({ stairsPreview: null });
   };
 
-  const cursor = panRef.current || spaceHeld ? 'grab' : activeTool === 'select' ? 'default' : 'crosshair';
+  const cursor =
+    panRef.current || spaceHeld
+      ? 'grab'
+      : activeTool === 'select'
+        ? 'default'
+        : activeTool === 'underlay' && underlayMode === 'move'
+          ? 'move'
+          : 'crosshair';
 
   return (
     <svg

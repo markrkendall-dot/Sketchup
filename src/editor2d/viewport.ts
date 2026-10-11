@@ -1,4 +1,5 @@
 import { boundsOf, type Bounds } from '../model/geometry';
+import { underlayCorners } from '../model/underlay';
 import type { Level, Vec2 } from '../model/types';
 import type { Viewport } from '../store/uiStore';
 
@@ -56,9 +57,14 @@ export function visibleBounds(v: Viewport, size: Size): Bounds {
   return { minX: a.x, minY: a.y, maxX: b.x, maxY: b.y };
 }
 
-/** Fit the nodes of a level, or null if it is empty. Never zooms in past 4 px/inch. */
-export function fitLevel(level: Level, size: Size): Viewport | null {
-  const b = boundsOf(Object.values(level.nodes));
+/**
+ * Fit the nodes of a level (and its image underlay, unless `withUnderlay` is false), or null if
+ * there is nothing to fit. Never zooms in past 4 px/inch.
+ */
+export function fitLevel(level: Level, size: Size, withUnderlay = true): Viewport | null {
+  const points: Vec2[] = Object.values(level.nodes);
+  if (withUnderlay && level.underlay) points.push(...underlayCorners(level.underlay));
+  const b = boundsOf(points);
   if (!b) return null;
   const v = fitToBounds(b, size);
   if (v.k <= 4) return v;

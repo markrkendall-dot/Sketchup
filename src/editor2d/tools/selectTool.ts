@@ -10,6 +10,7 @@ import { hitRoomLabel } from '../roomLabels';
 import { SNAP_RADIUS_PX } from '../snap';
 import type { Tool, ToolContext } from './index';
 import { endRoomDrag, moveRoomDrag, startRename, startRoomDrag, type RoomDrag } from './roomTool';
+import { confirmRemoveUnderlay, endUnderlayDrag, moveUnderlayDrag, nudgeUnderlay, startUnderlayDrag } from './underlayTool';
 
 const DRAG_THRESHOLD_PX = 3;
 /** Minimum half-width of a wall's pick area, in screen px. */
@@ -94,7 +95,9 @@ type DragState =
     }
   | ({ kind: 'room' } & RoomDrag)
   | { kind: 'stairs'; id: Id; grab: Vec2; origin: Vec2; startScreen: Vec2; started: boolean }
-  | { kind: 'box'; a: Vec2; additive: boolean };
+  | { kind: 'box'; a: Vec2; additive: boolean }
+  /** Moving the image underlay (state kept by underlayTool.ts). */
+  | { kind: 'underlay' };
 
 let drag: DragState | null = null;
 
@@ -140,6 +143,8 @@ function finishDrag(ctx: ToolContext): void {
     resumeHistory();
   } else if (drag?.kind === 'room') {
     endRoomDrag(drag);
+  } else if (drag?.kind === 'underlay') {
+    endUnderlayDrag();
   }
 }
 
@@ -165,6 +170,11 @@ export const selectTool: Tool = {
     const sel = ui.selection;
 
     if (!hit) {
+      // An unlocked underlay under the cursor is selected and dragged; Shift still box-selects.
+      if (!e.shiftKey && startUnderlayDrag(ctx, e)) {
+        drag = { kind: 'underlay' };
+        return;
+      }
       if (!e.shiftKey) ui.clearSelection();
       drag = { kind: 'box', a: e.world, additive: e.shiftKey };
       return;
@@ -223,6 +233,10 @@ export const selectTool: Tool = {
         openingId: hit?.kind === 'opening' ? hit.id : null,
       });
       ctx.ui().patchDraft({ cursor: e.world, snap: null });
+      return;
+    }
+    if (drag.kind === 'underlay') {
+      moveUnderlayDrag(ctx, e);
       return;
     }
     if (drag.kind === 'room') {
@@ -292,7 +306,7 @@ export const selectTool: Tool = {
 
   onPointerUp(e, ctx) {
     const ui = ctx.ui();
-    if (drag?.kind === 'move' || drag?.kind === 'opening' || drag?.kind === 'room' || drag?.kind === 'stairs') finishDrag(ctx);
+    if (drag && drag.kind !== 'box') finishDrag(ctx);
     else if (drag?.kind === 'box') {
       const a = drag.a;
       const b = e.world;
@@ -331,6 +345,17 @@ export const selectTool: Tool = {
     if ((e.key === 'Enter' || e.key === 'F2') && selectionSize(sel) === 1 && sel.rooms.length === 1) {
       startRename(ctx, sel.rooms[0]);
       return true;
+    }
+    if (ui.underlaySelected) {
+      if (nudgeUnderlay(ctx, e)) return true;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        confirmRemoveUnderlay(ctx.levelId);
+        return true;
+      }
+      if (e.key === 'Escape' && !drag) {
+        ui.selectUnderlay(false);
+        return true;
+      }
     }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (!selectionSize(sel)) return false;
