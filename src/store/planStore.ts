@@ -392,7 +392,7 @@ export const usePlanStore = create<PlanState>()(
               for (const [key, value] of Object.entries(patch) as [keyof Wall, unknown][]) {
                 // undefined clears an optional field; required fields are never removed.
                 if (value === undefined) {
-                  if (key === 'heightOverride') delete w.heightOverride;
+                  if (key === 'heightOverride' || key === 'finish' || key === 'color') delete w[key];
                 } else if (w[key] !== value) (w as unknown as Record<string, unknown>)[key] = value;
               }
             }
@@ -479,7 +479,7 @@ export const usePlanStore = create<PlanState>()(
             }
             for (const [key, value] of Object.entries(patch) as [keyof Opening, unknown][]) {
               if (value === undefined) {
-                if (key === 'swing') delete o.swing;
+                if (key === 'swing' || key === 'lites' || key === 'shutters' || key === 'trim') delete o[key];
               } else (o as unknown as Record<string, unknown>)[key] = value;
             }
             if (o.type !== 'door' && o.swing) delete o.swing;
@@ -588,7 +588,11 @@ export const usePlanStore = create<PlanState>()(
                 ? next.outline.length === r.outline.length && next.outline.every((p, i) => p.x === r.outline[i].x && p.y === r.outline[i].y)
                 : next[k] === r[k];
             if (keys.every(same)) return false;
-            for (const k of keys) if (!same(k)) (r as unknown as Record<string, unknown>)[k] = next[k];
+            for (const k of keys) {
+              if (same(k)) continue;
+              if (next[k] === undefined) delete r[k]; // an optional field (colour) cleared
+              else (r as unknown as Record<string, unknown>)[k] = next[k];
+            }
           }),
 
         deleteRoofs: (levelId, ids) =>

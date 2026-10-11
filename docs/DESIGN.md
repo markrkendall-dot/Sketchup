@@ -38,6 +38,7 @@ export interface Wall {
   kind: 'exterior' | 'interior';
   phase: Phase;
   heightOverride?: Inches;   // defaults to level.wallHeight
+  finish?: 'clapboard' | 'shingle' | 'board' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
 }
 
 export interface Opening {
@@ -50,6 +51,7 @@ export interface Opening {
   sill: Inches;              // bottom of hole above floor top; 0 for doors
   phase: Phase;
   swing?: { hinge: 'a' | 'b'; side: 'left' | 'right' };
+  lites?: { cols: number; rows: number }; shutters?: boolean; trim?: Inches; // see "Exterior appearance"
 }
 
 export interface Room { id: Id; name: string; anchor: Vec2; ceilingOverride?: Inches }
@@ -79,7 +81,7 @@ export interface Roof {
   bearingOffset: Inches;     // bearing height above the level's ceiling (usually 0)
   thickness: Inches;         // slab thickness, measured vertically
   fascia: Inches;            // fascia and rake board depth
-  phase: Phase; finish: 'metal' | 'shingle';
+  phase: Phase; finish: 'metal' | 'shingle'; color?: string;
 }
 
 export interface Level {
@@ -351,6 +353,68 @@ visible columns as `Chimney` / `Post` (materials `column_<kind>_<phase>`).
 **Fit 3D** (`bounds.ts planBox`) includes the columns and the terrain's height over the house area (a
 6 x 6 sampling of the plan box), never the 40' margin.
 
+## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
+
+All of it is optional data on existing elements (no schema bump: `migrate()` reads the fields when they are
+valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | board | plain | screen`; an unknown value is
+dropped) and `Wall.color` (`#rrggbb`, lower-cased on load), `Opening.lites {cols, rows}` (whole numbers 1 to 12),
+`Opening.shutters`, `Opening.trim` (0 to 24"), `Roof.color`. Defaults when absent (`wallFinishOf`, `wallColorOf`,
+`roofColorOf`): exterior walls shingle in the house's stain `#5a3a35`, interior walls plain `#e8e4dc`, a metal roof
+`#6e6259`, a shingle roof `#4a4a4a`; the fascia, rake boards and window trim are tan `#d9c9a3`. The Level panel's
+"Exterior finish" and "Exterior colour" set every exterior wall of the level with one `updateWalls` (one undo step);
+the Wall, Opening and Roof panels edit one element. The colour picker commits once when it closes (native
+`change`), the hex field on Enter or blur. `updateWalls`, `updateOpening` and `updateRoof` take `undefined` to clear
+an optional field.
+
+**Siding textures** (`textures.ts`): `sidingTexture(finish, color)` draws a 256 x 256 canvas that stands for 48" x 48"
+of wall (a texel is 3/16"), once per finish and colour, cached, `RepeatWrapping`, `repeat` 1/48, so wall UVs are in
+inches. Clapboard: 6" courses (8 per tile), a 1 px darker shadow line at the bottom of each course, a few percent
+of brightness variation per course. Shingle: 4.8" courses (10 per tile; 5" does not divide 48" and the tile must
+repeat), vertical joints every 4" to 8" that sum to exactly 48" per course and stagger from course to course
+(`shingleJoints`), the same shadow line, a joint line and brightness variation per shingle. Board: 8" vertical boards
+(6 per tile) with a joint line. Plain: no texture, a flat colour. Screen: a see-through mesh (1 px lines every 8 px
+on a translucent grey, material `transparent`, opacity 0.4, no depth write, `DoubleSide`). The layout maths
+(`courseBoundaries`, `shingleJoints`, `seeded`) is pure and tested; drawing needs `document`, and
+`sidingTexture` returns null without it (node, tests), where materials fall back to the flat colour.
+`wallMaterial(phase, kind, finish, color)` keys its shared materials by phase, finish and colour: existing walls
+use the texture with a white tint, new ones multiply it by a light green, demolished walls stay translucent red
+with no texture, plain walls are the colour itself (pulled toward green when new). The wall mesh is one merged
+geometry with one material, so it cannot tell the faces of a wall apart: **both faces of an exterior wall show the
+siding** (the inside of a window reveal shows shingle too); interior walls are plain unless given a finish.
+
+**UVs**: `buildWallGeometry` ends with `addWallUVs`, which gives every triangle UVs in inches by its flat normal:
+faces along the wall (long faces, jambs of a gable triangle, the part above the plate) take u = distance along the
+centerline from the wall's start, v = height above the level's floor top; faces across the wall (jambs, free ends)
+take u = distance across the wall; top and bottom faces (also the sloped tops under a roof) u along, v across. A
+wall's courses therefore run level and continuous across its pieces, openings and the gable triangle, restart at each
+level's floor top, and need not line up across a corner (the horizontal courses do; the vertical joints do not).
+
+**Opening fills** (`openings3d.ts openingFill`, pure): a window or door becomes boxes in the wall's own frame (s along
+the centerline, d from the mid plane toward the outside, y above the floor top); `meshes.ts buildOpeningFill` turns
+each into a `prism` and merges them per material part. Window: trim (head and two jambs, `trim` wide, 4" default,
+1" proud of the outside face), a 1.5" sill projecting 1" past the trim, a sash frame of four 1.5" boards 1.75" deep,
+`(cols - 1)` vertical and `(rows - 1)` horizontal 0.75" muntins (default 2 x 3 lites), one 0.25" glass pane at mid-wall,
+and with `shutters` two 1" boards each a third of the window width flanking the trim. Door: the same trim, door
+frame boards 1.5" wide, a 1.75" leaf of two stiles (5") and two rails (5" top, 8" bottom) round a 0.75" recessed
+panel; lites larger than 1 x 1 (the default) glaze the panel with glass and muntins instead. Passages stay open.
+The outside is found by `outwardSide`: the side of the wall with no closed room beside it when the other has one
+(`facesBesideWall`), else the side facing away from the level's node centroid. `getLevelMeshes` returns
+`openings: OpeningMesh[]` (id, type, phase and one geometry per part: `trim`, `sash`, `glass`, `leaf`, `shutter`),
+cached per opening object, wall object, footprint, wall height and outside side, and disposed like the rest. Materials
+(`openingMaterial`): trim tan, sash and muntins white `#f4f1ea`, glass `#bcd4e6` at opacity 0.35 (transparent, no depth
+write, drawn after the opaque meshes), leaf `#2f3a33`, shutters `#3f6f5f`; a demolished opening is translucent red,
+a new one pulled toward green. Fills follow `isOpeningVisible` like the hole they sit in.
+
+**Roofs** are two geometries per roof (`buildRoofParts`: the slab, and the fascia and rake boards in tan); the colour
+field changes the slab only. The chimney stays brick red.
+
+**Export** is colours only. Wall materials are clones of the live ones with `map` dropped and the flat colour
+(`wallFlatColor`) set, named `wall_<phase>_<kind>` for the default look and `..._<finish>_<hex>` otherwise;
+roofs `roof_<finish>_<phase>` (plus `_<hex>` when recoloured), `Fascia` meshes `fascia_<phase>`. Each opening part is
+a mesh named `Window` or `Door` with the material `trim`, `sash`, `glass`, `door_leaf` or `shutter` (`_new` / `_demo`
+for other phases). UV attributes are still written; no texture or image is. The Export menu says "Siding textures are
+not exported; colours are."
+
 ## 2D editor
 
 One `<svg>` with a single `<g transform="translate(tx ty) scale(k)">`. Transient state (cursor, snap,
@@ -486,8 +550,8 @@ selection is `uiStore.underlaySelected`, exclusive with the entity selection. St
 r3f `<Canvas frameloop="demand">` (lazy-loaded chunk), invalidate on plan changes and on the UI
 settings the 3D view uses (not on the 2D draft). One `<group>` per level at its floor top; meshes use
 the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat shading, FrontSide:
-existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior a
-little darker; floors tan, stairs grey; roofs by finish (metal `#6e6259`, metalness 0.4, roughness
+existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior walls
+textured by finish and colour (see "Exterior appearance"); floors tan, stairs grey; roofs by finish (metal `#6e6259`, metalness 0.4, roughness
 0.5; shingle `#4a4a4a`), demolished translucent like walls, new pulled toward green. Fit 3D and the
 walk start count roof overhangs and roof tops in the scene bounds. Hemisphere + one directional light (turned with the north angle, see "Site and terrain"), no shadows.
 The terrain is the ground (opaque green surface over the plan plus 40'); drei `<Grid>` (12" cells, 10'

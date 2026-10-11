@@ -4,7 +4,7 @@ import { getLevelMeshes } from '../derive/meshes';
 import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
-import { floorMaterial, roofMaterial, stairsMaterial, wallMaterial } from './materials';
+import { fasciaMaterial, floorMaterial, openingMaterial, roofMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -23,7 +23,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           key={w.id}
           name={`wall:${w.id}`}
           geometry={w.geometry}
-          material={wallMaterial(w.phase, w.kind)}
+          material={wallMaterial(w.phase, w.kind, w.finish, w.color)}
           renderOrder={w.phase === 'demo' ? 1 : 0}
           dispose={null}
         />
@@ -32,14 +32,32 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
         <mesh key={s.id} name={`stairs:${s.id}`} geometry={s.geometry} material={stairsMaterial(s.phase)} dispose={null} />
       ))}
       {meshes.roofs.map((r) => (
-        <mesh
-          key={r.id}
-          name={`roof:${r.id}`}
-          geometry={r.geometry}
-          material={roofMaterial(r.finish, r.phase)}
-          renderOrder={r.phase === 'demo' ? 1 : 0}
-          dispose={null}
-        />
+        <group key={r.id}>
+          <mesh
+            name={`roof:${r.id}`}
+            geometry={r.geometry}
+            material={roofMaterial(r.finish, r.phase, r.color)}
+            renderOrder={r.phase === 'demo' ? 1 : 0}
+            dispose={null}
+          />
+          {r.fascia && (
+            <mesh name={`fascia:${r.id}`} geometry={r.fascia} material={fasciaMaterial(r.phase)} renderOrder={r.phase === 'demo' ? 1 : 0} dispose={null} />
+          )}
+        </group>
+      ))}
+      {meshes.openings.map((o) => (
+        <group key={o.id} name={`opening:${o.id}`}>
+          {o.parts.map((p) => (
+            <mesh
+              key={p.part}
+              name={`opening:${o.id}:${p.part}`}
+              geometry={p.geometry}
+              material={openingMaterial(p.part, o.phase)}
+              renderOrder={o.phase === 'demo' || p.part === 'glass' ? 1 : 0}
+              dispose={null}
+            />
+          ))}
+        </group>
       ))}
     </group>
   );

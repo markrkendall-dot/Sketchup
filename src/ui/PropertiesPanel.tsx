@@ -14,7 +14,8 @@ import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
 import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
-import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallKind } from '../model/types';
+import { DEFAULT_TRIM, defaultWallColor, defaultWallFinish, litesOf, MAX_LITES, normalizeHex, ROOF_COLOR, roofColorOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
+import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -208,6 +209,99 @@ const kindOptions: { value: WallKind; label: string }[] = [
   { value: 'interior', label: 'Interior' },
 ];
 
+const finishOptions = WALL_FINISHES.map((f) => ({ value: f, label: WALL_FINISH_LABEL[f] }));
+
+/**
+ * A colour: the browser's picker plus a hex field. The picker previews while it is open and commits
+ * once when it closes (the native change event), so a drag through the spectrum is one undo step;
+ * the hex field commits on Enter or blur and shows an error for a bad value. `onReset` adds a
+ * "Default" button that clears the colour back to its default.
+ */
+function ColorField({ label, value, onCommit, onReset, hint }: { label: string; value: string; onCommit: (hex: string) => void; onReset?: () => void; hint?: ReactNode }) {
+  const id = useId();
+  const [text, setText] = useState(value);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const skipBlur = useRef(false);
+  const latest = useRef(onCommit);
+  latest.current = onCommit;
+  useEffect(() => {
+    setText(value);
+    setPreview(null);
+    setError(null);
+  }, [value]);
+  useEffect(() => {
+    const el = picker.current;
+    if (!el) return;
+    const done = () => {
+      const hex = normalizeHex(el.value);
+      setPreview(null);
+      if (hex) latest.current(hex);
+    };
+    el.addEventListener('change', done);
+    return () => el.removeEventListener('change', done);
+  }, []);
+  const commitText = (): boolean => {
+    const hex = normalizeHex(text);
+    if (!hex) {
+      setError('Use a hex colour such as #5a3a35.');
+      return false;
+    }
+    setError(null);
+    if (hex !== value) onCommit(hex);
+    else setText(value);
+    return true;
+  };
+  return (
+    <div className={`field color-field${error ? ' has-error' : ''}`}>
+      <label htmlFor={id}>{label}</label>
+      <div className="color-row">
+        <input ref={picker} type="color" aria-label={`${label} picker`} value={preview ?? value} onChange={(e) => setPreview(e.target.value)} />
+        <input
+          id={id}
+          aria-label={label}
+          aria-invalid={!!error}
+          value={preview ?? text}
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(e) => {
+            setText(e.target.value);
+            setError(null);
+          }}
+          onBlur={() => {
+            if (!skipBlur.current && !commitText()) {
+              setText(value);
+              setError(null);
+            }
+            skipBlur.current = false;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (commitText()) {
+                skipBlur.current = true;
+                releaseFocus(e.currentTarget);
+              }
+            } else if (e.key === 'Escape') {
+              setText(value);
+              setError(null);
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            }
+          }}
+        />
+        {onReset && (
+          <button type="button" className="color-reset" title="Back to the default colour" onClick={onReset}>
+            Default
+          </button>
+        )}
+      </div>
+      {error && <div className="field-error" role="alert">{error}</div>}
+      {!error && hint && <div className="field-hint">{hint}</div>}
+    </div>
+  );
+}
+
 /** Shared value of a field across items, or null when they differ. */
 function common<T, V>(items: T[], get: (t: T) => V): V | null {
   if (items.length === 0) return null;
@@ -349,6 +443,14 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
         }}
         hint="Blank uses the level's wall height."
       />
+      <SelectField label="Finish" value={wallFinishOf(wall)} options={finishOptions} onChange={(finish) => updateWalls(levelId, [wall.id], { finish })} />
+      <ColorField
+        label="Colour"
+        value={wallColorOf(wall)}
+        onCommit={(color) => updateWalls(levelId, [wall.id], { color })}
+        onReset={wall.color || wall.finish ? () => updateWalls(levelId, [wall.id], { color: undefined, finish: undefined }) : undefined}
+        hint={wall.kind === 'exterior' ? 'Both faces of an exterior wall show the siding.' : undefined}
+      />
       <WallFaceLengths level={level} wall={wall} />
       <ReadOnly label="Openings">{openingCount}</ReadOnly>
     </>
@@ -372,6 +474,8 @@ function MultiWallProps({ levelId, walls }: { levelId: Id; walls: Wall[] }) {
           if (v !== null) updateWalls(levelId, ids, { thickness: v });
         }}
       />
+      <SelectField label="Finish" value={common(walls, wallFinishOf)} options={finishOptions} onChange={(finish) => updateWalls(levelId, ids, { finish })} />
+      <ColorField label="Colour" value={common(walls, wallColorOf) ?? defaultWallColor('exterior')} onCommit={(color) => updateWalls(levelId, ids, { color })} />
     </>
   );
 }
@@ -534,10 +638,50 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
           />
         </>
       )}
+      {opening.type !== 'passage' && (
+        <>
+          <NumberField
+            label={opening.type === 'door' ? 'Glazed columns' : 'Lites across'}
+            value={litesOf(opening).cols}
+            check={liteCheck}
+            onCommit={(cols) => updateOpening(levelId, opening.id, { lites: { cols, rows: litesOf(opening).rows } })}
+            hint={opening.type === 'door' ? 'A door is a solid panel at 1 x 1; more lites glaze its panel.' : undefined}
+          />
+          <NumberField
+            label={opening.type === 'door' ? 'Glazed rows' : 'Lites down'}
+            value={litesOf(opening).rows}
+            check={liteCheck}
+            onCommit={(rows) => updateOpening(levelId, opening.id, { lites: { cols: litesOf(opening).cols, rows } })}
+          />
+          <LengthField
+            label="Trim width"
+            value={trimOf(opening)}
+            bound="nonnegative"
+            onCommit={(v) => void (v !== null && updateOpening(levelId, opening.id, { trim: v }))}
+            hint={`Outside face, default ${formatLength(DEFAULT_TRIM, denom)}.`}
+          />
+        </>
+      )}
+      {opening.type === 'window' && (
+        <label className="check-row">
+          <input
+            type="checkbox"
+            aria-label="Shutters"
+            checked={!!opening.shutters}
+            onChange={(e) => {
+              updateOpening(levelId, opening.id, { shutters: e.target.checked ? true : undefined });
+              releaseFocus(e.currentTarget);
+            }}
+          />
+          Shutters (two boards flanking the trim)
+        </label>
+      )}
       <ReadOnly label="Wall length">{formatLength(L, denom)}</ReadOnly>
     </>
   );
 }
+
+const liteCheck = (v: number): string | null => (Number.isInteger(v) && v >= 1 && v <= MAX_LITES ? null : `A whole number from 1 to ${MAX_LITES}.`);
 
 /**
  * The room's sides measured face to face (the net outline), so typed lengths can be checked against
@@ -808,6 +952,13 @@ function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
       <LengthField label="Thickness" value={roof.thickness} onCommit={(v) => void (v !== null && set({ thickness: v }))} hint="Measured vertically." />
       <LengthField label="Fascia" value={roof.fascia} bound="nonnegative" onCommit={(v) => void (v !== null && set({ fascia: v }))} hint="Depth of the fascia and rake boards." />
       <SelectField label="Finish" value={roof.finish} options={roofFinishOptions} onChange={(finish) => set({ finish })} />
+      <ColorField
+        label="Colour"
+        value={roofColorOf(roof)}
+        onCommit={(color) => set({ color })}
+        onReset={roof.color ? () => set({ color: undefined }) : undefined}
+        hint={`Default for ${roof.finish}: ${ROOF_COLOR[roof.finish]}. The fascia is tan.`}
+      />
       <SelectField label="Phase" value={roof.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
       <ReadOnly label={roof.shape === 'shed' ? 'High side' : roof.shape === 'flat' ? 'Underside' : 'Ridge'}>{formatLength(ridge, denom)} above the floor</ReadOnly>
       <ReadOnly label="Eave">{formatLength(eave, denom)} above the floor</ReadOnly>
@@ -1248,6 +1399,26 @@ function UnderlayRow({ level }: { level: Level }) {
   );
 }
 
+/** Finish and colour of every exterior wall on a level, set together (one undo step each). */
+function ExteriorAppearance({ level }: { level: Level }) {
+  const updateWalls = usePlanStore((s) => s.updateWalls);
+  const exterior = Object.values(level.walls).filter((w) => w.kind === 'exterior');
+  const ids = exterior.map((w) => w.id);
+  const finish = common(exterior, wallFinishOf) ?? (exterior.length ? null : defaultWallFinish('exterior'));
+  const color = common(exterior, wallColorOf) ?? defaultWallColor('exterior');
+  return (
+    <>
+      <SelectField label="Exterior finish" value={finish as WallFinish | null} options={finishOptions} onChange={(f) => ids.length && updateWalls(level.id, ids, { finish: f })} />
+      <ColorField
+        label="Exterior colour"
+        value={color}
+        onCommit={(c) => ids.length && updateWalls(level.id, ids, { color: c })}
+        hint={ids.length ? `Sets all ${ids.length} exterior walls on this level.` : 'No exterior walls on this level yet.'}
+      />
+    </>
+  );
+}
+
 function LevelProps({ level }: { level: Level }) {
   const { updateLevel, setBaseFloorElevation, updateSettings } = usePlanStore.getState();
   const extThickness = usePlanStore((s) => s.plan.settings.defaultExteriorThickness);
@@ -1326,6 +1497,7 @@ function LevelProps({ level }: { level: Level }) {
         onCommit={(v) => void (v !== null && updateSettings({ defaultInteriorThickness: v }))}
         hint="For interior walls (X). To change drawn walls, select them."
       />
+      <ExteriorAppearance level={level} />
       {floorTop !== undefined && ceiling !== undefined && (
         <>
           <ReadOnly label="Floor top">{formatLength(floorTop, denom)}</ReadOnly>

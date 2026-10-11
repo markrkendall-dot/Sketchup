@@ -1,12 +1,15 @@
 import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Uint32BufferAttribute, Vector2 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Column, Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallKind } from '../model/types';
+import type { Column, Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { getFootprints, type Footprint } from './footprint';
-import { getOpeningsByWall, openingSymbol } from './openings';
+import { DEFAULT_TRIM, wallColorOf, wallFinishOf } from '../model/finish';
+import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
+import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible } from './phase';
-import { getFaces, slabOutlines, type FaceSet } from './rooms';
+import { facesBesideWall, getFaces, slabOutlines, type FaceSet } from './rooms';
 import { columnOutline, planTerrain, type TerrainGrid } from './site';
+import { roofColorOf } from '../model/finish';
 import { profileAt, roofBearing, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { floorToFloor, stairsFrame, stairsOutline, stairsPoint, stairSteps } from './stairs';
 
@@ -467,7 +470,42 @@ export function buildWallGeometry(
     };
     parts.push(slopedPrism(poly, () => H, roofTop, { bottom: !below, top: true, side }));
   });
-  return mergeAll(parts);
+  return addWallUVs(mergeAll(parts), fp);
+}
+
+/**
+ * Texture coordinates in inches, so a siding texture that repeats every 48" lines up across pieces
+ * and openings (view3d/textures.ts). Faces along the wall (long faces, the gable triangle above the
+ * plate): u is the distance along the centerline from the wall's start, v the height above the
+ * floor top. Faces across the wall (jambs, ends): u is the distance across the wall, v the height.
+ * Top and bottom faces (including the sloped tops under a roof): u along the wall, v across it.
+ * The geometry is non-indexed with flat normals, so the mapping is chosen per triangle.
+ */
+export function addWallUVs(g: BufferGeometry, fp: Pick<Footprint, 'a' | 'dir' | 'normal'>): BufferGeometry {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  const uv = new Float32Array((pos?.count ?? 0) * 2);
+  for (let i = 0; i < (pos?.count ?? 0); i++) {
+    const x = pos.getX(i) - fp.a.x;
+    const z = pos.getZ(i) - fp.a.y;
+    const along = x * fp.dir.x + z * fp.dir.y;
+    const across = x * fp.normal.x + z * fp.normal.y;
+    const nx = nor.getX(i);
+    const ny = nor.getY(i);
+    const nz = nor.getZ(i);
+    if (Math.abs(ny) > 0.5) {
+      uv[2 * i] = along;
+      uv[2 * i + 1] = across;
+    } else if (Math.abs(nx * fp.normal.x + nz * fp.normal.y) >= Math.abs(nx * fp.dir.x + nz * fp.dir.y)) {
+      uv[2 * i] = along;
+      uv[2 * i + 1] = pos.getY(i);
+    } else {
+      uv[2 * i] = across;
+      uv[2 * i + 1] = pos.getY(i);
+    }
+  }
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -584,6 +622,67 @@ export function buildRoofGeometry(roof: Roof, bearingHeight: number): BufferGeom
   return geometryFrom(boards.reduce((all, b) => all.concat(b), slab));
 }
 
+/** The roof as two geometries so the tan fascia and rake boards get their own material. */
+export function buildRoofParts(roof: Roof, bearingHeight: number): { slab: BufferGeometry; fascia: BufferGeometry | null } {
+  const { slab, boards } = roofSolid(roof, bearingHeight);
+  const fascia = boards.reduce((all, b) => all.concat(b), [] as number[]);
+  return { slab: geometryFrom(slab), fascia: fascia.length ? geometryFrom(fascia) : null };
+}
+
+function roofParts(roof: Roof, bearing: number): { geometry: BufferGeometry; fascia: BufferGeometry | null } {
+  const { slab, fascia } = buildRoofParts(roof, bearing);
+  return { geometry: slab, fascia };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Window and door fills (openings3d.ts)
+
+/**
+ * The geometry of an opening's fill, one merged geometry per material part. `side` is +1 when the
+ * wall's left normal points outside, -1 when the right one does (trim, sills and shutters go on
+ * the outside face). Level-local, like the wall.
+ */
+export function buildOpeningFill(fp: Footprint, o: Opening, wallHeight: number, side: 1 | -1): OpeningMesh['parts'] {
+  const sym = openingSymbol(fp, o);
+  const bottom = Math.max(0, o.sill);
+  const top = Math.min(wallHeight, o.sill + o.height);
+  const boxes = openingFill({ type: o.type, j0: sym.j0, j1: sym.j1, bottom, top, thickness: fp.thickness, lites: o.lites, trim: o.trim ?? DEFAULT_TRIM, shutters: o.shutters });
+  const byPart = new Map<FillPart, BufferGeometry[]>();
+  for (const b of boxes) {
+    const list = byPart.get(b.part);
+    const g = boxGeometry(fp, b, side);
+    if (list) list.push(g);
+    else byPart.set(b.part, [g]);
+  }
+  return [...byPart].map(([part, gs]) => ({ part, geometry: mergeAll(gs) })).filter((p) => triangleCount(p.geometry) > 0);
+}
+
+/** A fill box in plan space: a rectangle along the wall (s, outward d) extruded from y0 to y1. */
+function boxGeometry(fp: Footprint, b: FillBox, side: 1 | -1): BufferGeometry {
+  const pt = (s: number, d: number) => wallPoint(fp, s, side * d);
+  return prism([pt(b.s0, b.d0), pt(b.s1, b.d0), pt(b.s1, b.d1), pt(b.s0, b.d1)], b.y0, b.y1);
+}
+
+/** Mean of a level's node positions (the fallback for telling a wall's outside from its inside). */
+function levelCentroid(level: Level): Vec2 {
+  const nodes = Object.values(level.nodes);
+  if (!nodes.length) return { x: 0, y: 0 };
+  return { x: nodes.reduce((t, n) => t + n.x, 0) / nodes.length, y: nodes.reduce((t, n) => t + n.y, 0) / nodes.length };
+}
+
+/**
+ * Which side of a wall is outside: +1 for the left normal, -1 for the right one. The side with no
+ * closed room beside it, when the other has one; otherwise the side facing away from the middle of
+ * the level's nodes.
+ */
+export function outwardSide(fp: Pick<Footprint, 'a' | 'b' | 'normal' | 'wallId'>, wall: Pick<Wall, 'id' | 'a' | 'b'>, faces: FaceSet, centroid: Vec2): 1 | -1 {
+  const { left, right } = facesBesideWall(faces, wall);
+  if (left && !right) return -1;
+  if (right && !left) return 1;
+  const mid = { x: (fp.a.x + fp.b.x) / 2, y: (fp.a.y + fp.b.y) / 2 };
+  return dot(sub(mid, centroid), fp.normal) >= 0 ? 1 : -1;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Memoized level meshes
 
@@ -592,6 +691,9 @@ export interface WallMesh {
   geometry: BufferGeometry;
   phase: Phase;
   kind: WallKind;
+  /** The wall's finish and colour after defaults (model/finish.ts). */
+  finish: WallFinish;
+  color: string;
 }
 
 export interface StairsMesh {
@@ -602,9 +704,23 @@ export interface StairsMesh {
 
 export interface RoofMesh {
   id: Id;
+  /** The roof slab. */
   geometry: BufferGeometry;
+  /** Fascia and rake boards (tan), null when the roof has none. */
+  fascia: BufferGeometry | null;
   phase: Phase;
   finish: RoofFinish;
+  /** Hex colour of the slab (the roof's own, else by finish). */
+  color: string;
+}
+
+/** What an opening fill is for, in the export: `Window` or `Door`. */
+export interface OpeningMesh {
+  id: Id;
+  type: 'window' | 'door';
+  phase: Phase;
+  /** One merged geometry per material part, level-local like the walls. */
+  parts: { part: FillPart; geometry: BufferGeometry }[];
 }
 
 export interface LevelMeshes {
@@ -614,6 +730,8 @@ export interface LevelMeshes {
   stairs: StairsMesh[];
   /** The level's roofs visible in the view mode (level-local, like the walls). */
   roofs: RoofMesh[];
+  /** Window and door fills of the visible openings (passages have none). */
+  openings: OpeningMesh[];
 }
 
 interface WallEntry {
@@ -645,6 +763,16 @@ interface RoofEntry {
   roof: Roof;
   bearing: number;
   geometry: BufferGeometry;
+  fascia: BufferGeometry | null;
+}
+
+interface OpeningEntry {
+  fp: Footprint;
+  opening: Opening;
+  wall: Wall;
+  height: number;
+  side: 1 | -1;
+  parts: OpeningMesh['parts'];
 }
 
 interface LevelEntry {
@@ -663,6 +791,7 @@ const wallCache = new Map<string, Map<Id, WallEntry>>();
 const floorCache = new Map<string, FloorEntry>();
 const stairsCache = new Map<string, Map<Id, StairsEntry>>();
 const roofCache = new Map<string, Map<Id, RoofEntry>>();
+const openingCache = new Map<string, Map<Id, OpeningEntry>>();
 const levelCache = new Map<string, LevelEntry>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
@@ -689,6 +818,11 @@ function stairHoles(below: Level | undefined, viewMode: ViewMode): Vec2[][] {
     .map((s) => stairsOutline(s));
 }
 
+function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null }): void {
+  e.geometry.dispose();
+  e.fascia?.dispose();
+}
+
 /** Drop and dispose cache entries of levels that are no longer in the plan. */
 function pruneCaches(plan: Plan): void {
   const alive = (key: string) => plan.levels[key.slice(0, key.lastIndexOf('|'))] !== undefined;
@@ -705,9 +839,14 @@ function pruneCaches(plan: Plan): void {
   for (const cache of [stairsCache, roofCache]) {
     for (const [key, m] of cache) {
       if (alive(key)) continue;
-      for (const e of m.values()) e.geometry.dispose();
+      for (const e of m.values()) disposeEntry(e);
       cache.delete(key);
     }
+  }
+  for (const [key, m] of openingCache) {
+    if (alive(key)) continue;
+    for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
+    openingCache.delete(key);
   }
   for (const key of levelCache.keys()) if (!alive(key)) levelCache.delete(key);
 }
@@ -721,7 +860,7 @@ function pruneCaches(plan: Plan): void {
  */
 export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): LevelMeshes {
   const level = plan.levels[levelId];
-  if (!level) return { walls: [], stairs: [], roofs: [] };
+  if (!level) return { walls: [], stairs: [], roofs: [], openings: [] };
   const key = `${levelId}|${viewMode}`;
   const idx = plan.levelOrder.indexOf(levelId);
   const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
@@ -823,7 +962,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
             geometry: buildWallGeometry(fp, wall, openings ?? [], height, viewMode, { bands, endHeights, buttHeights, splitPoints, roofTop, raisedJoin }),
           };
     nextWalls.set(wall.id, entry);
-    walls.push({ id: wall.id, geometry: entry.geometry, phase: wall.phase, kind: wall.kind });
+    walls.push({ id: wall.id, geometry: entry.geometry, phase: wall.phase, kind: wall.kind, finish: wallFinishOf(wall), color: wallColorOf(wall) });
   }
   if (prevWalls) for (const [id, e] of prevWalls) if (nextWalls.get(id) !== e) e.geometry.dispose();
   wallCache.set(key, nextWalls);
@@ -878,14 +1017,40 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const roofs: RoofMesh[] = [];
   for (const { roof, bearing } of roofsOnLevel) {
     const old = prevRoofs?.get(roof.id);
-    const entry = old && old.roof === roof && old.bearing === bearing ? old : { roof, bearing, geometry: buildRoofGeometry(roof, bearing) };
+    const entry: RoofEntry = old && old.roof === roof && old.bearing === bearing ? old : { roof, bearing, ...roofParts(roof, bearing) };
     nextRoofs.set(roof.id, entry);
-    roofs.push({ id: roof.id, geometry: entry.geometry, phase: roof.phase, finish: roof.finish });
+    roofs.push({ id: roof.id, geometry: entry.geometry, fascia: entry.fascia, phase: roof.phase, finish: roof.finish, color: roofColorOf(roof) });
   }
-  if (prevRoofs) for (const [id, e] of prevRoofs) if (nextRoofs.get(id) !== e) e.geometry.dispose();
+  if (prevRoofs) for (const [id, e] of prevRoofs) if (nextRoofs.get(id) !== e) disposeEntry(e);
   roofCache.set(key, nextRoofs);
 
-  const result: LevelMeshes = { walls, stairs, roofs, ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  // Window and door fills.
+  const prevFills = openingCache.get(key);
+  const nextFills = new Map<Id, OpeningEntry>();
+  const openingMeshes: OpeningMesh[] = [];
+  const centroid = levelCentroid(level);
+  for (const wall of Object.values(level.walls)) {
+    const fp = fps.get(wall.id);
+    const list = byWall.get(wall.id);
+    if (!fp || !list) continue;
+    let side: 1 | -1 | null = null;
+    for (const o of list) {
+      if (o.type === 'passage' || !isOpeningVisible(o, wall, viewMode)) continue;
+      side ??= outwardSide(fp, wall, faces, centroid);
+      const height = heightOf(wall);
+      const old = prevFills?.get(o.id);
+      const entry: OpeningEntry =
+        old && old.fp === fp && old.opening === o && old.wall === wall && old.height === height && old.side === side
+          ? old
+          : { fp, opening: o, wall, height, side, parts: buildOpeningFill(fp, o, height, side) };
+      nextFills.set(o.id, entry);
+      if (entry.parts.length) openingMeshes.push({ id: o.id, type: o.type, phase: o.phase, parts: entry.parts });
+    }
+  }
+  if (prevFills) for (const [id, e] of prevFills) if (nextFills.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
+  openingCache.set(key, nextFills);
+
+  const result: LevelMeshes = { walls, stairs, roofs, openings: openingMeshes, ...(floor.geometry ? { floor: floor.geometry } : {}) };
   levelCache.set(key, { level, belowStairs, ftf, result });
   return result;
 }
@@ -895,8 +1060,10 @@ export function clearMeshCache(): void {
   for (const m of wallCache.values()) for (const e of m.values()) e.geometry.dispose();
   for (const e of floorCache.values()) e.geometry?.dispose();
   for (const m of stairsCache.values()) for (const e of m.values()) e.geometry.dispose();
-  for (const m of roofCache.values()) for (const e of m.values()) e.geometry.dispose();
+  for (const m of roofCache.values()) for (const e of m.values()) disposeEntry(e);
+  for (const m of openingCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
   roofCache.clear();
+  openingCache.clear();
   clearSiteCache();
   wallCache.clear();
   floorCache.clear();

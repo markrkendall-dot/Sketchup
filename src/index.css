@@ -734,6 +734,26 @@ select.phase-select.phase-new {
   font-variant-numeric: tabular-nums;
 }
 
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field .color-row input[type='color'] {
+  width: 34px;
+  height: 26px;
+  padding: 1px;
+  flex: none;
+  cursor: pointer;
+}
+
+.color-reset {
+  flex: none;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
 .field.has-error input {
   border-color: var(--danger);
   background: #fef2f2;

@@ -1,8 +1,9 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { dist, projectPointToSegment, segmentIntersection } from './geometry';
+import { isHexColor, MAX_LITES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
-import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall } from './types';
+import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 2 as const;
@@ -398,11 +399,11 @@ const phaseOf = (v: unknown): Phase => (typeof v === 'string' && PHASES.has(v) ?
 const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 
 const NODE_KEYS = ['id', 'x', 'y'] as const;
-const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride'] as const;
-const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing'] as const;
+const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
+const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove'] as const;
-const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish'] as const;
+const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
@@ -434,6 +435,9 @@ function migrateWalls(raw: Json, nodes: Level['nodes'], where: string): Level['w
     wall.kind = w.kind === 'exterior' || w.kind === 'interior' ? w.kind : w.thickness >= 6 ? 'exterior' : 'interior';
     wall.phase = phaseOf(w.phase);
     put(wall, 'heightOverride', isNum(w.heightOverride) && w.heightOverride > 0 ? w.heightOverride : undefined);
+    // Optional appearance fields: an unknown finish or a malformed colour is dropped (the defaults apply).
+    put(wall, 'finish', typeof w.finish === 'string' && WALL_FINISHES.includes(w.finish as WallFinish) ? w.finish : undefined);
+    put(wall, 'color', isHexColor(w.color) ? w.color.toLowerCase() : undefined);
     out[wid] = wall as unknown as Wall;
   }
   return out;
@@ -463,6 +467,11 @@ function migrateOpenings(raw: Json, walls: Level['walls']): Level['openings'] {
           }
         : undefined,
     );
+    const lites = o.lites;
+    const liteCount = (v: unknown): v is number => isNum(v) && Number.isInteger(v) && v >= 1 && v <= MAX_LITES;
+    put(opening, 'lites', isObject(lites) && liteCount(lites.cols) && liteCount(lites.rows) ? { cols: lites.cols, rows: lites.rows } : undefined);
+    put(opening, 'shutters', typeof o.shutters === 'boolean' ? o.shutters : undefined);
+    put(opening, 'trim', isNum(o.trim) && o.trim >= 0 && o.trim <= 24 ? o.trim : undefined);
     out[oid] = opening as unknown as Opening;
   }
   return out;
@@ -557,6 +566,7 @@ function migrateRoofs(raw: Json, where: string): Level['roofs'] {
     roof.outline = (r.outline as Vec2[]).map((p) => ({ x: p.x, y: p.y }));
     roof.phase = phaseOf(r.phase);
     roof.finish = r.finish === 'shingle' ? 'shingle' : 'metal';
+    put(roof, 'color', isHexColor(r.color) ? r.color.toLowerCase() : undefined);
     out[rid] = roof as unknown as Roof;
   }
   return out;

@@ -108,6 +108,7 @@ function ExportMenu() {
           <p className="menu-note">
             Exports what the 3D view shows: the {VIEW_MODE_LABEL[viewMode]} view of {shown || 'no levels'}.
           </p>
+          <p className="menu-note">Siding textures are not exported; colours are.</p>
           <p className="menu-note">
             Import in SketchUp: File &gt; Import, choose glTF; OBJ: set units to inches.
           </p>

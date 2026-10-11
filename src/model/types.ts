@@ -17,6 +17,8 @@ export interface Node {
 }
 
 export type WallKind = 'exterior' | 'interior';
+/** How a wall's face is dressed in 3D (DESIGN.md "Exterior appearance"). */
+export type WallFinish = 'clapboard' | 'shingle' | 'board' | 'plain' | 'screen';
 
 export interface Wall {
   id: Id;
@@ -26,6 +28,10 @@ export interface Wall {
   kind: WallKind;
   phase: Phase;
   heightOverride?: Inches; // defaults to level.wallHeight
+  /** Absent: shingle for exterior walls, plain for interior ones (model/finish.ts). */
+  finish?: WallFinish;
+  /** Hex colour `#rrggbb`. Absent: the house's red-brown for exterior walls, off-white for interior ones. */
+  color?: string;
 }
 
 export interface Opening {
@@ -38,6 +44,12 @@ export interface Opening {
   sill: Inches; // bottom of hole above floor top; 0 for doors
   phase: Phase;
   swing?: { hinge: 'a' | 'b'; side: 'left' | 'right' };
+  /** Divided lites of a window sash (default 2 x 3) or a glazed door (default 1 x 1: a solid panel). */
+  lites?: { cols: number; rows: number };
+  /** Green board shutters flanking a window. */
+  shutters?: boolean;
+  /** Width of the trim round the opening on the outside face (default 4"). */
+  trim?: Inches;
 }
 
 export interface Room {
@@ -84,6 +96,8 @@ export interface Roof {
   fascia: Inches;
   phase: Phase;
   finish: RoofFinish;
+  /** Hex colour `#rrggbb` of the roof surface. Absent: by finish (model/finish.ts). */
+  color?: string;
 }
 
 /** A post or chimney on the site (M9 implements their behaviour). */

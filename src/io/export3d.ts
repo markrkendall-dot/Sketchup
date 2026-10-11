@@ -2,10 +2,12 @@ import { Group, Mesh, type BufferGeometry, type Material, type MeshStandardMater
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
+import type { FillPart } from '../derive/openings3d';
 import { getLevelMeshes, getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
-import type { Column, Phase, Plan, RoofFinish, ViewMode, WallKind } from '../model/types';
+import { defaultWallColor, defaultWallFinish, ROOF_COLOR } from '../model/finish';
+import type { Column, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { columnMaterial, floorMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { columnMaterial, fasciaMaterial, floorMaterial, openingMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallFlatColor, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -22,15 +24,23 @@ export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActi
 export type ExportFormat = 'glb' | 'obj';
 
 /** Material names without spaces: OBJ `usemtl` and some importers stop at the first space. */
-const wallMaterialName = (phase: Phase, kind: WallKind) => `wall_${phase}_${kind}`;
+const wallMaterialName = (phase: Phase, kind: WallKind, finish: WallFinish, color: string) => {
+  const base = `wall_${phase}_${kind}`;
+  // The house's default look keeps the plain name; any other finish or colour is spelled out.
+  if (phase === 'demo' || (finish === defaultWallFinish(kind) && color === defaultWallColor(kind))) return base;
+  return `${base}_${finish}_${color.slice(1)}`;
+};
 const stairsMaterialName = (phase: Phase) => `stairs_${phase}`;
-const roofMaterialName = (finish: RoofFinish, phase: Phase) => `roof_${finish}_${phase}`;
+const roofMaterialName = (finish: RoofFinish, phase: Phase, color: string) =>
+  phase === 'demo' || color === ROOF_COLOR[finish] ? `roof_${finish}_${phase}` : `roof_${finish}_${phase}_${color.slice(1)}`;
+const OPENING_MATERIAL: Record<FillPart, string> = { trim: 'trim', sash: 'sash', glass: 'glass', leaf: 'door_leaf', shutter: 'shutter' };
+const openingMaterialName = (part: FillPart, phase: Phase) => (phase === 'existing' ? OPENING_MATERIAL[part] : `${OPENING_MATERIAL[part]}_${phase}`);
 const columnMaterialName = (kind: Column['kind'], phase: Phase) => `column_${kind}_${phase}`;
 
 /**
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
  * with one group per visible level at its floor-top elevation holding `Wall <n> (<kind>, <phase>)`,
- * `Floor`, `Stairs` and `Roof` meshes. Levels with nothing to show are left out. A `Site` group (at
+ * `Floor`, `Stairs`, `Roof` (with its tan `Fascia`), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `door_leaf`, `shutter`). Colours only: siding textures are not exported. Levels with nothing to show are left out. A `Site` group (at
  * elevation 0, absolute heights) follows with the `Chimney` and `Post` meshes the view mode shows
  * and, when the site has grade points, the `Terrain` (material `terrain`; without grade points the
  * ground is a flat plane at the slab and is left out). Geometries are clones (the
@@ -43,11 +53,12 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   root.scale.setScalar(METRES_PER_INCH);
   const elev = getLevelElevations(plan);
   const materials = new Map<string, MeshStandardMaterial>();
-  const material = (name: string, live: MeshStandardMaterial) => {
+  const material = (name: string, live: MeshStandardMaterial, adjust?: (m: MeshStandardMaterial) => void) => {
     let m = materials.get(name);
     if (!m) {
       m = live.clone();
       m.name = name;
+      adjust?.(m);
       materials.set(name, m);
     }
     return m;
@@ -61,13 +72,17 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   for (const id of visible3dLevels(plan.levelOrder, levelVisibility)) {
     const level = plan.levels[id];
     const meshes = getLevelMeshes(plan, id, viewMode);
-    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.stairs.length && !meshes.roofs.length)) continue;
+    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length)) continue;
     const group = new Group();
     group.name = level.name;
     group.position.set(0, elev[id]?.floorTop ?? 0, 0);
     if (meshes.floor) group.add(mesh('Floor', meshes.floor, material('floor', floorMaterial)));
     meshes.walls.forEach((w, i) => {
-      const mat = material(wallMaterialName(w.phase, w.kind), wallMaterial(w.phase, w.kind));
+      // Colours only: the live material's siding texture is dropped and its flat colour used.
+      const mat = material(wallMaterialName(w.phase, w.kind, w.finish, w.color), wallMaterial(w.phase, w.kind, w.finish, w.color), (m) => {
+        m.map = null;
+        m.color.set(wallFlatColor(w.phase, w.finish, w.color));
+      });
       const m = mesh(`Wall ${i + 1} (${w.kind}, ${w.phase})`, w.geometry, mat);
       // Translucent demolished walls draw after the opaque ones, as in the live view.
       if (w.phase === 'demo') m.renderOrder = 1;
@@ -77,9 +92,22 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
       group.add(mesh('Stairs', s.geometry, material(stairsMaterialName(s.phase), stairsMaterial(s.phase))));
     }
     for (const r of meshes.roofs) {
-      const m = mesh('Roof', r.geometry, material(roofMaterialName(r.finish, r.phase), roofMaterial(r.finish, r.phase)));
+      const m = mesh('Roof', r.geometry, material(roofMaterialName(r.finish, r.phase, r.color), roofMaterial(r.finish, r.phase, r.color)));
       if (r.phase === 'demo') m.renderOrder = 1;
       group.add(m);
+      if (r.fascia) {
+        const f = mesh('Fascia', r.fascia, material(`fascia_${r.phase}`, fasciaMaterial(r.phase)));
+        if (r.phase === 'demo') f.renderOrder = 1;
+        group.add(f);
+      }
+    }
+    // Windows and doors: one mesh per material part, named Window or Door.
+    for (const o of meshes.openings) {
+      for (const p of o.parts) {
+        const m = mesh(o.type === 'door' ? 'Door' : 'Window', p.geometry, material(openingMaterialName(p.part, o.phase), openingMaterial(p.part, o.phase)));
+        if (o.phase === 'demo' || p.part === 'glass') m.renderOrder = 1;
+        group.add(m);
+      }
     }
     root.add(group);
   }

@@ -123,7 +123,10 @@ describe('buildExportScene', () => {
   it('the First Floor group measures 30\' x 40\' plus one wall thickness, in metres', () => {
     const { plan, first } = fixture();
     const root = buildExportScene(plan, 'all', allVisible(first));
-    const box = new Box3().setFromObject(byName(root, 'First Floor')!);
+    // The structure only: window trim and sills project beyond the wall faces.
+    const group = byName(root, 'First Floor')!;
+    const box = new Box3();
+    for (const c of group.children) if (c.name !== 'Window' && c.name !== 'Door') box.expandByObject(c);
     const t = 6.5 * METRES_PER_INCH;
     expect(box.max.x - box.min.x).toBeCloseTo(9.144 + t, 6);
     expect(box.max.z - box.min.z).toBeCloseTo(12.192 + t, 6);
@@ -162,10 +165,13 @@ describe('buildExportScene', () => {
       expect(m.map).toBeNull();
       mats.add(m);
     });
-    expect(meshes).toBe(7 + 1 + 1 + 7 + 1);
+    expect(meshes).toBe(7 + 1 + 1 + 7 + 1 + 3); // + the window's trim, sash and glass
     expect([...mats].map((m) => m.name).sort()).toEqual([
       'floor',
+      'glass',
+      'sash',
       'stairs_existing',
+      'trim',
       'wall_demo_interior',
       'wall_existing_exterior',
     ]);
@@ -256,13 +262,17 @@ describe('file formats', () => {
     expect(ffNames).toContain('Floor');
     expect(ffNames).toContain('Stairs');
     expect(ffNames.filter((n) => n.startsWith('Wall '))).toHaveLength(6);
-    expect(json.materials.map((m) => m.name).sort()).toEqual(['floor', 'stairs_existing', 'wall_existing_exterior']);
+    expect(json.materials.map((m) => m.name).sort()).toEqual(['floor', 'glass', 'sash', 'stairs_existing', 'trim', 'wall_existing_exterior']);
 
     const gltf = await new GLTFLoader().parseAsync(glb, '');
     const ff = gltf.scene.getObjectByName('First_Floor')!;
     expect(ff.parent!.scale.x).toBeCloseTo(METRES_PER_INCH, 9);
     gltf.scene.updateMatrixWorld(true);
-    const box = new Box3().setFromObject(ff);
+    const box = new Box3();
+    // The structure only: window trim and sills project beyond the wall faces.
+    ff.children.forEach((c) => {
+      if (c.name !== 'Window' && c.name !== 'Door') box.expandByObject(c);
+    });
     expect(box.max.x - box.min.x).toBeCloseTo(9.144 + 6.5 * METRES_PER_INCH, 5);
     expect(box.max.z - box.min.z).toBeCloseTo(12.192 + 6.5 * METRES_PER_INCH, 5);
   });
