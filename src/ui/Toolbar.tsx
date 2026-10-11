@@ -9,15 +9,16 @@ import { visible3dLevels } from '../view3d/visibility';
 import { choosePlanFile, newPlan, savePlan, zoomToFit } from './fileActions';
 import { focusCanvas, releaseFocus } from './focus';
 
-const TOOLS: { name: ToolName; label: string; key: string }[] = [
+/** `short` replaces the label below 1100 px (index.css hides one of the two spans). */
+const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
   { name: 'wall', label: 'Wall', key: 'W' },
   { name: 'room', label: 'Room', key: 'R' },
   { name: 'door', label: 'Door', key: 'D' },
   { name: 'window', label: 'Window', key: 'N' },
-  { name: 'passage', label: 'Passage', key: 'P' },
+  { name: 'passage', label: 'Passage', short: 'Opening', key: 'P' },
   { name: 'stairs', label: 'Stairs', key: 'T' },
-  { name: 'underlay', label: 'Underlay', key: 'U' },
+  { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
 ];
 
 const TOOL_TITLE: Partial<Record<ToolName, string>> = {
@@ -159,6 +160,10 @@ export function Toolbar() {
   const layout = useUiStore((s) => s.layout);
   const setLayout = useUiStore((s) => s.setLayout);
   const helpOpen = useUiStore((s) => s.helpOpen);
+  const levelBarOpen = useUiStore((s) => s.levelBarOpen);
+  const propertiesOpen = useUiStore((s) => s.propertiesOpen);
+  const toggleLevelBar = useUiStore((s) => s.toggleLevelBar);
+  const toggleProperties = useUiStore((s) => s.toggleProperties);
   const { canUndo, canRedo } = useTemporal();
 
   return (
@@ -260,7 +265,15 @@ export function Toolbar() {
                 focusCanvas();
               }}
             >
-              {t.label} <kbd>{t.key}</kbd>
+              {t.short ? (
+                <>
+                  <span className="lbl-long">{t.label}</span>
+                  <span className="lbl-short">{t.short}</span>
+                </>
+              ) : (
+                t.label
+              )}{' '}
+              <kbd>{t.key}</kbd>
             </button>
           ))}
         </div>
@@ -314,6 +327,24 @@ export function Toolbar() {
           </button>
           <button onClick={() => afterAction(zoomToFit)} title="Zoom the plan to fit (Z)">
             Fit
+          </button>
+        </div>
+        <div className="group narrow-only" role="group" aria-label="Panels">
+          <button
+            className={levelBarOpen ? 'active' : ''}
+            aria-pressed={levelBarOpen}
+            onClick={() => afterAction(toggleLevelBar)}
+            title="Show or hide the level bar ([)"
+          >
+            Levels
+          </button>
+          <button
+            className={propertiesOpen ? 'active' : ''}
+            aria-pressed={propertiesOpen}
+            onClick={() => afterAction(toggleProperties)}
+            title="Show or hide the properties panel (])"
+          >
+            Properties
           </button>
         </div>
       </div>

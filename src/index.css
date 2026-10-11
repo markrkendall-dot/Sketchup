@@ -8,7 +8,9 @@
   --accent-soft: #dbeafe;
   --danger: #dc2626;
   --canvas: #fbfbfa;
+  --grid-inch: #e9e9e5;
   --grid-minor: #efefec;
+  --grid-foot: #cfcfcb;
   --grid-major: #d6d6d3;
   --wall-exterior: #5b6170;
   --wall-interior: #a1a6b0;
@@ -191,6 +193,16 @@ kbd {
   stroke: var(--grid-minor);
   stroke-width: 1;
   fill: none;
+}
+
+.grid-inch {
+  stroke: var(--grid-inch);
+  stroke-width: 1;
+  fill: none;
+}
+
+.grid-minor.grid-foot {
+  stroke: var(--grid-foot);
 }
 
 .grid-major {
@@ -389,6 +401,12 @@ kbd {
   stroke-width: 1.75;
 }
 
+.snap-marker.ghost {
+  fill: none;
+  stroke: #71717a;
+  stroke-width: 2;
+}
+
 .snap-cross {
   stroke: #71717a;
   stroke-width: 1;
@@ -524,7 +542,7 @@ kbd {
 
 .statusbar .coords {
   font-variant-numeric: tabular-nums;
-  min-width: 15em;
+  min-width: 12em;
   color: var(--text);
 }
 
@@ -1375,4 +1393,134 @@ button.primary:hover:not(:disabled) {
 
 .room-dims-edges li {
   line-height: 1.45;
+}
+
+/* The phase for new walls is also the "Draw as" select in the toolbar; below 1400 px the status bar
+   drops its copy so the hint and the length readout keep their room. */
+@media (max-width: 1399px) {
+  .statusbar .status-phase {
+    display: none;
+  }
+}
+
+/* Narrow windows ----------------------------------------------------------------------------- */
+
+.narrow-only,
+.split-hint {
+  display: none;
+}
+
+.lbl-short {
+  display: none;
+}
+
+/* Under 1100 px the toolbar drops what is only a reminder (hotkey suffixes; they are in the
+   tooltips and the ? help) and uses the short tool names, so it stays within two rows. */
+@media (max-width: 1099px) {
+  .toolbar {
+    padding: 5px 8px;
+    gap: 5px;
+  }
+
+  .toolbar-row {
+    gap: 6px;
+  }
+
+  .toolbar kbd {
+    display: none;
+  }
+
+  .toolbar button,
+  .toolbar select {
+    padding: 4px 7px;
+  }
+
+  .lbl-long {
+    display: none;
+  }
+
+  .lbl-short {
+    display: inline;
+  }
+
+  .plan-name {
+    width: 9em;
+  }
+
+  .statusbar {
+    gap: 10px;
+    padding: 4px 8px;
+  }
+
+  .statusbar .coords {
+    min-width: 0;
+    flex: none;
+  }
+}
+
+/* Under 900 px the level bar and the properties panel float over the plan instead of squeezing it,
+   start closed, and open with their toolbar buttons or the [ and ] keys. The split layout has no
+   room for a 3D pane: it shows the plan and a hint. */
+@media (max-width: 899px) {
+  .narrow-only {
+    display: flex;
+  }
+
+  .brand,
+  .statusbar .status-phase {
+    display: none;
+  }
+
+  .plan-name {
+    width: 7em;
+  }
+
+  .toolbar button,
+  .toolbar select {
+    padding: 4px 6px;
+  }
+
+  .workspace {
+    position: relative;
+  }
+
+  .level-bar,
+  .side-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 20;
+    box-shadow: 0 0 18px rgba(0, 0, 0, 0.22);
+  }
+
+  .level-bar {
+    left: 0;
+  }
+
+  .side-panel {
+    right: 0;
+    max-width: 90%;
+  }
+
+  .app.levels-collapsed .level-bar,
+  .app.properties-collapsed .side-panel {
+    display: none;
+  }
+
+  .split-hint {
+    display: block;
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 5;
+    margin: 0;
+    padding: 5px 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    pointer-events: none;
+  }
 }

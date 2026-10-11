@@ -10,6 +10,7 @@ import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
 import { UnderlayFileInput } from './ui/UnderlayImport';
+import { useNarrow } from './ui/useNarrow';
 
 // The 3D view (three, fiber, drei) loads on first use, so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D'));
@@ -131,15 +132,24 @@ function SplitHandle({ container }: { container: RefObject<HTMLDivElement | null
 function Views() {
   const layout = useUiStore((s) => s.layout);
   const ratio = useUiStore((s) => s.splitRatio);
+  const narrow = useNarrow();
   const ref = useRef<HTMLDivElement>(null);
+  // Under 900 px the 3D pane has no room: the split layout keeps the plan, says why, and does not
+  // mount the 3D canvas at all.
+  const split = layout === 'split' && !narrow;
   return (
-    <div ref={ref} className={`views layout-${layout}`}>
-      <main className="canvas-host" style={layout === 'split' ? { flex: `0 0 ${ratio * 100}%` } : undefined}>
+    <div ref={ref} className={`views layout-${layout}${layout === 'split' && narrow ? ' split-narrow' : ''}`}>
+      <main className="canvas-host" style={split ? { flex: `0 0 ${ratio * 100}%` } : undefined}>
         <PlanCanvas />
         <RoomNameEditor />
+        {layout === 'split' && narrow && (
+          <p className="split-hint" role="status">
+            The 3D view needs a window at least 900 px wide. Use the 3D button to see it full size.
+          </p>
+        )}
       </main>
-      {layout === 'split' && <SplitHandle container={ref} />}
-      {layout !== '2d' && (
+      {split && <SplitHandle container={ref} />}
+      {(layout === '3d' || split) && (
         <Suspense fallback={<section className="view3d-host" aria-label="3D view" aria-busy="true" />}>
           <Scene3D />
         </Suspense>
@@ -149,6 +159,8 @@ function Views() {
 }
 
 export function App() {
+  const levelBarOpen = useUiStore((s) => s.levelBarOpen);
+  const propertiesOpen = useUiStore((s) => s.propertiesOpen);
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -161,7 +173,7 @@ export function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className={`app${levelBarOpen ? '' : ' levels-collapsed'}${propertiesOpen ? '' : ' properties-collapsed'}`}>
       <Toolbar />
       <div className="workspace">
         <LevelBar />

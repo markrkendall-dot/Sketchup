@@ -121,6 +121,23 @@ function computePreview(ctx: ToolContext, type: OpeningToolName, d: Draft): Open
   };
 }
 
+/**
+ * True when the end the distance is measured from is a node where three or more visible walls
+ * meet: the reference is then the face of a partition (a T or a cross), not a corner.
+ */
+function referenceIsPartition(ctx: ToolContext, pv: OpeningPreview): boolean {
+  const level = ctx.level();
+  const wall = level.walls[pv.wallId];
+  if (!wall) return false;
+  const nodeId = pv.nearEnd === 'a' ? wall.a : wall.b;
+  const vm = ctx.ui().viewMode;
+  let degree = 0;
+  for (const w of Object.values(level.walls)) {
+    if ((w.a === nodeId || w.b === nodeId) && isVisible(w.phase, vm)) degree++;
+  }
+  return degree >= 3;
+}
+
 function makeOpeningTool(type: OpeningToolName): Tool {
   const label = OPENING_LABEL[type];
 
@@ -146,13 +163,16 @@ function makeOpeningTool(type: OpeningToolName): Tool {
     }
     const id = ctx.actions.addOpening(ctx.levelId, pv.opening);
     const denom = ctx.plan().settings.precisionDenominator;
+    const dist = formatLength(pv.nearEnd === 'a' ? pv.fromA : pv.fromB, denom);
     refresh(ctx, {
       lengthBuffer: '',
       error: id === null,
       message:
         id === null
           ? `Could not place the ${type} here.`
-          : `${label} placed ${formatLength(pv.nearEnd === 'a' ? pv.fromA : pv.fromB, denom)} from the inside corner at the ${pv.nearEnd === 'a' ? 'start' : 'end'} of the wall.`,
+          : referenceIsPartition(ctx, pv)
+            ? `${label} placed ${dist} from the partition face.`
+            : `${label} placed ${dist} from the inside corner at the ${pv.nearEnd === 'a' ? 'start' : 'end'} of the wall.`,
     });
     return id;
   };

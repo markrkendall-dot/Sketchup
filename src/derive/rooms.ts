@@ -309,6 +309,29 @@ export function faceOfRoom(set: FaceSet, roomId: Id): Face | null {
   return set.faces.find((f) => f.roomId === roomId) ?? null;
 }
 
+/**
+ * The faces on each side of a wall: `left` is the +normal side of a->b (DESIGN.md), `right` the
+ * other. A face's interior is on the right of each of its half-edges, so a face that traces the
+ * wall a->b lies on the wall's right and one that traces b->a on its left. Null where no closed
+ * face touches that side (outside, or an open area).
+ */
+export function facesBesideWall(
+  set: FaceSet,
+  wall: Pick<Level['walls'][string], 'id' | 'a' | 'b'>,
+): { left: Face | null; right: Face | null } {
+  let left: Face | null = null;
+  let right: Face | null = null;
+  for (const f of set.faces) {
+    const n = f.nodeIds.length;
+    for (let i = 0; i < n; i++) {
+      if (f.wallIds[i] !== wall.id) continue;
+      if (f.nodeIds[i] === wall.a && f.nodeIds[(i + 1) % n] === wall.b) right = f;
+      else if (f.nodeIds[i] === wall.b && f.nodeIds[(i + 1) % n] === wall.a) left = f;
+    }
+  }
+  return { left, right };
+}
+
 /** The smallest face containing p. */
 export function faceAt(set: FaceSet, p: Vec2): Face | null {
   let best: Face | null = null;

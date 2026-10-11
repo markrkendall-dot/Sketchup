@@ -76,7 +76,7 @@ export const roomTool: Tool = {
     if (face.roomId) {
       const name = level.rooms[face.roomId]?.name ?? '';
       ui.setSelection({ ...EMPTY_SELECTION, rooms: [face.roomId] });
-      ui.patchDraft({ error: true, message: `This area is already named "${name}". Double-click its label to rename it.` });
+      ui.patchDraft({ error: true, message: `This area is already named "${name}". Double-click its label.` });
       return;
     }
     ui.clearSelection();

@@ -3,7 +3,7 @@
 // tool or the 3D walk view handles itself; they are here so the help lists them.
 import { activateUnderlayTool, cycleViewMode, switchLevelByIndex, switchTool } from '../editor2d/tools';
 import { redo, undo } from '../store/planStore';
-import { LAYOUTS, useUiStore, type ToolName } from '../store/uiStore';
+import { isNarrow, LAYOUTS, useUiStore, type ToolName } from '../store/uiStore';
 import { choosePlanFile, savePlan, zoomToFit } from './fileActions';
 
 export type KeyGroup = 'Tools' | 'While drawing' | 'View' | 'Edit and file' | '3D and walk';
@@ -59,16 +59,17 @@ function cycleLayout(): void {
 }
 
 export const KEY_BINDINGS: readonly KeyBinding[] = [
-  tool('s', 'select', 'Select, move and delete'),
-  tool('w', 'wall', 'Draw walls'),
-  tool('r', 'room', 'Name a room'),
-  tool('d', 'door', 'Place a door'),
-  tool('n', 'window', 'Place a window'),
-  tool('p', 'passage', 'Place a passage (opening without a door)'),
-  tool('t', 'stairs', 'Place stairs'),
-  tool('u', 'underlay', 'Image underlay: load, move, scale by two points'),
+  tool('s', 'select', 'Select, move and delete: click a wall, corner, opening or room label; drag to move; drag empty space to box-select'),
+  tool('w', 'wall', 'Draw walls: click to start, click or type a length for each wall; Esc, double-click or right-click ends the chain'),
+  tool('r', 'room', 'Name a room: click inside a closed area; click a label to select it, drag to move it, double-click to rename'),
+  tool('d', 'door', 'Place a door: point at a wall, click to place, or type the distance from the nearer corner and press Enter'),
+  tool('n', 'window', 'Place a window: point at a wall, click to place, or type the distance from the nearer corner and press Enter'),
+  tool('p', 'passage', 'Place a passage (an opening without a door), the same way as a door'),
+  tool('t', 'stairs', 'Place stairs: move the mouse the way they go up, click to place the bottom step; edit the size in the properties panel'),
+  tool('u', 'underlay', 'Image underlay: load, move, scale by two points; lock it, then trace walls with W'),
 
-  { keys: "12'6  150  6 1/2\"", label: 'Type a length (walls) or a distance from the corner (doors, windows); Enter commits', group: 'While drawing' },
+  { keys: "12'6  150  6 1/2\"", label: "Type a length (walls), or the distance from the nearer corner's inside face to the near edge (doors, windows, passages); Enter commits", group: 'While drawing' },
+  { keys: 'Enter or click', label: 'Walls: with nothing typed, commit the wall at the cursor', group: 'While drawing' },
   { keys: 'Backspace', label: 'Edit the typed length', group: 'While drawing' },
   { keys: 'Esc', label: 'Clear the typed length, then finish the wall chain; with Select, clear the selection', group: 'While drawing' },
   {
@@ -104,6 +105,28 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     },
   },
   { keys: 'G', label: 'Grid on or off', group: 'View', combos: ['g'], run: () => useUiStore.getState().toggleGrid() },
+  {
+    keys: '[',
+    label: 'Narrow window (under 900 px): show or hide the level bar',
+    group: 'View',
+    combos: ['['],
+    run: () => {
+      if (!isNarrow()) return false;
+      useUiStore.getState().toggleLevelBar();
+    },
+    whileDrawing: true,
+  },
+  {
+    keys: ']',
+    label: 'Narrow window (under 900 px): show or hide the properties panel',
+    group: 'View',
+    combos: [']'],
+    run: () => {
+      if (!isNarrow()) return false;
+      useUiStore.getState().toggleProperties();
+    },
+    whileDrawing: true,
+  },
   { keys: 'Z / Home', label: 'Zoom the plan to fit', group: 'View', combos: ['z', 'Home'], run: () => zoomToFit(), whileDrawing: true },
   { keys: '`', label: 'Cycle layout: 2D, Split, 3D', group: 'View', combos: ['`'], run: () => cycleLayout(), whileDrawing: true },
   { keys: 'Space + drag, middle drag', label: 'Pan the plan', group: 'View' },
@@ -140,7 +163,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     combos: ['f'],
     run: () => {
       const ui = useUiStore.getState();
-      if (ui.layout === '2d') return false;
+      // No 3D view to walk in: the 2D layout, or the split layout in a window too narrow for its 3D pane.
+      if (ui.layout === '2d' || (ui.layout === 'split' && isNarrow())) return false;
       ui.setCameraMode('walk');
     },
   },

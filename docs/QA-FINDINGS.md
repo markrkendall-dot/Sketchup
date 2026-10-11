@@ -6,6 +6,14 @@ HomePlan v1 (seven milestones, all on `claude/cool-mccarthy-rqi8ka`) is feature 
 
 Execution: fixes are implemented by subagents, **Opus 5.5** for batch A (performance, touches the rendering architecture) and **Sonnet 5.5** for batches B and C (small, well-specified changes). The coordinating session reviews each batch, re-runs the milestone e2e scripts (`scratchpad/m1-e2e.mjs` … `m7-e2e.mjs`) and the QA probes (`scratchpad/qa/perf.mjs`, `qa1.mjs`, `qa2.mjs`, `qa3.mjs`), then commits and pushes. One commit per batch.
 
+## Status
+
+All three batches are merged on `claude/cool-mccarthy-rqi8ka`. Items 1 to 20 and 22 are fixed and verified
+(400 unit tests, milestone e2e scripts m1 to m7, and the QA probes). Item 21 stays open: the
+`THREE.Clock` warning comes from @react-three/fiber 9.8.1, the latest 9.x, so there is nothing to bump.
+Item 15 needed no code change (the flush already existed); tests were added. Measured after batch A at
+76 walls: hover 718 ms to 45 ms, 30 wall-tool mouse moves 3.1 s to 0.56 s, drag step 158 ms to 53 ms.
+
 ## Findings, ranked
 
 ### P1: fix before the measuring session

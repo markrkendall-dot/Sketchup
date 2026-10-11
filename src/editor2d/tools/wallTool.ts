@@ -73,6 +73,22 @@ function startJoin(ctx: ToolContext, d: Draft): { dir: Vec2 | null; thickness: n
   return best ?? { dir: null, thickness: undefined };
 }
 
+/**
+ * The face-to-face length a centerline length stands for under the `measureTo` rule: the inverse of
+ * adjustTypedLength (inside added the half thicknesses to the typed length, so subtract them here).
+ */
+export function centerlineToFace(
+  center: number,
+  measureTo: MeasureTo,
+  thickness: number,
+  dir: Vec2,
+  prevDir: Vec2 | null,
+  prevThickness: number = thickness,
+): number {
+  if (measureTo === 'center') return center;
+  return adjustTypedLength(center, measureTo === 'inside' ? 'outside' : 'inside', thickness, dir, prevDir, prevThickness);
+}
+
 function typedToCenterline(ctx: ToolContext, d: Draft, typed: number): number {
   const { settings } = ctx.plan();
   const thickness = thicknessFor(ctx.ui().nextWallKind, settings);
@@ -89,16 +105,31 @@ function computePreview(ctx: ToolContext, d: Draft): WallPreview | null {
   if (!start) return null;
   const { settings } = ctx.plan();
   const thickness = thicknessFor(ctx.ui().nextWallKind, settings);
+  const measureTo = ctx.ui().measureTo;
   if (d.lengthBuffer) {
     const typed = tryParseLength(d.lengthBuffer);
     if (typed === null || typed <= 0) return null;
     const len = typedToCenterline(ctx, d, typed);
-    return { a: start.point, b: add(start.point, scale(d.direction, len)), thickness, length: Math.abs(len), typed: true };
+    const preview: WallPreview = {
+      a: start.point,
+      b: add(start.point, scale(d.direction, len)),
+      thickness,
+      length: Math.abs(len),
+      typed: true,
+    };
+    if (measureTo !== 'center') preview.face = { measureTo, length: typed };
+    return preview;
   }
   if (!d.snap) return null;
   const len = dist(start.point, d.snap.point);
   if (len < MERGE_EPS) return null;
-  return { a: start.point, b: d.snap.point, thickness, length: len, typed: false };
+  const preview: WallPreview = { a: start.point, b: d.snap.point, thickness, length: len, typed: false };
+  if (measureTo !== 'center') {
+    const join = startJoin(ctx, { ...d, direction: normalize(sub(d.snap.point, start.point)) });
+    const face = centerlineToFace(len, measureTo, thickness, normalize(sub(d.snap.point, start.point)), join.dir, join.thickness);
+    if (face > 0) preview.face = { measureTo, length: face };
+  }
+  return preview;
 }
 
 function patch(ctx: ToolContext, p: Partial<Draft>): void {

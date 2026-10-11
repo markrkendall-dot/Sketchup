@@ -40,8 +40,8 @@ export async function loadUnderlayFile(file: File, req: PickRequest): Promise<vo
   after.patchDraft({
     error: false,
     message: req.replace
-      ? `Image replaced (${img.pixelWidth} x ${img.pixelHeight} px). Check the scale with Scale by two points.`
-      : `Image loaded (${img.pixelWidth} x ${img.pixelHeight} px) at a provisional 40' width. Next: Scale by two points in the properties panel.`,
+      ? `Image replaced (${img.pixelWidth} x ${img.pixelHeight} px). Check its scale (Scale by two points).`
+      : `Image loaded (${img.pixelWidth} x ${img.pixelHeight} px) at 40' wide for now. Next: Scale by two points in the panel.`,
   });
 }
 

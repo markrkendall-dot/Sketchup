@@ -27,6 +27,20 @@ export function showNotice(text: string | null, error = false, ms = 4000): void 
   }
 }
 
+/**
+ * Item 17: naming a room the same as another room on the level is allowed, but says so in the
+ * status bar. Call it before the add or rename, with the room being renamed (if any) excluded.
+ */
+export function noteDuplicateRoomName(levelId: string, name: string, exceptRoomId?: string | null): boolean {
+  const level = getPlan().levels[levelId];
+  if (!level) return false;
+  const wanted = name.trim().toLowerCase();
+  const dup = Object.values(level.rooms).find((r) => r.id !== exceptRoomId && r.name.trim().toLowerCase() === wanted);
+  if (!dup) return false;
+  showNotice(`There is already a ${dup.name} on this level`);
+  return true;
+}
+
 /** Fit the active level (and its underlay, when shown) into the 2D view. */
 export function zoomToFit(): void {
   const ui = useUiStore.getState();
@@ -78,7 +92,11 @@ export async function openPlanFile(file: File): Promise<void> {
     replacePlan(plan);
     showNotice(`Opened ${file.name}.`);
   } catch (err) {
-    window.alert(err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    // Replace any earlier notice (e.g. "Saved a copy") with the rejection, which stays until the
+    // next notice, and tell the user in the alert as well.
+    showNotice(`Could not open ${file.name}: ${message}`, true);
+    window.alert(message);
   }
 }
 

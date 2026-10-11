@@ -9,7 +9,7 @@ import {
   type UnderlayMode,
 } from '../../store/uiStore';
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
-import { snapPoint } from '../snap';
+import { snapPoint, type GhostWall } from '../snap';
 import { doorTool, passageTool, windowTool } from './openingTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
@@ -70,6 +70,45 @@ const tools: Record<ToolName, Tool> = {
 
 export const getTool = (name: ToolName): Tool => tools[name];
 
+interface GhostSnapSources {
+  nodes: Vec2[];
+  walls: GhostWall[];
+}
+
+const ghostCache = new WeakMap<Level, Map<ViewMode, GhostSnapSources>>();
+
+/** The level below's corners and wall centerlines that the ghost shows in a view mode (cached per level). */
+function ghostSources(below: Level, viewMode: ViewMode): GhostSnapSources {
+  let byMode = ghostCache.get(below);
+  if (!byMode) ghostCache.set(below, (byMode = new Map()));
+  let hit = byMode.get(viewMode);
+  if (!hit) {
+    const shown = visibleNodeIds(below, viewMode);
+    const nodes: Vec2[] = [];
+    for (const id of shown) {
+      const n = below.nodes[id];
+      if (n) nodes.push({ x: n.x, y: n.y });
+    }
+    const walls: GhostWall[] = [];
+    for (const w of Object.values(below.walls)) {
+      const a = below.nodes[w.a];
+      const b = below.nodes[w.b];
+      if (a && b && isVisible(w.phase, viewMode)) walls.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y } });
+    }
+    byMode.set(viewMode, (hit = { nodes, walls }));
+  }
+  return hit;
+}
+
+/** Ghost snap sources while "Show level below" is on and the active level has one under it. */
+function ghostFor(plan: Plan, levelId: Id): GhostSnapSources | null {
+  const ui = useUiStore.getState();
+  if (!ui.showLevelBelow) return null;
+  const i = plan.levelOrder.indexOf(levelId);
+  const below = i > 0 ? plan.levels[plan.levelOrder[i - 1]] : undefined;
+  return below ? ghostSources(below, ui.viewMode) : null;
+}
+
 export function makeToolContext(): ToolContext | null {
   const levelId = useUiStore.getState().activeLevelId;
   if (!getPlan().levels[levelId]) return null;
@@ -81,6 +120,7 @@ export function makeToolContext(): ToolContext | null {
     ui: useUiStore.getState,
     snap: (raw, opts) => {
       const plan = getPlan();
+      const ghost = ghostFor(plan, levelId);
       return snapPoint(raw, {
         level: plan.levels[levelId],
         k: useUiStore.getState().viewport.k,
@@ -90,6 +130,8 @@ export function makeToolContext(): ToolContext | null {
         from: opts.from,
         excludeNodeIds: opts.excludeNodeIds,
         viewMode: useUiStore.getState().viewMode,
+        ghostNodes: ghost?.nodes,
+        ghostWalls: ghost?.walls,
       });
     },
   };

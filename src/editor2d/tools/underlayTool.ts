@@ -103,7 +103,7 @@ export function nudgeUnderlay(ctx: ToolContext, e: KeyboardEvent): boolean {
   const u = ctx.level().underlay;
   if (!u) return false;
   if (u.locked) {
-    ctx.ui().patchDraft({ error: true, message: 'The image is locked. Unlock it in the properties panel to move it.' });
+    ctx.ui().patchDraft({ error: true, message: 'The image is locked. Unlock it in the panel to move it.' });
     return true;
   }
   const step = e.shiftKey ? NUDGE_SHIFT : NUDGE;
@@ -148,7 +148,7 @@ function commitScale(ctx: ToolContext): void {
   ui.setUnderlayMode('move');
   ui.patchDraft({
     error: false,
-    message: `Scale set: ${formatPxScale(next.scale)}, image ${formatLength(u.pixelWidth * next.scale, denom)} wide. Lock the image, then trace walls with W.`,
+    message: `Scale set: ${formatPxScale(next.scale)}, image ${formatLength(u.pixelWidth * next.scale, denom)} wide. Lock it, trace with W.`,
   });
 }
 

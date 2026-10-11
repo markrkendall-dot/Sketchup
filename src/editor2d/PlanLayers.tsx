@@ -5,7 +5,7 @@ import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces 
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { faceAt, getFaces, type Face, type FaceSet } from '../derive/rooms';
 import { floorToFloor, stairsSymbol, stairSteps, type StairsSymbol } from '../derive/stairs';
-import { add, midpoint, polygonSignedArea, scale } from '../model/geometry';
+import { add, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Level, Opening, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
 import { usePlanStore } from '../store/planStore';
@@ -17,6 +17,12 @@ import { ROOM_AREA_DY, ROOM_NAME_DY } from './roomLabels';
 const LABEL_GAP_PX = 11;
 /** Hide labels on walls shorter than this on screen. */
 const MIN_LABEL_WALL_PX = 34;
+/** Estimated width of one character of a dimension label, screen px; a longer label is hidden. */
+const LABEL_CHAR_PX = 6.5;
+/** A room whose bounding box is smaller than this on screen (either side) loses its area text... */
+const MIN_ROOM_AREA_PX = 60;
+/** ... and smaller than this its name too. */
+const MIN_ROOM_NAME_PX = 40;
 /** Spacing of the demolition hatch, in screen px. */
 const HATCH_PX = 7;
 /** Radius of the open wall end markers, screen px. */
@@ -273,22 +279,84 @@ const OpeningShape = memo(function OpeningShape({ levelId, openingId }: { levelI
   );
 });
 
+/** Bit 1: a face lies on the wall's left (+normal) side; bit 2: on its right. Per face set, per wall. */
+const sideCache = new WeakMap<FaceSet, Map<Id, number>>();
+function faceSides(set: FaceSet, level: Level): Map<Id, number> {
+  let m = sideCache.get(set);
+  if (!m) {
+    sideCache.set(set, (m = new Map()));
+    for (const f of set.faces) {
+      for (let i = 0; i < f.wallIds.length; i++) {
+        const wall = level.walls[f.wallIds[i]];
+        if (!wall) continue;
+        // The interior is on the right of the half-edge: tracing a->b puts the face on the wall's right.
+        const bit = f.nodeIds[i] === wall.a ? 2 : 1;
+        m.set(wall.id, (m.get(wall.id) ?? 0) | bit);
+      }
+    }
+  }
+  return m;
+}
+
+/**
+ * Where along a wall (distance from its a end) the dimension label goes, and how much room it has:
+ * the middle of the longest stretch not crossed by the swing of a door that opens to the label's
+ * side, or the middle of the wall when no such door is there.
+ */
+function labelSpan(fp: Footprint, wall: Wall, openings: readonly Opening[] | undefined, viewMode: ViewMode, side: 1 | -1): { at: number; room: number } {
+  const swings: [number, number][] = [];
+  for (const o of openings ?? []) {
+    if (o.type !== 'door' || !isOpeningVisible(o, wall, viewMode)) continue;
+    if ((o.swing?.side ?? 'left') !== (side === 1 ? 'left' : 'right')) continue;
+    const sym = openingSymbol(fp, o);
+    swings.push([sym.j0, sym.j1]);
+  }
+  if (swings.length === 0) return { at: fp.length / 2, room: fp.length };
+  swings.sort((p, q) => p[0] - q[0]);
+  let best = { at: fp.length / 2, room: 0 };
+  let from = 0;
+  for (const [j0, j1] of [...swings, [fp.length, fp.length] as [number, number]]) {
+    if (j0 - from > best.room) best = { at: (from + j0) / 2, room: j0 - from };
+    from = Math.max(from, j1);
+  }
+  return best;
+}
+
 const DimensionLabel = memo(function DimensionLabel({ levelId, wallId }: { levelId: Id; wallId: Id }) {
   const fp = useFootprint(levelId, wallId);
-  const phase = usePlanStore((s) => s.plan.levels[levelId]?.walls[wallId]?.phase);
+  const wall = usePlanStore((s) => s.plan.levels[levelId]?.walls[wallId]);
+  const openings = usePlanStore((s) => {
+    const level = s.plan.levels[levelId];
+    return level ? getOpeningsByWall(level).get(wallId) : undefined;
+  });
   const viewMode = useUiStore((s) => s.viewMode);
-  const visible = !!phase && isVisible(phase, viewMode);
+  const visible = !!wall && isVisible(wall.phase, viewMode);
   const k = useViewportScale();
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  if (!fp || !visible || fp.length * k < MIN_LABEL_WALL_PX) return null;
-  // Left side of a->b, just outside the wall face.
-  const pos = add(midpoint(fp.a, fp.b), scale(fp.normal, fp.thickness / 2 + LABEL_GAP_PX / k));
+  // An exterior wall with a face on exactly one side is labeled on the other (outside) side: +1
+  // is the left (+normal) side, the default; -1 the right.
+  const side = usePlanStore((s): 1 | -1 => {
+    const level = s.plan.levels[levelId];
+    if (!level || level.walls[wallId]?.kind !== 'exterior') return 1;
+    const bits = faceSides(getFaces(level, viewMode), level).get(wallId) ?? 0;
+    return bits === 1 ? -1 : 1;
+  });
+  if (!fp || !wall || !visible || fp.length * k < MIN_LABEL_WALL_PX) return null;
+  const text = formatLengthCompact(fp.length, denom);
+  const width = text.length * LABEL_CHAR_PX;
+  // Drop a label that would be wider than the wall it belongs to.
+  if (width > fp.length * k) return null;
+  // Slide it clear of the swing of a door on its side; hide it when no clear stretch is wide enough.
+  const span = labelSpan(fp, wall, openings, viewMode, side);
+  if (width > span.room * k) return null;
+  // Just outside the wall face, on the left of a->b unless the outside is on the right.
+  const pos = add(add(fp.a, scale(fp.dir, span.at)), scale(fp.normal, side * (fp.thickness / 2 + LABEL_GAP_PX / k)));
   let angle = (Math.atan2(fp.dir.y, fp.dir.x) * 180) / Math.PI;
   if (angle > 90 || angle <= -90) angle += 180; // never upside down
   return (
     <g transform={`translate(${pos.x} ${pos.y}) rotate(${angle}) scale(${1 / k})`}>
       <text className="dim-label" textAnchor="middle" dominantBaseline="central">
-        {formatLengthCompact(fp.length, denom)}
+        {text}
       </text>
     </g>
   );
@@ -507,9 +575,11 @@ function RoomLabelGroup({
   x: number;
   y: number;
   name: string | null;
-  area: string;
+  /** Null hides the area line. */
+  area: string | null;
 }) {
   const k = useViewportScale();
+  if (name === null && area === null) return null;
   return (
     <g className={className} data-room-id={roomId} data-face-id={faceId} transform={`translate(${x} ${y}) scale(${1 / k})`}>
       {name !== null && (
@@ -517,14 +587,40 @@ function RoomLabelGroup({
           {name}
         </text>
       )}
-      <text className="room-area" y={name !== null ? ROOM_AREA_DY : 0} textAnchor="middle" dominantBaseline="central">
-        {area}
-      </text>
+      {area !== null && (
+        <text className="room-area" y={name !== null ? ROOM_AREA_DY : 0} textAnchor="middle" dominantBaseline="central">
+          {area}
+        </text>
+      )}
     </g>
   );
 }
 
-/** The label of a face: its room's name, if a room names it, and its net area. */
+/** The shorter side of a face's bounding box, in inches (cached per face). */
+const faceSpans = new WeakMap<Face, number>();
+function faceSpan(f: Face): number {
+  let span = faceSpans.get(f);
+  if (span === undefined) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of f.netPolygon) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+    faceSpans.set(f, (span = Math.min(maxX - minX, maxY - minY)));
+  }
+  return span;
+}
+
+/**
+ * The label of a face: its room's name, if a room names it, and its net area. In a small room the
+ * labels thin out so they never run over the walls: the area goes when the face's bounding box is
+ * under 60 px on either side, the name under 40 px.
+ */
 const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; faceId: string }) {
   const x = useFaceSetValue(levelId, (set) => findFace(set, faceId)?.labelPoint.x ?? 0, 0);
   const y = useFaceSetValue(levelId, (set) => findFace(set, faceId)?.labelPoint.y ?? 0, 0);
@@ -537,9 +633,15 @@ const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; fa
     return id && level.rooms[id] ? id : null;
   }, null);
   const name = usePlanStore((s) => (roomId ? (s.plan.levels[levelId]?.rooms[roomId]?.name ?? null) : null));
+  const span = useFaceSetValue(levelId, (set) => {
+    const f = findFace(set, faceId);
+    return f ? faceSpan(f) : 0;
+  }, 0);
+  const k = useViewportScale();
   const selected = useUiStore((s) => roomId !== null && s.selection.rooms.includes(roomId));
   const editing = useUiStore((s) => roomId !== null && s.roomEdit?.roomId === roomId);
   if (editing) return null;
+  const px = span * k;
   return (
     <RoomLabelGroup
       className={`room-label${roomId ? '' : ' unlabeled'}${selected ? ' is-selected' : ''}`}
@@ -547,8 +649,8 @@ const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; fa
       faceId={faceId}
       x={x}
       y={y}
-      name={roomId ? name : null}
-      area={area}
+      name={roomId && px >= MIN_ROOM_NAME_PX ? name : null}
+      area={px >= MIN_ROOM_AREA_PX ? area : null}
     />
   );
 });

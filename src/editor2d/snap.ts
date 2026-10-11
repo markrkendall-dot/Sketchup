@@ -23,6 +23,20 @@ export interface SnapContext {
   excludeWallIds?: ReadonlySet<Id>;
   /** When given, walls hidden in this view (and nodes touching only hidden walls) never snap. */
   viewMode?: ViewMode;
+  /**
+   * Nodes of the level below that are visible in the ghost (the caller applies the view mode).
+   * They snap after this level's own node, midpoint and on-wall snaps and before alignment guides,
+   * and always give a new point on this level: the result carries no node id.
+   */
+  ghostNodes?: readonly Vec2[];
+  /** Centerlines of the level below's visible walls, for ghost-wall snaps (same ranking). */
+  ghostWalls?: readonly GhostWall[];
+}
+
+/** A wall of the level below, by its end points. */
+export interface GhostWall {
+  a: Vec2;
+  b: Vec2;
 }
 
 interface Line {
@@ -71,7 +85,7 @@ function lineSegment(l: Line, a: Vec2, b: Vec2): Vec2 | null {
 const roundTo = (v: number, step: number) => (step > 0 ? Math.round(v / step) * step : v);
 
 /**
- * Snap a raw world point. Priority: node > wall midpoint > on-wall > alignment guide > grid.
+ * Snap a raw world point. Priority: node > wall midpoint > on-wall > level-below node > level-below wall > alignment guide > grid.
  * Pure function of its inputs (see docs/DESIGN.md "Snapping").
  */
 export function snapPoint(raw: Vec2, ctx: SnapContext): SnapResult {
@@ -142,6 +156,40 @@ export function snapPoint(raw: Vec2, ctx: SnapContext): SnapResult {
     }
   }
   if (onWall) return { point: onWall.p, kind: 'wall', wallId: onWall.wallId, guides: [] };
+
+  // 3b. The level below (ghost): its corners, then its wall centerlines. Same radii as the
+  // level's own; the point is new on this level, never a reference to the other level's ids.
+  if (ctx.ghostNodes && ctx.ghostNodes.length > 0) {
+    bestD = r(SNAP_RADIUS_PX.node);
+    let ghost: Vec2 | null = null;
+    for (const n of ctx.ghostNodes) {
+      const d = dist(n, target);
+      if (d <= bestD && onLine(n)) {
+        bestD = d;
+        ghost = n;
+      }
+    }
+    if (ghost) return { point: { x: ghost.x, y: ghost.y }, kind: 'ghost-node', guides: [] };
+  }
+  if (ctx.ghostWalls && ctx.ghostWalls.length > 0) {
+    bestD = r(SNAP_RADIUS_PX.wall);
+    let ghostOnWall: Vec2 | null = null;
+    for (const w of ctx.ghostWalls) {
+      const pr = projectPointToSegment(target, w.a, w.b);
+      let p: Vec2 | null = pr.tRaw > 0 && pr.tRaw < 1 && onLine(pr.point) ? pr.point : null;
+      if (!p && line) {
+        const x = lineSegment(line, w.a, w.b);
+        if (x && dist(x, w.a) > 1e-6 && dist(x, w.b) > 1e-6) p = x;
+      }
+      if (!p) continue;
+      const d = dist(p, target);
+      if (d <= bestD) {
+        bestD = d;
+        ghostOnWall = p;
+      }
+    }
+    if (ghostOnWall) return { point: ghostOnWall, kind: 'ghost-wall', guides: [] };
+  }
 
   // 4. Alignment guides to any node's x or y.
   const sources: Vec2[] = nodes.map((n) => ({ x: n.x, y: n.y }));

@@ -206,8 +206,12 @@ own viewport state, never `getScreenCTM`.
 ### Snapping (`snap.ts`)
 
 `snapPoint(raw, ctx) -> {point, kind, nodeId?, wallId?, guides}`. Radii in screen px, divided by k.
-Priority: node (10px) > wall midpoint (8px) > on-wall projection (8px) > alignment guides to any
-node's x or y (6px) > grid (settings.snapGrid). Ortho lock (default on, Shift inverts while held,
+Priority: node (10px) > wall midpoint (8px) > on-wall projection (8px) > level-below corner
+(`ghost-node`, 10px) > level-below wall (`ghost-wall`, 8px) > alignment guides to any node's x or y
+(6px) > grid (settings.snapGrid). The ghost kinds exist only while "Show level below" is on:
+`tools/index.ts` passes the lower level's visible nodes and wall centerlines as `ghostNodes` /
+`ghostWalls`, and a ghost snap carries no node or wall id, so the wall tool always makes a new node
+on the active level at that point (hollow grey marker in the overlay). Ortho lock (default on, Shift inverts while held,
 `O` toggles): with a start point, project raw onto the horizontal or vertical axis through it first,
 then only accept node/on-wall snaps within 1" of that axis. With ortho off, Shift snaps to 15 deg.
 
@@ -262,6 +266,15 @@ plain keys (Esc or `?` closes it); then the active tool; then, while a typed len
 every other plain key is swallowed; while a wall chain or calibration is in progress only bindings
 marked `whileDrawing` run. Committing a properties field with Enter (or a select change) blurs it
 and focuses the canvas, so the next Ctrl+Z undoes the plan, not the text.
+
+### Narrow windows
+
+Below 1100 px the toolbar drops the hotkey suffixes and uses short tool names (Image, Opening) so it
+stays within two rows (CSS only; the long names stay in the DOM, hidden). Below 900 px (`NARROW_QUERY`
+in `uiStore.ts`, mirrored in `index.css`) the level bar and properties panel float over the plan
+instead of squeezing it, start closed, and toggle with the toolbar's Levels / Properties buttons or
+the `[` and `]` keys (`levelBarOpen` / `propertiesOpen`; the keys do nothing in a wide window). The
+split layout keeps the plan, shows a one-line hint, and does not mount the 3D canvas.
 
 ## Undo/redo
 

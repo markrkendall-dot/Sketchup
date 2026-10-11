@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { getFootprints } from '../derive/footprint';
 import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
-import { getFaces, roomDimensions, type Face } from '../derive/rooms';
+import { facesBesideWall, getFaces, roomDimensions, type Face, type FaceSet } from '../derive/rooms';
 import { floorToFloor, STAIRS_LIMITS, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool } from '../editor2d/tools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
@@ -14,6 +15,7 @@ import type { Id, Level, Opening, Phase, Room, Stairs, Wall, WallKind } from '..
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
+import { noteDuplicateRoomName } from './fileActions';
 import { releaseFocus } from './focus';
 
 const PHASES: Phase[] = ['existing', 'demo', 'new'];
@@ -244,6 +246,41 @@ function SelectionActions({ levelId, walls, openings, stairs }: { levelId: Id; w
   );
 }
 
+/** Name of the room a face belongs to, or null (no face, or a face no room names). */
+function roomNameOf(level: Level, face: Face | null): string | null {
+  const room = face?.roomId ? level.rooms[face.roomId] : undefined;
+  const name = room?.name.trim();
+  return name ? name : null;
+}
+
+/**
+ * Left and right face lengths of a wall, from its footprint's trimmed edge points (what a tape
+ * measure along each face reads), each with the room on that side when a face names one.
+ */
+function WallFaceLengths({ level, wall }: { level: Level; wall: Wall }) {
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const fp = getFootprints(level, viewMode).get(wall.id);
+  if (!fp) return null;
+  const set = getFaces(level, viewMode);
+  const sides = facesBesideWall(set, wall);
+  const [leftA, leftB, rightB, rightA] = fp.edge;
+  const rows = [
+    { label: 'Left face', len: Math.hypot(leftB.x - leftA.x, leftB.y - leftA.y), room: roomNameOf(level, sides.left) },
+    { label: 'Right face', len: Math.hypot(rightB.x - rightA.x, rightB.y - rightA.y), room: roomNameOf(level, sides.right) },
+  ];
+  return (
+    <>
+      {rows.map((r) => (
+        <ReadOnly key={r.label} label={r.label}>
+          {formatLength(r.len, denom)}
+          {r.room && <span className="face-room"> to {r.room}</span>}
+        </ReadOnly>
+      ))}
+    </>
+  );
+}
+
 function WallProps({ level, wall }: { level: Level; wall: Wall }) {
   const levelId = level.id;
   const [anchor, setAnchor] = useState<LengthAnchor>('start');
@@ -289,6 +326,7 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
         }}
         hint="Blank uses the level's wall height."
       />
+      <WallFaceLengths level={level} wall={wall} />
       <ReadOnly label="Openings">{openingCount}</ReadOnly>
     </>
   );
@@ -315,6 +353,45 @@ function MultiWallProps({ levelId, walls }: { levelId: Id; walls: Wall[] }) {
   );
 }
 
+/** Names of the rooms with a corner at a node, in the order the faces come. */
+function roomsAtNode(level: Level, set: FaceSet, nodeId: Id): string[] {
+  const names: string[] = [];
+  for (const f of set.faces) {
+    const name = roomNameOf(level, f);
+    if (name && f.nodeIds.includes(nodeId) && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/**
+ * Door swing in a homeowner's words: the room each side of the wall opens into, and the room whose
+ * corner each hinge end is near. A side with no named room says "Outside" on an exterior wall;
+ * otherwise (and for hinges when no room tells the two ends apart) the caller keeps the plain
+ * wording.
+ */
+function swingWording(
+  level: Level,
+  wall: Wall,
+  set: FaceSet,
+): { side: { left: string | null; right: string | null }; hinge: { a: string | null; b: string | null } } {
+  const sides = facesBesideWall(set, wall);
+  const sideLabel = (face: Face | null): string | null => {
+    const name = roomNameOf(level, face);
+    if (name) return name;
+    return !face && wall.kind === 'exterior' ? 'Outside' : null;
+  };
+  // A room is "near" an end when it has a corner there and not at the other end. Both ends need
+  // one; where the same rooms touch both ends (a wall between two rooms that both run its length),
+  // nothing tells the ends apart and the plain Start side / End side wording stays.
+  const atA = roomsAtNode(level, set, wall.a);
+  const atB = roomsAtNode(level, set, wall.b);
+  const nearA = atA.find((n) => !atB.includes(n));
+  const nearB = atB.find((n) => !atA.includes(n));
+  const hingeA = nearA && nearB ? `near the ${nearA} corner` : null;
+  const hingeB = nearA && nearB ? `near the ${nearB} corner` : null;
+  return { side: { left: sideLabel(sides.left), right: sideLabel(sides.right) }, hinge: { a: hingeA, b: hingeB } };
+}
+
 function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   const levelId = level.id;
   const updateOpening = usePlanStore((s) => s.updateOpening);
@@ -337,6 +414,8 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
     updateOpening(levelId, opening.id, { offset });
     return null;
   };
+  const viewMode = useUiStore((s) => s.viewMode);
+  const wording = wall ? swingWording(level, wall, getFaces(level, viewMode)) : null;
   const changeType = (type: OpeningType) => {
     if (type === opening.type) return;
     const def = OPENING_DEFAULTS[type];
@@ -416,17 +495,17 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
             label="Hinge"
             value={opening.swing?.hinge ?? 'a'}
             options={[
-              { value: 'a', label: 'Start side' },
-              { value: 'b', label: 'End side' },
+              { value: 'a', label: wording?.hinge.a ?? 'Start side' },
+              { value: 'b', label: wording?.hinge.b ?? 'End side' },
             ]}
             onChange={(hinge) => updateOpening(levelId, opening.id, { swing: { side: opening.swing?.side ?? 'left', hinge } })}
           />
           <SelectField
-            label="Swings to"
+            label="Swings into"
             value={opening.swing?.side ?? 'left'}
             options={[
-              { value: 'left', label: 'Left of wall' },
-              { value: 'right', label: 'Right of wall' },
+              { value: 'left', label: wording?.side.left ?? 'Left of wall' },
+              { value: 'right', label: wording?.side.right ?? 'Right of wall' },
             ]}
             onChange={(side) => updateOpening(levelId, opening.id, { swing: { hinge: opening.swing?.hinge ?? 'a', side } })}
           />
@@ -488,7 +567,10 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
   useEffect(() => setName(room.name), [room.name]);
   const commitName = () => {
     const v = name.trim();
-    if (v && v !== room.name) updateRoom(level.id, room.id, { name: v });
+    if (v && v !== room.name) {
+      noteDuplicateRoomName(level.id, v, room.id);
+      updateRoom(level.id, room.id, { name: v });
+    }
     else setName(room.name);
   };
   return (

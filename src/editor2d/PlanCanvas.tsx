@@ -29,7 +29,14 @@ function wheelFactor(e: WheelEvent): number {
   return Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0015));
 }
 
-/** Lines every displayGrid (12") and heavier every 10', over the visible range only. */
+/** Once the display grid spacing is wider than this on screen, 1" lines are drawn between its lines. */
+const FINE_GRID_FROM_PX = 200;
+
+/**
+ * Lines every displayGrid (12") and heavier every 10', over the visible range only. Zoomed in far
+ * enough that the 12" spacing exceeds 200 px, lighter 1" lines fill in between (still only the
+ * visible range, so at most a few dozen per axis) and the 12" lines get a little darker.
+ */
 const Grid = memo(function Grid({ size }: { size: Size }) {
   const viewport = useUiStore((s) => s.viewport);
   const show = useUiStore((s) => s.showGrid);
@@ -37,6 +44,7 @@ const Grid = memo(function Grid({ size }: { size: Size }) {
   if (!show || size.width === 0 || step <= 0) return null;
   const vb = visibleBounds(viewport, size);
   const major = 120;
+  const fine = step > 1 && step * viewport.k > FINE_GRID_FROM_PX;
   const path = (spacing: number, skipMultiple: number | null) => {
     if (spacing * viewport.k < 6) return '';
     let d = '';
@@ -56,7 +64,8 @@ const Grid = memo(function Grid({ size }: { size: Size }) {
   };
   return (
     <g className="grid" pointerEvents="none">
-      <path className="grid-minor" d={path(step, major)} />
+      {fine && <path className="grid-inch" d={path(1, step)} />}
+      <path className={fine ? 'grid-minor grid-foot' : 'grid-minor'} d={path(step, major)} />
       <path className="grid-major" d={path(major, null)} />
     </g>
   );

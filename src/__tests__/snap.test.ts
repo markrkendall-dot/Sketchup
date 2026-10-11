@@ -171,3 +171,69 @@ describe('ortho lock', () => {
     expect(r.point).toEqual({ x: 100, y: 360 });
   });
 });
+
+describe('ghost snapping (level below)', () => {
+  // The level below has a corner at (500, 500) and a wall from (500, 500) to (800, 500).
+  const ghostNodes = [{ x: 500, y: 500 }, { x: 800, y: 500 }];
+  const ghostWalls = [{ a: { x: 500, y: 500 }, b: { x: 800, y: 500 } }];
+  const ctx: SnapContext = { ...base, ghostNodes, ghostWalls };
+
+  it('snaps to a ghost corner at the node radius, with no node id', () => {
+    const r = snapPoint({ x: 507, y: 496 }, ctx);
+    expect(r.kind).toBe('ghost-node');
+    expect(r.point).toEqual({ x: 500, y: 500 });
+    expect(r.nodeId).toBeUndefined();
+    expect(r.wallId).toBeUndefined();
+  });
+
+  it('uses the node radius (scales with zoom)', () => {
+    expect(snapPoint({ x: 507, y: 496 }, { ...ctx, k: 2 }).kind).not.toBe('ghost-node');
+    expect(snapPoint({ x: 515, y: 500 }, { ...ctx, k: 0.5 }).kind).toBe('ghost-node');
+  });
+
+  it('snaps onto a ghost wall by projection, with no wall id', () => {
+    const r = snapPoint({ x: 612.5, y: 505 }, ctx);
+    expect(r.kind).toBe('ghost-wall');
+    expect(r.point).toEqual({ x: 612.5, y: 500 });
+    expect(r.wallId).toBeUndefined();
+  });
+
+  it('ghost corner beats ghost wall', () => {
+    expect(snapPoint({ x: 504, y: 503 }, ctx).kind).toBe('ghost-node');
+  });
+
+  it("this level's own node, midpoint and wall snaps win over the ghost", () => {
+    const own = level([node('n1', 0, 0), node('n2', 100, 0)], [wall('w1', 'n1', 'n2')]);
+    const near = (x: number, y: number) => ({ ...ctx, level: own, ghostNodes: [{ x, y }], ghostWalls: [{ a: { x, y }, b: { x: x + 300, y } }] });
+    // Own corner within 10px of a ghost corner: the own corner wins.
+    expect(snapPoint({ x: 3, y: 2 }, near(6, 0)).kind).toBe('node');
+    // Own midpoint (50, 0) versus a ghost corner 4" away.
+    expect(snapPoint({ x: 52, y: 3 }, near(54, 4)).kind).toBe('midpoint');
+    // Own wall projection versus a ghost corner 4" along the wall.
+    const r = snapPoint({ x: 30, y: 4 }, near(34, 6));
+    expect(r.kind).toBe('wall');
+    expect(r.wallId).toBe('w1');
+  });
+
+  it('ghost snaps beat alignment guides and the grid', () => {
+    // 4" from the ghost corner, and within 6px of the own node's x: ghost wins.
+    const own = level([node('n3', 504, 900)], []);
+    const r = snapPoint({ x: 504, y: 497 }, { ...ctx, level: own });
+    expect(r.kind).toBe('ghost-node');
+    // Nothing near: falls through to the grid as before.
+    expect(snapPoint({ x: 40.4, y: 80.6 }, ctx).kind).toBe('grid');
+  });
+
+  it('with ortho from a start point, ghost corners must lie near the axis', () => {
+    const from = { x: 0, y: 500 };
+    const on = snapPoint({ x: 497, y: 502 }, { ...ctx, level: level([], []), from });
+    expect(on.kind).toBe('ghost-node');
+    expect(on.point).toEqual({ x: 500, y: 500 });
+    const off = snapPoint({ x: 497, y: 502 }, { ...ctx, level: level([], []), from: { x: 0, y: 520 } });
+    expect(off.kind).not.toBe('ghost-node');
+  });
+
+  it('without ghost lists nothing changes', () => {
+    expect(snapPoint({ x: 507, y: 496 }, base).kind).toBe('grid');
+  });
+});

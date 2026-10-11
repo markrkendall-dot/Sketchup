@@ -16,6 +16,7 @@ import {
   type WallPreview,
 } from '../store/uiStore';
 import { StairsGlyph } from './PlanLayers';
+import { wallPreviewText } from './previewLabel';
 import { worldToScreen } from './viewport';
 
 // Transient editor feedback, drawn in screen space. The only component that subscribes to
@@ -47,6 +48,23 @@ function SnapMarker({ snap, v }: { snap: SnapResult; v: Viewport }) {
             { x: p.x + 6, y: p.y },
             { x: p.x, y: p.y + 6 },
             { x: p.x - 6, y: p.y },
+          ])}
+        />
+      );
+      break;
+    case 'ghost-node':
+      // Hollow grey: a corner of the level below, not of this level.
+      marker = <circle className="snap-marker ghost" cx={p.x} cy={p.y} r={7} />;
+      break;
+    case 'ghost-wall':
+      marker = (
+        <polygon
+          className="snap-marker ghost"
+          points={pts([
+            { x: p.x, y: p.y - 7 },
+            { x: p.x + 7, y: p.y },
+            { x: p.x, y: p.y + 7 },
+            { x: p.x - 7, y: p.y },
           ])}
         />
       );
@@ -84,7 +102,7 @@ function RubberBand({ preview, v, denom }: { preview: WallPreview; v: Viewport; 
       <line className="rubber-center" x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
       <g transform={`translate(${m.x + off.x} ${m.y + off.y}) rotate(${angle})`}>
         <text className="rubber-label" textAnchor="middle" dominantBaseline="central">
-          {formatLengthCompact(preview.length, denom)}
+          {wallPreviewText(preview, denom)}
         </text>
       </g>
     </g>

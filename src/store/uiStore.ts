@@ -23,7 +23,16 @@ export interface Viewport {
   k: number;
 }
 
-export type SnapKind = 'node' | 'midpoint' | 'wall' | 'guide' | 'angle' | 'grid' | 'none';
+export type SnapKind =
+  | 'node'
+  | 'midpoint'
+  | 'wall'
+  | 'ghost-node'
+  | 'ghost-wall'
+  | 'guide'
+  | 'angle'
+  | 'grid'
+  | 'none';
 
 export interface Guide {
   from: Vec2;
@@ -50,6 +59,11 @@ export interface WallPreview {
   length: number;
   /** True when the preview follows a typed length rather than the cursor. */
   typed: boolean;
+  /**
+   * While "Lengths to" is inside or outside and the new wall turns a square corner: the
+   * face-to-face length that `length` (the centerline) corresponds to.
+   */
+  face?: { measureTo: Exclude<MeasureTo, 'center'>; length: number };
 }
 
 export interface OpeningPreview {
@@ -166,7 +180,22 @@ export function loadMeasureTo(): MeasureTo {
   return MEASURE_TO_VALUES.find((m) => m === v) ?? 'center';
 }
 
+/** Below this window width the level bar and properties panel collapse and the 3D pane goes (index.css agrees). */
+export const NARROW_QUERY = '(max-width: 899px)';
+
+/** True while the window is narrow (see NARROW_QUERY). False where there is no window (tests). */
+export function isNarrow(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(NARROW_QUERY).matches;
+}
+
 export interface UiState {
+  /**
+   * Narrow windows only (see NARROW_QUERY): the level bar and the properties panel are overlays
+   * that start closed and are toggled with their toolbar buttons or the [ and ] keys. Wide windows
+   * always show both and ignore these.
+   */
+  levelBarOpen: boolean;
+  propertiesOpen: boolean;
   /** Ortho lock for the wall tool (O); Shift inverts it while held. Persisted, never in undo. */
   orthoLock: boolean;
   /** What a typed wall length refers to. Persisted, never in undo. */
@@ -213,6 +242,8 @@ export interface UiState {
   /** The keyboard help overlay is open. */
   helpOpen: boolean;
   notice: Notice | null;
+  toggleLevelBar: () => void;
+  toggleProperties: () => void;
   setOrthoLock: (on: boolean) => void;
   setMeasureTo: (measureTo: MeasureTo) => void;
   setTool: (tool: ToolName) => void;
@@ -284,6 +315,8 @@ export const MIN_SPLIT = 0.2;
 export const MAX_SPLIT = 0.8;
 
 export const useUiStore = create<UiState>()((set) => ({
+  levelBarOpen: false,
+  propertiesOpen: false,
   orthoLock: loadOrthoLock(),
   measureTo: loadMeasureTo(),
   activeTool: 'wall',
@@ -313,6 +346,8 @@ export const useUiStore = create<UiState>()((set) => ({
   walkLocked: false,
   helpOpen: false,
   notice: null,
+  toggleLevelBar: () => set((s) => ({ levelBarOpen: !s.levelBarOpen })),
+  toggleProperties: () => set((s) => ({ propertiesOpen: !s.propertiesOpen })),
   setOrthoLock: (orthoLock) => {
     writePref(ORTHO_LOCK_KEY, String(orthoLock));
     set({ orthoLock });
