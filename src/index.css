@@ -1,0 +1,338 @@
+:root {
+  --bg: #f4f4f5;
+  --panel: #ffffff;
+  --border: #d4d4d8;
+  --text: #18181b;
+  --muted: #71717a;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --danger: #dc2626;
+  --canvas: #fbfbfa;
+  --grid-minor: #efefec;
+  --grid-major: #d6d6d3;
+  --wall-exterior: #5b6170;
+  --wall-interior: #a1a6b0;
+  --wall-edge: #1f2329;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+}
+
+/* Toolbar ------------------------------------------------------------------------------------ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.plan-name {
+  font: inherit;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 6px;
+  width: 14em;
+  background: transparent;
+}
+
+.plan-name:hover,
+.plan-name:focus {
+  border-color: var(--border);
+  background: #fff;
+  outline: none;
+}
+
+.group {
+  display: flex;
+}
+
+.group > button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.group > button:first-child {
+  border-radius: 4px 0 0 4px;
+  margin-left: 0;
+}
+
+.group > button:last-of-type {
+  border-radius: 0 4px 4px 0;
+}
+
+.group > button:only-of-type {
+  border-radius: 4px;
+}
+
+button,
+select {
+  font: inherit;
+  color: inherit;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #f4f4f5;
+}
+
+button.active {
+  background: var(--accent-soft);
+  border-color: #93c5fd;
+  color: #1e40af;
+  position: relative;
+}
+
+button:disabled {
+  color: #a1a1aa;
+  cursor: default;
+}
+
+kbd {
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.measure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Canvas ------------------------------------------------------------------------------------- */
+
+.canvas-host {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.plan-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+
+.plan-bg {
+  fill: var(--canvas);
+}
+
+.grid-minor {
+  stroke: var(--grid-minor);
+  stroke-width: 1;
+  fill: none;
+}
+
+.grid-major {
+  stroke: var(--grid-major);
+  stroke-width: 1;
+  fill: none;
+}
+
+.wall-fill {
+  stroke: none;
+}
+
+.wall-exterior .wall-fill {
+  fill: var(--wall-exterior);
+}
+
+.wall-interior .wall-fill {
+  fill: var(--wall-interior);
+}
+
+.wall-edge {
+  stroke: var(--wall-edge);
+  stroke-width: 1;
+  fill: none;
+}
+
+.wall.is-hovered .wall-fill {
+  fill: #7c8aa5;
+}
+
+.wall.is-selected .wall-fill {
+  fill: #3b82f6;
+}
+
+.wall.is-selected .wall-edge {
+  stroke: #1d4ed8;
+}
+
+.dim-label {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  fill: #27272a;
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.node {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.node.is-selected {
+  fill: var(--accent);
+}
+
+/* Overlay ------------------------------------------------------------------------------------ */
+
+.snap-marker {
+  fill: none;
+  stroke: #ea580c;
+  stroke-width: 1.75;
+}
+
+.snap-cross {
+  stroke: #71717a;
+  stroke-width: 1;
+}
+
+.snap-guide {
+  stroke: #ea580c;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.8;
+}
+
+.rubber-body {
+  fill: rgba(37, 99, 235, 0.18);
+  stroke: rgba(37, 99, 235, 0.7);
+  stroke-width: 1;
+}
+
+.rubber-center {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+}
+
+.rubber.typed .rubber-body {
+  fill: rgba(22, 163, 74, 0.2);
+  stroke: rgba(22, 163, 74, 0.8);
+}
+
+.rubber-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #1e3a8a;
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+}
+
+.length-box rect {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.length-box text {
+  font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+  fill: var(--text);
+}
+
+.length-box.error rect {
+  stroke: var(--danger);
+  fill: #fef2f2;
+}
+
+.length-box .caret {
+  fill: var(--muted);
+}
+
+.select-box {
+  fill: rgba(37, 99, 235, 0.08);
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+/* Status bar --------------------------------------------------------------------------------- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.statusbar .coords {
+  font-variant-numeric: tabular-nums;
+  min-width: 15em;
+  color: var(--text);
+}
+
+.statusbar .hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusbar .error {
+  color: var(--danger);
+}
+
+.statusbar code {
+  color: var(--text);
+}
+
+.wall-kind-exterior {
+  color: #3f3f46;
+  font-weight: 600;
+}
+
+.wall-kind-interior {
+  color: #6b7280;
+}
