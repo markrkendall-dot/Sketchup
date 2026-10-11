@@ -1,0 +1,189 @@
+import { add, cross, dist, dot, scale, sub } from '../model/geometry';
+import { clampOpeningOffset } from '../model/openings';
+import type { Id, Level, Opening, Vec2 } from '../model/types';
+
+/** The parts of a wall footprint opening geometry needs (a Footprint satisfies it). */
+export interface WallGeom {
+  a: Vec2;
+  dir: Vec2;
+  normal: Vec2;
+  thickness: number;
+  length: number;
+  s0: number;
+  s1: number;
+}
+
+type Seg = [Vec2, Vec2];
+
+export interface OpeningSymbol {
+  /** Center and jambs along the centerline, after clamping to the wall. */
+  center: number;
+  j0: number;
+  j1: number;
+  /** The hole in the wall: [left j0, left j1, right j1, right j0]. */
+  gap: [Vec2, Vec2, Vec2, Vec2];
+  /** Thin solid lines (window frame and glass). */
+  lines: Seg[];
+  /** Dashed lines (passage header). */
+  dashed: Seg[];
+  /** Door leaf from the hinge, perpendicular to the wall. */
+  leaf: Seg | null;
+  /** Door swing arc from the leaf tip to the strike jamb, centered on the hinge. */
+  arc: { from: Vec2; to: Vec2; center: Vec2; r: number; sweep: 0 | 1 } | null;
+}
+
+/** Point at distance s along the centerline and `off` along the left normal. */
+export const wallPoint = (g: WallGeom, s: number, off: number): Vec2 =>
+  add(add(g.a, scale(g.dir, s)), scale(g.normal, off));
+
+/** Where an opening is drawn: its offset clamped to the wall's core interval. */
+export const displayCenter = (g: WallGeom, o: Pick<Opening, 'offset' | 'width'>): number =>
+  clampOpeningOffset(o.offset, o.width, g.s0, g.s1);
+
+export function openingSymbol(
+  g: WallGeom,
+  o: Pick<Opening, 'type' | 'offset' | 'width' | 'swing'>,
+): OpeningSymbol {
+  const center = displayCenter(g, o);
+  const w = Math.min(o.width, g.s1 - g.s0);
+  const j0 = center - w / 2;
+  const j1 = center + w / 2;
+  const h = g.thickness / 2;
+  const gap: OpeningSymbol['gap'] = [wallPoint(g, j0, h), wallPoint(g, j1, h), wallPoint(g, j1, -h), wallPoint(g, j0, -h)];
+  const sym: OpeningSymbol = { center, j0, j1, gap, lines: [], dashed: [], leaf: null, arc: null };
+  if (o.type === 'window') {
+    for (const off of [h, 0, -h]) sym.lines.push([wallPoint(g, j0, off), wallPoint(g, j1, off)]);
+  } else if (o.type === 'passage') {
+    for (const off of [h, -h]) sym.dashed.push([wallPoint(g, j0, off), wallPoint(g, j1, off)]);
+  } else {
+    const swing = o.swing ?? { hinge: 'a', side: 'left' };
+    const side = swing.side === 'left' ? 1 : -1;
+    const [sh, sj] = swing.hinge === 'a' ? [j0, j1] : [j1, j0];
+    const hinge = wallPoint(g, sh, side * h);
+    const tip = add(hinge, scale(g.normal, side * w));
+    const strike = wallPoint(g, sj, side * h);
+    sym.leaf = [hinge, tip];
+    sym.arc = {
+      from: tip,
+      to: strike,
+      center: hinge,
+      r: w,
+      sweep: cross(sub(tip, hinge), sub(strike, hinge)) > 0 ? 1 : 0,
+    };
+  }
+  return sym;
+}
+
+/** SVG path for an opening symbol's arc. */
+export const arcPath = (arc: NonNullable<OpeningSymbol['arc']>, map: (p: Vec2) => Vec2 = (p) => p, r = arc.r): string => {
+  const f = map(arc.from);
+  const t = map(arc.to);
+  return `M${f.x},${f.y}A${r},${r} 0 0 ${arc.sweep} ${t.x},${t.y}`;
+};
+
+export interface WallPieces {
+  /** Fill polygons, one per solid piece. */
+  fills: Vec2[][];
+  /** Long edges of each piece plus jamb lines at every gap; no end caps. */
+  edges: Seg[];
+  /** Gaps that were cut, merged and sorted, as [j0, j1] intervals. */
+  gaps: [number, number][];
+}
+
+/**
+ * Split a wall quad into solid pieces around the given gaps (intervals along the centerline).
+ * The first and last pieces keep the footprint's own end corners, so mitred quads (M3) work too.
+ */
+export function wallPieces(
+  g: WallGeom,
+  quad: readonly [Vec2, Vec2, Vec2, Vec2],
+  gapsIn: readonly [number, number][],
+): WallPieces {
+  const [la, lb, rb, ra] = quad;
+  const h = g.thickness / 2;
+  const sorted = gapsIn
+    .map(([u, v]): [number, number] => [Math.max(u, 0), Math.min(v, g.length)])
+    .filter(([u, v]) => v - u > 1e-6)
+    .sort((p, q) => p[0] - q[0]);
+  const gaps: [number, number][] = [];
+  for (const gp of sorted) {
+    const last = gaps[gaps.length - 1];
+    if (last && gp[0] <= last[1]) last[1] = Math.max(last[1], gp[1]);
+    else gaps.push([gp[0], gp[1]]);
+  }
+  const fills: Vec2[][] = [];
+  const edges: Seg[] = [];
+  let start = 0;
+  const ends = [...gaps.map(([u]) => u), g.length];
+  ends.forEach((end, i) => {
+    const first = i === 0;
+    const last = i === ends.length - 1;
+    const l0 = first ? la : wallPoint(g, start, h);
+    const r0 = first ? ra : wallPoint(g, start, -h);
+    const l1 = last ? lb : wallPoint(g, end, h);
+    const r1 = last ? rb : wallPoint(g, end, -h);
+    if (end - start > 1e-6 || first || last) {
+      fills.push([l0, l1, r1, r0]);
+      edges.push([l0, l1], [r0, r1]);
+    }
+    if (!first) edges.push([l0, r0]);
+    if (!last) edges.push([l1, r1]);
+    if (!last) start = gaps[i][1];
+  });
+  return { fills, edges, gaps };
+}
+
+/** True when p is on the opening: inside its gap, or on a door's leaf or swing arc. */
+export function hitOpening(g: WallGeom, o: Opening, p: Vec2, pickRadius: number): boolean {
+  const sym = openingSymbol(g, o);
+  const rel = sub(p, g.a);
+  const s = dot(rel, g.dir);
+  const off = dot(rel, g.normal);
+  if (s >= sym.j0 && s <= sym.j1 && Math.abs(off) <= Math.max(g.thickness / 2, pickRadius)) return true;
+  if (sym.leaf) {
+    const [hinge, tip] = sym.leaf;
+    const d = sub(tip, hinge);
+    const len2 = dot(d, d);
+    const t = Math.max(0, Math.min(1, dot(sub(p, hinge), d) / len2));
+    if (dist(p, add(hinge, scale(d, t))) <= pickRadius) return true;
+  }
+  if (sym.arc) {
+    const { center, from, to, r } = sym.arc;
+    const v = sub(p, center);
+    // Inside the quarter: between the leaf direction and the wall direction toward the strike.
+    if (Math.abs(dist(p, center) - r) <= pickRadius && dot(v, sub(from, center)) >= -1e-9 && dot(v, sub(to, center)) >= -1e-9)
+      return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Openings grouped by wall, memoized per openings record. A wall's list keeps its identity while
+// its openings are unchanged, so wall components re-render only when their own openings change.
+
+const EMPTY: readonly Opening[] = Object.freeze([]);
+const byWallCache = new WeakMap<Level['openings'], ReadonlyMap<Id, readonly Opening[]>>();
+const previousByLevel = new Map<Id, ReadonlyMap<Id, readonly Opening[]>>();
+
+export function getOpeningsByWall(level: Level): ReadonlyMap<Id, readonly Opening[]> {
+  const hit = byWallCache.get(level.openings);
+  if (hit) return hit;
+  const groups = new Map<Id, Opening[]>();
+  for (const o of Object.values(level.openings)) {
+    const list = groups.get(o.wallId);
+    if (list) list.push(o);
+    else groups.set(o.wallId, [o]);
+  }
+  const prev = previousByLevel.get(level.id);
+  const out = new Map<Id, readonly Opening[]>();
+  for (const [wallId, list] of groups) {
+    const old = prev?.get(wallId);
+    out.set(wallId, old && old.length === list.length && old.every((o, i) => o === list[i]) ? old : list);
+  }
+  byWallCache.set(level.openings, out);
+  previousByLevel.set(level.id, out);
+  return out;
+}
+
+export const openingsOnWall = (level: Level, wallId: Id): readonly Opening[] =>
+  getOpeningsByWall(level).get(wallId) ?? EMPTY;

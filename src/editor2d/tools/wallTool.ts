@@ -1,3 +1,4 @@
+import { visibleNodeIds } from '../../derive/phase';
 import { add, cross, dist, length, normalize, scale, sub } from '../../model/geometry';
 import { MERGE_EPS } from '../../model/plan';
 import type { Id, MeasureTo, PlanSettings, Vec2, WallKind } from '../../model/types';
@@ -5,11 +6,7 @@ import { tryParseLength } from '../../model/units';
 import type { Draft, WallPreview, WallStart } from '../../store/uiStore';
 import { SNAP_RADIUS_PX } from '../snap';
 import type { Tool, ToolContext, ToolPointerEvent } from './index';
-
-/** Characters that start or extend the typed length buffer. */
-const BUFFER_START = /^[0-9'"/.-]$/;
-/** Extra characters accepted once the buffer is non-empty (`12 6`, `12ft`, `6in`). */
-const BUFFER_CONTINUE = /^[ ftin]$/;
+import { applyBufferKey } from './lengthBuffer';
 
 export function thicknessFor(kind: WallKind, settings: PlanSettings): number {
   return kind === 'exterior' ? settings.defaultExteriorThickness : settings.defaultInteriorThickness;
@@ -101,7 +98,7 @@ function commit(ctx: ToolContext, end: Vec2 | Id): void {
   const result = ctx.actions.addWall(ctx.levelId, startRef(ctx, start), end, {
     kind,
     thickness: thicknessFor(kind, ctx.plan().settings),
-    phase: 'existing',
+    phase: ui.drawPhase,
   });
   if (!result) return;
   const chainFirst = d.chainFirstNodeId ?? result.a;
@@ -137,12 +134,13 @@ function commitTyped(ctx: ToolContext): void {
     return;
   }
   const end = add(start.point, scale(d.direction, len));
-  // Close onto an existing node within the node-snap radius (tape error tolerance).
+  // Close onto an existing (visible) node within the node-snap radius (tape error tolerance).
   const radius = SNAP_RADIUS_PX.node / ctx.ui().viewport.k;
+  const shown = visibleNodeIds(ctx.level(), ctx.ui().viewMode);
   let best: Id | null = null;
   let bestD = radius;
   for (const n of Object.values(ctx.level().nodes)) {
-    if (n.id === start.nodeId) continue;
+    if (n.id === start.nodeId || !shown.has(n.id)) continue;
     const dd = dist(n, end);
     if (dd <= bestD) {
       bestD = dd;
@@ -211,18 +209,13 @@ export const wallTool: Tool = {
       if (d.lengthBuffer) commitTyped(ctx);
       return true;
     }
-    if (key === 'Backspace') {
-      if (d.lengthBuffer) patch(ctx, { lengthBuffer: d.lengthBuffer.slice(0, -1), error: false });
+    const next = applyBufferKey(d.lengthBuffer, key);
+    if (next !== null) {
+      patch(ctx, { lengthBuffer: next, error: false, message: null });
       return true;
     }
-    if (key.length === 1) {
-      const ch = key.toLowerCase();
-      if (BUFFER_START.test(ch) || (d.lengthBuffer && BUFFER_CONTINUE.test(ch))) {
-        patch(ctx, { lengthBuffer: d.lengthBuffer + ch, error: false, message: null });
-        return true;
-      }
-    }
-    return false;
+    // Backspace on an empty buffer is swallowed so it never deletes a selection mid-draw.
+    return key === 'Backspace';
   },
 
   cancel(ctx) {

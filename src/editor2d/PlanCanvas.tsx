@@ -10,7 +10,7 @@ import {
 import { getPlan, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { Overlay } from './Overlay';
-import { PlanLayers } from './PlanLayers';
+import { GhostLevel, PlanLayers } from './PlanLayers';
 import { dispatchPointer, type ToolPointerEvent } from './tools';
 import { fitLevel, initialViewport, screenToWorld, visibleBounds, zoomAt, type Size } from './viewport';
 
@@ -71,6 +71,11 @@ export function PlanCanvas() {
   const size = useUiStore((s) => s.canvasSize);
   const spaceHeld = useUiStore((s) => s.spaceHeld);
   const activeTool = useUiStore((s) => s.activeTool);
+  const showBelow = useUiStore((s) => s.showLevelBelow);
+  const belowId = usePlanStore((s) => {
+    const i = s.plan.levelOrder.indexOf(levelId);
+    return i > 0 ? s.plan.levelOrder[i - 1] : null;
+  });
 
   // Track size; set the initial viewport once the canvas has a size.
   useLayoutEffect(() => {
@@ -159,10 +164,12 @@ export function PlanCanvas() {
   const onPointerLeave = () => {
     if (panRef.current) return;
     const ui = useUiStore.getState();
-    ui.setHover({ nodeId: null, wallId: null });
+    ui.setHover({});
+    // Opening tools: no ghost while the pointer is off the canvas.
+    if (ui.draft.openingPreview) ui.patchDraft({ openingPreview: null });
   };
 
-  const cursor = panRef.current || spaceHeld ? 'grab' : activeTool === 'wall' ? 'crosshair' : 'default';
+  const cursor = panRef.current || spaceHeld ? 'grab' : activeTool === 'select' ? 'default' : 'crosshair';
 
   return (
     <svg
@@ -182,6 +189,7 @@ export function PlanCanvas() {
       <rect className="plan-bg" width="100%" height="100%" />
       <Grid size={size} />
       <g transform={`translate(${viewport.tx} ${viewport.ty}) scale(${viewport.k})`}>
+        {showBelow && belowId && <GhostLevel levelId={belowId} />}
         {levelId && <PlanLayers levelId={levelId} />}
       </g>
       <Overlay />

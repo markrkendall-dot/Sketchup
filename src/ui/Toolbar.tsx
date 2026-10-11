@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { switchTool } from '../editor2d/tools';
+import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
+import { setViewMode, switchTool } from '../editor2d/tools';
 import { fitLevel, initialViewport } from '../editor2d/viewport';
 import { downloadPlan, readPlanFile } from '../io/file';
 import { createEmptyPlan, defaultLevelId } from '../model/plan';
 import type { MeasureTo, Plan } from '../model/types';
 import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planStore';
-import { useUiStore, type ToolName } from '../store/uiStore';
+import { useUiStore, type DrawPhase, type ToolName } from '../store/uiStore';
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
   { name: 'wall', label: 'Wall', key: 'W' },
+  { name: 'door', label: 'Door', key: 'D' },
+  { name: 'window', label: 'Window', key: 'N' },
+  { name: 'passage', label: 'Passage', key: 'P' },
 ];
 
 function zoomToFit(): void {
@@ -60,6 +64,9 @@ export function Toolbar() {
   const toggleGrid = useUiStore((s) => s.toggleGrid);
   const orthoLock = usePlanStore((s) => s.plan.settings.orthoLock);
   const measureTo = usePlanStore((s) => s.plan.settings.measureTo);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const drawPhase = useUiStore((s) => s.drawPhase);
+  const setDrawPhase = useUiStore((s) => s.setDrawPhase);
   const updateSettings = usePlanStore((s) => s.updateSettings);
   const { canUndo, canRedo } = useTemporal();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -122,6 +129,31 @@ export function Toolbar() {
           Fit
         </button>
       </div>
+      <div className="group view-modes" role="group" aria-label="View mode">
+        {VIEW_MODES.map((m) => (
+          <button
+            key={m}
+            className={viewMode === m ? `active view-${m}` : `view-${m}`}
+            aria-pressed={viewMode === m}
+            title="View mode (V cycles): Existing shows existing + demolished, Proposed shows existing + new, All shows everything"
+            onClick={() => setViewMode(m)}
+          >
+            {VIEW_MODE_LABEL[m]}
+          </button>
+        ))}
+      </div>
+      <label className="measure">
+        Draw as
+        <select
+          aria-label="Phase for new elements"
+          className={`phase-select phase-${drawPhase}`}
+          value={drawPhase}
+          onChange={(e) => setDrawPhase(e.target.value as DrawPhase)}
+        >
+          <option value="existing">existing</option>
+          <option value="new">new</option>
+        </select>
+      </label>
       <label className="measure">
         Lengths to
         <select

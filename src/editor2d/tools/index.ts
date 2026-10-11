@@ -1,7 +1,9 @@
+import { isOpeningVisible, isVisible, VIEW_MODES, visibleNodeIds } from '../../derive/phase';
 import { getPlan, usePlanStore, type PlanState } from '../../store/planStore';
-import { useUiStore, type SnapResult, type ToolName, type UiState } from '../../store/uiStore';
-import type { Id, Level, Plan, Vec2 } from '../../model/types';
+import { selectionSize, useUiStore, type SnapResult, type ToolName, type UiState } from '../../store/uiStore';
+import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint } from '../snap';
+import { doorTool, passageTool, windowTool } from './openingTool';
 import { selectTool } from './selectTool';
 import { wallTool } from './wallTool';
 
@@ -45,7 +47,13 @@ export interface Tool {
   cancel(ctx: ToolContext): void;
 }
 
-const tools: Record<ToolName, Tool> = { select: selectTool, wall: wallTool };
+const tools: Record<ToolName, Tool> = {
+  select: selectTool,
+  wall: wallTool,
+  door: doorTool,
+  window: windowTool,
+  passage: passageTool,
+};
 
 export const getTool = (name: ToolName): Tool => tools[name];
 
@@ -68,6 +76,7 @@ export function makeToolContext(): ToolContext | null {
         shift: opts.shift,
         from: opts.from,
         excludeNodeIds: opts.excludeNodeIds,
+        viewMode: useUiStore.getState().viewMode,
       });
     },
   };
@@ -115,4 +124,55 @@ export function switchTool(name: ToolName): void {
 export function cancelActiveTool(): void {
   const ctx = makeToolContext();
   if (ctx) getTool(ctx.ui().activeTool).cancel(ctx);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Commands that touch both stores.
+
+/** Drop selected ids that no longer exist or are hidden in the current view mode. */
+export function pruneSelection(): void {
+  const ui = useUiStore.getState();
+  const level = getPlan().levels[ui.activeLevelId];
+  const sel = ui.selection;
+  if (!level || selectionSize(sel) === 0) return;
+  const vm = ui.viewMode;
+  const shownNodes = visibleNodeIds(level, vm);
+  const nodes = sel.nodes.filter((id) => level.nodes[id] && shownNodes.has(id));
+  const walls = sel.walls.filter((id) => level.walls[id] && isVisible(level.walls[id].phase, vm));
+  const openings = sel.openings.filter((id) => {
+    const o = level.openings[id];
+    return o && isOpeningVisible(o, level.walls[o.wallId], vm);
+  });
+  if (nodes.length + walls.length + openings.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings });
+  }
+}
+
+/** Switch the active level: keeps the viewport, clears selection and any draft. */
+export function switchLevel(levelId: Id): void {
+  const ui = useUiStore.getState();
+  if (ui.activeLevelId === levelId || !getPlan().levels[levelId]) return;
+  cancelActiveTool();
+  ui.setActiveLevel(levelId);
+  if (lastPointer) dispatchPointer('move', lastPointer);
+}
+
+/** Select a level by its position from the bottom (0 = lowest). */
+export function switchLevelByIndex(index: number): void {
+  const id = getPlan().levelOrder[index];
+  if (id) switchLevel(id);
+}
+
+export function setViewMode(mode: ViewMode): void {
+  const ui = useUiStore.getState();
+  if (ui.viewMode === mode) return;
+  ui.setViewMode(mode);
+  pruneSelection();
+  // Re-run hover / ghost logic: the hovered wall may have just been hidden.
+  if (lastPointer) dispatchPointer('move', lastPointer);
+}
+
+export function cycleViewMode(): void {
+  const i = VIEW_MODES.indexOf(useUiStore.getState().viewMode);
+  setViewMode(VIEW_MODES[(i + 1) % VIEW_MODES.length]);
 }

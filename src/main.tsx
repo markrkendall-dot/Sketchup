@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { pruneSelection } from './editor2d/tools';
 import { loadAutosave, startAutosave } from './io/file';
 import { defaultLevelId } from './model/plan';
 import { clearHistory, usePlanStore } from './store/planStore';
@@ -21,9 +22,11 @@ async function boot(): Promise<void> {
   useUiStore.getState().setActiveLevel(defaultLevelId(usePlanStore.getState().plan));
 
   // Keep the active level valid when the plan is replaced (Open, New, or undo across them).
-  usePlanStore.subscribe((s) => {
+  // Drop selected ids that undo removed or a phase change hid.
+  usePlanStore.subscribe((s, prev) => {
     const ui = useUiStore.getState();
     if (!s.plan.levels[ui.activeLevelId]) ui.setActiveLevel(defaultLevelId(s.plan));
+    else if (s.plan !== prev.plan) pruneSelection();
   });
   startAutosave(usePlanStore);
 

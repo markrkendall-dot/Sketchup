@@ -1,0 +1,215 @@
+import { getFootprints, type Footprint } from '../../derive/footprint';
+import { displayCenter, openingsOnWall, wallPoint } from '../../derive/openings';
+import { isVisible, phasesCoexist } from '../../derive/phase';
+import { dist, dot, sub } from '../../model/geometry';
+import { clampOpeningOffset, jambDistances, OPENING_DEFAULTS, OPENING_LABEL } from '../../model/openings';
+import type { Id, Opening, Vec2 } from '../../model/types';
+import { formatLength, tryParseLength } from '../../model/units';
+import type { Draft, OpeningPreview, OpeningToolName } from '../../store/uiStore';
+import type { Tool, ToolContext } from './index';
+import { applyBufferKey } from './lengthBuffer';
+
+/** A wall is hovered when the cursor is within this many screen px of its body. */
+export const OPENING_HOVER_PX = 12;
+
+/** Nearest visible wall whose body is within OPENING_HOVER_PX of p. */
+export function findHoverWall(ctx: ToolContext, p: Vec2): Footprint | null {
+  const level = ctx.level();
+  const { viewport, viewMode } = ctx.ui();
+  const fps = getFootprints(level);
+  let best: Footprint | null = null;
+  let bestBody = OPENING_HOVER_PX / viewport.k;
+  let bestCenter = Infinity;
+  for (const w of Object.values(level.walls)) {
+    if (!isVisible(w.phase, viewMode)) continue;
+    const fp = fps.get(w.id);
+    if (!fp || fp.length < 1e-6) continue;
+    const s = Math.max(0, Math.min(fp.length, dot(sub(p, fp.a), fp.dir)));
+    const dc = dist(p, wallPoint(fp, s, 0));
+    const body = Math.max(0, dc - fp.thickness / 2);
+    if (body < bestBody || (body === bestBody && dc < bestCenter)) {
+      best = fp;
+      bestBody = body;
+      bestCenter = dc;
+    }
+  }
+  return best;
+}
+
+function computePreview(ctx: ToolContext, type: OpeningToolName, d: Draft): OpeningPreview | null {
+  const cursor = d.cursor;
+  if (!cursor) return null;
+  const fp = findHoverWall(ctx, cursor);
+  if (!fp) return null;
+  const ui = ctx.ui();
+  const L = fp.length;
+  const rel = sub(cursor, fp.a);
+  // Position along the wall, rounded to the snap grid so click-placed offsets are clean numbers.
+  const grid = ctx.plan().settings.snapGrid;
+  const raw = Math.max(0, Math.min(L, dot(rel, fp.dir)));
+  const s = grid > 0 ? Math.round(raw / grid) * grid : raw;
+  const cursorSide: 1 | -1 = dot(rel, fp.normal) >= 0 ? 1 : -1;
+  const def = OPENING_DEFAULTS[type];
+  const w = def.width;
+  const nearEnd = s <= L / 2 ? 'a' : 'b';
+
+  let want = s;
+  let typed = false;
+  let problem: string | null = null;
+  if (d.lengthBuffer) {
+    const v = tryParseLength(d.lengthBuffer);
+    if (v !== null && v >= 0) {
+      // Typed: distance from the nearer end (node) to the near jamb.
+      want = nearEnd === 'a' ? v + w / 2 : L - v - w / 2;
+      typed = true;
+    }
+  }
+  const center = clampOpeningOffset(want, w, fp.s0, fp.s1);
+  const denom = ctx.plan().settings.precisionDenominator;
+  if (fp.s1 - fp.s0 < w) {
+    problem = `This wall is too short for a ${formatLength(w, denom)} ${type}.`;
+  } else if (typed && Math.abs(center - want) > 1e-6) {
+    const max = nearEnd === 'a' ? fp.s1 - w : L - (fp.s0 + w);
+    problem = `Too far: at most ${formatLength(Math.max(0, max), denom)} from this end.`;
+  }
+
+  const phase = ui.drawPhase;
+  if (!problem) {
+    for (const o of openingsOnWall(ctx.level(), fp.wallId)) {
+      if (!isVisible(o.phase, ui.viewMode) || !phasesCoexist(o.phase, phase)) continue;
+      if (Math.abs(displayCenter(fp, o) - center) < (o.width + w) / 2 - 1e-6) {
+        problem = 'Overlaps another opening on this wall.';
+        break;
+      }
+    }
+  }
+
+  const opening: Omit<Opening, 'id'> = {
+    wallId: fp.wallId,
+    type,
+    offset: center,
+    width: w,
+    height: def.height,
+    sill: def.sill,
+    phase,
+  };
+  if (type === 'door') {
+    opening.swing = {
+      hinge: d.hingeFlip ? 'b' : 'a',
+      side: (cursorSide === 1) !== d.swingFlip ? 'left' : 'right',
+    };
+  }
+  const { fromA, fromB } = jambDistances(center, w, L);
+  return {
+    wallId: fp.wallId,
+    geom: { a: fp.a, dir: fp.dir, normal: fp.normal, thickness: fp.thickness, length: L, s0: fp.s0, s1: fp.s1 },
+    opening,
+    fromA,
+    fromB,
+    nearEnd,
+    cursorSide,
+    typed,
+    problem,
+  };
+}
+
+function makeOpeningTool(type: OpeningToolName): Tool {
+  const label = OPENING_LABEL[type];
+
+  /** Merge a draft patch and recompute the ghost from the stored cursor. */
+  const refresh = (ctx: ToolContext, p: Partial<Draft>) => {
+    const ui = ctx.ui();
+    const next = { ...ui.draft, ...p };
+    const openingPreview = computePreview(ctx, type, next);
+    ui.patchDraft({ ...p, openingPreview });
+    ui.setHover({ wallId: openingPreview?.wallId ?? null });
+  };
+
+  const place = (ctx: ToolContext): Id | null => {
+    const d = ctx.ui().draft;
+    const pv = d.openingPreview;
+    if (!pv) {
+      refresh(ctx, { error: true, message: `Point at a wall to place the ${type}.` });
+      return null;
+    }
+    if (pv.problem) {
+      refresh(ctx, { error: true, message: pv.problem });
+      return null;
+    }
+    const id = ctx.actions.addOpening(ctx.levelId, pv.opening);
+    const denom = ctx.plan().settings.precisionDenominator;
+    refresh(ctx, {
+      lengthBuffer: '',
+      error: id === null,
+      message:
+        id === null
+          ? `Could not place the ${type} here.`
+          : `${label} placed ${formatLength(pv.nearEnd === 'a' ? pv.fromA : pv.fromB, denom)} from the ${pv.nearEnd === 'a' ? 'start' : 'end'} of the wall.`,
+    });
+    return id;
+  };
+
+  return {
+    onPointerDown(e, ctx) {
+      if (e.button === 2) {
+        refresh(ctx, { cursor: e.world, lengthBuffer: '', error: false, message: null });
+        return;
+      }
+      if (e.button !== 0) return;
+      refresh(ctx, { cursor: e.world, snap: null });
+      place(ctx);
+    },
+
+    onPointerMove(e, ctx) {
+      refresh(ctx, { cursor: e.world, snap: null });
+    },
+
+    onPointerUp() {},
+    onDoubleClick() {},
+
+    onKeyDown(e, ctx) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
+      const d = ctx.ui().draft;
+      const key = e.key;
+      if (key === 'Tab') {
+        if (type === 'door') {
+          if (e.shiftKey) refresh(ctx, { hingeFlip: !d.hingeFlip, message: 'Hinge flipped.' });
+          else refresh(ctx, { swingFlip: !d.swingFlip, message: 'Swing side flipped.' });
+        }
+        return true; // never move focus off the canvas
+      }
+      if (key === 'Escape') {
+        if (!d.lengthBuffer) return false;
+        refresh(ctx, { lengthBuffer: '', error: false, message: null });
+        return true;
+      }
+      if (key === 'Enter') {
+        if (!d.lengthBuffer) return d.openingPreview ? (place(ctx), true) : false;
+        const v = tryParseLength(d.lengthBuffer);
+        if (v === null || v < 0) {
+          refresh(ctx, { error: true, message: `Can't read "${d.lengthBuffer}" as a distance.` });
+          return true;
+        }
+        place(ctx);
+        return true;
+      }
+      // Typing starts only while a wall is targeted, so digits otherwise switch levels.
+      if (!d.lengthBuffer && !d.openingPreview) return false;
+      const next = applyBufferKey(d.lengthBuffer, key);
+      if (next !== null) {
+        refresh(ctx, { lengthBuffer: next, error: false, message: null });
+        return true;
+      }
+      return key === 'Backspace';
+    },
+
+    cancel(ctx) {
+      ctx.ui().patchDraft({ openingPreview: null, lengthBuffer: '', error: false, message: null });
+      ctx.ui().setHover({});
+    },
+  };
+}
+
+export const doorTool = makeOpeningTool('door');
+export const windowTool = makeOpeningTool('window');
+export const passageTool = makeOpeningTool('passage');

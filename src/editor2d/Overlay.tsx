@@ -1,9 +1,16 @@
 import { memo } from 'react';
+import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
 import { add, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
 import type { Vec2 } from '../model/types';
 import { formatLengthCompact } from '../model/units';
 import { usePlanStore } from '../store/planStore';
-import { useUiStore, type SnapResult, type Viewport, type WallPreview } from '../store/uiStore';
+import {
+  useUiStore,
+  type OpeningPreview,
+  type SnapResult,
+  type Viewport,
+  type WallPreview,
+} from '../store/uiStore';
 import { worldToScreen } from './viewport';
 
 // Transient editor feedback, drawn in screen space. The only component that subscribes to
@@ -79,6 +86,103 @@ function RubberBand({ preview, v, denom }: { preview: WallPreview; v: Viewport; 
   );
 }
 
+/** Gap between the wall face and an opening's dimension line, in screen px. */
+const OPENING_DIM_GAP_PX = 22;
+
+/** Upright rotation (degrees) for text running along direction d. */
+function uprightAngle(d: Vec2): number {
+  let angle = (Math.atan2(d.y, d.x) * 180) / Math.PI;
+  if (angle > 90 || angle <= -90) angle += 180;
+  return angle;
+}
+
+/**
+ * A dimension line between two screen points with end ticks and a label on a pill. When the
+ * segment is too short to hold the label, the label moves past the `far` end so it never sits on
+ * the opening or the corner.
+ */
+function DimLine({
+  a,
+  b,
+  n,
+  text,
+  strong,
+  far,
+}: {
+  a: Vec2;
+  b: Vec2;
+  n: Vec2;
+  text: string;
+  strong: boolean;
+  far: 'a' | 'b';
+}) {
+  const tick = (p: Vec2) => {
+    const p0 = add(p, scale(n, 5));
+    const p1 = sub(p, scale(n, 5));
+    return `M${p0.x},${p0.y}L${p1.x},${p1.y}`;
+  };
+  const along = sub(b, a);
+  const len = Math.hypot(along.x, along.y);
+  const w = text.length * (strong ? 7.4 : 6.8) + 10;
+  let m = midpoint(a, b);
+  if (len < w + 8) {
+    const u = len > 1e-6 ? scale(along, 1 / len) : { x: n.y, y: -n.x };
+    m = far === 'a' ? sub(a, scale(u, w / 2 + 6)) : add(b, scale(u, w / 2 + 6));
+  }
+  return (
+    <g className={strong ? 'opening-dim strong' : 'opening-dim'}>
+      <path d={`M${a.x},${a.y}L${b.x},${b.y}${tick(a)}${tick(b)}`} />
+      <g transform={`translate(${m.x} ${m.y}) rotate(${uprightAngle(len > 1e-6 ? along : { x: 1, y: 0 })})`}>
+        <rect x={-w / 2} y={-9} width={w} height={18} rx={9} />
+        <text textAnchor="middle" dominantBaseline="central">
+          {text}
+        </text>
+      </g>
+    </g>
+  );
+}
+
+function OpeningGhost({ preview, v, denom }: { preview: OpeningPreview; v: Viewport; denom: number }) {
+  const g = preview.geom;
+  const map = (p: Vec2) => worldToScreen(v, p);
+  const sym = openingSymbol(g, preview.opening);
+  const segs = [...sym.lines, ...sym.dashed, ...(sym.leaf ? [sym.leaf] : [])]
+    .map(([p, q]) => {
+      const a = map(p);
+      const b = map(q);
+      return `M${a.x},${a.y}L${b.x},${b.y}`;
+    })
+    .join('');
+  // Dimension lines on the cursor's side of the wall, from each wall end to the nearer jamb.
+  const n = scale(g.normal, preview.cursorSide);
+  const off = (g.thickness / 2) * v.k + OPENING_DIM_GAP_PX;
+  const at = (s: number) => add(map(wallPoint(g, s, 0)), scale(n, off));
+  const cls = `opening-ghost${preview.problem ? ' invalid' : ''}${preview.typed ? ' typed' : ''}`;
+  return (
+    <g className={cls}>
+      <polygon className="opening-ghost-gap" points={pts(sym.gap.map(map))} />
+      {segs && <path className="opening-ghost-line" d={segs} />}
+      {sym.arc && <path className="opening-ghost-line" d={arcPath(sym.arc, map, sym.arc.r * v.k)} />}
+      <DimLine
+        a={at(0)}
+        b={at(sym.j0)}
+        n={n}
+        text={formatLengthCompact(preview.fromA, denom)}
+        strong={preview.nearEnd === 'a'}
+        far="a"
+      />
+      <DimLine
+        a={at(sym.j1)}
+        b={at(g.length)}
+        n={n}
+        text={formatLengthCompact(preview.fromB, denom)}
+        strong={preview.nearEnd === 'b'}
+        far="b"
+      />
+    </g>
+  );
+}
+
 function LengthBox({ text, at, error }: { text: string; at: Vec2; error: boolean }) {
   const width = Math.max(48, text.length * 8.5 + 20);
   return (
@@ -103,6 +207,7 @@ export const Overlay = memo(function Overlay() {
   return (
     <g className="overlay" pointerEvents="none">
       {draft.wallPreview && <RubberBand preview={draft.wallPreview} v={v} denom={denom} />}
+      {draft.openingPreview && <OpeningGhost preview={draft.openingPreview} v={v} denom={denom} />}
       {draft.snap && <SnapMarker snap={draft.snap} v={v} />}
       {box && (
         <rect

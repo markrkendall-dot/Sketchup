@@ -1,7 +1,11 @@
 import { create } from 'zustand';
-import type { Id, Vec2, WallKind } from '../model/types';
+import type { WallGeom } from '../derive/openings';
+import type { Id, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
-export type ToolName = 'select' | 'wall';
+export type OpeningToolName = Opening['type'];
+export type ToolName = 'select' | 'wall' | OpeningToolName;
+/** Phases the drawing tools can create; demo is applied to existing elements instead. */
+export type DrawPhase = Extract<Phase, 'existing' | 'new'>;
 
 export interface Viewport {
   /** Screen x of world origin, px. */
@@ -41,6 +45,23 @@ export interface WallPreview {
   typed: boolean;
 }
 
+export interface OpeningPreview {
+  wallId: Id;
+  geom: WallGeom;
+  opening: Omit<Opening, 'id'>;
+  /** Distances from the a and b ends (nodes) to the nearer jamb. */
+  fromA: number;
+  fromB: number;
+  /** End the typed distance is measured from. */
+  nearEnd: 'a' | 'b';
+  /** Side of the wall the cursor is on: 1 = left (+normal), -1 = right. */
+  cursorSide: 1 | -1;
+  /** Position follows the typed length buffer. */
+  typed: boolean;
+  /** Null when the opening can be placed, else why not. */
+  problem: string | null;
+}
+
 export interface Draft {
   /** World point under the pointer (raw, unsnapped). */
   cursor: Vec2 | null;
@@ -61,22 +82,41 @@ export interface Draft {
   message: string | null;
   /** Select tool: box selection rectangle in world coordinates. */
   box: { a: Vec2; b: Vec2 } | null;
+  /** Opening tools: ghost of the opening about to be placed. */
+  openingPreview: OpeningPreview | null;
+  /** Opening tools: Tab flips the door swing side relative to the cursor side. */
+  swingFlip: boolean;
+  /** Opening tools: Shift+Tab flips the hinge from the a side to the b side. */
+  hingeFlip: boolean;
 }
 
 export interface Selection {
   nodes: Id[];
   walls: Id[];
+  openings: Id[];
+}
+
+export interface Hover {
+  nodeId: Id | null;
+  wallId: Id | null;
+  openingId: Id | null;
 }
 
 export interface UiState {
   activeTool: ToolName;
   activeLevelId: Id;
   selection: Selection;
-  hover: { nodeId: Id | null; wallId: Id | null };
+  hover: Hover;
   viewport: Viewport;
   draft: Draft;
   showGrid: boolean;
   nextWallKind: WallKind;
+  /** Which phases are shown (DESIGN.md ViewMode). */
+  viewMode: ViewMode;
+  /** Phase given to walls and openings drawn from now on. */
+  drawPhase: DrawPhase;
+  /** Draw the level below the active one as a faint ghost. */
+  showLevelBelow: boolean;
   spaceHeld: boolean;
   /** Size of the plan canvas in px, kept by PlanCanvas. */
   canvasSize: { width: number; height: number };
@@ -84,7 +124,8 @@ export interface UiState {
   setActiveLevel: (id: Id) => void;
   setSelection: (sel: Selection) => void;
   clearSelection: () => void;
-  setHover: (hover: { nodeId: Id | null; wallId: Id | null }) => void;
+  /** Missing fields are null. */
+  setHover: (hover: Partial<Hover>) => void;
   setViewport: (v: Viewport) => void;
   patchDraft: (patch: Partial<Draft>) => void;
   resetDraft: () => void;
@@ -92,6 +133,11 @@ export interface UiState {
   toggleWallKind: () => void;
   setSpaceHeld: (held: boolean) => void;
   setCanvasSize: (size: { width: number; height: number }) => void;
+  /** The existing view only documents what is there: it also resets drawPhase to existing. */
+  setViewMode: (mode: ViewMode) => void;
+  /** Drawing new elements while in the existing view switches to the proposed view. */
+  setDrawPhase: (phase: DrawPhase) => void;
+  toggleShowLevelBelow: () => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -106,38 +152,49 @@ export const emptyDraft = (): Draft => ({
   error: false,
   message: null,
   box: null,
+  openingPreview: null,
+  swingFlip: false,
+  hingeFlip: false,
 });
 
-const EMPTY_SELECTION: Selection = { nodes: [], walls: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [] };
+const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
+
+export const selectionSize = (s: Selection): number => s.nodes.length + s.walls.length + s.openings.length;
 
 export const useUiStore = create<UiState>()((set) => ({
   activeTool: 'wall',
   activeLevelId: '',
   selection: EMPTY_SELECTION,
-  hover: { nodeId: null, wallId: null },
+  hover: NO_HOVER,
   viewport: { tx: 300, ty: 200, k: 0.5 },
   draft: emptyDraft(),
   showGrid: true,
   nextWallKind: 'exterior',
+  viewMode: 'all',
+  drawPhase: 'existing',
+  showLevelBelow: false,
   spaceHeld: false,
   canvasSize: { width: 0, height: 0 },
   setTool: (activeTool) =>
     set((s) => ({
       activeTool,
       draft: { ...emptyDraft(), cursor: s.draft.cursor },
-      hover: { nodeId: null, wallId: null },
+      hover: NO_HOVER,
     })),
   setActiveLevel: (activeLevelId) =>
-    set({ activeLevelId, selection: EMPTY_SELECTION, draft: emptyDraft() }),
+    set({ activeLevelId, selection: EMPTY_SELECTION, draft: emptyDraft(), hover: NO_HOVER }),
   setSelection: (selection) => set({ selection }),
-  clearSelection: () =>
-    set((s) =>
-      s.selection.nodes.length || s.selection.walls.length ? { selection: EMPTY_SELECTION } : s,
-    ),
-  setHover: (hover) =>
-    set((s) =>
-      s.hover.nodeId === hover.nodeId && s.hover.wallId === hover.wallId ? s : { hover },
-    ),
+  clearSelection: () => set((s) => (selectionSize(s.selection) ? { selection: EMPTY_SELECTION } : s)),
+  setHover: (h) =>
+    set((s) => {
+      const hover: Hover = { nodeId: h.nodeId ?? null, wallId: h.wallId ?? null, openingId: h.openingId ?? null };
+      return s.hover.nodeId === hover.nodeId &&
+        s.hover.wallId === hover.wallId &&
+        s.hover.openingId === hover.openingId
+        ? s
+        : { hover };
+    }),
   setViewport: (viewport) => set({ viewport }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
   resetDraft: () => set((s) => ({ draft: { ...emptyDraft(), cursor: s.draft.cursor } })),
@@ -146,6 +203,14 @@ export const useUiStore = create<UiState>()((set) => ({
     set((s) => ({ nextWallKind: s.nextWallKind === 'exterior' ? 'interior' : 'exterior' })),
   setSpaceHeld: (spaceHeld) => set((s) => (s.spaceHeld === spaceHeld ? s : { spaceHeld })),
   setCanvasSize: (canvasSize) => set({ canvasSize }),
+  setViewMode: (viewMode) =>
+    set((s) => ({ viewMode, drawPhase: viewMode === 'existing' ? 'existing' : s.drawPhase })),
+  setDrawPhase: (drawPhase) =>
+    set((s) => ({
+      drawPhase,
+      viewMode: drawPhase === 'new' && s.viewMode === 'existing' ? 'proposed' : s.viewMode,
+    })),
+  toggleShowLevelBelow: () => set((s) => ({ showLevelBelow: !s.showLevelBelow })),
 }));
 
 export const useViewport = () => useUiStore((s) => s.viewport);

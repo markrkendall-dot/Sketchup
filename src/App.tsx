@@ -1,10 +1,14 @@
 import { useEffect } from 'react';
 import { PlanCanvas } from './editor2d/PlanCanvas';
-import { dispatchKey, dispatchShift, switchTool } from './editor2d/tools';
+import { cycleViewMode, dispatchKey, dispatchShift, switchLevelByIndex, switchTool } from './editor2d/tools';
 import { redo, undo, usePlanStore } from './store/planStore';
-import { useUiStore } from './store/uiStore';
+import { useUiStore, type ToolName } from './store/uiStore';
+import { LevelBar } from './ui/LevelBar';
+import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
+
+const TOOL_KEYS: Record<string, ToolName> = { s: 'select', w: 'wall', d: 'door', n: 'window', p: 'passage' };
 
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -13,8 +17,9 @@ function isEditable(target: EventTarget | null): boolean {
 
 /**
  * One keyboard entry point: the active tool sees keys first (length buffer, Esc, Delete), then
- * global hotkeys. While the wall tool is drawing, single-letter hotkeys other than W/S are
- * suppressed so typing a length never toggles anything.
+ * global hotkeys. While the wall tool is drawing, single-letter hotkeys other than the tool keys
+ * are suppressed so typing a length never toggles anything. Digits reach the level hotkeys only
+ * when no tool took them for a length buffer.
  */
 function onKeyDown(e: KeyboardEvent): void {
   if (isEditable(e.target)) return;
@@ -40,8 +45,8 @@ function onKeyDown(e: KeyboardEvent): void {
     return;
   }
   if (e.altKey || mod || e.repeat) return;
-  if (key === 's' || key === 'w') {
-    switchTool(key === 's' ? 'select' : 'wall');
+  if (Object.hasOwn(TOOL_KEYS, key)) {
+    switchTool(TOOL_KEYS[key]);
     e.preventDefault();
     return;
   }
@@ -51,6 +56,8 @@ function onKeyDown(e: KeyboardEvent): void {
     const { plan, updateSettings } = usePlanStore.getState();
     updateSettings({ orthoLock: !plan.settings.orthoLock });
   } else if (key === 'g') ui.toggleGrid();
+  else if (key === 'v') cycleViewMode();
+  else if (/^[1-9]$/.test(key)) switchLevelByIndex(Number(key) - 1);
   else return;
   e.preventDefault();
 }
@@ -80,9 +87,13 @@ export function App() {
   return (
     <div className="app">
       <Toolbar />
-      <main className="canvas-host">
-        <PlanCanvas />
-      </main>
+      <div className="workspace">
+        <LevelBar />
+        <main className="canvas-host">
+          <PlanCanvas />
+        </main>
+        <PropertiesPanel />
+      </div>
       <StatusBar />
     </div>
   );

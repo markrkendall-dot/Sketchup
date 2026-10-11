@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { dist, projectPointToSegment } from './geometry';
+import { clampOpeningOffset, openingInterval } from './openings';
 import type { Id, Level, Plan, PlanSettings, Vec2, Wall } from './types';
 
 export const SCHEMA_VERSION = 1 as const;
@@ -96,14 +97,16 @@ export function findWallBetween(level: Level, a: Id, b: Id): Wall | null {
   return null;
 }
 
-function clampOpenings(level: Level, wallId: Id): void {
-  const wall = level.walls[wallId];
-  if (!wall) return;
-  const len = wallLength(level, wall);
+/** Clamp the offsets of every opening on a wall (or on all walls when wallId is omitted). */
+export function clampOpenings(level: Level, wallId?: Id): void {
   for (const o of Object.values(level.openings)) {
-    if (o.wallId !== wallId) continue;
-    const half = o.width / 2;
-    o.offset = len < o.width ? len / 2 : Math.min(Math.max(o.offset, half), len - half);
+    if (wallId !== undefined && o.wallId !== wallId) continue;
+    const wall = level.walls[o.wallId];
+    if (!wall) continue;
+    const [s0, s1] = openingInterval(wallLength(level, wall));
+    const next = clampOpeningOffset(o.offset, o.width, s0, s1);
+    // Assign only on change so immer keeps untouched openings' identity.
+    if (Math.abs(next - o.offset) > 1e-9) o.offset = next;
   }
 }
 
@@ -228,6 +231,11 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
     used.add(w.b);
   }
   for (const id of Object.keys(level.nodes)) if (!used.has(id)) delete level.nodes[id];
+
+  // 5. Openings: drop any whose wall is gone, clamp the rest (walls may have been shortened by a
+  // node move that preceded this pass).
+  for (const o of Object.values(level.openings)) if (!level.walls[o.wallId]) delete level.openings[o.id];
+  clampOpenings(level);
 
   return remap;
 }

@@ -1,21 +1,35 @@
-import { add, dist, projectPointToSegment, sub } from '../../model/geometry';
-import type { Id, Level, Vec2 } from '../../model/types';
+import { getFootprints } from '../../derive/footprint';
+import { hitOpening } from '../../derive/openings';
+import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase';
+import { add, dist, dot, projectPointToSegment, sub } from '../../model/geometry';
+import type { Id, Level, Vec2, ViewMode } from '../../model/types';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
-import type { Selection } from '../../store/uiStore';
+import { EMPTY_SELECTION, selectionSize, type Selection } from '../../store/uiStore';
 import { SNAP_RADIUS_PX } from '../snap';
 import type { Tool, ToolContext } from './index';
 
 const DRAG_THRESHOLD_PX = 3;
 /** Minimum half-width of a wall's pick area, in screen px. */
 const WALL_PICK_PX = 4;
+/** Pick radius around opening symbols (door leaf and arc), in screen px. */
+const OPENING_PICK_PX = 4;
 
-export type Hit = { kind: 'node'; id: Id } | { kind: 'wall'; id: Id } | null;
+export type Hit =
+  | { kind: 'node'; id: Id }
+  | { kind: 'opening'; id: Id }
+  | { kind: 'wall'; id: Id }
+  | null;
 
-/** Nodes within 10px take priority over walls. */
-export function hitTest(level: Level, p: Vec2, k: number): Hit {
+/**
+ * Priority: nodes within 10px, then opening symbols, then walls. Elements hidden in `viewMode`
+ * are never hit.
+ */
+export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all'): Hit {
   let best: Hit = null;
   let bestD = SNAP_RADIUS_PX.node / k;
+  const shownNodes = visibleNodeIds(level, viewMode);
   for (const n of Object.values(level.nodes)) {
+    if (!shownNodes.has(n.id)) continue;
     const d = dist(n, p);
     if (d <= bestD) {
       bestD = d;
@@ -23,8 +37,17 @@ export function hitTest(level: Level, p: Vec2, k: number): Hit {
     }
   }
   if (best) return best;
+
+  const fps = getFootprints(level);
+  for (const o of Object.values(level.openings)) {
+    if (!isOpeningVisible(o, level.walls[o.wallId], viewMode)) continue;
+    const fp = fps.get(o.wallId);
+    if (fp && hitOpening(fp, o, p, OPENING_PICK_PX / k)) return { kind: 'opening', id: o.id };
+  }
+
   bestD = Infinity;
   for (const w of Object.values(level.walls)) {
+    if (!isVisible(w.phase, viewMode)) continue;
     const a = level.nodes[w.a];
     const b = level.nodes[w.b];
     if (!a || !b) continue;
@@ -46,6 +69,14 @@ type DragState =
       origins: Record<Id, Vec2>;
       /** When dragging one node directly, it snaps like a cursor. */
       single: Id | null;
+      started: boolean;
+    }
+  | {
+      kind: 'opening';
+      id: Id;
+      startScreen: Vec2;
+      /** Opening offset minus the cursor's position along the wall at grab time. */
+      grabDelta: number;
       started: boolean;
     }
   | { kind: 'box'; a: Vec2; additive: boolean };
@@ -76,18 +107,34 @@ function pruneSelection(ctx: ToolContext): void {
   const sel = ctx.ui().selection;
   const nodes = sel.nodes.filter((id) => level.nodes[id]);
   const walls = sel.walls.filter((id) => level.walls[id]);
-  if (nodes.length !== sel.nodes.length || walls.length !== sel.walls.length) {
-    ctx.ui().setSelection({ nodes, walls });
+  const openings = sel.openings.filter((id) => level.openings[id]);
+  if (nodes.length + walls.length + openings.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ nodes, walls, openings });
   }
 }
 
-function finishMove(ctx: ToolContext): void {
+function finishDrag(ctx: ToolContext): void {
   if (drag?.kind === 'move' && drag.started) {
     // Still paused: the normalize pass belongs to the same undo step as the drag.
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
     resumeHistory();
     pruneSelection(ctx);
+  } else if (drag?.kind === 'opening' && drag.started) {
+    resumeHistory();
   }
+}
+
+/** Position of p along an opening's wall, or null if the wall is gone. */
+function alongWall(ctx: ToolContext, openingId: Id, p: Vec2): number | null {
+  const level = ctx.level();
+  const o = level.openings[openingId];
+  const fp = o && getFootprints(level).get(o.wallId);
+  return fp ? dot(sub(p, fp.a), fp.dir) : null;
+}
+
+function selectHit(sel: Selection, hit: NonNullable<Hit>): Selection {
+  const key = hit.kind === 'node' ? 'nodes' : hit.kind === 'wall' ? 'walls' : 'openings';
+  return sel[key].includes(hit.id) ? sel : { ...EMPTY_SELECTION, [key]: [hit.id] };
 }
 
 export const selectTool: Tool = {
@@ -95,7 +142,7 @@ export const selectTool: Tool = {
     if (e.button !== 0) return;
     const ui = ctx.ui();
     const level = ctx.level();
-    const hit = hitTest(level, e.world, ui.viewport.k);
+    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode);
     const sel = ui.selection;
 
     if (!hit) {
@@ -104,24 +151,34 @@ export const selectTool: Tool = {
       return;
     }
     if (e.shiftKey) {
-      ui.setSelection(
-        hit.kind === 'node'
-          ? { ...sel, nodes: toggle(sel.nodes, hit.id) }
-          : { ...sel, walls: toggle(sel.walls, hit.id) },
-      );
+      const key = hit.kind === 'node' ? 'nodes' : hit.kind === 'wall' ? 'walls' : 'openings';
+      ui.setSelection({ ...sel, [key]: toggle(sel[key], hit.id) });
       drag = null;
+      return;
+    }
+    const next = selectHit(sel, hit);
+    if (next !== sel) ui.setSelection(next);
+    if (hit.kind === 'opening') {
+      const s = alongWall(ctx, hit.id, e.world);
+      drag =
+        s === null
+          ? null
+          : {
+              kind: 'opening',
+              id: hit.id,
+              startScreen: e.screen,
+              grabDelta: level.openings[hit.id].offset - s,
+              started: false,
+            };
       return;
     }
     let origins: Record<Id, Vec2>;
     let single: Id | null = null;
     if (hit.kind === 'node') {
-      if (!sel.nodes.includes(hit.id)) ui.setSelection({ nodes: [hit.id], walls: [] });
       const n = level.nodes[hit.id];
       origins = { [hit.id]: { x: n.x, y: n.y } };
       single = hit.id;
     } else {
-      const next = sel.walls.includes(hit.id) ? sel : { nodes: [], walls: [hit.id] };
-      if (next !== sel) ui.setSelection(next);
       origins = nodesToMove(level, next);
     }
     drag = { kind: 'move', startScreen: e.screen, grab: e.world, origins, single, started: false };
@@ -130,10 +187,11 @@ export const selectTool: Tool = {
   onPointerMove(e, ctx) {
     const ui = ctx.ui();
     if (!drag) {
-      const hit = hitTest(ctx.level(), e.world, ui.viewport.k);
+      const hit = hitTest(ctx.level(), e.world, ui.viewport.k, ui.viewMode);
       ui.setHover({
         nodeId: hit?.kind === 'node' ? hit.id : null,
         wallId: hit?.kind === 'wall' ? hit.id : null,
+        openingId: hit?.kind === 'opening' ? hit.id : null,
       });
       ui.patchDraft({ cursor: e.world, snap: null });
       return;
@@ -143,6 +201,22 @@ export const selectTool: Tool = {
       return;
     }
     if (!drag.started && dist(e.screen, drag.startScreen) < DRAG_THRESHOLD_PX) return;
+
+    if (drag.kind === 'opening') {
+      const s = alongWall(ctx, drag.id, e.world);
+      if (s === null) return;
+      const grid = ctx.plan().settings.snapGrid;
+      const raw = s + drag.grabDelta;
+      const offset = grid > 0 ? Math.round(raw / grid) * grid : raw;
+      ui.patchDraft({ cursor: e.world, snap: null });
+      // The store clamps the offset to the wall.
+      ctx.actions.updateOpening(ctx.levelId, drag.id, { offset });
+      if (!drag.started) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
 
     const positions: Record<Id, Vec2> = {};
     if (drag.single) {
@@ -171,7 +245,7 @@ export const selectTool: Tool = {
 
   onPointerUp(e, ctx) {
     const ui = ctx.ui();
-    if (drag?.kind === 'move') finishMove(ctx);
+    if (drag?.kind === 'move' || drag?.kind === 'opening') finishDrag(ctx);
     else if (drag?.kind === 'box') {
       const a = drag.a;
       const b = e.world;
@@ -182,14 +256,14 @@ export const selectTool: Tool = {
       const inside = (p: Vec2) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
       const level = ctx.level();
       const walls = Object.values(level.walls)
-        .filter((w) => inside(level.nodes[w.a]) && inside(level.nodes[w.b]))
+        .filter((w) => isVisible(w.phase, ui.viewMode) && inside(level.nodes[w.a]) && inside(level.nodes[w.b]))
         .map((w) => w.id);
       const sel = ui.selection;
       if (Math.max(maxX - minX, maxY - minY) * ui.viewport.k > DRAG_THRESHOLD_PX) {
         ui.setSelection(
           drag.additive
-            ? { nodes: sel.nodes, walls: [...new Set([...sel.walls, ...walls])] }
-            : { nodes: [], walls },
+            ? { ...sel, walls: [...new Set([...sel.walls, ...walls])] }
+            : { ...EMPTY_SELECTION, walls },
         );
       }
       ui.patchDraft({ box: null });
@@ -204,10 +278,10 @@ export const selectTool: Tool = {
     const ui = ctx.ui();
     const sel = ui.selection;
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (!sel.nodes.length && !sel.walls.length) return false;
+      if (!selectionSize(sel)) return false;
       ctx.actions.deleteEntities(ctx.levelId, sel);
       ui.clearSelection();
-      ui.setHover({ nodeId: null, wallId: null });
+      ui.setHover({});
       return true;
     }
     if (e.key === 'Escape') {
@@ -215,7 +289,7 @@ export const selectTool: Tool = {
         selectTool.cancel(ctx);
         return true;
       }
-      if (!sel.nodes.length && !sel.walls.length) return false;
+      if (!selectionSize(sel)) return false;
       ui.clearSelection();
       return true;
     }
@@ -223,7 +297,7 @@ export const selectTool: Tool = {
   },
 
   cancel(ctx) {
-    finishMove(ctx);
+    finishDrag(ctx);
     drag = null;
     ctx.ui().patchDraft({ box: null, snap: null });
   },

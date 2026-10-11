@@ -1,5 +1,6 @@
 import { add, cross, dist, dot, midpoint, projectPointToSegment, scale, sub } from '../model/geometry';
-import type { Id, Level, Vec2 } from '../model/types';
+import { isVisible, visibleNodeIds } from '../derive/phase';
+import type { Id, Level, Vec2, ViewMode } from '../model/types';
 import type { Guide, SnapResult } from '../store/uiStore';
 
 /** Snap radii in screen pixels (divided by the zoom to get inches). */
@@ -20,6 +21,8 @@ export interface SnapContext {
   from?: Vec2 | null;
   excludeNodeIds?: ReadonlySet<Id>;
   excludeWallIds?: ReadonlySet<Id>;
+  /** When given, walls hidden in this view (and nodes touching only hidden walls) never snap. */
+  viewMode?: ViewMode;
 }
 
 interface Line {
@@ -77,9 +80,14 @@ export function snapPoint(raw: Vec2, ctx: SnapContext): SnapResult {
   const line = c?.line ?? null;
   const target = line ? projectOnLine(raw, line) : raw;
   const onLine = (p: Vec2) => !line || distToLine(p, line) <= AXIS_TOLERANCE;
-  const nodes = Object.values(ctx.level.nodes).filter((n) => !ctx.excludeNodeIds?.has(n.id));
+  const viewMode = ctx.viewMode;
+  const shownNodes = viewMode ? visibleNodeIds(ctx.level, viewMode) : null;
+  const nodes = Object.values(ctx.level.nodes).filter(
+    (n) => !ctx.excludeNodeIds?.has(n.id) && (!shownNodes || shownNodes.has(n.id)),
+  );
   const walls = Object.values(ctx.level.walls).filter(
     (w) =>
+      (!viewMode || isVisible(w.phase, viewMode)) &&
       !ctx.excludeWallIds?.has(w.id) &&
       !ctx.excludeNodeIds?.has(w.a) &&
       !ctx.excludeNodeIds?.has(w.b) &&
