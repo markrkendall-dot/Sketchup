@@ -317,7 +317,7 @@ describe('wall kind, phase and copy', () => {
     const w0 = Object.keys(store().plan.levels[first].walls)[0];
     store().addOpening(first, door(w0, 60));
     store().updateWalls(first, [w0], { heightOverride: 100 });
-    expect(store().copyWallsFromLevel(first, second)).toBe(4);
+    expect(store().copyWallsFromLevel(first, second)).toEqual({ copied: 4, skipped: 0 });
     const up = store().plan.levels[second];
     const down = store().plan.levels[first];
     expect(Object.keys(up.walls)).toHaveLength(4);

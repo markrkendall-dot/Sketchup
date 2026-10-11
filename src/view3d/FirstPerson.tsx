@@ -8,11 +8,11 @@ import {
   eyeElevation,
   MAX_STEP_SECONDS,
   RUN_FACTOR,
-  startLevel,
   stepLevel,
   WALK_SPEED,
   walkLevels,
   walkStart,
+  walkStartLevel,
   walkStep,
 } from './walk';
 
@@ -65,7 +65,7 @@ export function FirstPerson() {
     const plan = getPlan();
     const ui = useUiStore.getState();
     const levels = walkLevels(plan, ui);
-    const id = startLevel(levels, ui.activeLevelId);
+    const id = walkStartLevel(plan, ui);
     if (!id) return;
     const at = walkStart(plan, id, ui.viewMode, levels);
     const y = eyeElevation(plan, id);

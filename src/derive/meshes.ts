@@ -12,7 +12,7 @@ import { facesBesideWall, getFaces, slabOutlines, type FaceSet } from './rooms';
 import { columnOutline, planTerrain, type TerrainGrid } from './site';
 import { roofColorOf } from '../model/finish';
 import { profileAt, roofBearing, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
-import { floorToFloor, stairsFrame, stairsOutline, stairsPoint, stairSteps } from './stairs';
+import { floorToFloor, stairsFrame, stairsHoleOutline, stairsPoint, stairSteps } from './stairs';
 
 /** Moved to rooms.ts (the 2D editor uses it for "Fit to walls"); re-exported for the 3D code. */
 export { slabOutlines };
@@ -758,6 +758,8 @@ interface FloorEntry {
   /** Per outer-face edge, the inside distance of the wall below that runs up through the slab (slabInsets). */
   insets: number[][] | null;
   belowStairs: Level['stairs'] | undefined;
+  /** Floor to floor of the level below: where its stairs' holes start depends on it. */
+  belowFtf: number;
   thickness: number;
   geometry: BufferGeometry | null;
 }
@@ -823,12 +825,20 @@ function sameRings<T extends Vec2 | number>(p: readonly (readonly T[])[], q: rea
   });
 }
 
-/** Holes cut in a level's slab by stairs on the level below. */
-function stairHoles(below: Level | undefined, viewMode: ViewMode): Vec2[][] {
+/**
+ * Holes cut in a level's slab by stairs on the level below (`belowFtf`: that level's floor to
+ * floor): only the part of each flight where the headroom under the slab is short
+ * (stairsHoleOutline), so a closet over the low end keeps its floor.
+ */
+export function stairHoles(below: Level | undefined, viewMode: ViewMode, belowFtf: number): Vec2[][] {
   if (!below) return [];
-  return Object.values(below.stairs)
-    .filter((s) => s.cutsFloorAbove && isVisible(s.phase, viewMode))
-    .map((s) => stairsOutline(s));
+  const out: Vec2[][] = [];
+  for (const s of Object.values(below.stairs)) {
+    if (!s.cutsFloorAbove || !isVisible(s.phase, viewMode)) continue;
+    const hole = stairsHoleOutline(s, belowFtf);
+    if (hole) out.push(hole);
+  }
+  return out;
 }
 
 function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null }): void {
@@ -988,6 +998,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   // Floor slab.
   const faces = getFaces(level, viewMode);
   const belowStairs = below?.stairs;
+  const belowFtf = below ? floorToFloor(plan, below.id) : 0;
   const insets = slabInsets(plan, levelId, viewMode);
   const prevFloor = floorCache.get(key);
   let floor: FloorEntry;
@@ -997,17 +1008,19 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     sameRings(prevFloor.outerFaceThickness, faces.outerFaceThickness) &&
     sameRings(prevFloor.insets ?? [], insets ?? []) &&
     prevFloor.belowStairs === belowStairs &&
+    prevFloor.belowFtf === belowFtf &&
     prevFloor.thickness === level.floorThickness
   ) {
     floor = prevFloor;
   } else {
     prevFloor?.geometry?.dispose();
-    const holes = stairHoles(below, viewMode);
+    const holes = stairHoles(below, viewMode, belowFtf);
     floor = {
       outerFaces: faces.outerFaces,
       outerFaceThickness: faces.outerFaceThickness,
       insets,
       belowStairs,
+      belowFtf,
       thickness: level.floorThickness,
       geometry: buildFloorGeometry(faces, holes, level.floorThickness, insets ?? false),
     };
@@ -1113,12 +1126,13 @@ export function buildTerrainGeometry(grid: TerrainGrid): BufferGeometry {
 let terrainEntry: { grid: TerrainGrid; geometry: BufferGeometry } | null = null;
 
 /**
- * The terrain's geometry: the same object while the grid (site.ts planTerrain, which is memoized
- * by the grade points, the plan bounds and the fallback elevation) is the same, so a 2D edit that
- * touches neither rebuilds nothing. The replaced geometry is disposed.
+ * The terrain's geometry in a view mode: the same object while the grid (site.ts planTerrain,
+ * which is memoized by the grade points, the plan bounds, the fallback elevation and the lowest
+ * level's outline that is cut out of the ground) is the same, so a 2D edit that touches none of
+ * them rebuilds nothing. The replaced geometry is disposed.
  */
-export function getTerrainGeometry(plan: Plan): BufferGeometry {
-  const grid = planTerrain(plan);
+export function getTerrainGeometry(plan: Plan, viewMode: ViewMode = 'all'): BufferGeometry {
+  const grid = planTerrain(plan, viewMode);
   if (terrainEntry && terrainEntry.grid === grid) return terrainEntry.geometry;
   terrainEntry?.geometry.dispose();
   terrainEntry = { grid, geometry: buildTerrainGeometry(grid) };

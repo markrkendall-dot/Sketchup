@@ -64,3 +64,57 @@ describe('normalizeLevel', () => {
     expect(JSON.stringify(l)).toBe(snapshot);
   });
 });
+
+describe('normalizeLevel: which duplicate survives (REVIEW-2 A1)', () => {
+  it('keeps the existing wall over a new one between the same nodes, wherever it comes in the record', () => {
+    const l = build({ p: { x: 0, y: 0 }, q: { x: 100, y: 0 } }, [
+      ['p', 'q'],
+      ['q', 'p'],
+    ]);
+    l.walls.w0.phase = 'new';
+    normalizeLevel(l);
+    expect(Object.keys(l.walls)).toEqual(['w1']);
+    expect(l.walls.w1.phase).toBe('existing');
+  });
+
+  it('keeps a wall with openings over one without (same phase), and moves the openings over', () => {
+    const l = build({ p: { x: 0, y: 0 }, q: { x: 100, y: 0 } }, [
+      ['p', 'q'],
+      ['q', 'p'],
+    ]);
+    l.openings.o = { id: 'o', wallId: 'w1', type: 'window', offset: 30, width: 24, height: 36, sill: 30, phase: 'existing' };
+    normalizeLevel(l);
+    expect(Object.keys(l.walls)).toEqual(['w1']);
+    expect(l.openings.o.wallId).toBe('w1');
+    expect(l.openings.o.offset).toBe(30);
+    // Equal ranks: the first one stays.
+    const m = build({ p: { x: 0, y: 0 }, q: { x: 100, y: 0 } }, [
+      ['p', 'q'],
+      ['q', 'p'],
+    ]);
+    normalizeLevel(m);
+    expect(Object.keys(m.walls)).toEqual(['w0']);
+  });
+
+  it('a new wall lying on an existing one does not replace the existing piece when split', () => {
+    const l = build({ p: { x: 0, y: 0 }, q: { x: 300, y: 0 }, m: { x: 100, y: 0 }, n: { x: 200, y: 0 } }, [
+      ['p', 'q'],
+      ['m', 'n'],
+    ]);
+    l.walls.w1.phase = 'new';
+    l.openings.o = { id: 'o', wallId: 'w0', type: 'door', offset: 150, width: 36, height: 80, sill: 0, phase: 'existing' };
+    normalizeLevel(l);
+    const walls = Object.values(l.walls);
+    expect(walls).toHaveLength(3);
+    expect(walls.every((w) => w.phase === 'existing')).toBe(true);
+    // The door stays on the middle piece, at the same place along the line.
+    const o = l.openings.o;
+    const w = l.walls[o.wallId];
+    const a = l.nodes[w.a];
+    const b = l.nodes[w.b];
+    expect(Math.min(a.x, b.x)).toBe(100);
+    expect(Math.max(a.x, b.x)).toBe(200);
+    expect(a.x + Math.sign(b.x - a.x) * o.offset).toBeCloseTo(150, 9);
+    expect(getGraph(l).degree('m')).toBe(2);
+  });
+});

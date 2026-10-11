@@ -102,8 +102,15 @@ function copyWallsFromBelow(activeId: Id, belowId: Id): void {
   ) {
     return;
   }
-  usePlanStore.getState().copyWallsFromLevel(belowId, activeId);
+  const { copied, skipped } = usePlanStore.getState().copyWallsFromLevel(belowId, activeId);
   useUiStore.getState().setSelection(EMPTY_SELECTION);
+  if (skipped > 0) {
+    const n = (k: number) => `${k} ${k === 1 ? 'wall' : 'walls'}`;
+    useUiStore.getState().setNotice({
+      text: `Copied ${n(copied)} from ${below.name}; skipped ${n(skipped)} that would lie on top of walls already on ${active.name}.`,
+      error: false,
+    });
+  }
 }
 
 export function LevelBar() {

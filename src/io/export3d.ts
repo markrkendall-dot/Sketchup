@@ -114,7 +114,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   const site = new Group();
   site.name = 'Site';
   if (Object.keys(plan.site.gradePoints).length) {
-    site.add(mesh('Terrain', getTerrainGeometry(plan), material('terrain', terrainMaterial)));
+    site.add(mesh('Terrain', getTerrainGeometry(plan, viewMode), material('terrain', terrainMaterial)));
   }
   for (const c of getSiteMeshes(plan, viewMode).columns) {
     const m = mesh(c.kind === 'chimney' ? 'Chimney' : 'Post', c.geometry, material(columnMaterialName(c.kind, c.phase), columnMaterial(c.kind, c.phase)));

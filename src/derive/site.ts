@@ -1,8 +1,9 @@
-import { boundsOf, type Bounds } from '../model/geometry';
+import { boundsOf, clipHalfPlane, cross, pointInPolygon, polygonSignedArea, sub, type Bounds } from '../model/geometry';
 import type { Column, Id, Plan, Site, Vec2, ViewMode } from '../model/types';
 import { getLevelElevations } from './levels';
 import { isVisible, phasesCoexist } from './phase';
-import { roofBearing, roofExtremes, roofHeightAt } from './roofs';
+import { roofBearing, roofExtremes, roofHeightAt, triangulate } from './roofs';
+import { getFaces, slabOutlines } from './rooms';
 
 // The site (DESIGN.md "Site and terrain"). Pure: no three, no React, so the 2D editor can use it
 // without loading the 3D chunk; derive/meshes.ts wraps the grid in a BufferGeometry.
@@ -100,13 +101,29 @@ export function terrainBounds(bounds: Bounds): Bounds {
   };
 }
 
+/** How far under the lowest slab's bottom the ground inside the house's footprint sits. */
+export const TERRAIN_UNDER_SLAB = 2;
+
 /**
  * The terrain surface over the plan bounds plus the margin: a (cellsX + 1) x (cellsY + 1) grid of
  * vertices with the interpolated elevation (or `fallback` without grade points) and two upward
  * triangles per cell. The step is TERRAIN_STEP unless that would exceed TERRAIN_MAX_CELLS cells
  * along an axis, then it grows to fit.
+ *
+ * `footprints` (the lowest level's slab outlines, out to the walls' outside faces) cut the house
+ * out of the ground: grid vertices inside one get `floorUnder` (the lowest slab's bottom minus
+ * 2"), so the ground dips under the basement instead of filling it. The cells the outlines cross
+ * are split along them (extra vertices after the grid's), so the ground meets the wall's outside
+ * face at grade and drops to `floorUnder` straight down there, inside the wall, rather than
+ * sloping across a whole cell.
  */
-export function terrainGrid(site: Pick<Site, 'gradePoints'>, bounds: Bounds, fallback: number): TerrainGrid {
+export function terrainGrid(
+  site: Pick<Site, 'gradePoints'>,
+  bounds: Bounds,
+  fallback: number,
+  footprints: readonly (readonly Vec2[])[] = [],
+  floorUnder: number = fallback - TERRAIN_UNDER_SLAB,
+): TerrainGrid {
   const step = stepFor(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
   const tb = terrainBounds(bounds);
   const cellsX = Math.max(1, Math.round((tb.maxX - tb.minX) / step));
@@ -114,52 +131,224 @@ export function terrainGrid(site: Pick<Site, 'gradePoints'>, bounds: Bounds, fal
   const nx = cellsX + 1;
   const ny = cellsY + 1;
   const points = Object.values(site.gradePoints);
-  const positions = new Float32Array(nx * ny * 3);
+  const cut = footprintCut(footprints);
+  const grade = new Float64Array(nx * ny);
+  const inside = new Uint8Array(nx * ny);
   for (let j = 0; j < ny; j++) {
     const y = tb.minY + j * step;
     for (let i = 0; i < nx; i++) {
       const x = tb.minX + i * step;
-      const o = (j * nx + i) * 3;
-      positions[o] = x;
-      positions[o + 1] = idw(points, x, y, fallback);
-      positions[o + 2] = y;
+      const v = j * nx + i;
+      grade[v] = idw(points, x, y, fallback);
+      if (cut && cut.contains(x, y)) inside[v] = 1;
     }
   }
-  const indices = new Uint32Array(cellsX * cellsY * 6);
-  let k = 0;
+  const pos: number[] = [];
+  for (let v = 0; v < nx * ny; v++) {
+    pos.push(tb.minX + (v % nx) * step, inside[v] ? floorUnder : grade[v], tb.minY + Math.floor(v / nx) * step);
+  }
+  const idx: number[] = [];
+  // Extra vertices of the split cells, shared by position and side (ground / under the house);
+  // a grid vertex is reused where it is on the same side.
+  const extra = new Map<string, number>();
+  const vertexAt = (p: Vec2, under: boolean, h: number): number => {
+    const key = `${p.x.toFixed(5)},${p.y.toFixed(5)},${under ? 1 : 0}`;
+    let k = extra.get(key);
+    if (k === undefined) {
+      const gi = Math.round((p.x - tb.minX) / step);
+      const gj = Math.round((p.y - tb.minY) / step);
+      const onGrid = Math.abs(tb.minX + gi * step - p.x) < 1e-6 && Math.abs(tb.minY + gj * step - p.y) < 1e-6;
+      if (onGrid && gi >= 0 && gi < nx && gj >= 0 && gj < ny && !!inside[gj * nx + gi] === under) k = gj * nx + gi;
+      else {
+        k = pos.length / 3;
+        pos.push(p.x, h, p.y);
+      }
+      extra.set(key, k);
+    }
+    return k;
+  };
   for (let j = 0; j < cellsY; j++) {
     for (let i = 0; i < cellsX; i++) {
       const a = j * nx + i; // (x, y)
       const b = (j + 1) * nx + i; // (x, y + step)
       const c = j * nx + i + 1; // (x + step, y)
       const d = (j + 1) * nx + i + 1;
-      // (b - a) x (c - a) points along +Y in three coordinates.
-      indices[k++] = a;
-      indices[k++] = b;
-      indices[k++] = c;
-      indices[k++] = c;
-      indices[k++] = b;
-      indices[k++] = d;
+      const x0 = tb.minX + i * step;
+      const y0 = tb.minY + j * step;
+      if (!cut || !cut.crosses(x0, y0, x0 + step, y0 + step)) {
+        // (b - a) x (c - a) points along +Y in three coordinates.
+        idx.push(a, b, c, c, b, d);
+        continue;
+      }
+      // The outline crosses this cell: split both triangles into the parts outside (on the
+      // grade plane of the triangle) and inside (flat at floorUnder).
+      const P = (v: number): Vec2 => ({ x: pos[v * 3], y: pos[v * 3 + 2] });
+      for (const tri of [
+        [a, b, c],
+        [c, b, d],
+      ]) {
+        const corners = tri.map(P);
+        const heightAt = planeThrough(corners, tri.map((v) => grade[v]));
+        for (const piece of cut.split(corners)) {
+          const under = piece.inside;
+          const ids = piece.poly.map((p) => vertexAt(p, under, under ? floorUnder : heightAt(p)));
+          for (let k = 1; k + 1 < ids.length; k++) {
+            const p0 = piece.poly[0];
+            const p1 = piece.poly[k];
+            const p2 = piece.poly[k + 1];
+            // Upward in three coordinates: negative signed area on the y-down plan.
+            if (cross(sub(p1, p0), sub(p2, p0)) < 0) idx.push(ids[0], ids[k], ids[k + 1]);
+            else idx.push(ids[0], ids[k + 1], ids[k]);
+          }
+        }
+      }
     }
   }
-  return { positions, indices, bounds: tb, step, cellsX, cellsY };
+  return { positions: new Float32Array(pos), indices: new Uint32Array(idx), bounds: tb, step, cellsX, cellsY };
+}
+
+/** The height function of the plane through three plan points with the given heights. */
+function planeThrough(p: readonly Vec2[], h: readonly number[]): (q: Vec2) => number {
+  const det = cross(sub(p[1], p[0]), sub(p[2], p[0]));
+  return (q) => {
+    if (Math.abs(det) < 1e-12) return h[0];
+    // Barycentric weights of q.
+    const w1 = cross(sub(q, p[0]), sub(p[2], p[0])) / det;
+    const w2 = cross(sub(p[1], p[0]), sub(q, p[0])) / det;
+    return h[0] + (h[1] - h[0]) * w1 + (h[2] - h[0]) * w2;
+  };
+}
+
+interface FootprintCut {
+  contains(x: number, y: number): boolean;
+  /** True when an outline edge touches the closed rectangle. */
+  crosses(x0: number, y0: number, x1: number, y1: number): boolean;
+  /** A convex polygon cut into convex pieces inside and outside the footprints (slivers dropped). */
+  split(poly: Vec2[]): { poly: Vec2[]; inside: boolean }[];
+}
+
+const MIN_PIECE_AREA = 1e-6;
+
+/** The footprints as convex triangles (ear clipping) plus their edges, for terrainGrid. */
+function footprintCut(footprints: readonly (readonly Vec2[])[]): FootprintCut | null {
+  const rings = footprints.filter((f) => f.length >= 3 && Math.abs(polygonSignedArea(f)) > MIN_PIECE_AREA).map((f) => (polygonSignedArea(f) > 0 ? [...f] : [...f].reverse()));
+  if (rings.length === 0) return null;
+  // Each triangle as its three inward half-planes (dot(n, p) <= c keeps the inside).
+  const tris: { n: Vec2; c: number }[][] = [];
+  const triBoxes: Bounds[] = [];
+  for (const ring of rings) {
+    for (const [i0, i1, i2] of triangulate(ring)) {
+      const t = [ring[i0], ring[i1], ring[i2]];
+      tris.push(
+        t.map((p, k) => {
+          const q = t[(k + 1) % 3];
+          // Positive area (math sense): the inside is left of p -> q, i.e. cross(q - p, x - p) >= 0.
+          const n = { x: q.y - p.y, y: -(q.x - p.x) };
+          return { n, c: n.x * p.x + n.y * p.y };
+        }),
+      );
+      triBoxes.push(boundsOf(t)!);
+    }
+  }
+  const edges: [Vec2, Vec2][] = rings.flatMap((r) => r.map((p, i) => [p, r[(i + 1) % r.length]] as [Vec2, Vec2]));
+  const area = (poly: Vec2[]) => Math.abs(polygonSignedArea(poly));
+  return {
+    contains: (x, y) => rings.some((r) => pointInPolygon({ x, y }, r)),
+    crosses: (x0, y0, x1, y1) => edges.some(([p, q]) => segmentTouchesRect(p, q, x0, y0, x1, y1)),
+    split(poly) {
+      const box = boundsOf(poly)!;
+      const out: { poly: Vec2[]; inside: boolean }[] = [];
+      let outside: Vec2[][] = [poly];
+      tris.forEach((planes, t) => {
+        const tb = triBoxes[t];
+        if (tb.maxX < box.minX || tb.minX > box.maxX || tb.maxY < box.minY || tb.minY > box.maxY) return;
+        // Inside part: the polygon clipped by the triangle's three half-planes.
+        let inPart: Vec2[] = poly;
+        for (const { n, c } of planes) if (inPart.length) inPart = clipHalfPlane(inPart, n, c);
+        if (inPart.length && area(inPart) > MIN_PIECE_AREA) out.push({ poly: inPart, inside: true });
+        // Outside parts: subtract the triangle from every remaining piece (convex difference).
+        const next: Vec2[][] = [];
+        for (const piece of outside) {
+          let rest: Vec2[] = piece;
+          for (const { n, c } of planes) {
+            const beyond = clipHalfPlane(rest, { x: -n.x, y: -n.y }, -c);
+            if (beyond.length && area(beyond) > MIN_PIECE_AREA) next.push(beyond);
+            rest = clipHalfPlane(rest, n, c);
+            if (!rest.length) break;
+          }
+        }
+        outside = next;
+      });
+      for (const p of outside) out.push({ poly: p, inside: false });
+      return out;
+    },
+  };
+}
+
+/** True when segment p-q has a point in the closed rectangle (Liang-Barsky). */
+function segmentTouchesRect(p: Vec2, q: Vec2, x0: number, y0: number, x1: number, y1: number): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  for (const [den, num] of [
+    [-dx, p.x - x0],
+    [dx, x1 - p.x],
+    [-dy, p.y - y0],
+    [dy, y1 - p.y],
+  ]) {
+    if (den === 0) {
+      if (num < 0) return false;
+    } else {
+      const r = num / den;
+      if (den < 0) t0 = Math.max(t0, r);
+      else t1 = Math.min(t1, r);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * The house cut out of the ground (terrainGrid's `footprints` and `floorUnder`): `key` is what the
+ * outlines are derived from (the lowest level's outer faces), so the memo can tell they are the
+ * same without building them.
+ */
+export interface TerrainCut {
+  key: object;
+  floorUnder: number;
+  footprints: () => Vec2[][];
 }
 
 // Memo: the grid depends on the grade points (not on columns or the north angle), the plan bounds
-// (after rounding to whole cells) and the fallback elevation. Keyed by the grade points record,
-// which immer keeps while an edit does not touch a grade point, so moving a wall or a column
-// never rebuilds the terrain.
-const terrainMemo = new WeakMap<object, { key: string; grid: TerrainGrid }>();
+// (after rounding to whole cells), the fallback elevation and the house cut. Keyed by the grade
+// points record, which immer keeps while an edit does not touch a grade point, and by the lowest
+// level's outer faces (getFaces keeps them while its nodes and walls are untouched), so moving a
+// wall on another level or a column never rebuilds the terrain.
+const terrainMemo = new WeakMap<object, { key: string; cut: object | null; grid: TerrainGrid }>();
 
-/** terrainGrid(), memoized by the site's grade points, the plan bounds and the fallback elevation. */
-export function terrainFor(site: Pick<Site, 'gradePoints'>, bounds: Bounds, fallback: number): TerrainGrid {
+/** terrainGrid(), memoized by the site's grade points, the plan bounds, the fallback elevation and the cut. */
+export function terrainFor(site: Pick<Site, 'gradePoints'>, bounds: Bounds, fallback: number, cut?: TerrainCut): TerrainGrid {
   const tb = terrainBounds(bounds);
-  const key = `${tb.minX},${tb.minY},${tb.maxX},${tb.maxY}|${fallback}`;
+  const key = `${tb.minX},${tb.minY},${tb.maxX},${tb.maxY}|${fallback}|${cut ? cut.floorUnder : ''}`;
   const hit = terrainMemo.get(site.gradePoints);
-  if (hit && hit.key === key) return hit.grid;
-  const grid = terrainGrid(site, bounds, fallback);
-  terrainMemo.set(site.gradePoints, { key, grid });
+  if (hit && hit.key === key && hit.cut === (cut?.key ?? null)) return hit.grid;
+  const grid = cut ? terrainGrid(site, bounds, fallback, cut.footprints(), cut.floorUnder) : terrainGrid(site, bounds, fallback);
+  terrainMemo.set(site.gradePoints, { key, cut: cut?.key ?? null, grid });
   return grid;
+}
+
+/**
+ * The house's cut in the ground: the lowest level's slab outlines in the view mode (out to the
+ * walls' outside faces), with the ground TERRAIN_UNDER_SLAB under that level's slab. Undefined when
+ * the lowest level has no closed outline.
+ */
+export function terrainCut(plan: Plan, viewMode: ViewMode): TerrainCut | undefined {
+  const lowest = plan.levels[plan.levelOrder[0]];
+  if (!lowest) return undefined;
+  const faces = getFaces(lowest, viewMode);
+  if (faces.outerFaces.length === 0) return undefined;
+  return { key: faces.outerFaces, floorUnder: fallbackElevation(plan) - TERRAIN_UNDER_SLAB, footprints: () => slabOutlines(faces, true) };
 }
 
 /** Flat ground without grade points: the bottom of the lowest level's slab. */
@@ -188,9 +377,9 @@ export function siteBounds(plan: Plan): Bounds {
   return boundsOf(pts) ?? EMPTY_BOUNDS;
 }
 
-/** The terrain grid of a plan (memoized, see terrainFor). */
-export function planTerrain(plan: Plan): TerrainGrid {
-  return terrainFor(plan.site, siteBounds(plan), fallbackElevation(plan));
+/** The terrain grid of a plan in a view mode, the house cut out of it (memoized, see terrainFor). */
+export function planTerrain(plan: Plan, viewMode: ViewMode = 'all'): TerrainGrid {
+  return terrainFor(plan.site, siteBounds(plan), fallbackElevation(plan), terrainCut(plan, viewMode));
 }
 
 /** Where the 3D view's sun stands: from the south-west in plan terms, turned with the north angle. */
@@ -296,7 +485,7 @@ export function defaultGradeElevation(plan: Plan): number {
 }
 
 /** The level the site view shows as a ghost: the first floor (the level above the lowest), or the lowest if only one. */
-export function siteGhostLevelId(plan: Plan): Id | undefined {
+export function siteGhostLevelId(plan: { readonly levelOrder: readonly Id[] }): Id | undefined {
   return plan.levelOrder[1] ?? plan.levelOrder[0];
 }
 

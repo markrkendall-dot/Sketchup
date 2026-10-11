@@ -6,7 +6,7 @@ import { isOpeningVisible, isVisible } from '../derive/phase';
 import { faceAt, getFaces, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
 import { siteGhostLevelId } from '../derive/site';
-import { floorToFloor, stairsSymbol, stairSteps, type StairsSymbol } from '../derive/stairs';
+import { floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, stairSteps, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
@@ -432,6 +432,48 @@ const StairsLayer = memo(function StairsLayer({ levelId }: { levelId: Id }) {
     <g className="layer-stairs" pointerEvents="none">
       {ids.map((id) => (
         <StairsShape key={id} levelId={levelId} stairsId={id} />
+      ))}
+    </g>
+  );
+});
+
+/**
+ * The openings that the level below's stairs cut in this level's floor (DESIGN.md "Openings in 3D":
+ * only where headroom under the floor is short, stairsHoleOutline): a dashed outline with an X, the
+ * usual "open to below" mark, and the treads below it, faint. Nothing where the flight is not cut.
+ */
+const StairHolesLayer = memo(function StairHolesLayer({ levelId }: { levelId: Id }) {
+  const belowId = usePlanStore((s) => {
+    const i = s.plan.levelOrder.indexOf(levelId);
+    return i > 0 ? s.plan.levelOrder[i - 1] : null;
+  });
+  const stairs = usePlanStore((s) => (belowId ? s.plan.levels[belowId]?.stairs : undefined));
+  const ftf = usePlanStore((s) => (belowId ? floorToFloor(s.plan, belowId) : 0));
+  const viewMode = useUiStore((s) => s.viewMode);
+  const holes = useMemo(() => {
+    const out: { id: Id; start: number; outline: string; cross: string; treads: string }[] = [];
+    for (const st of Object.values(stairs ?? {})) {
+      if (!st.cutsFloorAbove || !isVisible(st.phase, viewMode)) continue;
+      const hole = stairsHoleOutline(st, ftf);
+      if (!hole) continue;
+      const start = stairsHoleStart(st, ftf);
+      const sym = stairsSymbol(st, stairSteps(ftf).risers);
+      // Treads lie across the flight at increasing distance up it; keep the ones over the hole.
+      const step = st.run / (sym.treads.length + 1);
+      const treads = sym.treads.filter((_, i) => (i + 1) * step > start + 1e-6);
+      out.push({ id: st.id, start, outline: polyPath(hole), cross: segPath([[hole[0], hole[2]], [hole[1], hole[3]]]), treads: segPath(treads) });
+    }
+    return out;
+  }, [stairs, ftf, viewMode]);
+  if (holes.length === 0) return null;
+  return (
+    <g className="layer-stair-holes" pointerEvents="none">
+      {holes.map((h) => (
+        <g key={h.id} className="stair-hole" data-stair-hole={h.id} data-hole-start={h.start}>
+          <path className="stair-hole-body" d={h.outline} vectorEffect="non-scaling-stroke" />
+          {h.treads && <path className="stair-hole-tread" d={h.treads} vectorEffect="non-scaling-stroke" />}
+          <path className="stair-hole-cross" d={h.cross} vectorEffect="non-scaling-stroke" />
+        </g>
       ))}
     </g>
   );
@@ -962,6 +1004,7 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
       <PatternDefs />
       <UnderlayLayer levelId={levelId} />
       <RoomFillsLayer levelId={levelId} />
+      <StairHolesLayer levelId={levelId} />
       <RoofGhostLayer levelId={levelId} />
       <RoofsLayer levelId={levelId} />
       <StairsLayer levelId={levelId} />

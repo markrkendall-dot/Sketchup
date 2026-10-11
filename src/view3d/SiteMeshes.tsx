@@ -6,11 +6,13 @@ import { columnMaterial, terrainMaterial } from './materials';
 
 /**
  * The ground: one mesh over the plan plus a 40' margin, from the memoized terrain geometry
- * (derive/meshes.ts getTerrainGeometry, which owns and disposes it). The selector returns the same
- * geometry while the grade points, the plan bounds and the fallback elevation are unchanged.
+ * (derive/meshes.ts getTerrainGeometry, which owns and disposes it), with the lowest level's
+ * footprint cut out of it down to under its slab. The selector returns the same geometry while
+ * the grade points, the plan bounds, the fallback elevation and that footprint are unchanged.
  */
 export const Terrain = memo(function Terrain() {
-  const geometry = usePlanStore((s) => getTerrainGeometry(s.plan));
+  const viewMode = useUiStore((s) => s.viewMode);
+  const geometry = usePlanStore((s) => getTerrainGeometry(s.plan, viewMode));
   return <mesh name="terrain" geometry={geometry} material={terrainMaterial} dispose={null} />;
 });
 

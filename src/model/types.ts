@@ -67,6 +67,13 @@ export interface Stairs {
   run: Inches; // horizontal length; the flight climbs to the next level's floor top
   phase: Phase;
   cutsFloorAbove: boolean;
+  /**
+   * Clear height kept between the treads and the floor above (default 80", STAIRS_HEADROOM): the
+   * floor opening starts where the flight has climbed to floor-to-floor minus this.
+   */
+  headroom?: Inches;
+  /** Where the floor opening starts, along the run from the bottom; overrides the headroom rule. */
+  holeStart?: Inches;
 }
 
 export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';

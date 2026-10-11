@@ -51,6 +51,7 @@ function ExportMenu() {
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const active = useUiStore((s) => s.activeLevelId);
+  const siteMode = useUiStore((s) => s.siteMode);
   const order = usePlanStore((s) => s.plan.levelOrder);
   const levels = usePlanStore((s) => s.plan.levels);
 
@@ -77,7 +78,7 @@ function ExportMenu() {
     }
   };
 
-  const shown = visible3dLevels(order, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active })
+  const shown = visible3dLevels(order, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode })
     .map((id) => levels[id]?.name)
     .join(', ');
 

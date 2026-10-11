@@ -72,6 +72,43 @@ export function stairsOutline(s: Pick<Stairs, 'origin' | 'direction' | 'width' |
   return [stairsPoint(f, 0, -h), stairsPoint(f, s.run, -h), stairsPoint(f, s.run, h), stairsPoint(f, 0, h)];
 }
 
+/** Default clear height over the treads that the floor opening above keeps (6'8"). */
+export const STAIRS_HEADROOM = 80;
+/** A floor opening shorter than this along the run is not cut. */
+const MIN_HOLE = 1;
+
+/**
+ * Where the floor opening starts along the run by the headroom rule, ignoring any override: the
+ * flight rises floorToFloor over the run, so headroom to the floor above drops below `headroom` at
+ * d0 = run * (floorToFloor - headroom) / floorToFloor (0 when the flight is lower than the headroom).
+ */
+export function headroomHoleStart(s: Pick<Stairs, 'run' | 'headroom'>, floorToFloor: number): number {
+  if (!(floorToFloor > 0)) return 0;
+  return (s.run * Math.max(0, floorToFloor - (s.headroom ?? STAIRS_HEADROOM))) / floorToFloor;
+}
+
+/** Where the floor opening starts along the run: `holeStart` when set, else the headroom rule. */
+export function stairsHoleStart(s: Pick<Stairs, 'run' | 'headroom' | 'holeStart'>, floorToFloor: number): number {
+  return Math.max(0, s.holeStart ?? headroomHoleStart(s, floorToFloor));
+}
+
+/**
+ * The opening the flight cuts in the floor above: the part of its footprint from the hole start
+ * (stairsHoleStart) to the top, as bottom-left, top-left, top-right, bottom-right like
+ * stairsOutline. Null when that is less than an inch long (a short flight with headroom to spare
+ * all the way up cuts nothing). Ignores cutsFloorAbove; the caller checks it.
+ */
+export function stairsHoleOutline(
+  s: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run' | 'headroom' | 'holeStart'>,
+  floorToFloor: number,
+): Vec2[] | null {
+  const d0 = stairsHoleStart(s, floorToFloor);
+  if (d0 >= s.run - MIN_HOLE) return null;
+  const f = stairsFrame(s);
+  const h = s.width / 2;
+  return [stairsPoint(f, d0, -h), stairsPoint(f, s.run, -h), stairsPoint(f, s.run, h), stairsPoint(f, d0, h)];
+}
+
 type Seg = [Vec2, Vec2];
 
 export interface StairsSymbol {

@@ -124,3 +124,34 @@ describe('length buffer keys', () => {
     expect(applyBufferKey('', 'Backspace')).toBeNull();
   });
 });
+
+describe('wall tool: a wall on top of a wall (REVIEW-2 A1)', () => {
+  it('shows the message, keeps the chain where it was and adds nothing; clicked or typed', () => {
+    dispatchPointer('down', ptr(0, 0));
+    dispatchPointer('move', ptr(240, 0));
+    dispatchPointer('down', ptr(240, 0));
+    press('Escape');
+    expect(walls()).toHaveLength(1);
+    // Start on the wall and run along it.
+    dispatchPointer('move', ptr(100, 0));
+    dispatchPointer('down', ptr(100, 0));
+    dispatchPointer('move', ptr(200, 0));
+    dispatchPointer('down', ptr(200, 0));
+    expect(walls()).toHaveLength(1);
+    expect(ui().draft.message).toBe('A wall is already there. Select it and Mark demolish, or draw the new wall beside it.');
+    expect(ui().draft.wallStart?.point).toEqual({ x: 100, y: 0 });
+    // The message stays while the cursor moves; a typed length along the wall is refused the same way.
+    dispatchPointer('move', ptr(150, 0));
+    expect(ui().draft.message).toMatch(/^A wall is already there/);
+    type('50');
+    press('Enter');
+    expect(walls()).toHaveLength(1);
+    expect(ui().draft.message).toMatch(/^A wall is already there/);
+    // Turning away works.
+    press('Escape');
+    dispatchPointer('move', ptr(100, 80));
+    dispatchPointer('down', ptr(100, 80));
+    expect(walls()).toHaveLength(3);
+    expect(ui().draft.message).toBeNull();
+  });
+});

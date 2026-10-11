@@ -987,6 +987,27 @@ button.danger {
   opacity: 0.55;
 }
 
+/* The opening a stair below cuts in this floor: "open to below". */
+.stair-hole .stair-hole-body {
+  fill: rgba(31, 35, 41, 0.06);
+  stroke: #52525b;
+  stroke-width: 1.2;
+  stroke-dasharray: 6 4;
+}
+
+.stair-hole .stair-hole-cross {
+  fill: none;
+  stroke: #71717a;
+  stroke-width: 0.8;
+  stroke-dasharray: 6 4;
+}
+
+.stair-hole .stair-hole-tread {
+  fill: none;
+  stroke: #a1a1aa;
+  stroke-width: 0.7;
+}
+
 .check-row {
   display: flex;
   align-items: center;

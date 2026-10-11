@@ -406,15 +406,34 @@ describe('floor slabs', () => {
     expect(buildFloorGeometry(getFaces(level, 'all'), [], 12)).toBeNull();
   });
 
-  it('stairs below with cutsFloorAbove cut the slab of the level above', () => {
+  it('stairs below with cutsFloorAbove cut the slab of the level above, where headroom is short', () => {
     const { plan, first } = boxPlan({});
     const withHole = getLevelMeshes(plan, first.id, 'all').floor!;
-    expect(upArea(withHole)).toBeCloseTo(246.5 * 246.5 - 36 * 120, 3);
+    // 108" floor to floor, 80" headroom: the opening starts 120 * 28 / 108 up the 120" run.
+    const d0 = (120 * 28) / 108;
+    expect(upArea(withHole)).toBeCloseTo(246.5 * 246.5 - 36 * (120 - d0), 2);
+    // Floor over the low end of the flight (y 200 - 20), open over the top (y 200 - 100).
+    expect(inside(withHole, [60, -6, 180])).toBe(true);
+    expect(inside(withHole, [60, -6, 100])).toBe(false);
+    // An override, and a raised basement ceiling (the cache follows the level below's height).
+    const over = boxPlan({ holeStart: 60 });
+    expect(upArea(getLevelMeshes(over.plan, over.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * 60, 2);
+    const full = boxPlan({ holeStart: 0 });
+    expect(upArea(getLevelMeshes(full.plan, full.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * 120, 2);
+    const tall = { ...plan, levels: { ...plan.levels, [plan.levelOrder[0]]: { ...plan.levels[plan.levelOrder[0]], wallHeight: 120 } } };
+    const d1 = (120 * (132 - 80)) / 132;
+    expect(upArea(getLevelMeshes(tall, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * (120 - d1), 2);
     const noCut = boxPlan({ cutsFloorAbove: false });
     expect(upArea(getLevelMeshes(noCut.plan, noCut.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5, 3);
     // New stairs do not cut the existing floor.
     const newStairs = boxPlan({ phase: 'new' });
     expect(upArea(getLevelMeshes(newStairs.plan, newStairs.first.id, 'existing').floor!)).toBeCloseTo(246.5 * 246.5, 3);
+    // An opening that would start at the top cuts nothing; a flight lower than the headroom (a
+    // basement 60" high) is short of headroom from the bottom step, so it is open all the way.
+    const top = boxPlan({ holeStart: 120 });
+    expect(upArea(getLevelMeshes(top.plan, top.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5, 3);
+    const lowCeiling = { ...plan, levels: { ...plan.levels, [plan.levelOrder[0]]: { ...plan.levels[plan.levelOrder[0]], wallHeight: 60 } } };
+    expect(upArea(getLevelMeshes(lowCeiling, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * 120, 2);
   });
 });
 

@@ -1,15 +1,20 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   floorToFloor,
+  headroomHoleStart,
   hitStairs,
   normalizeDegrees,
   orthoDirection,
+  stairsHoleOutline,
+  stairsHoleStart,
   stairsOutline,
   stairsSymbol,
+  STAIRS_HEADROOM,
   stairSteps,
 } from '../derive/stairs';
 import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
+import example from '../../docs/examples/146-mick-road.json';
 import type { Stairs } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 
@@ -157,5 +162,78 @@ describe('stairs store actions', () => {
     expect(stairs[id]).toEqual(level().stairs[id]);
     expect(stairs.bad).toBeUndefined();
     expect(stairs.old).toEqual({ id: 'old', origin: { x: 1, y: 2 }, direction: 0, width: 30, run: 100, phase: 'existing', cutsFloorAbove: true });
+  });
+});
+
+describe('the opening a flight cuts in the floor above (REVIEW-2 A2)', () => {
+  it("the example stair: 108\" floor to floor, 125\" run, the opening starts 32\" up, past the 30\" closet", () => {
+    const plan = migrate(example);
+    const first = plan.levels[plan.levelOrder[1]];
+    const st = Object.values(first.stairs)[0];
+    const ftf = floorToFloor(plan, first.id);
+    expect(ftf).toBe(108);
+    expect(STAIRS_HEADROOM).toBe(80);
+    expect(stairsHoleStart(st, ftf)).toBeCloseTo((125 * 28) / 108, 9);
+    expect(Math.round(stairsHoleStart(st, ftf))).toBe(32);
+    const hole = stairsHoleOutline(st, ftf)!;
+    // Climbing east from x 7: the opening runs from x 39.4 to 132, the whole 33" width.
+    const xs = hole.map((p) => p.x);
+    const ys = hole.map((p) => p.y);
+    expect(Math.min(...xs)).toBeCloseTo(7 + (125 * 28) / 108, 9);
+    expect(Math.min(...xs)).toBeGreaterThan(7 + 30); // past the closet (x 7 to 37 inside)
+    expect(Math.max(...xs)).toBe(132);
+    expect(Math.max(...ys) - Math.min(...ys)).toBe(33);
+    expect(polygonSignedArea(hole)).toBeCloseTo(polygonSignedArea(stairsOutline(st)) * (1 - 28 / 108), 6);
+  });
+
+  it('holeStart overrides the headroom rule; headroom moves it', () => {
+    const s = flight({ run: 120 });
+    expect(stairsHoleStart(s, 108)).toBeCloseTo((120 * 28) / 108, 9);
+    expect(stairsHoleStart({ ...s, holeStart: 50 }, 108)).toBe(50);
+    expect(stairsHoleStart({ ...s, holeStart: 0 }, 108)).toBe(0);
+    expect(stairsHoleOutline({ ...s, holeStart: 0 }, 108)).toEqual(stairsOutline(s));
+    expect(stairsHoleStart({ ...s, headroom: 84 }, 108)).toBeCloseTo((120 * 24) / 108, 9);
+    expect(headroomHoleStart({ ...s, headroom: 84 }, 108)).toBeCloseTo((120 * 24) / 108, 9);
+    // Up the screen from y 200: the opening is the top part, y 80 to 200 - 50.
+    const ys = stairsHoleOutline({ ...s, holeStart: 50 }, 108)!.map((p) => p.y);
+    expect([Math.min(...ys), Math.max(...ys)]).toEqual([80, 150]);
+  });
+
+  it('an opening shorter than an inch is not cut; a flight lower than the headroom is open all the way', () => {
+    // The opening is run * headroom / floorToFloor long by the rule.
+    expect(stairsHoleOutline(flight({ headroom: 0.5 }), 108)).toBeNull();
+    expect(stairsHoleOutline(flight({ holeStart: 119.5 }), 108)).toBeNull();
+    expect(stairsHoleOutline(flight({ holeStart: 200 }), 108)).toBeNull();
+    expect(stairsHoleOutline(flight({ holeStart: 118.5 }), 108)).not.toBeNull();
+    // 72" floor to floor is less than the 80" headroom: short of headroom from the first step.
+    expect(stairsHoleStart(flight(), 72)).toBe(0);
+    expect(stairsHoleOutline(flight(), 72)).toEqual(stairsOutline(flight()));
+  });
+
+  it('store and migrate: headroom and holeStart are optional, validated, and clear with undefined', () => {
+    const id = store().addStairs(levelId(), flight({ headroom: 84, holeStart: 30 }))!;
+    expect(level().stairs[id]).toMatchObject({ headroom: 84, holeStart: 30 });
+    expect(store().addStairs(levelId(), flight({ headroom: 0 }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ holeStart: -1 }))).toBeNull();
+    const before = store().plan;
+    store().updateStairs(levelId(), id, { holeStart: Number.NaN });
+    expect(store().plan).toBe(before);
+    store().updateStairs(levelId(), id, { holeStart: undefined });
+    expect('holeStart' in level().stairs[id]).toBe(false);
+    expect(level().stairs[id].headroom).toBe(84);
+    undo();
+    expect(level().stairs[id].holeStart).toBe(30);
+    // A flight added without them stores neither key.
+    const plain = store().addStairs(levelId(), flight())!;
+    expect(Object.keys(level().stairs[plain])).not.toContain('headroom');
+    // Migrate keeps valid values, drops broken ones and leaves absent ones absent.
+    const json = JSON.parse(JSON.stringify(store().plan));
+    const lv = json.levels[levelId()];
+    lv.stairs[plain].headroom = -5;
+    lv.stairs[plain].holeStart = 'x';
+    const loaded = migrate(json).levels[levelId()].stairs;
+    expect(loaded[id]).toEqual(level().stairs[id]);
+    expect(loaded[plain]).toEqual(level().stairs[plain]);
+    expect(JSON.stringify(migrate(JSON.parse(JSON.stringify(store().plan))))).toBe(JSON.stringify(store().plan));
   });
 });

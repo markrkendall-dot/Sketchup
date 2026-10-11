@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getFootprints } from '../derive/footprint';
 import { getGraph } from '../derive/graph';
 import { adjustTypedLength } from '../editor2d/tools/wallTool';
-import { createEmptyPlan, defaultLevelId, floorTops, migrate, SCHEMA_VERSION } from '../model/plan';
+import { createEmptyPlan, defaultLevelId, floorTops, migrate, SCHEMA_VERSION, WALL_OVERLAP_MESSAGE } from '../model/plan';
+import { getFaces } from '../derive/rooms';
+import example from '../../docs/examples/146-mick-road.json';
 import type { Level, Opening } from '../model/types';
 import {
   clearHistory,
@@ -331,5 +333,107 @@ describe('undo and redo on another level', () => {
     off();
     undo();
     expect(seen).toEqual(['undo', 'redo']);
+  });
+});
+
+describe('a wall on top of a wall (REVIEW-2 A1)', () => {
+  const box = () => {
+    // 20' x 15' room: north wall y 0, x 0..240.
+    const id = levelId();
+    for (const [a, b] of [
+      [{ x: 0, y: 0 }, { x: 240, y: 0 }],
+      [{ x: 240, y: 0 }, { x: 240, y: 180 }],
+      [{ x: 240, y: 180 }, { x: 0, y: 180 }],
+      [{ x: 0, y: 180 }, { x: 0, y: 0 }],
+    ]) {
+      store().addWall(id, a, b, opts);
+    }
+    clearHistory();
+    useUiStore.getState().patchDraft({ message: null, error: false });
+    return id;
+  };
+  const newOpts = { kind: 'exterior', thickness: 6.5, phase: 'new' } as const;
+
+  it('refuses a wall over the whole of an existing one, with the message, and leaves the plan alone', () => {
+    const id = box();
+    const before = store().plan;
+    expect(store().addWall(id, { x: 0, y: 0 }, { x: 240, y: 0 }, newOpts)).toBeNull();
+    expect(store().plan).toBe(before);
+    expect(useUiStore.getState().draft.message).toBe(WALL_OVERLAP_MESSAGE);
+    expect(useUiStore.getState().draft.message).toBe('A wall is already there. Select it and Mark demolish, or draw the new wall beside it.');
+    expect(usePlanStore.temporal.getState().pastStates).toHaveLength(0);
+  });
+
+  it('refuses a partial overlap, inside or running past the end, and one a hair off the line', () => {
+    const id = box();
+    expect(store().addWall(id, { x: 99, y: 0 }, { x: 194, y: 0 }, newOpts)).toBeNull();
+    expect(store().addWall(id, { x: 200, y: 0 }, { x: 300, y: 0 }, newOpts)).toBeNull();
+    expect(store().addWall(id, { x: -60, y: 0.3 }, { x: 60, y: 0.2 }, newOpts)).toBeNull();
+    // Any phase counts: a demolished wall is hidden in Proposed but still there.
+    store().setPhase(id, { walls: Object.keys(level().walls), openings: [] }, 'demo');
+    expect(store().addWall(id, { x: 20, y: 0 }, { x: 60, y: 0 }, newOpts)).toBeNull();
+    expect(Object.keys(level().walls)).toHaveLength(4);
+  });
+
+  it('allows walls that touch end to end, cross, or meet in a T', () => {
+    const id = box();
+    expect(store().addWall(id, { x: 240, y: 0 }, { x: 400, y: 0 }, newOpts)).not.toBeNull(); // continues the north wall
+    expect(store().addWall(id, { x: -100, y: 0 }, { x: 0, y: 0 }, newOpts)).not.toBeNull(); // and the other way
+    expect(store().addWall(id, { x: 120, y: -50 }, { x: 120, y: 50 }, newOpts)).not.toBeNull(); // crosses
+    expect(store().addWall(id, { x: 60, y: 180 }, { x: 60, y: 100 }, newOpts)).not.toBeNull(); // a T
+    // Parallel and close, but beside it.
+    expect(store().addWall(id, { x: 0, y: 8 }, { x: 240, y: 8 }, newOpts)).not.toBeNull();
+    // The box's walls are only split (north at the crossing, south at the T, east and west where the
+    // parallel wall meets them); none is replaced.
+    expect(Object.values(level().walls).filter((w) => w.phase === 'existing')).toHaveLength(4 + 4);
+  });
+
+  it('copyWallsFromLevel skips the walls that would lie on walls already there, and says how many', () => {
+    const id = box();
+    const second = store().plan.levelOrder[2];
+    store().addWall(second, { x: 0, y: 0 }, { x: 120, y: 0 }, newOpts);
+    expect(store().copyWallsFromLevel(id, second)).toEqual({ copied: 3, skipped: 1 });
+    const walls = Object.values(store().plan.levels[second].walls);
+    // The new piece on the north line is untouched; the west wall's corner node joins it, and the
+    // gap from x 120 to 240 is left open (two open ends) for the user to close.
+    expect(walls.filter((w) => w.phase === 'new')).toHaveLength(1);
+    expect(walls.filter((w) => w.phase === 'existing')).toHaveLength(3);
+    expect(getFaces(store().plan.levels[second], 'all').openEnds).toHaveLength(2);
+  });
+
+  it('a node drag that would fold a wall onto its neighbour is refused for that step', () => {
+    const id = box();
+    // An L-shaped spur: (240, 0) -> (300, 0) continues the north wall.
+    const r = store().addWall(id, { x: 240, y: 0 }, { x: 300, y: 0 }, newOpts)!;
+    const before = store().plan;
+    // Dragging the spur's end back over the north wall would lay it on top.
+    store().moveNodes(id, { [r.b]: { x: 200, y: 0 } }, { normalize: false });
+    expect(store().plan).toBe(before);
+    store().moveNode(id, r.b, { x: 100, y: 0 });
+    expect(store().plan).toBe(before);
+    // Moving a whole wall onto its parallel neighbour too.
+    const south = Object.values(level().walls).find((w) => level().nodes[w.a].y === 180 && level().nodes[w.b].y === 180)!;
+    store().moveNodes(id, { [south.a]: { x: level().nodes[south.a].x, y: 0 }, [south.b]: { x: level().nodes[south.b].x, y: 0 } }, { normalize: false });
+    expect(store().plan).toBe(before);
+    // Other moves are fine.
+    store().moveNodes(id, { [r.b]: { x: 320, y: 0 } });
+    expect(level().nodes[r.b].x).toBe(320);
+  });
+
+  it("the north-wall repro on the example's First Floor leaves its 24 walls and no open ends", () => {
+    const plan = migrate(example);
+    store().setPlan(plan);
+    const first = plan.levelOrder[1];
+    const walls = () => store().plan.levels[first].walls;
+    expect(Object.keys(walls())).toHaveLength(24);
+    const north = Object.values(walls()).filter((w) => {
+      const l = store().plan.levels[first];
+      return l.nodes[w.a].y === 3.5 && l.nodes[w.b].y === 3.5;
+    });
+    expect(store().addWall(first, { x: 99, y: 3.5 }, { x: 194, y: 3.5 }, newOpts)).toBeNull();
+    expect(store().plan).toBe(plan);
+    expect(Object.keys(walls())).toHaveLength(24);
+    expect(north.every((w) => walls()[w.id] === w)).toBe(true);
+    for (const vm of ['existing', 'proposed', 'all'] as const) expect(getFaces(store().plan.levels[first], vm).openEnds).toHaveLength(0);
   });
 });

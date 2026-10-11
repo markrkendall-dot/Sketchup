@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyPlan } from '../model/plan';
 import type { Plan, Wall } from '../model/types';
-import { EYE_HEIGHT, eyeElevation, startLevel, stepLevel, walkLevels, walkStart, walkStep } from '../view3d/walk';
+import { EYE_HEIGHT, eyeElevation, startLevel, stepLevel, walkLevels, walkStart, walkStartLevel, walkStep } from '../view3d/walk';
 
 /** First Floor: a 30' x 40' box, optionally with an interior divider across the middle. */
 function plan(divider: boolean): Plan {
@@ -105,5 +105,25 @@ describe('walkStep', () => {
     const [dx, dz] = walkStep(0.3, 1, 1, 10);
     expect(Math.hypot(dx, dz)).toBeCloseTo(10, 9);
     close(walkStep(0.3, 0, 0, 10), [0, 0]);
+  });
+});
+
+describe('walking from site mode (REVIEW-2 A4)', () => {
+  it('starts on the first floor, the level the site view shows, not the lowest', () => {
+    const p = plan(false);
+    const [b, f, s] = p.levelOrder;
+    const site = { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: b, siteMode: true };
+    expect(walkStartLevel(p, site)).toBe(f);
+    // "Only active and below" keeps the first floor and the basement.
+    expect(walkLevels(p, { ...site, only3dActiveAndBelow: true })).toEqual([b, f]);
+    expect(walkStartLevel(p, { ...site, only3dActiveAndBelow: true })).toBe(f);
+    // Outside site mode the active level rules, as before.
+    expect(walkStartLevel(p, { ...site, siteMode: false })).toBe(b);
+    expect(walkStartLevel(p, { ...site, activeLevelId: s, siteMode: false })).toBe(s);
+    // The first floor hidden in 3D: the lowest shown.
+    expect(walkStartLevel(p, { ...site, hidden3dLevels: [f] })).toBe(b);
+    // The start point is in the first floor's box.
+    const at = walkStart(p, walkStartLevel(p, site)!, 'all', walkLevels(p, site));
+    expect(at).toEqual({ x: 180, y: 240 });
   });
 });

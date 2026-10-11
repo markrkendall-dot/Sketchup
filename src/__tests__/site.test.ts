@@ -13,13 +13,18 @@ import {
   siteBounds,
   sunPosition,
   terrainBounds,
+  terrainCut,
   terrainFor,
   terrainGrid,
   terrainHeightAt,
   TERRAIN_MARGIN,
   TERRAIN_MAX_CELLS,
   TERRAIN_STEP,
+  TERRAIN_UNDER_SLAB,
+  type TerrainGrid,
 } from '../derive/site';
+import { getFaces, slabOutlines } from '../derive/rooms';
+import example from '../../docs/examples/146-mick-road.json';
 import { dispatchKey, dispatchPointer, enterSiteMode, setViewMode, switchLevel, switchTool, type ToolPointerEvent } from '../editor2d/tools';
 import { hitSite } from '../editor2d/tools/siteTools';
 import { buildExportScene, disposeExportScene, type ExportLevelVisibility } from '../io/export3d';
@@ -29,7 +34,7 @@ import { clearHistory, redo, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore } from '../store/uiStore';
 import { bindingFor } from '../ui/keymap';
 import { planBox } from '../view3d/bounds';
-import { visible3dLevels } from '../view3d/visibility';
+import { active3dLevel, visible3dLevels } from '../view3d/visibility';
 
 const store = () => usePlanStore.getState();
 const plan = (): Plan => store().plan;
@@ -548,11 +553,16 @@ describe('view mode applies to roofs and columns', () => {
     expect(lowered.max[2]).toBe(flat.max[2]);
   });
 
-  it('site mode shows every level in 3D even with "only active and below"', () => {
+  it('in site mode "only active and below" counts from the first floor, the level the site view shows (REVIEW-2 A4)', () => {
     const order = plan().levelOrder;
     const base = { hidden3dLevels: [], only3dActiveAndBelow: true, activeLevelId: order[0] };
     expect(visible3dLevels(order, base)).toEqual([order[0]]);
-    expect(visible3dLevels(order, { ...base, siteMode: true })).toEqual(order);
+    expect(visible3dLevels(order, { ...base, siteMode: true })).toEqual([order[0], order[1]]);
+    expect(active3dLevel(order, { activeLevelId: order[0], siteMode: true })).toBe(order[1]);
+    expect(active3dLevel(order, { activeLevelId: order[0], siteMode: false })).toBe(order[0]);
+    // Without the option every checked level shows; a single-level plan uses that level.
+    expect(visible3dLevels(order, { ...base, only3dActiveAndBelow: false, siteMode: true })).toEqual(order);
+    expect(active3dLevel([order[0]], { activeLevelId: order[0], siteMode: true })).toBe(order[0]);
   });
 });
 
@@ -774,3 +784,170 @@ describe('site mode and the site tools', () => {
     expect(ui().selection.columns).toEqual([]);
   });
 });
+
+/** Height of the terrain surface over plan point p (the triangle containing it), or null outside. */
+function surfaceAt(grid: TerrainGrid, p: Vec2): number | null {
+  const P = (k: number) => ({ x: grid.positions[k * 3], y: grid.positions[k * 3 + 2], h: grid.positions[k * 3 + 1] });
+  for (let t = 0; t < grid.indices.length; t += 3) {
+    const [a, b, c] = [P(grid.indices[t]), P(grid.indices[t + 1]), P(grid.indices[t + 2])];
+    const det = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    if (Math.abs(det) < 1e-12) continue;
+    const w1 = ((p.x - a.x) * (c.y - a.y) - (p.y - a.y) * (c.x - a.x)) / det;
+    const w2 = ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / det;
+    if (w1 < -1e-9 || w2 < -1e-9 || w1 + w2 > 1 + 1e-9) continue;
+    return a.h + (b.h - a.h) * w1 + (c.h - a.h) * w2;
+  }
+  return null;
+}
+
+/** Plan area covered by the triangles, and whether each faces up (+Y). */
+function coverage(grid: TerrainGrid): { area: number; allUp: boolean } {
+  let area = 0;
+  let allUp = true;
+  const at = (k: number): Vec2 => ({ x: grid.positions[k * 3], y: grid.positions[k * 3 + 2] });
+  for (let t = 0; t < grid.indices.length; t += 3) {
+    const [a, b, c] = [at(grid.indices[t]), at(grid.indices[t + 1]), at(grid.indices[t + 2])];
+    const cr = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    // Upward in three coordinates is a negative cross product on the y-down plan.
+    if (cr > 1e-9) allUp = false;
+    area += Math.abs(cr) / 2;
+  }
+  return { area, allUp };
+}
+
+describe('the ground under the house (REVIEW-2 A3)', () => {
+  /** A 20' x 15' basement box (8" walls) at an odd offset, so the outline crosses the grid cells. */
+  function basementPlan(): { basement: string; first: string } {
+    store().setPlan(createEmptyPlan('Basement test'));
+    clearHistory();
+    const [basement, first] = plan().levelOrder;
+    const o = { kind: 'exterior' as const, thickness: 8, phase: 'existing' as const };
+    const pts = [
+      { x: 10, y: 13 },
+      { x: 250, y: 13 },
+      { x: 250, y: 193 },
+      { x: 10, y: 193 },
+    ];
+    for (let i = 0; i < 4; i++) store().addWall(basement, pts[i], pts[(i + 1) % 4], o);
+    return { basement, first };
+  }
+  const footprint = [rect(6, 9, 254, 197)];
+  const bounds = { minX: 6, minY: 9, maxX: 254, maxY: 197 };
+
+  it('vertices inside the footprint get floorUnder; outside they keep the grade surface', () => {
+    const site = siteWith(gp(-200, -200, -10), gp(500, 400, -90));
+    const plain = terrainGrid(site, bounds, -104);
+    const cut = terrainGrid(site, bounds, -104, footprint, -106);
+    const nx = plain.cellsX + 1;
+    const n = nx * (plain.cellsY + 1);
+    let lowered = 0;
+    for (let v = 0; v < n; v++) {
+      const x = plain.positions[v * 3];
+      const y = plain.positions[v * 3 + 2];
+      expect(cut.positions[v * 3]).toBe(x);
+      expect(cut.positions[v * 3 + 2]).toBe(y);
+      const inside = x > 6 && x < 254 && y > 9 && y < 197;
+      if (inside) lowered++;
+      expect(cut.positions[v * 3 + 1]).toBe(inside ? -106 : plain.positions[v * 3 + 1]);
+    }
+    expect(lowered).toBeGreaterThan(50);
+    // A point inside returns the lowered height, a point outside the plain surface.
+    expect(surfaceAt(cut, { x: 130, y: 100 })).toBeCloseTo(-106, 4);
+    expect(surfaceAt(cut, { x: 400, y: 300 })).toBeCloseTo(surfaceAt(plain, { x: 400, y: 300 })!, 4);
+    // Same extent and cells; every triangle faces up and together they cover the grid once.
+    expect([cut.bounds, cut.cellsX, cut.cellsY, cut.step]).toEqual([plain.bounds, plain.cellsX, plain.cellsY, plain.step]);
+    const area = (plain.bounds.maxX - plain.bounds.minX) * (plain.bounds.maxY - plain.bounds.minY);
+    expect(coverage(cut).allUp).toBe(true);
+    expect(coverage(cut).area).toBeCloseTo(area, 3);
+  });
+
+  it('the ground meets the outside face at grade and drops straight down there (no slope across a cell)', () => {
+    const site = siteWith(gp(-200, -200, -10), gp(500, 400, -30));
+    const plain = terrainGrid(site, bounds, -104);
+    const cut = terrainGrid(site, bounds, -104, footprint, -106);
+    // Just outside the north face (y 9) and just inside it.
+    for (const x of [20, 77.7, 130, 241]) {
+      expect(surfaceAt(cut, { x, y: 8.9 })).toBeCloseTo(surfaceAt(plain, { x, y: 8.9 })!, 3);
+      expect(surfaceAt(cut, { x, y: 9.1 })).toBeCloseTo(-106, 6);
+    }
+    // No triangle mixes ground and under-house heights.
+    for (let t = 0; t < cut.indices.length; t += 3) {
+      const hs = [0, 1, 2].map((k) => cut.positions[cut.indices[t + k] * 3 + 1]);
+      const under = hs.map((h) => h === -106);
+      expect(under.every((u) => u === under[0])).toBe(true);
+    }
+  });
+
+  it('no grade points: flat everywhere except the footprint', () => {
+    const cut = terrainGrid({ gradePoints: {} }, bounds, -104, footprint, -106);
+    const hs = new Set<number>();
+    for (let v = 0; v < cut.positions.length / 3; v++) hs.add(cut.positions[v * 3 + 1]);
+    expect([...hs].sort((p, q) => p - q)).toEqual([-106, -104]);
+    expect(surfaceAt(cut, { x: 130, y: 100 })).toBe(-106);
+    expect(surfaceAt(cut, { x: -100, y: 100 })).toBe(-104);
+    expect(surfaceAt(cut, { x: 253.9, y: 100 })).toBeCloseTo(-106, 9);
+    expect(surfaceAt(cut, { x: 254.1, y: 100 })).toBeCloseTo(-104, 9);
+  });
+
+  it('the plan terrain cuts the lowest level out at its slab bottom minus 2", following its walls', () => {
+    const { basement, first } = basementPlan();
+    store().addGradePoint({ at: { x: -50, y: -50 }, elevation: -10 });
+    store().addGradePoint({ at: { x: 400, y: 300 }, elevation: -60 });
+    const cut = terrainCut(plan(), 'all')!;
+    expect(cut.floorUnder).toBe(fallbackElevation(plan()) - TERRAIN_UNDER_SLAB);
+    expect(cut.floorUnder).toBe(-106);
+    expect(cut.footprints()).toEqual(slabOutlines(getFaces(plan().levels[basement], 'all'), true));
+    const g1 = planTerrain(plan());
+    expect(surfaceAt(g1, { x: 130, y: 100 })).toBeCloseTo(-106, 6);
+    expect(surfaceAt(g1, { x: 300, y: 100 })).toBeCloseTo(terrainHeightAt(plan().site, { x: 300, y: 100 }, -104), 0);
+    // An edit on another level, a column or a basement room label keep the grid.
+    store().addWall(first, { x: 0, y: 0 }, { x: 100, y: 0 }, { kind: 'exterior', thickness: 6.5, phase: 'existing' });
+    store().addColumn({ at: { x: 100, y: 100 }, kind: 'post', width: 6, depth: 6, rotation: 0, base: 0, top: 96, phase: 'existing' });
+    store().addRoom(basement, { name: 'Basement', anchor: { x: 100, y: 100 } });
+    expect(planTerrain(plan())).toBe(g1);
+    // A basement wall edit rebuilds it: demolishing the basement walls leaves the existing view
+    // cut but not the proposed one.
+    const walls = Object.keys(plan().levels[basement].walls);
+    store().setPhase(basement, { walls, openings: [] }, 'demo');
+    const g2 = planTerrain(plan(), 'existing');
+    expect(g2).not.toBe(g1);
+    expect(surfaceAt(g2, { x: 130, y: 100 })).toBeCloseTo(-106, 6);
+    expect(planTerrain(plan(), 'proposed')).not.toBe(g2);
+    expect(surfaceAt(planTerrain(plan(), 'proposed'), { x: 130, y: 100 })).toBeGreaterThan(-60);
+    // The geometry follows: same object while the grid is the same.
+    const geo = getTerrainGeometry(plan(), 'all');
+    store().setNorthAngle(15);
+    expect(getTerrainGeometry(plan(), 'all')).toBe(geo);
+  });
+
+  it("the example's basement is empty of ground: every grid point inside its footprint is under the slab", () => {
+    const ex = migrate(example);
+    const grid = planTerrain(ex, 'all');
+    const lowest = ex.levels[ex.levelOrder[0]];
+    const outlines = slabOutlines(getFaces(lowest, 'all'), true);
+    expect(outlines.length).toBeGreaterThan(0);
+    const under = fallbackElevation(ex) - 2;
+    expect(under).toBe(-106);
+    let inside = 0;
+    // The grid's own vertices (the split cells' extra vertices on the outline follow).
+    for (let v = 0; v < (grid.cellsX + 1) * (grid.cellsY + 1); v++) {
+      const p = { x: grid.positions[v * 3], y: grid.positions[v * 3 + 2] };
+      if (!outlines.some((o) => pointInPolygonStrict(p, o))) continue;
+      inside++;
+      expect(grid.positions[v * 3 + 1]).toBe(under);
+    }
+    expect(inside).toBeGreaterThan(100);
+    // The basement floor is 4" above the ground under it all over the interior.
+    expect(surfaceAt(grid, { x: 160, y: 160 })).toBeCloseTo(-106, 6);
+  });
+});
+
+function pointInPolygonStrict(p: Vec2, poly: Vec2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i];
+    const b = poly[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}

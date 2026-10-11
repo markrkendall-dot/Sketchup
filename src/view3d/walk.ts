@@ -4,7 +4,7 @@ import { getFaces } from '../derive/rooms';
 import { pointInPolygon, polygonSignedArea } from '../model/geometry';
 import type { Id, Plan, Vec2, ViewMode } from '../model/types';
 import { planBox } from './bounds';
-import { visible3dLevels } from './visibility';
+import { active3dLevel, visible3dLevels } from './visibility';
 
 // First-person walkthrough (DESIGN.md "3D"): pure helpers for view3d/FirstPerson.tsx.
 
@@ -27,6 +27,14 @@ export function walkLevels(plan: Plan, ui: LevelVisibility): Id[] {
 /** The level walking starts on: the active one when it is shown, else the lowest shown. */
 export function startLevel(levels: readonly Id[], activeLevelId: Id): Id | undefined {
   return levels.includes(activeLevelId) ? activeLevelId : levels[0];
+}
+
+/**
+ * The level walking starts on for the current UI: the active level (in site mode the first floor,
+ * the level the site view shows; active3dLevel) when the 3D view shows it, else the lowest shown.
+ */
+export function walkStartLevel(plan: Plan, ui: LevelVisibility): Id | undefined {
+  return startLevel(walkLevels(plan, ui), active3dLevel(plan.levelOrder, ui));
 }
 
 /** The next level below (-1) or above (+1) in `levels`, or null at the bottom / top. */

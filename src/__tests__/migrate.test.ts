@@ -153,6 +153,8 @@ describe('migrate from schemaVersion 0', () => {
 describe('migrate a current file', () => {
   /** A plan with every kind of entity, built through the store as the editor would. */
   function richPlan(): Plan {
+    // A fresh plan each time: drawing the same walls twice is refused (they would overlap).
+    store().setPlan(createEmptyPlan());
     const s = store();
     const lid = defaultLevelId(s.plan);
     const o = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;

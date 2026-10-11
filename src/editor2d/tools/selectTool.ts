@@ -4,6 +4,7 @@ import { hitOpening } from '../../derive/openings';
 import { hitStairs } from '../../derive/stairs';
 import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase';
 import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../../model/geometry';
+import { WALL_OVERLAP_MESSAGE } from '../../model/plan';
 import type { Id, Level, Vec2, ViewMode } from '../../model/types';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection } from '../../store/uiStore';
@@ -199,6 +200,7 @@ export const selectTool: Tool = {
     const ui = ctx.ui();
     const level = ctx.level();
     const sel = ui.selection;
+    if (ui.draft.message === WALL_OVERLAP_MESSAGE) ui.patchDraft({ message: null, error: false });
     // A selected roof's corner handle: drag it (snapping like the roof tool).
     const handle = e.shiftKey ? null : hitRoofHandle(level, sel.roofs, e.world, ui.viewport.k);
     if (handle) {
@@ -358,9 +360,16 @@ export const selectTool: Tool = {
       for (const [id, o] of Object.entries(drag.origins)) positions[id] = add(o, step);
       ui.patchDraft({ cursor: e.world, snap: null });
     }
+    const before = ctx.plan();
     ctx.actions.moveNodes(ctx.levelId, positions, { normalize: false });
+    if (ctx.plan() === before) {
+      // Refused (a wall would land on top of another): the nodes stay at the last good position.
+      ui.patchDraft({ message: WALL_OVERLAP_MESSAGE, error: true });
+      return;
+    }
+    if (ui.draft.message === WALL_OVERLAP_MESSAGE) ui.patchDraft({ message: null, error: false });
     if (!drag.started) {
-      // First set of the drag is tracked; the rest are folded into it.
+      // First set of the drag that changes the plan is tracked; the rest are folded into it.
       drag.started = true;
       pauseHistory();
     }

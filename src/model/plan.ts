@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
-import { dist, projectPointToSegment, segmentIntersection } from './geometry';
+import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
 import { isHexColor, MAX_LITES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
 import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
@@ -121,6 +121,89 @@ export function clampOpenings(level: Level, wallId?: Id, source?: FootprintSourc
   }
 }
 
+/**
+ * Length along which segments p0-p1 and q0-q1 lie on top of each other: 0 unless one segment's
+ * ends are both within MERGE_EPS of the other's line (collinear), then the overlap of their
+ * intervals measured along p (projectPointToSegment on p0-p1). Ends that only touch give 0.
+ */
+export function collinearOverlap(p0: Vec2, p1: Vec2, q0: Vec2, q1: Vec2): number {
+  const lp = dist(p0, p1);
+  const lq = dist(q0, q1);
+  if (lp < 1e-9 || lq < 1e-9) return 0;
+  const offLine = (p: Vec2, a: Vec2, b: Vec2, len: number) => Math.abs(cross(sub(b, a), sub(p, a))) / len;
+  const qOnP = offLine(q0, p0, p1, lp) <= MERGE_EPS && offLine(q1, p0, p1, lp) <= MERGE_EPS;
+  const pOnQ = offLine(p0, q0, q1, lq) <= MERGE_EPS && offLine(p1, q0, q1, lq) <= MERGE_EPS;
+  if (!qOnP && !pOnQ) return 0;
+  const s0 = projectPointToSegment(q0, p0, p1).tRaw * lp;
+  const s1 = projectPointToSegment(q1, p0, p1).tRaw * lp;
+  return Math.max(0, Math.min(lp, Math.max(s0, s1)) - Math.max(0, Math.min(s0, s1)));
+}
+
+/** Shown when a new wall (or a copied or dragged one) would lie on top of a wall already there. */
+export const WALL_OVERLAP_MESSAGE = 'A wall is already there. Select it and Mark demolish, or draw the new wall beside it.';
+
+/**
+ * The first wall of the level (any phase: hidden demolished walls are still there) that the
+ * segment a-b would lie on top of for more than MERGE_EPS, or null. Walls it only touches end to
+ * end, crosses or meets in a T are fine.
+ */
+export function wallOverlapping(level: Level, a: Vec2, b: Vec2, skip?: (w: Wall) => boolean): Wall | null {
+  for (const w of Object.values(level.walls)) {
+    if (skip?.(w)) continue;
+    const p = level.nodes[w.a];
+    const q = level.nodes[w.b];
+    if (p && q && collinearOverlap(p, q, a, b) > MERGE_EPS) return w;
+  }
+  return null;
+}
+
+/**
+ * True when moving the nodes to `positions` would lay one of their walls on top of another wall
+ * (a collinear overlap longer than MERGE_EPS that was not there before the move).
+ */
+export function movesCreateOverlap(level: Level, positions: Record<Id, Vec2>): boolean {
+  const moved = (id: Id) => id in positions && !!level.nodes[id];
+  const touched = Object.values(level.walls).filter((w) => moved(w.a) || moved(w.b));
+  if (touched.length === 0) return false;
+  const after = (id: Id): Vec2 => (moved(id) ? positions[id] : level.nodes[id]);
+  const all = Object.values(level.walls);
+  for (const w of touched) {
+    const wa = after(w.a);
+    const wb = after(w.b);
+    for (const o of all) {
+      if (o === w || !level.nodes[o.a] || !level.nodes[o.b]) continue;
+      if (collinearOverlap(wa, wb, after(o.a), after(o.b)) <= MERGE_EPS) continue;
+      if (collinearOverlap(level.nodes[w.a], level.nodes[w.b], level.nodes[o.a], level.nodes[o.b]) > MERGE_EPS) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Which of two walls between the same two nodes survives the duplicate drop: an `existing` wall
+ * over a new or demolished one, then a wall with openings over one without. Lower wins; equal
+ * ranks keep the wall that was there first.
+ */
+function survivorRank(level: Level, w: Wall): number {
+  const hasOpenings = Object.values(level.openings).some((o) => o.wallId === w.id);
+  return (w.phase === 'existing' ? 0 : 2) + (hasOpenings ? 0 : 1);
+}
+
+/** Drop wall `dropId` in favour of `keepId` (same two nodes): its openings move over, then clamp. */
+function mergeDuplicateInto(level: Level, keepId: Id, dropId: Id): void {
+  const keep = level.walls[keepId];
+  const drop = level.walls[dropId];
+  const len = wallLength(level, keep);
+  for (const o of Object.values(level.openings)) {
+    if (o.wallId !== dropId) continue;
+    o.wallId = keepId;
+    if (keep.a !== drop.a) o.offset = len - o.offset;
+  }
+  delete level.walls[dropId];
+  clampOpenings(level, keepId);
+}
+
 function deleteWallInPlace(level: Level, wallId: Id): void {
   delete level.walls[wallId];
   for (const o of Object.values(level.openings)) if (o.wallId === wallId) delete level.openings[o.id];
@@ -216,15 +299,12 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
     const key = w.a < w.b ? `${w.a}|${w.b}` : `${w.b}|${w.a}`;
     const prev = seen.get(key);
     if (prev) {
-      const keepWall = level.walls[prev];
-      const len = wallLength(level, keepWall);
-      for (const o of Object.values(level.openings)) {
-        if (o.wallId !== w.id) continue;
-        o.wallId = prev;
-        if (keepWall.a !== w.a) o.offset = len - o.offset;
-      }
-      delete level.walls[w.id];
-      clampOpenings(level, prev);
+      // Keep the existing wall (then the one with openings, then the first) and move the other's
+      // openings onto it, so drawing over a wall never silently replaces the original.
+      if (survivorRank(level, w) < survivorRank(level, level.walls[prev])) {
+        mergeDuplicateInto(level, w.id, prev);
+        seen.set(key, w.id);
+      } else mergeDuplicateInto(level, prev, w.id);
     } else seen.set(key, w.id);
   }
 
@@ -246,8 +326,31 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
         if (pr.distance > MERGE_EPS || s <= MERGE_EPS || s >= len - MERGE_EPS) continue;
         const tailExists = findWallBetween(level, n.id, w.b);
         const headExists = findWallBetween(level, w.a, n.id);
-        if (headExists && tailExists) {
-          deleteWallInPlace(level, w.id);
+        const rank = survivorRank(level, w);
+        const headWins = !!headExists && rank < survivorRank(level, headExists);
+        const tailWins = !!tailExists && rank < survivorRank(level, tailExists);
+        if ((headExists && tailExists) || headWins || tailWins) {
+          // Split, then resolve each duplicate piece by the survivor rule (an existing wall is not
+          // replaced by a new one lying on top of it; openings move to whichever piece stays).
+          const tail: Wall = { ...w, id: newId(), a: n.id, b: w.b };
+          w.b = n.id;
+          level.walls[tail.id] = tail;
+          for (const o of Object.values(level.openings)) {
+            if (o.wallId === w.id && o.offset > s) {
+              o.wallId = tail.id;
+              o.offset -= s;
+            }
+          }
+          clampOpenings(level, w.id);
+          clampOpenings(level, tail.id);
+          if (headExists) {
+            if (headWins) mergeDuplicateInto(level, w.id, headExists.id);
+            else mergeDuplicateInto(level, headExists.id, w.id);
+          }
+          if (tailExists) {
+            if (tailWins) mergeDuplicateInto(level, tail.id, tailExists.id);
+            else mergeDuplicateInto(level, tailExists.id, tail.id);
+          }
           split = true;
           break outer;
         }
@@ -402,7 +505,7 @@ const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride'] as const;
-const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove'] as const;
+const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
@@ -491,7 +594,10 @@ function migrateRooms(raw: Json): Level['rooms'] {
   return out;
 }
 
-/** Keep stairs with a usable position and size; fill in phase and cutsFloorAbove when missing. */
+/**
+ * Keep stairs with a usable position and size; fill in phase and cutsFloorAbove when missing; keep
+ * headroom (positive) and holeStart (not negative) only when valid.
+ */
 function migrateStairs(raw: Json): Level['stairs'] {
   const out: Level['stairs'] = {};
   for (const [sid, st] of Object.entries(raw)) {
@@ -503,6 +609,9 @@ function migrateStairs(raw: Json): Level['stairs'] {
     stairs.direction = isNum(st.direction) ? st.direction : 0;
     stairs.phase = phaseOf(st.phase);
     stairs.cutsFloorAbove = typeof st.cutsFloorAbove === 'boolean' ? st.cutsFloorAbove : true;
+    // Optional floor-opening fields: kept when usable, dropped otherwise (the defaults apply).
+    put(stairs, 'headroom', isNum(st.headroom) && st.headroom > 0 ? st.headroom : undefined);
+    put(stairs, 'holeStart', isNum(st.holeStart) && st.holeStart >= 0 ? st.holeStart : undefined);
     out[sid] = stairs as unknown as Stairs;
   }
   return out;

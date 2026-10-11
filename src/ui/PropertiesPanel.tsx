@@ -6,7 +6,7 @@ import { PHASE_LABEL } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, groundAt } from '../derive/site';
-import { floorToFloor, STAIRS_LIMITS, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
+import { floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsHoleOutline, stairsHoleStart, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool } from '../editor2d/tools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
@@ -852,6 +852,7 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         />
         Cuts the floor above{aboveName ? ` (${aboveName})` : ''}
       </label>
+      {stairs.cutsFloorAbove && <StairsOpeningFields level={level} stairs={stairs} ftf={ftf} />}
       <ReadOnly label="Risers">
         {risers} x {formatLength(rise, denom)}
       </ReadOnly>
@@ -859,6 +860,55 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
       <p className="panel-note">
         Rises {formatLength(ftf, denom)}, floor top to floor top. Drag with the select tool to move.
       </p>
+    </>
+  );
+}
+
+/**
+ * Where the stair's opening in the floor above starts: by default where the headroom under that
+ * floor drops below `headroom` (80"), or a typed distance from the bottom. A flight with headroom
+ * all the way up cuts nothing, and the panel says so.
+ */
+function StairsOpeningFields({ level, stairs, ftf }: { level: Level; stairs: Stairs; ftf: number }) {
+  const updateStairs = usePlanStore((s) => s.updateStairs);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const byRule = headroomHoleStart(stairs, ftf);
+  const start = stairsHoleStart(stairs, ftf);
+  const hole = stairsHoleOutline(stairs, ftf);
+  return (
+    <>
+      <LengthField
+        label="Floor opening starts"
+        value={stairs.holeStart}
+        bound="nonnegative"
+        allowEmpty
+        placeholder={`${formatLength(byRule, denom)} (headroom rule)`}
+        onCommit={(v) => {
+          if (v !== null && v > stairs.run) return `At most the run, ${formatLength(stairs.run, denom)}`;
+          updateStairs(level.id, stairs.id, { holeStart: v ?? undefined });
+          return null;
+        }}
+        hint="From the bottom of the flight. Blank follows the headroom rule."
+      />
+      <LengthField
+        label="Headroom"
+        value={stairs.headroom}
+        allowEmpty
+        placeholder={`${formatLength(STAIRS_HEADROOM, denom)} (default)`}
+        onCommit={(v) => {
+          updateStairs(level.id, stairs.id, { headroom: v ?? undefined });
+        }}
+        hint="Clear height over the treads; the opening starts where the floor above comes lower."
+      />
+      <ReadOnly label="Floor opening">
+        {hole ? (
+          <>
+            {formatLength(start, denom)} to {formatLength(stairs.run, denom)} up the run ({formatLength(stairs.run - start, denom)} long)
+          </>
+        ) : (
+          'none: the floor above clears the flight'
+        )}
+      </ReadOnly>
     </>
   );
 }

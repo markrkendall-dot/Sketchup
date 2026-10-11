@@ -61,6 +61,8 @@ export interface Stairs {
   direction: Degrees;        // plan angle of travel going up: 0 = +x, 90 = +y (down the screen)
   width: Inches; run: Inches; // run = horizontal length; climbs to the next level's floor top
   phase: Phase; cutsFloorAbove: boolean;
+  headroom?: Inches;         // clear height the floor opening above keeps; default 80"
+  holeStart?: Inches;        // where that opening starts along the run; overrides the headroom rule
 }
 
 export interface Underlay {
@@ -141,7 +143,20 @@ clamped). Two walls that cross strictly inside both (farther than MERGE_EPS from
 parallel, no shared node) get a node at the crossing, which the same pass then splits both at, so
 an X becomes four walls at one node. One change per pass; the pass count is bounded by the level
 size, and a crossing that lands on an existing node is skipped rather than retried.
-Simple graph, not multigraph: at most one wall between two nodes.
+Simple graph, not multigraph: at most one wall between two nodes. When two walls end up between
+the same nodes (the duplicate drop, and a split whose piece already exists), the survivor is the
+`existing` one over `new`/`demo`, then the one with openings, then the one that was there first;
+the other's openings move onto it.
+
+Walls never lie on top of each other: `addWall` refuses a segment that overlaps a wall of the level
+(any phase; hidden demolished walls are still there) collinearly by more than MERGE_EPS
+(`collinearOverlap`: both ends of one segment within MERGE_EPS of the other's line and their
+intervals overlapping; touching end to end, crossing and T joins are fine), returns null and sets
+the draft message "A wall is already there. Select it and Mark demolish, or draw the new wall
+beside it." `copyWallsFromLevel` skips such walls (it returns `{copied, skipped}`, the level bar
+reports the skipped count), and `moveNode(s)` / `setWallLength` refuse a step that would create a
+new overlap (the select tool keeps the nodes at the last accepted position and shows the message;
+its drag starts the undo step on the first step that changes the plan).
 
 ## Corner joins (`derive/footprint.ts`)
 
@@ -205,7 +220,13 @@ instead). Then:
   closed, consistently wound surface (tested).
 - Floor slab: each outer face polygon (reversed, positive), pushed out by half of each edge's wall
   thickness to the exterior faces (`outerFaceThickness` from rooms.ts), with holes for stairs on the
-  level below that have `cutsFloorAbove` (only holes that fit strictly inside). Outer faces nested in
+  level below that have `cutsFloorAbove` (only holes that fit strictly inside). A hole is only the
+  part of the flight where headroom is short (`stairsHoleOutline(stairs, floorToFloor)`): from
+  `d0 = holeStart ?? run * max(0, floorToFloor - headroom) / floorToFloor` (headroom default 80")
+  to the top of the run, none when that is under 1". The starter's stair (108" floor to floor, 125"
+  run) opens from 32" up, so the closet over its low end keeps its floor. The 2D view of the level
+  above draws the same opening (dashed, with an X and the treads under it), and the stair panel
+  has "Floor opening starts" (blank follows the rule, shown as the placeholder) and "Headroom". Outer faces nested in
   another component are skipped. If a level has no closed outer face, draw no slab. Where the walls
   of the level below run up through the slab, the edge stops at their inside face instead (see
   "Platform framing").
@@ -314,16 +335,23 @@ the plan bounds (`siteBounds`: nodes of every level, roof outlines, columns, gra
 rounded outward to whole cells, so a wall moving about does not change the grid; the step grows when
 that would exceed 200 cells along an axis. The result is an indexed
 surface (vertex = plan x, elevation, plan y; two triangles per cell, all facing +Y) plus its `bounds`
-(`terrainBounds`). The memo `terrainFor` is keyed by the site's `gradePoints` record (immer keeps its
-identity while a grade point is untouched, so a column, the north angle or a wall inside the bounds
-never rebuilds anything), then by the rounded bounds and the fallback. `getTerrainGeometry(plan)` keeps
-one `BufferGeometry` per grid (smooth normals) and disposes the one it replaces. The terrain is
+(`terrainBounds`). The house is cut out of it: `terrainGrid(site, bounds, fallback, footprints,
+floorUnder)` sets the grid vertices inside the footprints (the lowest level's `slabOutlines(getFaces(lowest,
+viewMode), true)`, out to its walls' outside faces) to `floorUnder` (that level's slab bottom minus 2"),
+and splits the cells the outlines cross along them (convex pieces of each cell triangle inside and
+outside the outline's triangles; extra vertices after the grid's), so the ground meets the outside face at
+grade and drops straight down there, inside the wall. The memo `terrainFor` is keyed by the site's
+`gradePoints` record (immer keeps its identity while a grade point is untouched, so a column, the north
+angle or a wall inside the bounds never rebuilds anything), then by the rounded bounds, the fallback, the
+`floorUnder` and the lowest level's `outerFaces` array (`terrainCut`; getFaces keeps it while that level's
+nodes and walls are untouched, so an edit on another level does not rebuild the ground and a basement wall
+edit does). `getTerrainGeometry(plan, viewMode)` keeps one `BufferGeometry` per grid (smooth normals) and
+disposes the one it replaces. The terrain is
 opaque and FrontSide (`#7f9a63`, roughness 1) and replaces the infinite grid as the ground, so the
 basement walls below grade are buried and the walkout side shows. The drei grid stays as an overlay
 ("Grid" checkbox in the 3D bar, `uiStore.show3dGrid`, default on) 1" above the fallback elevation: with
-grade points the terrain is above it and hides it, which is the point (no z-fighting). The terrain also
-passes through the basement's interior volume (the ground is not cut away under the house), so it
-shows through basement openings and in the walk view inside the basement. A weighted average never
+grade points the terrain is above it and hides it, which is the point (no z-fighting). Under the lowest
+level the ground sits 2" below its slab, so the basement interior is empty. A weighted average never
 leaves the range of the grade points' elevations, so with every grade point at or below the First Floor
 slab's underside (the "north pair at first floor top minus 12 inches" of the renovation scenario) the
 ground never reaches that slab; a grade point above it would, and nothing clamps it.
@@ -347,8 +375,10 @@ solid; demolished hatched red, new green; hidden in the views that hide them), a
 canvas corner turned by `northAngle`. Choosing any level (the lowest too) leaves site mode
 (`setActiveLevel` clears the flag). In site mode only select, grade point (E) and column (C) work;
 `switchTool` refuses the level tools and says "Choose a level to draw walls" in the status bar (the
-toolbar buttons stay clickable but dimmed and `aria-disabled`; E and C do nothing outside it). The 3D
-view ignores "Only active level and below" in site mode (the active level is the lowest then).
+toolbar buttons stay clickable but dimmed and `aria-disabled`; E and C do nothing outside it). In
+site mode the 3D view's "Only active level and below", the export and the walk start use the level
+the site view ghosts (the first floor) as the active level (`active3dLevel`), since the active level
+is parked at the lowest.
 
 **Site tools** (`siteTools.ts`): `siteSnap` snaps to the first floor's wall-face corners and faces, nodes,
 midpoints and the grid. Grade point: a click stores the spot in `draft.gradePending`; the length buffer

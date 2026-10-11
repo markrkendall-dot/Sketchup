@@ -76,7 +76,11 @@ Before you start, measure on paper. Then follow these steps in order.
    your notes, fix the wall that is off rather than the room.
 8. **Copy the walls to the next level and adjust.** Click the level tab (or press `3` for the
    top level, `1` for the bottom) and use "Copy walls from level below", then move, delete or
-   add walls. Stairs (`T`) go on the lower level and cut the floor above.
+   add walls (walls that would land on top of walls already there are skipped, and the status
+   bar says how many). Stairs (`T`) go on the lower level and cut the floor above where the
+   headroom over the treads would be under 80": the opening starts at run x (floor to floor -
+   80") / floor to floor up the flight (the stair's properties change the headroom or set the
+   start).
 9. **Load a photo as an underlay if you have one.** A scanned plan, a real-estate sketch or a
    photo of graph paper: press `U`, load the image, click "Scale by two points", click the two
    ends of a wall whose length you know and type it, then lock the image and trace over it.
@@ -246,7 +250,8 @@ and the plan's north angle is 0.
   and the stair's south wall (y 137.5) with a 36" passage at x 132 to 168 and a 30" opening at
   x 7 to 37 (the stair's bottom, from Living). The stair climbs **east** from the west wall's
   inside face (x 7) to x 132, 33" wide (the whole 2'9" strip), under the Second Floor's landing,
-  and cuts the Second Floor's floor. Rooms, east-west x north-south: Entry hall 15'5" x 7'6",
+  and cuts the Second Floor's floor from 32" up the run (where the headroom drops under 80"), so the
+  Master closet over its low end keeps its floor. Rooms, east-west x north-south: Entry hall 15'5" x 7'6",
   Bath 9'6" x 7'6", Kitchen 11'6" x 17'2" (adjusted, see below), Living 13'5" x 14'0", Stair
   13'5" x 2'9" (the strip), Utility 11'6" x 9'5". There are **no open wall ends** on this floor.
 - **Second Floor interior** (the owner's sketch, face to face; partitions 5", existing): the Bunk's
@@ -290,7 +295,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | First Floor rooms | measured, face to face: Entry hall 15'5" x 7'6", Bath 9'6" x 7'6", Living 13'5" x 14'0" (measured 14'1"), Utility 11'6" x 9'5" | Re-check any that look wrong |
 | Kitchen | 11'6" x 17'2", **adjusted: re-measure.** MK measured 16'3"; the upstairs wins, and the first-floor mistake is suspected near the bottom of the stairs | Kitchen north-south, between the lake wall and the y 99.5 wall |
 | Interior partition thickness | 5" (measured) | At a jamb |
-| Stair | 33" wide, 125" run climbing east from the west wall to x 132 (under the upstairs landing), cuts the Second Floor floor; the 2'9" strip | Width, run, riser count |
+| Stair | 33" wide, 125" run climbing east from the west wall to x 132 (under the upstairs landing), cuts the Second Floor floor from 32" up the run (80" headroom); the 2'9" strip | Width, run, riser count |
 | Bath door (First Floor) | 30" x 80" in the Bath's west wall, north jamb 6" from the north wall's inside face (y 13 to 43); **position is an estimate** | Jamb to the north wall |
 | Kitchen/Living passage | 48" wide, south jamb 6' from the lake wall (y 188 to 236), sill 0, 80" high | Jamb to jamb |
 | Hall and Living passages | 36" wide at x 132 to 168 in the y 99.5 line and the y 137.5 wall; 30" opening at x 7 to 37 (the stair's bottom, from Living) | Jamb to jamb |
@@ -353,7 +358,9 @@ Set the view to **All** and **Draw as: new**, then:
   basement terrace in front of the walkout doors, as *new*: their outside faces on the basement's
   outside faces, joining the house at T junctions, then add a roof (`K`, still *new*) with its
   own pitch and overhang. Windows and doors in those walls are *new* too. Where the new wall
-  replaces an existing wall or window, select the old one and **Mark demolish**.
+  replaces an existing wall or window, select the old one and **Mark demolish**, then draw the new
+  wall beside it: a wall drawn on top of an existing one is refused ("A wall is already there"),
+  so the existing wall is never replaced by accident.
 - **The porch.** Select the existing porch's three walls and its roof, **Mark demolish**. Draw the
   larger porch as new: its walls (with openings above the knee walls, or posts from the Site tab,
   `C`, Tab for a post), its roof, and any steps. The entry door stays unless you change it.
@@ -367,9 +374,6 @@ parts green. Export from Existing and from Proposed to give the contractor or Sk
 
 ## Known limitations
 
-- **Stairs cut their whole footprint out of the floor above.** The First Floor stair's hole in the
-  Second Floor is the full stair rectangle (x 7 to 132, y 102 to 135), so it also removes the floor
-  under the Master closet, which really sits over the low end of the stair.
 - **Roofs**: no valleys or dormers; roofs that meet (a wing roof running into the main wall,
   porch roofs) simply overlap, and the walls only follow the roofs on their own level. A hip roof
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
@@ -378,8 +382,10 @@ parts green. Export from Existing and from Proposed to give the contractor or Sk
   floors and steps, foundations under additions and porches, gutters, cabinets, fixtures,
   furniture, and text or dimension notes you place yourself.
 - **Walk mode has no collision**: you can walk through walls and the ground.
-- The terrain is the average of your grade points, weighted by distance; it does not cut away for
-  the basement, so the ground shows through basement openings.
+- The terrain is the average of your grade points, weighted by distance. Under the lowest level's
+  footprint (out to its walls' outside faces) it drops to 2" below that level's slab, so the
+  basement is empty; the ground is not shaped any further around the house (no window wells,
+  no foundation under a wing or porch that has no basement).
 - A wall has one thickness; layered walls (siding, sheathing, studs, drywall) are not modeled, and
   both faces of an exterior wall show the siding.
 - At most one wall between two corners, and walls are straight (no curved walls).

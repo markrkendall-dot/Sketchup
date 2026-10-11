@@ -92,9 +92,10 @@ function Levels() {
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const active = useUiStore((s) => s.activeLevelId);
+  const siteMode = useUiStore((s) => s.siteMode);
   const shown = useMemo(
-    () => visible3dLevels(order, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active }),
-    [order, hidden, only, active],
+    () => visible3dLevels(order, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode }),
+    [order, hidden, only, active, siteMode],
   );
   return (
     <>

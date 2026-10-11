@@ -11,9 +11,12 @@ import {
   roofProblem,
   findNodeNear,
   MERGE_EPS,
+  movesCreateOverlap,
   newId,
   normalizeLevel,
+  WALL_OVERLAP_MESSAGE,
   wallLength,
+  wallOverlapping,
 } from '../model/plan';
 import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { normalizeDegrees, stairsRunOk, stairsWidthOk } from '../derive/stairs';
@@ -70,8 +73,13 @@ export interface PlanState {
   plan: Plan;
   setPlan: (plan: Plan) => void;
   renamePlan: (name: string) => void;
+  /**
+   * Add a wall between two points or nodes and normalize the level. Null when it is degenerate or
+   * would lie on top of a wall already there (then the draft message says so).
+   */
   addWall: (levelId: Id, a: Vec2 | Id, b: Vec2 | Id, opts: AddWallOptions) => AddWallResult | null;
   moveNode: (levelId: Id, nodeId: Id, pos: Vec2, opts?: { normalize?: boolean }) => void;
+  /** Move nodes; a move that would lay a wall on top of another wall is refused (nothing changes). */
   moveNodes: (levelId: Id, positions: Record<Id, Vec2>, opts?: { normalize?: boolean }) => void;
   /** Run normalize() on a level; used at the end of an untracked drag. */
   normalize: (levelId: Id, moved?: Id[]) => void;
@@ -105,7 +113,10 @@ export interface PlanState {
   deleteRooms: (levelId: Id, ids: Id[]) => void;
   /** Add stairs; returns the id, or null when the size or position is not usable. */
   addStairs: (levelId: Id, stairs: NewStairs) => Id | null;
-  /** Patch stairs; invalid sizes are rejected, the direction is normalized to [0, 360). */
+  /**
+   * Patch stairs; invalid sizes are rejected, the direction is normalized to [0, 360). `headroom`
+   * and `holeStart` take undefined to clear them.
+   */
   updateStairs: (levelId: Id, id: Id, patch: StairsPatch) => void;
   deleteStairs: (levelId: Id, ids: Id[]) => void;
   /** Add a roof; returns the id, or null when its outline or sizes are not usable. */
@@ -133,9 +144,10 @@ export interface PlanState {
   setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; columns?: Id[] }, phase: Phase) => void;
   /**
    * Copy the nodes and walls (not openings) of one level into another, merged with whatever is
-   * there, in one undo step. Returns the number of walls copied.
+   * there, in one undo step. Walls that would lie on top of a wall already on the target level
+   * are skipped. Returns how many walls were copied and how many were skipped.
    */
-  copyWallsFromLevel: (fromId: Id, toId: Id) => number;
+  copyWallsFromLevel: (fromId: Id, toId: Id) => { copied: number; skipped: number };
   updateSettings: (patch: Partial<PlanSettings>) => void;
   renameLevel: (levelId: Id, name: string) => void;
   updateLevel: (levelId: Id, patch: LevelPatch) => void;
@@ -230,7 +242,9 @@ const validStairs = (s: Omit<Stairs, 'id'>, limits: { width: boolean; run: boole
   Number.isFinite(s.run) &&
   Number.isFinite(s.direction) &&
   Number.isFinite(s.origin.x) &&
-  Number.isFinite(s.origin.y);
+  Number.isFinite(s.origin.y) &&
+  (s.headroom === undefined || (Number.isFinite(s.headroom) && s.headroom > 0)) &&
+  (s.holeStart === undefined || (Number.isFinite(s.holeStart) && s.holeStart >= 0));
 
 /** A roof's stored form: outline points copied, ridge angle in [0, 360). */
 function cleanRoof(r: Roof): Roof {
@@ -297,22 +311,31 @@ export const usePlanStore = create<PlanState>()(
 
         addWall: (levelId, aRef, bRef, opts) => {
           let result: AddWallResult | null = null;
+          let overlap = false;
           editLevel(levelId, (level) => {
-            const resolveRef = (ref: Vec2 | Id): { id: Id; existing: boolean } | null => {
-              if (typeof ref === 'string') return level.nodes[ref] ? { id: ref, existing: true } : null;
+            // Where each end lands: a node id, an existing node within MERGE_EPS, or a new point.
+            const locate = (ref: Vec2 | Id): { id: Id | null; at: Vec2 } | null => {
+              if (typeof ref === 'string') return level.nodes[ref] ? { id: ref, at: level.nodes[ref] } : null;
               const near = findNodeNear(level, ref);
-              if (near) return { id: near, existing: true };
-              const id = newId();
-              level.nodes[id] = { id, x: ref.x, y: ref.y };
-              return { id, existing: false };
+              return near ? { id: near, at: level.nodes[near] } : { id: null, at: ref };
             };
-            const a = resolveRef(aRef);
-            const b = resolveRef(bRef);
-            if (!a || !b || a.id === b.id) {
-              // Do not leave a node created for a rejected wall behind.
-              for (const r of [a, b]) if (r && !r.existing) delete level.nodes[r.id];
+            const la = locate(aRef);
+            const lb = locate(bRef);
+            if (!la || !lb || (la.id !== null && la.id === lb.id) || dist(la.at, lb.at) <= MERGE_EPS) return false;
+            // A wall on top of a wall already there (any phase) would replace a piece of it when
+            // the level is normalized: refuse it instead (docs/REVIEW-2.md A1).
+            if (wallOverlapping(level, la.at, lb.at)) {
+              overlap = true;
               return false;
             }
+            const place = (l: { id: Id | null; at: Vec2 }): { id: Id; existing: boolean } => {
+              if (l.id) return { id: l.id, existing: true };
+              const id = newId();
+              level.nodes[id] = { id, x: l.at.x, y: l.at.y };
+              return { id, existing: false };
+            };
+            const a = place(la);
+            const b = place(lb);
             const wall: Wall = {
               id: newId(),
               a: a.id,
@@ -332,18 +355,22 @@ export const usePlanStore = create<PlanState>()(
               bWasExisting: b.existing,
             };
           });
+          if (overlap) useUiStore.getState().patchDraft({ message: WALL_OVERLAP_MESSAGE, error: true });
           return result;
         },
 
         moveNode: (levelId, nodeId, pos, opts) =>
           editLevel(levelId, (level) => {
             if (!level.nodes[nodeId]) return false;
+            if (movesCreateOverlap(level, { [nodeId]: pos })) return false;
             moveNodesInPlace(level, { [nodeId]: pos });
             if (opts?.normalize !== false) normalizeLevel(level, new Set([nodeId]));
           }),
 
         moveNodes: (levelId, positions, opts) =>
           editLevel(levelId, (level) => {
+            // A step that would lay a wall on top of another is refused: the nodes stay put.
+            if (movesCreateOverlap(level, positions)) return false;
             moveNodesInPlace(level, positions);
             if (opts?.normalize !== false) normalizeLevel(level, new Set(Object.keys(positions)));
           }),
@@ -434,6 +461,7 @@ export const usePlanStore = create<PlanState>()(
               anchor === 'start'
                 ? [w.b, { x: a.x + ux * length, y: a.y + uy * length }]
                 : [w.a, { x: b.x - ux * length, y: b.y - uy * length }];
+            if (movesCreateOverlap(level, { [movedId]: pos })) return false;
             moveNodesInPlace(level, { [movedId]: pos });
             normalizeLevel(level, new Set([movedId]));
             ok = true;
@@ -539,6 +567,8 @@ export const usePlanStore = create<PlanState>()(
               origin: { x: input.origin.x, y: input.origin.y },
               direction: normalizeDegrees(input.direction),
             };
+            if (stairs.headroom === undefined) delete stairs.headroom;
+            if (stairs.holeStart === undefined) delete stairs.holeStart;
             level.stairs[stairs.id] = stairs;
             id = stairs.id;
           });
@@ -557,6 +587,14 @@ export const usePlanStore = create<PlanState>()(
             if (patch.run !== undefined) st.run = patch.run;
             if (patch.phase !== undefined) st.phase = patch.phase;
             if (patch.cutsFloorAbove !== undefined) st.cutsFloorAbove = patch.cutsFloorAbove;
+            // Optional fields: undefined clears them (back to the headroom rule / 80").
+            for (const k of ['headroom', 'holeStart'] as const) {
+              if (!(k in patch)) continue;
+              const v = patch[k];
+              if (v === undefined) {
+                if (k in st) delete st[k];
+              } else if (st[k] !== v) st[k] = v;
+            }
           }),
 
         deleteStairs: (levelId, ids) =>
@@ -718,31 +756,48 @@ export const usePlanStore = create<PlanState>()(
           }),
 
         copyWallsFromLevel: (fromId, toId) => {
-          let count = 0;
+          const out = { copied: 0, skipped: 0 };
           set((s) => {
             const from = s.plan.levels[fromId];
             const to = s.plan.levels[toId];
             if (!from || !to || from === to) return;
+            // Walls that would lie on top of a wall already on the target level are skipped (the
+            // duplicate drop would otherwise replace pieces of the target's walls).
+            const targetWalls = new Set(Object.keys(to.walls));
             const nodeMap = new Map<Id, Id>();
-            for (const n of Object.values(from.nodes)) {
-              const id = newId();
-              nodeMap.set(n.id, id);
-              to.nodes[id] = { id, x: n.x, y: n.y };
-            }
+            const nodeFor = (id: Id): Id | null => {
+              const n = from.nodes[id];
+              if (!n) return null;
+              let mapped = nodeMap.get(id);
+              if (!mapped) {
+                mapped = newId();
+                nodeMap.set(id, mapped);
+                to.nodes[mapped] = { id: mapped, x: n.x, y: n.y };
+              }
+              return mapped;
+            };
             for (const w of Object.values(from.walls)) {
-              const a = nodeMap.get(w.a);
-              const b = nodeMap.get(w.b);
+              const pa = from.nodes[w.a];
+              const pb = from.nodes[w.b];
+              if (!pa || !pb) continue;
+              if (wallOverlapping(to, pa, pb, (t) => !targetWalls.has(t.id))) {
+                out.skipped++;
+                continue;
+              }
+              const a = nodeFor(w.a);
+              const b = nodeFor(w.b);
               if (!a || !b) continue;
               const copy: Wall = { ...w, id: newId(), a, b };
               // Height overrides belong to the source level's storey.
               delete copy.heightOverride;
               to.walls[copy.id] = copy;
-              count++;
+              out.copied++;
             }
+            if (out.copied === 0) return;
             normalizeLevel(to);
             touch(s.plan);
           });
-          return count;
+          return out;
         },
 
         updateSettings: (patch) =>
