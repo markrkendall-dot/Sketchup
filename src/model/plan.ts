@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
+import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { dist, projectPointToSegment } from './geometry';
-import { clampOpeningOffset, openingInterval } from './openings';
+import { clampOpeningOffset } from './openings';
 import type { Id, Level, Plan, PlanSettings, Vec2, Wall } from './types';
 
 export const SCHEMA_VERSION = 1 as const;
@@ -97,13 +98,18 @@ export function findWallBetween(level: Level, a: Id, b: Id): Wall | null {
   return null;
 }
 
-/** Clamp the offsets of every opening on a wall (or on all walls when wallId is omitted). */
-export function clampOpenings(level: Level, wallId?: Id): void {
+/**
+ * Clamp the offsets of every opening on a wall (or on all walls when wallId is omitted) to the
+ * wall's core interval between corner joins (derive/openings.ts coreInterval). Footprints are
+ * computed fresh: `level` is usually an immer draft.
+ */
+export function clampOpenings(level: Level, wallId?: Id, source?: FootprintSource): void {
+  let fps = source;
   for (const o of Object.values(level.openings)) {
     if (wallId !== undefined && o.wallId !== wallId) continue;
-    const wall = level.walls[o.wallId];
-    if (!wall) continue;
-    const [s0, s1] = openingInterval(wallLength(level, wall));
+    if (!level.walls[o.wallId]) continue;
+    fps ??= draftFootprints(level);
+    const [s0, s1] = coreInterval(level, o.wallId, o.phase, fps)!;
     const next = clampOpeningOffset(o.offset, o.width, s0, s1);
     // Assign only on change so immer keeps untouched openings' identity.
     if (Math.abs(next - o.offset) > 1e-9) o.offset = next;

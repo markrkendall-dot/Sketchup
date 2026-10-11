@@ -1,13 +1,15 @@
 import { memo, useMemo } from 'react';
 import { getFootprints, type Footprint } from '../derive/footprint';
-import { getGraph } from '../derive/graph';
-import { arcPath, openingsOnWall, openingSymbol, wallPieces } from '../derive/openings';
+import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible } from '../derive/phase';
-import { add, midpoint, scale } from '../model/geometry';
-import type { Id, Vec2 } from '../model/types';
-import { formatLengthCompact } from '../model/units';
+import { getFaces, type FaceSet } from '../derive/rooms';
+import { add, midpoint, polygonSignedArea, scale } from '../model/geometry';
+import type { Id, Opening, Vec2, ViewMode, Wall } from '../model/types';
+import { formatArea, formatLengthCompact } from '../model/units';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore, useViewportScale } from '../store/uiStore';
+import { outlinePath } from './outline';
+import { ROOM_AREA_DY, ROOM_NAME_DY, roomLabels } from './roomLabels';
 
 /** Gap between a wall face and its dimension label, in screen px. */
 const LABEL_GAP_PX = 11;
@@ -15,15 +17,31 @@ const LABEL_GAP_PX = 11;
 const MIN_LABEL_WALL_PX = 34;
 /** Spacing of the demolition hatch, in screen px. */
 const HATCH_PX = 7;
+/** Radius of the open wall end markers, screen px. */
+const OPEN_END_PX = 4.5;
+/** Room tints cycle through this many classes. */
+const ROOM_TINTS = 4;
 export const HATCH_DEMO_ID = 'hp-hatch-demo';
 
 const pt = (p: Vec2) => `${p.x},${p.y}`;
 const segPath = (segs: readonly (readonly [Vec2, Vec2])[]) => segs.map(([p, q]) => `M${pt(p)}L${pt(q)}`).join('');
+const polyPath = (poly: readonly Vec2[]) => `M${poly.map(pt).join('L')}Z`;
 
+/** A wall's footprint in the current view mode (undefined while the wall is hidden). */
 function useFootprint(levelId: Id, wallId: Id | undefined): Footprint | undefined {
+  const viewMode = useUiStore((s) => s.viewMode);
   return usePlanStore((s) => {
     const level = s.plan.levels[levelId];
-    return level && wallId ? getFootprints(level).get(wallId) : undefined;
+    return level && wallId ? getFootprints(level, viewMode).get(wallId) : undefined;
+  });
+}
+
+/** Faces, open ends and room labels of a level in the current view mode (memoized). */
+function useFaceSet(levelId: Id): FaceSet | null {
+  const viewMode = useUiStore((s) => s.viewMode);
+  return usePlanStore((s) => {
+    const level = s.plan.levels[levelId];
+    return level ? getFaces(level, viewMode) : null;
   });
 }
 
@@ -47,49 +65,109 @@ const PatternDefs = memo(function PatternDefs() {
   );
 });
 
-const WallShape = memo(function WallShape({ levelId, wallId }: { levelId: Id; wallId: Id }) {
-  const fp = useFootprint(levelId, wallId);
-  const wall = usePlanStore((s) => s.plan.levels[levelId]?.walls[wallId]);
-  const openings = usePlanStore((s) => {
-    const level = s.plan.levels[levelId];
-    return level ? openingsOnWall(level, wallId) : undefined;
-  });
+/**
+ * A wall's solid pieces (mitred outline cut around its visible openings), cached per footprint
+ * object so unchanged walls are not re-cut when another wall or the selection changes.
+ */
+const piecesCache = new WeakMap<Footprint, { wall: Wall; openings: readonly Opening[] | undefined; viewMode: ViewMode; pieces: WallPieces }>();
+function wallPiecesFor(fp: Footprint, wall: Wall, openings: readonly Opening[] | undefined, viewMode: ViewMode): WallPieces {
+  const hit = piecesCache.get(fp);
+  if (hit && hit.wall === wall && hit.openings === openings && hit.viewMode === viewMode) return hit.pieces;
+  const gaps: [number, number][] = [];
+  for (const o of openings ?? []) {
+    if (!isOpeningVisible(o, wall, viewMode)) continue;
+    const sym = openingSymbol(fp, o);
+    gaps.push([sym.j0, sym.j1]);
+  }
+  const pieces = wallPieces(fp, fp, gaps);
+  piecesCache.set(fp, { wall, openings, viewMode, pieces });
+  return pieces;
+}
+
+const wallClass = (wall: Wall, selected: boolean, hovered: boolean) =>
+  `wall wall-${wall.kind} phase-${wall.phase}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}`;
+
+/** Paint order of fill groups: where two styles meet, the later one's hairline wins consistently. */
+const fillRank = (wall: Wall, selected: boolean, hovered: boolean) =>
+  (selected ? 40 : hovered ? 30 : 0) + (wall.phase === 'demo' ? 0 : wall.phase === 'new' ? 10 : 20) + (wall.kind === 'interior' ? 0 : 1);
+
+/** A positive (consistently wound) polygon path, so same-style pieces merge without seams. */
+const orientedPath = (poly: readonly Vec2[]) => polyPath(polygonSignedArea(poly) < 0 ? [...poly].reverse() : poly);
+
+interface StyleGroup {
+  cls: string;
+  rank: number;
+  ids: Id[];
+  fill: string;
+  segs: [Vec2, Vec2][];
+  /** Outline segments chained into polylines (outline.ts). */
+  edge: string;
+}
+
+/**
+ * Wall fills and outlines, merged into one path per style (kind, phase, selection, hover).
+ *
+ * Separate shapes that share an edge leave a faint anti-aliasing seam (or a doubled dot where two
+ * strokes end) however they are drawn. One fill path with consistent winding has no internal edges,
+ * and outline segments chained into polylines meet in line joins, so mitred corners and the two
+ * halves of a wall split by a T read as one solid with one outline. The outline is the long edges (trimmed
+ * where a T's butt wall meets the face), opening jambs, and end caps only at open ends and bevels:
+ * never at joins. All fills are painted before all outlines.
+ *
+ * Each group lists its walls in data-wall-ids. Fills and outlines are recomputed for the whole
+ * level on change; per-wall pieces are cached on the footprint object, which keeps its identity
+ * while the wall is unchanged.
+ */
+function useWallGroups(levelId: Id): StyleGroup[] {
+  const level = usePlanStore((s) => s.plan.levels[levelId]);
   const viewMode = useUiStore((s) => s.viewMode);
-  // Caps only at ends with no other visible wall, so a wall split by a T shows no seam.
-  const caps = usePlanStore((s) => {
-    const level = s.plan.levels[levelId];
-    const w = level?.walls[wallId];
-    if (!w) return 0;
-    const g = getGraph(level);
-    const free = (n: Id) =>
-      !(g.adjacency.get(n) ?? []).some((id) => id !== wallId && isVisible(level.walls[id].phase, viewMode));
-    return (free(w.a) ? 1 : 0) | (free(w.b) ? 2 : 0);
-  });
-  const selected = useUiStore((s) => s.selection.walls.includes(wallId));
-  const hovered = useUiStore((s) => s.hover.wallId === wallId);
-  const pieces = useMemo(() => {
-    if (!fp || !wall) return null;
-    const gaps: [number, number][] = [];
-    for (const o of openings ?? []) {
-      if (!isOpeningVisible(o, wall, viewMode)) continue;
-      const sym = openingSymbol(fp, o);
-      gaps.push([sym.j0, sym.j1]);
+  const selected = useUiStore((s) => s.selection.walls);
+  const hovered = useUiStore((s) => s.hover.wallId);
+  return useMemo(() => {
+    if (!level) return [];
+    const fps = getFootprints(level, viewMode);
+    const byWall = getOpeningsByWall(level);
+    const map = new Map<string, StyleGroup>();
+    for (const wall of Object.values(level.walls)) {
+      const fp = fps.get(wall.id);
+      if (!fp) continue;
+      const sel = selected.includes(wall.id);
+      const hov = hovered === wall.id;
+      const cls = wallClass(wall, sel, hov);
+      const pieces = wallPiecesFor(fp, wall, byWall.get(wall.id), viewMode);
+      const fill = pieces.fills.map(orientedPath).join('');
+      const edges = pieces.edges;
+      const g = map.get(cls);
+      if (g) {
+        g.ids.push(wall.id);
+        g.fill += fill;
+        g.segs.push(...edges);
+      } else map.set(cls, { cls, rank: fillRank(wall, sel, hov), ids: [wall.id], fill, segs: [...edges], edge: '' });
     }
-    return wallPieces(fp, fp.quad, gaps);
-  }, [fp, wall, openings, viewMode]);
-  if (!fp || !wall || !pieces || !isVisible(wall.phase, viewMode)) return null;
-  const [la, lb, rb, ra] = fp.quad;
-  let edges = segPath(pieces.edges);
-  if (caps & 1) edges += `M${pt(la)}L${pt(ra)}`;
-  if (caps & 2) edges += `M${pt(lb)}L${pt(rb)}`;
-  const cls = `wall wall-${wall.kind} phase-${wall.phase}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}`;
+    for (const g of map.values()) g.edge = outlinePath(g.segs);
+    return [...map.values()].sort((p, q) => p.rank - q.rank);
+  }, [level, viewMode, selected, hovered]);
+}
+
+const WallsLayer = memo(function WallsLayer({ levelId }: { levelId: Id }) {
+  const groups = useWallGroups(levelId);
   return (
-    <g className={cls} data-wall-id={wallId}>
-      {pieces.fills.map((poly, i) => (
-        <polygon key={i} className="wall-fill" points={poly.map(pt).join(' ')} vectorEffect="non-scaling-stroke" />
-      ))}
-      <path className="wall-edge" d={edges} vectorEffect="non-scaling-stroke" />
-    </g>
+    <>
+      <g className="layer-walls" pointerEvents="none">
+        {groups.map((g) => (
+          <g key={g.cls} className={g.cls}>
+            <path className="wall-fill" d={g.fill} vectorEffect="non-scaling-stroke" />
+          </g>
+        ))}
+      </g>
+      <g className="layer-wall-edges" pointerEvents="none">
+        {groups.map((g) => (
+          <g key={g.cls} className={g.cls} data-wall-ids={g.ids.join(' ')}>
+            <path className="wall-edge" d={g.edge} vectorEffect="non-scaling-stroke" />
+          </g>
+        ))}
+      </g>
+    </>
   );
 });
 
@@ -169,13 +247,89 @@ function useOpeningIds(levelId: Id): Id[] {
   return useMemo(() => (openings ? Object.keys(openings) : []), [openings]);
 }
 
-const WallsLayer = memo(function WallsLayer({ levelId }: { levelId: Id }) {
-  const ids = useWallIds(levelId);
+/** Light tint under every enclosed area (net polygon), below the walls. */
+const RoomFillsLayer = memo(function RoomFillsLayer({ levelId }: { levelId: Id }) {
+  const set = useFaceSet(levelId);
+  const selected = useUiStore((s) => s.selection.rooms);
+  if (!set || set.faces.length === 0) return null;
   return (
-    <g className="layer-walls">
-      {ids.map((id) => (
-        <WallShape key={id} levelId={levelId} wallId={id} />
+    <g className="layer-room-fills" pointerEvents="none">
+      {set.faces.map((f, i) => (
+        <path
+          key={f.id}
+          className={`room-fill tint-${i % ROOM_TINTS}${f.roomId && selected.includes(f.roomId) ? ' is-selected' : ''}`}
+          d={polyPath(f.netPolygon)}
+          data-face-id={f.id}
+          vectorEffect="non-scaling-stroke"
+        />
       ))}
+    </g>
+  );
+});
+
+/**
+ * Room names and net areas at each face's label point, constant on screen. Unlabeled faces show
+ * only their area; rooms whose anchor is in no face (or shares one) show at the anchor in a warning
+ * colour. Picking is done by the tools (roomLabels.ts), so the layer only takes pointer events
+ * (for the cursor) while the select or room tool is active.
+ */
+const RoomLabelsLayer = memo(function RoomLabelsLayer({ levelId }: { levelId: Id }) {
+  const set = useFaceSet(levelId);
+  const level = usePlanStore((s) => s.plan.levels[levelId]);
+  const k = useViewportScale();
+  const tool = useUiStore((s) => s.activeTool);
+  const selected = useUiStore((s) => s.selection.rooms);
+  const editing = useUiStore((s) => s.roomEdit?.roomId ?? null);
+  const labels = useMemo(() => (level && set ? roomLabels(level, set) : []), [level, set]);
+  if (labels.length === 0) return null;
+  const pickable = tool === 'select' || tool === 'room';
+  return (
+    <g className={`layer-room-labels${pickable ? ' pickable' : ''}`} pointerEvents={pickable ? 'auto' : 'none'}>
+      {labels.map((l) => {
+        const id = l.room?.id;
+        const isSel = !!id && selected.includes(id);
+        if (id && id === editing) return null;
+        const cls = `room-label${l.room ? '' : ' unlabeled'}${l.orphan ? ' orphan' : ''}${isSel ? ' is-selected' : ''}`;
+        return (
+          <g
+            key={l.face ? l.face.id : `orphan-${id}`}
+            className={cls}
+            data-room-id={id}
+            data-face-id={l.face?.id}
+            transform={`translate(${l.at.x} ${l.at.y}) scale(${1 / k})`}
+          >
+            {l.room && (
+              <text className="room-name" y={ROOM_NAME_DY} textAnchor="middle" dominantBaseline="central">
+                {l.room.name}
+              </text>
+            )}
+            <text className="room-area" y={l.room ? ROOM_AREA_DY : 0} textAnchor="middle" dominantBaseline="central">
+              {l.face ? formatArea(l.face.netArea) : l.orphan === 'shared' ? 'shares an area' : 'not enclosed'}
+            </text>
+          </g>
+        );
+      })}
+      {selected.map((id) => {
+        const room = level?.rooms[id];
+        if (!room) return null;
+        return <circle key={`anchor-${id}`} className="room-anchor" cx={room.anchor.x} cy={room.anchor.y} r={3.5 / k} />;
+      })}
+    </g>
+  );
+});
+
+/** Small red circles on wall ends that join nothing (the loop is not closed there). */
+const OpenEndsLayer = memo(function OpenEndsLayer({ levelId }: { levelId: Id }) {
+  const set = useFaceSet(levelId);
+  const nodes = usePlanStore((s) => s.plan.levels[levelId]?.nodes);
+  const k = useViewportScale();
+  if (!set || !nodes || set.openEnds.length === 0) return null;
+  return (
+    <g className="layer-open-ends" pointerEvents="none">
+      {set.openEnds.map((id) => {
+        const n = nodes[id];
+        return n ? <circle key={id} className="open-end" data-node-id={id} cx={n.x} cy={n.y} r={OPEN_END_PX / k} /> : null;
+      })}
     </g>
   );
 });
@@ -222,13 +376,8 @@ export const GhostLevel = memo(function GhostLevel({ levelId }: { levelId: Id })
   const viewMode = useUiStore((s) => s.viewMode);
   const d = useMemo(() => {
     if (!level) return '';
-    const fps = getFootprints(level);
     let path = '';
-    for (const w of Object.values(level.walls)) {
-      const fp = fps.get(w.id);
-      if (!fp || !isVisible(w.phase, viewMode)) continue;
-      path += `M${fp.quad.map(pt).join('L')}Z`;
-    }
+    for (const fp of getFootprints(level, viewMode).values()) path += polyPath(fp.poly);
     return path;
   }, [level, viewMode]);
   if (!d) return null;
@@ -243,9 +392,12 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
   return (
     <>
       <PatternDefs />
+      <RoomFillsLayer levelId={levelId} />
       <WallsLayer levelId={levelId} />
       <OpeningsLayer levelId={levelId} />
+      <RoomLabelsLayer levelId={levelId} />
       <LabelsLayer levelId={levelId} />
+      <OpenEndsLayer levelId={levelId} />
       <NodesLayer levelId={levelId} />
     </>
   );

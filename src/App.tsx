@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { PlanCanvas } from './editor2d/PlanCanvas';
+import { RoomNameEditor } from './editor2d/RoomNameEditor';
 import { cycleViewMode, dispatchKey, dispatchShift, switchLevelByIndex, switchTool } from './editor2d/tools';
 import { redo, undo, usePlanStore } from './store/planStore';
 import { useUiStore, type ToolName } from './store/uiStore';
@@ -8,7 +9,7 @@ import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
 
-const TOOL_KEYS: Record<string, ToolName> = { s: 'select', w: 'wall', d: 'door', n: 'window', p: 'passage' };
+const TOOL_KEYS: Record<string, ToolName> = { s: 'select', w: 'wall', r: 'room', d: 'door', n: 'window', p: 'passage' };
 
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -91,6 +92,7 @@ export function App() {
         <LevelBar />
         <main className="canvas-host">
           <PlanCanvas />
+          <RoomNameEditor />
         </main>
         <PropertiesPanel />
       </div>

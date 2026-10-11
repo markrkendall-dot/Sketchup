@@ -193,17 +193,22 @@ kbd {
   --wall-color: var(--wall-interior);
 }
 
-/* The hairline stroke in the fill colour hides anti-aliasing seams where a wall is split into
-   collinear pieces (T junctions, openings); it stays inside the edge strokes. */
+/* Fills of one style are a single path (no internal seams, see WallFillsLayer). The hairline
+   stroke in the fill colour covers the anti-aliasing seam where two styles meet (an interior wall
+   butting an exterior one); it stays inside the edge strokes. */
 .wall-fill {
   fill: var(--wall-color);
   stroke: var(--wall-color);
   stroke-width: 0.75;
+  stroke-linejoin: round;
 }
 
+/* Square caps: where two collinear outline segments meet (a wall split by a T, a corner) their
+   ends overlap by half a pixel instead of leaving a lighter anti-aliased dot. */
 .wall-edge {
   stroke: var(--wall-edge);
   stroke-width: 1;
+  stroke-linecap: square;
   fill: none;
 }
 
@@ -757,4 +762,115 @@ button.danger {
   color: var(--muted);
   font-size: 12.5px;
   margin: 12px 0 0;
+}
+
+/* Rooms ------------------------------------------------------------------------------------- */
+
+.room-fill {
+  stroke: none;
+}
+
+.room-fill.tint-0 {
+  fill: #f3efe4;
+}
+
+.room-fill.tint-1 {
+  fill: #e9f0ec;
+}
+
+.room-fill.tint-2 {
+  fill: #ebeef5;
+}
+
+.room-fill.tint-3 {
+  fill: #f4ecee;
+}
+
+.room-fill.is-selected {
+  fill: #dbe7fb;
+}
+
+.room-label text {
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.room-name {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  fill: #27272a;
+}
+
+.room-area {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  fill: #52525b;
+}
+
+.room-label.unlabeled .room-area {
+  fill: #a1a1aa;
+}
+
+.room-label.orphan .room-name,
+.room-label.orphan .room-area {
+  fill: #c2410c;
+}
+
+.room-label.orphan .room-area {
+  font-style: italic;
+}
+
+.room-label.is-selected .room-name {
+  fill: var(--accent);
+}
+
+.layer-room-labels.pickable .room-label:not(.unlabeled) {
+  cursor: move;
+}
+
+.room-anchor {
+  fill: var(--accent);
+  stroke: #fff;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.open-end {
+  fill: #fff;
+  stroke: var(--danger);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.room-name-editor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 11em;
+  font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  outline: 2px solid var(--accent-soft);
+}
+
+.statusbar .status-open-ends {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.statusbar .status-measure {
+  color: var(--text);
+  text-decoration: underline dotted;
+  cursor: help;
+}
+
+.panel-note.warning {
+  color: #c2410c;
 }

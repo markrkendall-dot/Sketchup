@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
 import { setViewMode, switchTool } from '../editor2d/tools';
+import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import { fitLevel, initialViewport } from '../editor2d/viewport';
 import { downloadPlan, readPlanFile } from '../io/file';
 import { createEmptyPlan, defaultLevelId } from '../model/plan';
@@ -11,6 +12,7 @@ import { useUiStore, type DrawPhase, type ToolName } from '../store/uiStore';
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
   { name: 'wall', label: 'Wall', key: 'W' },
+  { name: 'room', label: 'Room', key: 'R' },
   { name: 'door', label: 'Door', key: 'D' },
   { name: 'window', label: 'Window', key: 'N' },
   { name: 'passage', label: 'Passage', key: 'P' },
@@ -154,7 +156,7 @@ export function Toolbar() {
           <option value="new">new</option>
         </select>
       </label>
-      <label className="measure">
+      <label className="measure" title={MEASURE_RULE}>
         Lengths to
         <select
           value={measureTo}

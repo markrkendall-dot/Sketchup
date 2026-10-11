@@ -112,24 +112,39 @@ Simple graph, not multigraph: at most one wall between two nodes.
 
 ## Corner joins (`derive/footprint.ts`)
 
-For wall a->b with unit direction d and left normal n, the left offset line is `a + n*t/2 -> b + n*t/2`.
-At node a, sort incident walls by outgoing angle. The wall's left edge meets the right edge of the next
-wall counter-clockwise; intersect the offset lines. Symmetrically for the right edge and the previous
-wall clockwise. Fallbacks: degree 1 -> square cap; collinear neighbour (|cross| < 1e-6) -> square cap
-(the through wall at a T); miter longer than `1.5 * max(t, t_neighbour)` -> bevel at that cap length.
-Output per wall: `quad: [leftA, leftB, rightB, rightA]` and the core interval
-`s0 = max(0, proj(leftA), proj(rightA))`, `s1 = min(L, proj(leftB), proj(rightB))`. Openings are
-clamped to `[s0 + w/2, s1 - w/2]`.
+For wall a->b with unit direction d and left normal n = perpLeft(d) = (d.y, -d.x) (walking a->b on
+the y-down screen, left is on your left), the left offset line is `a + n*t/2 -> b + n*t/2`.
+`getFootprints(level, viewMode)` only uses walls visible in the view mode (hidden walls get no
+footprint and do not shape corners). At each node, sort incident walls by outgoing angle (atan2
+ascending, clockwise on screen). The corner of each sector between consecutive walls is the
+intersection of the first wall's right edge and the next wall's left edge; it is computed once per
+node and shared, so neighbours get bit-identical points. Fallbacks: degree 1 -> square cap; an
+opposite collinear pair (|cross| < 1e-6) is a "through" pair (a wall split by a T, or the thicker pair
+of an X): both halves are square capped and every other wall at the node lands its corners on their
+face lines; other collinear neighbours -> square cap; an outer (reflex) miter longer than
+`1.5 * max(t, t_neighbour)` -> bevel at that length, with the bevel midpoint as an extra outline vertex
+shared by both walls. At degree >= 3 nodes without a through pair (a Y) the cap of each wall also
+runs through the node, so the hub is covered. Output per wall: `quad: [leftA, leftB, rightB, rightA]`
+(where the long edges end), `poly` (the fill outline: the quad plus any bevel/hub vertices), `edge`
+(stroke extents: as the quad, but trimmed where a butt wall meets the face) and the core interval
+`s0 = max(0, proj(edge leftA), proj(edge rightA))`, `s1 = min(L, proj(edge leftB), proj(edge rightB))`.
+Openings are clamped to `[s0 + w/2, s1 - w/2]`, using the intersection of the intervals over the
+views (existing, proposed) in which the opening shows; jamb distances in the UI are measured from
+s0/s1 (the inside face of the corner, what a tape measure gives).
 
-2D stroke trick: fill the quad, stroke only the two long edges plus end caps at degree-1 nodes, so a
-through wall split by a T shows no seam.
+2D stroke trick: fill the outline, stroke only the long edges plus end caps at open ends and bevels,
+so a through wall split by a T shows no seam. Same-style walls are drawn as one fill path (consistent
+winding) and one outline path (segments chained into polylines): separate shapes meeting edge to edge
+always leave an anti-aliasing seam.
 
 ## Rooms (`derive/rooms.ts`)
 
 Planar face enumeration: two half-edges per wall, sort outgoing half-edges by atan2 at each node,
-trace faces by stepping to the next half-edge clockwise from the twin. Discard the outer face of each
-component (negative signed area with the chosen convention; assert the sign in a test with one
-rectangle) and faces under 1 sq ft. Remove spike pairs `p, q, p` from dangling walls. A Room's anchor
+trace faces by stepping to the next half-edge clockwise from the twin (in the y-up/math sense: the
+previous one in ascending-atan2 order on the y-down plan). Bounded faces then come out clockwise on
+screen with positive `polygonSignedArea`, interior on the right of each half-edge. Discard the outer
+face of each component (negative signed area; pinned by a one-rectangle test in rooms.test.ts, kept
+as `outerFaces` for slabs) and faces under 1 sq ft. Remove spike pairs `p, q, p` from dangling walls. A Room's anchor
 is point-in-polygon tested against faces; the containing face gets the name. Rooms whose anchor is in
 no face render at the anchor in a warning colour. Net area: offset each edge inward by half the
 bounding wall thickness; fall back to centerline area if the offset polygon self-intersects.
@@ -209,8 +224,10 @@ moves are untracked, `resume()` on pointerup. One undo reverts the whole drag.
 
 ## Derivation and memoization
 
-`derive/*` are pure functions of plan objects. `getGraph(level)`, `getFootprints(level)`,
-`getFaces(level, viewMode)` are memoized by `WeakMap<Level, ...>`. `getFootprints` compares each
+`derive/*` are pure functions of plan objects. `getGraph(level)`, `getFootprints(level, viewMode)`,
+`getFaces(level, viewMode)` are memoized by `WeakMap<Level, ...>` (faces by the nodes/walls records,
+labels by the rooms record). Store actions run on immer drafts and use the unmemoized
+`computeFootprints` (a draft keeps its identity while mutated, so it must never key a cache). `getFootprints` compares each
 wall's new footprint with the previous one by value and returns the previous object if equal, so
 `<WallMesh3D>` can `useMemo` on the footprint reference and rebuild only changed walls. Dispose old
 geometry in effect cleanup.

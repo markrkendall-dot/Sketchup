@@ -1,6 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { getFootprints } from './derive/footprint';
+import { getFaces } from './derive/rooms';
 import { pruneSelection } from './editor2d/tools';
 import { loadAutosave, startAutosave } from './io/file';
 import { defaultLevelId } from './model/plan';
@@ -11,7 +13,11 @@ import './index.css';
 declare global {
   interface Window {
     /** Dev-only debug handle for tests and the console. */
-    __homeplan?: { planStore: typeof usePlanStore; uiStore: typeof useUiStore };
+    __homeplan?: {
+      planStore: typeof usePlanStore;
+      uiStore: typeof useUiStore;
+      derive: { getFaces: typeof getFaces; getFootprints: typeof getFootprints };
+    };
   }
 }
 
@@ -30,7 +36,7 @@ async function boot(): Promise<void> {
   });
   startAutosave(usePlanStore);
 
-  if (import.meta.env.DEV) window.__homeplan = { planStore: usePlanStore, uiStore: useUiStore };
+  if (import.meta.env.DEV) window.__homeplan = { planStore: usePlanStore, uiStore: useUiStore, derive: { getFaces, getFootprints } };
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

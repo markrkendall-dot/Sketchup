@@ -153,7 +153,8 @@ function OpeningGhost({ preview, v, denom }: { preview: OpeningPreview; v: Viewp
       return `M${a.x},${a.y}L${b.x},${b.y}`;
     })
     .join('');
-  // Dimension lines on the cursor's side of the wall, from each wall end to the nearer jamb.
+  // Dimension lines on the cursor's side of the wall, from each end of the core interval (the
+  // inside face of the corner) to the nearer jamb.
   const n = scale(g.normal, preview.cursorSide);
   const off = (g.thickness / 2) * v.k + OPENING_DIM_GAP_PX;
   const at = (s: number) => add(map(wallPoint(g, s, 0)), scale(n, off));
@@ -164,7 +165,7 @@ function OpeningGhost({ preview, v, denom }: { preview: OpeningPreview; v: Viewp
       {segs && <path className="opening-ghost-line" d={segs} />}
       {sym.arc && <path className="opening-ghost-line" d={arcPath(sym.arc, map, sym.arc.r * v.k)} />}
       <DimLine
-        a={at(0)}
+        a={at(g.s0)}
         b={at(sym.j0)}
         n={n}
         text={formatLengthCompact(preview.fromA, denom)}
@@ -173,7 +174,7 @@ function OpeningGhost({ preview, v, denom }: { preview: OpeningPreview; v: Viewp
       />
       <DimLine
         a={at(sym.j1)}
-        b={at(g.length)}
+        b={at(g.s1)}
         n={n}
         text={formatLengthCompact(preview.fromB, denom)}
         strong={preview.nearEnd === 'b'}

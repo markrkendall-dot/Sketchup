@@ -1,0 +1,308 @@
+import { add, lineIntersection, pointInPolygon, polygonSignedArea, scale, segmentIntersection, sub } from '../model/geometry';
+import type { Id, Level, Vec2, ViewMode } from '../model/types';
+import { isVisible } from './phase';
+
+// Rooms (DESIGN.md "Rooms"): planar face enumeration of the walls visible in a view mode.
+//
+// Winding convention (pinned by rooms.test.ts): plan coordinates are y-down and outgoing half-edges
+// at each node are sorted by atan2 ascending (clockwise on screen). A face is traced by stepping
+// from half-edge u->v to the outgoing half-edge at v that comes just BEFORE the twin v->u in that
+// order (the next one clockwise from the twin in the y-up/math sense). Bounded faces then come out
+// clockwise on screen with POSITIVE shoelace area (polygonSignedArea), their interior on the right
+// of each half-edge; the outer face of every connected component comes out negative.
+
+/** Faces smaller than one square foot are slivers, not rooms. */
+export const MIN_FACE_AREA = 144;
+
+export interface Face {
+  /** Stable id: hash of the sorted boundary node ids. */
+  id: string;
+  /** Boundary nodes in trace order (clockwise on screen), dangling spikes removed. */
+  nodeIds: Id[];
+  /** Wall of each boundary edge nodeIds[i] -> nodeIds[i + 1]. */
+  wallIds: Id[];
+  /** Centerline polygon, same order as nodeIds. */
+  polygon: Vec2[];
+  /** Polygon inset by half of each bounding wall's thickness (or the centerline polygon if that fails). */
+  netPolygon: Vec2[];
+  /** Square inches. */
+  grossArea: number;
+  netArea: number;
+  /** Room whose anchor lies in this face (the first one, if several do). */
+  roomId?: Id;
+  /** Where the face's label goes: the net polygon's centroid, or a fallback inside the face. */
+  labelPoint: Vec2;
+}
+
+export interface FaceSet {
+  faces: Face[];
+  /** Outer boundary of each component that encloses at least one face, positive (clockwise on screen). */
+  outerFaces: Vec2[][];
+  /** Nodes with exactly one visible wall. */
+  openEnds: Id[];
+  /** Rooms whose anchor is in no face, or in a face another room already labels. */
+  orphanRoomIds: Id[];
+}
+
+interface Geometry {
+  faces: Omit<Face, 'roomId' | 'labelPoint'>[];
+  outerFaces: Vec2[][];
+  openEnds: Id[];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Polygon helpers
+
+/** Area-weighted centroid; falls back to the vertex mean for degenerate polygons. */
+export function polygonCentroid(poly: readonly Vec2[]): Vec2 {
+  let a = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    const c = p.x * q.y - q.x * p.y;
+    a += c;
+    cx += (p.x + q.x) * c;
+    cy += (p.y + q.y) * c;
+  }
+  if (Math.abs(a) < 1e-9) {
+    const n = Math.max(poly.length, 1);
+    return { x: poly.reduce((s, p) => s + p.x, 0) / n, y: poly.reduce((s, p) => s + p.y, 0) / n };
+  }
+  return { x: cx / (3 * a), y: cy / (3 * a) };
+}
+
+/** A point inside the polygon: its centroid if inside, else the middle of the widest span at that height. */
+export function interiorPoint(poly: readonly Vec2[]): Vec2 {
+  const c = polygonCentroid(poly);
+  if (pointInPolygon(c, poly)) return c;
+  const xs: number[] = [];
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i];
+    const b = poly[j];
+    if (a.y > c.y !== b.y > c.y) xs.push(((b.x - a.x) * (c.y - a.y)) / (b.y - a.y) + a.x);
+  }
+  xs.sort((p, q) => p - q);
+  let best: Vec2 = c;
+  let bestW = -1;
+  for (let i = 0; i + 1 < xs.length; i += 2) {
+    if (xs[i + 1] - xs[i] > bestW) {
+      bestW = xs[i + 1] - xs[i];
+      best = { x: (xs[i] + xs[i + 1]) / 2, y: c.y };
+    }
+  }
+  return best;
+}
+
+/** True when two non-adjacent edges of the closed polygon cross or touch. */
+export function selfIntersects(poly: readonly Vec2[]): boolean {
+  const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    const a0 = poly[i];
+    const a1 = poly[(i + 1) % n];
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue; // adjacent through the wrap
+      if (segmentIntersection(a0, a1, poly[j], poly[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Inset a positive (clockwise on screen) polygon: edge i moves inward (to its right) by inset[i].
+ * Collinear neighbours with equal insets share one point; with different insets the step gets two.
+ */
+export function insetPolygon(poly: readonly Vec2[], inset: readonly number[]): Vec2[] {
+  const n = poly.length;
+  const dirs = poly.map((p, i) => {
+    const d = sub(poly[(i + 1) % n], p);
+    const len = Math.hypot(d.x, d.y);
+    return len < 1e-12 ? { x: 0, y: 0 } : { x: d.x / len, y: d.y / len };
+  });
+  // Right of travel on a y-down plan: (-d.y, d.x).
+  const inward = (d: Vec2): Vec2 => ({ x: -d.y, y: d.x });
+  const out: Vec2[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = (i - 1 + n) % n;
+    const dp = dirs[prev];
+    const dn = dirs[i];
+    const p = poly[i];
+    const lp = add(p, scale(inward(dp), inset[prev]));
+    const ln = add(p, scale(inward(dn), inset[i]));
+    const x = Math.abs(dp.x * dn.y - dp.y * dn.x) < 1e-9 ? null : lineIntersection(lp, dp, ln, dn);
+    if (x) out.push(x);
+    else if (Math.abs(inset[prev] - inset[i]) < 1e-9) out.push(ln);
+    else out.push(lp, ln);
+  }
+  return out;
+}
+
+function hashIds(ids: readonly string[]): string {
+  // FNV-1a over the joined ids; plenty for ids of faces on one level.
+  let h = 0x811c9dc5;
+  const s = ids.join('|');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return `f${(h >>> 0).toString(36)}`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Face enumeration
+
+/** Faces of the walls visible in `viewMode`. Pure; not memoized. */
+export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewMode: ViewMode): Geometry {
+  // Half-edges: 2w is a->b, 2w+1 is b->a, so the twin of h is h ^ 1.
+  const from: Id[] = [];
+  const to: Id[] = [];
+  const wallOf: Id[] = [];
+  const angle: number[] = [];
+  const thickness: number[] = [];
+  for (const w of Object.values(level.walls)) {
+    if (!isVisible(w.phase, viewMode)) continue;
+    const a = level.nodes[w.a];
+    const b = level.nodes[w.b];
+    if (!a || !b || w.a === w.b) continue;
+    from.push(w.a, w.b);
+    to.push(w.b, w.a);
+    wallOf.push(w.id, w.id);
+    angle.push(Math.atan2(b.y - a.y, b.x - a.x), Math.atan2(a.y - b.y, a.x - b.x));
+    thickness.push(w.thickness, w.thickness);
+  }
+  const H = from.length;
+  const out = new Map<Id, number[]>();
+  for (let h = 0; h < H; h++) {
+    const list = out.get(from[h]);
+    if (list) list.push(h);
+    else out.set(from[h], [h]);
+  }
+  const pos = new Int32Array(H);
+  for (const list of out.values()) {
+    list.sort((p, q) => angle[p] - angle[q] || p - q);
+    list.forEach((h, i) => (pos[h] = i));
+  }
+  const openEnds: Id[] = [];
+  for (const [id, list] of out) if (list.length === 1) openEnds.push(id);
+
+  const next = (h: number): number => {
+    const t = h ^ 1;
+    const list = out.get(to[h])!;
+    return list[(pos[t] - 1 + list.length) % list.length];
+  };
+
+  const visited = new Uint8Array(H);
+  const faces: Geometry['faces'] = [];
+  const outerFaces: Vec2[][] = [];
+  const usedIds = new Set<string>();
+  for (let start = 0; start < H; start++) {
+    if (visited[start]) continue;
+    let cycle: number[] = [];
+    let h = start;
+    while (!visited[h]) {
+      visited[h] = 1;
+      cycle.push(h);
+      h = next(h);
+    }
+    // Remove spikes (p -> q -> p along one dangling wall) until none are left.
+    let changed = true;
+    while (changed && cycle.length > 0) {
+      changed = false;
+      for (let i = 0; i < cycle.length; i++) {
+        const j = (i + 1) % cycle.length;
+        if (cycle.length >= 2 && (cycle[i] ^ 1) === cycle[j]) {
+          cycle = cycle.filter((_, k) => k !== i && k !== j);
+          changed = true;
+          break;
+        }
+      }
+    }
+    if (cycle.length < 3) continue;
+    const nodeIds = cycle.map((e) => from[e]);
+    const polygon = nodeIds.map((id) => ({ x: level.nodes[id].x, y: level.nodes[id].y }));
+    const area = polygonSignedArea(polygon);
+    if (area < 0) {
+      if (-area >= MIN_FACE_AREA) outerFaces.push([...polygon].reverse());
+      continue;
+    }
+    if (area < MIN_FACE_AREA) continue;
+    let netPolygon = insetPolygon(
+      polygon,
+      cycle.map((e) => thickness[e] / 2),
+    );
+    let netArea = polygonSignedArea(netPolygon);
+    if (!(netArea > 0) || netArea > area || selfIntersects(netPolygon)) {
+      netPolygon = polygon;
+      netArea = area;
+    }
+    let id = hashIds([...new Set(nodeIds)].sort());
+    while (usedIds.has(id)) id += '_';
+    usedIds.add(id);
+    faces.push({ id, nodeIds, wallIds: cycle.map((e) => wallOf[e]), polygon, netPolygon, grossArea: area, netArea });
+  }
+  return { faces, outerFaces, openEnds };
+}
+
+/** Label rooms: each room's anchor goes to the smallest face containing it; first come, first served. */
+export function labelFaces(geo: Geometry, rooms: Level['rooms']): FaceSet {
+  const owner = new Map<string, Id>();
+  const orphanRoomIds: Id[] = [];
+  const anchorOf = new Map<Id, Vec2>();
+  for (const room of Object.values(rooms)) {
+    let best: Geometry['faces'][number] | null = null;
+    for (const f of geo.faces) {
+      if ((!best || f.grossArea < best.grossArea) && pointInPolygon(room.anchor, f.polygon)) best = f;
+    }
+    if (!best || owner.has(best.id)) orphanRoomIds.push(room.id);
+    else {
+      owner.set(best.id, room.id);
+      anchorOf.set(room.id, room.anchor);
+    }
+  }
+  const faces: Face[] = geo.faces.map((f) => {
+    const roomId = owner.get(f.id);
+    const c = polygonCentroid(f.netPolygon);
+    const labelPoint = pointInPolygon(c, f.netPolygon) ? c : roomId ? anchorOf.get(roomId)! : interiorPoint(f.polygon);
+    return roomId ? { ...f, roomId, labelPoint } : { ...f, labelPoint };
+  });
+  return { faces, outerFaces: geo.outerFaces, openEnds: geo.openEnds, orphanRoomIds };
+}
+
+// Geometry depends on nodes and walls only; labels also on rooms. Both records keep their identity
+// across unrelated edits (immer structural sharing), so a room rename does not re-trace faces and an
+// opening edit returns the very same FaceSet.
+const geoCache = new WeakMap<Level['nodes'], WeakMap<Level['walls'], Map<ViewMode, Geometry>>>();
+const labelCache = new WeakMap<Geometry, WeakMap<Level['rooms'], FaceSet>>();
+
+function getGeometry(level: Level, viewMode: ViewMode): Geometry {
+  let byWalls = geoCache.get(level.nodes);
+  if (!byWalls) geoCache.set(level.nodes, (byWalls = new WeakMap()));
+  let byMode = byWalls.get(level.walls);
+  if (!byMode) byWalls.set(level.walls, (byMode = new Map()));
+  let geo = byMode.get(viewMode);
+  if (!geo) byMode.set(viewMode, (geo = computeFaceGeometry(level, viewMode)));
+  return geo;
+}
+
+/** Faces, open ends and room labels of a level in a view mode. Memoized. */
+export function getFaces(level: Level, viewMode: ViewMode): FaceSet {
+  const geo = getGeometry(level, viewMode);
+  let byRooms = labelCache.get(geo);
+  if (!byRooms) labelCache.set(geo, (byRooms = new WeakMap()));
+  let set = byRooms.get(level.rooms);
+  if (!set) byRooms.set(level.rooms, (set = labelFaces(geo, level.rooms)));
+  return set;
+}
+
+/** The face a room labels, or null. */
+export function faceOfRoom(set: FaceSet, roomId: Id): Face | null {
+  return set.faces.find((f) => f.roomId === roomId) ?? null;
+}
+
+/** The smallest face containing p. */
+export function faceAt(set: FaceSet, p: Vec2): Face | null {
+  let best: Face | null = null;
+  for (const f of set.faces) if ((!best || f.grossArea < best.grossArea) && pointInPolygon(p, f.polygon)) best = f;
+  return best;
+}

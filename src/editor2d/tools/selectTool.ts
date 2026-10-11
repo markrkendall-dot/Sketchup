@@ -5,8 +5,10 @@ import { add, dist, dot, projectPointToSegment, sub } from '../../model/geometry
 import type { Id, Level, Vec2, ViewMode } from '../../model/types';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection } from '../../store/uiStore';
+import { hitRoomLabel } from '../roomLabels';
 import { SNAP_RADIUS_PX } from '../snap';
 import type { Tool, ToolContext } from './index';
+import { endRoomDrag, moveRoomDrag, startRename, startRoomDrag, type RoomDrag } from './roomTool';
 
 const DRAG_THRESHOLD_PX = 3;
 /** Minimum half-width of a wall's pick area, in screen px. */
@@ -18,11 +20,14 @@ export type Hit =
   | { kind: 'node'; id: Id }
   | { kind: 'opening'; id: Id }
   | { kind: 'wall'; id: Id }
+  | { kind: 'room'; id: Id }
   | null;
 
+const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms' } as const;
+
 /**
- * Priority: nodes within 10px, then opening symbols, then walls. Elements hidden in `viewMode`
- * are never hit.
+ * Priority: nodes within 10px, then opening symbols, then walls, then room labels. Elements
+ * hidden in `viewMode` are never hit.
  */
 export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all'): Hit {
   let best: Hit = null;
@@ -38,7 +43,7 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   }
   if (best) return best;
 
-  const fps = getFootprints(level);
+  const fps = getFootprints(level, viewMode);
   for (const o of Object.values(level.openings)) {
     if (!isOpeningVisible(o, level.walls[o.wallId], viewMode)) continue;
     const fp = fps.get(o.wallId);
@@ -58,7 +63,9 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
       best = { kind: 'wall', id: w.id };
     }
   }
-  return best;
+  if (best) return best;
+  const room = hitRoomLabel(level, viewMode, p, k);
+  return room ? { kind: 'room', id: room } : null;
 }
 
 type DragState =
@@ -79,6 +86,7 @@ type DragState =
       grabDelta: number;
       started: boolean;
     }
+  | ({ kind: 'room' } & RoomDrag)
   | { kind: 'box'; a: Vec2; additive: boolean };
 
 let drag: DragState | null = null;
@@ -108,8 +116,9 @@ function pruneSelection(ctx: ToolContext): void {
   const nodes = sel.nodes.filter((id) => level.nodes[id]);
   const walls = sel.walls.filter((id) => level.walls[id]);
   const openings = sel.openings.filter((id) => level.openings[id]);
-  if (nodes.length + walls.length + openings.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ nodes, walls, openings });
+  const rooms = sel.rooms.filter((id) => level.rooms[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ nodes, walls, openings, rooms });
   }
 }
 
@@ -121,6 +130,8 @@ function finishDrag(ctx: ToolContext): void {
     pruneSelection(ctx);
   } else if (drag?.kind === 'opening' && drag.started) {
     resumeHistory();
+  } else if (drag?.kind === 'room') {
+    endRoomDrag(drag);
   }
 }
 
@@ -128,12 +139,12 @@ function finishDrag(ctx: ToolContext): void {
 function alongWall(ctx: ToolContext, openingId: Id, p: Vec2): number | null {
   const level = ctx.level();
   const o = level.openings[openingId];
-  const fp = o && getFootprints(level).get(o.wallId);
+  const fp = o && getFootprints(level, ctx.ui().viewMode).get(o.wallId);
   return fp ? dot(sub(p, fp.a), fp.dir) : null;
 }
 
 function selectHit(sel: Selection, hit: NonNullable<Hit>): Selection {
-  const key = hit.kind === 'node' ? 'nodes' : hit.kind === 'wall' ? 'walls' : 'openings';
+  const key = SEL_KEY[hit.kind];
   return sel[key].includes(hit.id) ? sel : { ...EMPTY_SELECTION, [key]: [hit.id] };
 }
 
@@ -151,13 +162,18 @@ export const selectTool: Tool = {
       return;
     }
     if (e.shiftKey) {
-      const key = hit.kind === 'node' ? 'nodes' : hit.kind === 'wall' ? 'walls' : 'openings';
+      const key = SEL_KEY[hit.kind];
       ui.setSelection({ ...sel, [key]: toggle(sel[key], hit.id) });
       drag = null;
       return;
     }
     const next = selectHit(sel, hit);
     if (next !== sel) ui.setSelection(next);
+    if (hit.kind === 'room') {
+      const rd = startRoomDrag(ctx, hit.id, e);
+      drag = rd ? { kind: 'room', ...rd } : null;
+      return;
+    }
     if (hit.kind === 'opening') {
       const s = alongWall(ctx, hit.id, e.world);
       drag =
@@ -193,6 +209,11 @@ export const selectTool: Tool = {
         wallId: hit?.kind === 'wall' ? hit.id : null,
         openingId: hit?.kind === 'opening' ? hit.id : null,
       });
+      ctx.ui().patchDraft({ cursor: e.world, snap: null });
+      return;
+    }
+    if (drag.kind === 'room') {
+      moveRoomDrag(ctx, drag, e);
       ui.patchDraft({ cursor: e.world, snap: null });
       return;
     }
@@ -245,7 +266,7 @@ export const selectTool: Tool = {
 
   onPointerUp(e, ctx) {
     const ui = ctx.ui();
-    if (drag?.kind === 'move' || drag?.kind === 'opening') finishDrag(ctx);
+    if (drag?.kind === 'move' || drag?.kind === 'opening' || drag?.kind === 'room') finishDrag(ctx);
     else if (drag?.kind === 'box') {
       const a = drag.a;
       const b = e.world;
@@ -271,12 +292,20 @@ export const selectTool: Tool = {
     drag = null;
   },
 
-  onDoubleClick() {},
+  onDoubleClick(e, ctx) {
+    const ui = ctx.ui();
+    const hit = hitTest(ctx.level(), e.world, ui.viewport.k, ui.viewMode);
+    if (hit?.kind === 'room') startRename(ctx, hit.id);
+  },
 
   onKeyDown(e, ctx) {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     const ui = ctx.ui();
     const sel = ui.selection;
+    if ((e.key === 'Enter' || e.key === 'F2') && selectionSize(sel) === 1 && sel.rooms.length === 1) {
+      startRename(ctx, sel.rooms[0]);
+      return true;
+    }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (!selectionSize(sel)) return false;
       ctx.actions.deleteEntities(ctx.levelId, sel);

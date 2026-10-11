@@ -1,4 +1,6 @@
 import { isOpeningVisible, isVisible, PHASE_LABEL, VIEW_MODE_LABEL } from '../derive/phase';
+import { getFaces } from '../derive/rooms';
+import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import { formatLength } from '../model/units';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore, type SnapKind, type ToolName } from '../store/uiStore';
@@ -19,20 +21,24 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: "Move to aim, type a length like 12'6 or 150 then Enter, or click. X: interior/exterior. Esc to finish.",
   },
   select: {
-    idle: 'Click a wall, corner or opening to select, drag to move, drag on empty space to box-select. Delete removes.',
-    busy: 'Click a wall, corner or opening to select, drag to move, drag on empty space to box-select. Delete removes.',
+    idle: 'Click a wall, corner, opening or room label to select, drag to move, drag on empty space to box-select. Delete removes.',
+    busy: 'Click a wall, corner, opening or room label to select, drag to move, drag on empty space to box-select. Delete removes.',
+  },
+  room: {
+    idle: 'Click inside a closed area to name it. Click a label to select, drag to move it, double-click to rename. Delete removes.',
+    busy: 'Click inside a closed area to name it. Click a label to select, drag to move it, double-click to rename. Delete removes.',
   },
   door: {
-    idle: 'Point at a wall. Click to place, or type the distance from the nearer corner and Enter. Tab: swing side, Shift+Tab: hinge.',
-    busy: 'Type the distance from the nearer corner to the door edge, then Enter. Tab: swing side, Shift+Tab: hinge.',
+    idle: "Point at a wall. Click to place, or type the distance from the nearer corner's inside face and Enter. Tab: swing side, Shift+Tab: hinge.",
+    busy: "Type the distance from the nearer corner's inside face to the door edge, then Enter. Tab: swing side, Shift+Tab: hinge.",
   },
   window: {
-    idle: 'Point at a wall. Click to place, or type the distance from the nearer corner and Enter.',
-    busy: 'Type the distance from the nearer corner to the window edge, then Enter.',
+    idle: "Point at a wall. Click to place, or type the distance from the nearer corner's inside face and Enter.",
+    busy: "Type the distance from the nearer corner's inside face to the window edge, then Enter.",
   },
   passage: {
-    idle: 'Point at a wall. Click to place, or type the distance from the nearer corner and Enter.',
-    busy: 'Type the distance from the nearer corner to the opening edge, then Enter.',
+    idle: "Point at a wall. Click to place, or type the distance from the nearer corner's inside face and Enter.",
+    busy: "Type the distance from the nearer corner's inside face to the opening edge, then Enter.",
   },
 };
 
@@ -59,6 +65,11 @@ export function StatusBar() {
     }
     return n;
   });
+  const openEnds = usePlanStore((s) => {
+    const level = s.plan.levels[levelId];
+    return level ? getFaces(level, viewMode).openEnds.length : 0;
+  });
+  const measureTo = usePlanStore((s) => s.plan.settings.measureTo);
   const p = draft.snap?.point ?? draft.cursor;
   const drawing = draft.wallStart !== null || draft.lengthBuffer !== '';
 
@@ -78,6 +89,16 @@ export function StatusBar() {
         {draft.message ?? (drawing ? HINTS[tool].busy : HINTS[tool].idle)}
       </span>
       <span className="spacer" />
+      {openEnds > 0 && (
+        <span className="status-open-ends" title="Wall ends that join nothing (red dots). Rooms are only found where walls close a loop.">
+          {openEnds} open wall {openEnds === 1 ? 'end' : 'ends'}
+        </span>
+      )}
+      {tool === 'wall' && measureTo !== 'center' && (
+        <span className="status-measure" title={MEASURE_RULE}>
+          Lengths to {measureTo} face
+        </span>
+      )}
       {tool === 'wall' && (
         <span className={`wall-kind wall-kind-${kind}`} title="Press X to toggle">
           Next wall: {kind} (X)

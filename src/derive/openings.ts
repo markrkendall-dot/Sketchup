@@ -1,6 +1,8 @@
 import { add, cross, dist, dot, scale, sub } from '../model/geometry';
 import { clampOpeningOffset } from '../model/openings';
-import type { Id, Level, Opening, Vec2 } from '../model/types';
+import type { Id, Level, Opening, Phase, Vec2, ViewMode } from '../model/types';
+import { computeFootprints, getFootprints, type Footprint, type Footprints } from './footprint';
+import { isVisible } from './phase';
 
 /** The parts of a wall footprint opening geometry needs (a Footprint satisfies it). */
 export interface WallGeom {
@@ -84,22 +86,33 @@ export const arcPath = (arc: NonNullable<OpeningSymbol['arc']>, map: (p: Vec2) =
 export interface WallPieces {
   /** Fill polygons, one per solid piece. */
   fills: Vec2[][];
-  /** Long edges of each piece plus jamb lines at every gap; no end caps. */
+  /** Long edges of each piece, jamb lines at every gap, and the outline's drawn end segments. */
   edges: Seg[];
   /** Gaps that were cut, merged and sorted, as [j0, j1] intervals. */
   gaps: [number, number][];
 }
 
+/** The parts of a footprint outline wallPieces needs; everything but the quad is optional. */
+export type WallOutline = Pick<Footprint, 'quad'> & Partial<Pick<Footprint, 'capA' | 'capB' | 'edge' | 'capEdges'>>;
+
 /**
- * Split a wall quad into solid pieces around the given gaps (intervals along the centerline).
- * The first and last pieces keep the footprint's own end corners, so mitred quads (M3) work too.
+ * Split a wall outline into solid pieces around the given gaps (intervals along the centerline).
+ * The first and last pieces keep the footprint's own end corners and extra cap points (mitres,
+ * bevels, junction hubs). Long edges follow `outline.edge` (trimmed at T junctions); end caps are
+ * drawn only where the outline says so (`capEdges`: open ends and bevels), never at joins.
  */
 export function wallPieces(
   g: WallGeom,
-  quad: readonly [Vec2, Vec2, Vec2, Vec2],
+  outlineIn: WallOutline | readonly [Vec2, Vec2, Vec2, Vec2],
   gapsIn: readonly [number, number][],
 ): WallPieces {
-  const [la, lb, rb, ra] = quad;
+  const outline: WallOutline = Array.isArray(outlineIn)
+    ? { quad: outlineIn as unknown as Footprint['quad'] }
+    : (outlineIn as WallOutline);
+  const [la, lb, rb, ra] = outline.quad;
+  const [ela, elb, erb, era] = outline.edge ?? outline.quad;
+  const capA = outline.capA ?? [];
+  const capB = outline.capB ?? [];
   const h = g.thickness / 2;
   const sorted = gapsIn
     .map(([u, v]): [number, number] => [Math.max(u, 0), Math.min(v, g.length)])
@@ -111,8 +124,13 @@ export function wallPieces(
     if (last && gp[0] <= last[1]) last[1] = Math.max(last[1], gp[1]);
     else gaps.push([gp[0], gp[1]]);
   }
+  const along = (p: Vec2) => dot(sub(p, g.a), g.dir);
   const fills: Vec2[][] = [];
   const edges: Seg[] = [];
+  // A long edge, skipped when trimming left nothing of it.
+  const pushEdge = (p: Vec2, q: Vec2) => {
+    if (along(q) - along(p) > 1e-9) edges.push([p, q]);
+  };
   let start = 0;
   const ends = [...gaps.map(([u]) => u), g.length];
   ends.forEach((end, i) => {
@@ -123,13 +141,15 @@ export function wallPieces(
     const l1 = last ? lb : wallPoint(g, end, h);
     const r1 = last ? rb : wallPoint(g, end, -h);
     if (end - start > 1e-6 || first || last) {
-      fills.push([l0, l1, r1, r0]);
-      edges.push([l0, l1], [r0, r1]);
+      fills.push([l0, l1, ...(last ? capB : []), r1, r0, ...(first ? capA : [])]);
+      pushEdge(first ? ela : l0, last ? elb : l1);
+      pushEdge(first ? era : r0, last ? erb : r1);
     }
     if (!first) edges.push([l0, r0]);
     if (!last) edges.push([l1, r1]);
     if (!last) start = gaps[i][1];
   });
+  edges.push(...(outline.capEdges ?? []));
   return { fills, edges, gaps };
 }
 
@@ -187,3 +207,74 @@ export function getOpeningsByWall(level: Level): ReadonlyMap<Id, readonly Openin
 
 export const openingsOnWall = (level: Level, wallId: Id): readonly Opening[] =>
   getOpeningsByWall(level).get(wallId) ?? EMPTY;
+
+// ---------------------------------------------------------------------------------------------
+// Core interval for an opening, independent of the UI's view mode.
+
+/** Footprints of a level per view mode. */
+export type FootprintSource = (viewMode: ViewMode) => Footprints;
+
+/** Memoized source for committed (non-draft) levels. */
+export const liveFootprints =
+  (level: Level): FootprintSource =>
+  (viewMode) =>
+    getFootprints(level, viewMode);
+
+/**
+ * Unmemoized source for immer drafts (a draft keeps its identity while it is mutated, so it must
+ * never key a cache). Computes each view once per source.
+ */
+export function draftFootprints(level: Pick<Level, 'nodes' | 'walls'>): FootprintSource {
+  const byMode = new Map<ViewMode, Footprints>();
+  return (viewMode) => {
+    let fps = byMode.get(viewMode);
+    if (!fps) {
+      fps = computeFootprints(level, viewMode);
+      byMode.set(viewMode, fps);
+    }
+    return fps;
+  };
+}
+
+const PHASE_VIEWS: readonly ViewMode[] = ['existing', 'proposed'];
+
+/**
+ * Where an opening of `phase` may sit on a wall: the intersection of the wall's core interval
+ * [s0, s1] over every view in which the opening shows (existing and/or proposed), so it clears the
+ * corners in each of them. Falls back to the "all" view (an opening that shows in neither), and to
+ * [0, L] if the wall has no footprint. Null when the wall does not exist.
+ */
+export function coreInterval(
+  level: Pick<Level, 'nodes' | 'walls'>,
+  wallId: Id,
+  phase: Phase,
+  source: FootprintSource,
+): [number, number] | null {
+  const wall = level.walls[wallId];
+  if (!wall) return null;
+  let views = PHASE_VIEWS.filter((vm) => isVisible(phase, vm) && isVisible(wall.phase, vm));
+  if (views.length === 0) views = ['all'];
+  let s0 = -Infinity;
+  let s1 = Infinity;
+  for (const vm of views) {
+    const fp = source(vm).get(wallId);
+    if (!fp) continue;
+    s0 = Math.max(s0, fp.s0);
+    s1 = Math.min(s1, fp.s1);
+  }
+  if (s0 === -Infinity) {
+    const a = level.nodes[wall.a];
+    const b = level.nodes[wall.b];
+    return [0, a && b ? dist(a, b) : 0];
+  }
+  return [s0, s1];
+}
+
+/** Distances from the core interval ends (inside faces of the corners) to the nearer jambs. */
+export function jambDistances(
+  offset: number,
+  width: number,
+  [s0, s1]: readonly [number, number],
+): { fromA: number; fromB: number } {
+  return { fromA: offset - width / 2 - s0, fromB: s1 - (offset + width / 2) };
+}

@@ -92,6 +92,38 @@ describe('addOpening', () => {
   });
 });
 
+describe('openings clamp to the core interval between corners (M3)', () => {
+  it('addOpening and updateOpening keep jambs off the mitred corner', () => {
+    const r1 = store().addWall(levelId(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts)!;
+    store().addWall(levelId(), r1.b, { x: 120, y: 120 }, opts);
+    const w = r1.wallIds[0];
+    const id = store().addOpening(levelId(), door(w, 500))!;
+    // s1 = 120 - 3.25 (inside face of the 6.5" corner wall).
+    expect(level().openings[id].offset).toBe(116.75 - 18);
+    store().updateOpening(levelId(), id, { offset: 0 });
+    expect(level().openings[id].offset).toBe(18);
+  });
+
+  it('a thicker corner wall pushes an opening back', () => {
+    const r1 = store().addWall(levelId(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts)!;
+    const r2 = store().addWall(levelId(), r1.b, { x: 120, y: 120 }, opts)!;
+    const id = store().addOpening(levelId(), door(r1.wallIds[0], 120))!;
+    expect(level().openings[id].offset).toBe(116.75 - 18);
+    store().updateWalls(levelId(), r2.wallIds, { thickness: 12 });
+    expect(level().openings[id].offset).toBe(114 - 18);
+  });
+
+  it('a new opening only has to clear corners of the proposed view', () => {
+    const r1 = store().addWall(levelId(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts)!;
+    store().addWall(levelId(), r1.b, { x: 120, y: 120 }, { ...opts, phase: 'demo' });
+    const w = r1.wallIds[0];
+    const oldId = store().addOpening(levelId(), door(w, 500))!;
+    const newId = store().addOpening(levelId(), door(w, 500, { phase: 'new' }))!;
+    expect(level().openings[oldId].offset).toBe(116.75 - 18);
+    expect(level().openings[newId].offset).toBe(120 - 18);
+  });
+});
+
 describe('updateOpening', () => {
   it('re-clamps after a move or a width change', () => {
     const w = addStraightWall(0, 120);

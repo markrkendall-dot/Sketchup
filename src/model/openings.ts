@@ -30,16 +30,5 @@ export function clampOpeningOffset(offset: number, width: number, s0: number, s1
   return Math.min(Math.max(offset, s0 + half), s1 - half);
 }
 
-/**
- * The interval along a wall's centerline that openings may occupy, as computed in the store.
- * M2: the whole centerline, matching the square-cap footprints (s0 = 0, s1 = L).
- * TODO(M3): use the mitred footprint's s0/s1 once corner joins exist.
- */
-export function openingInterval(length: number): [number, number] {
-  return [0, length];
-}
-
-/** Distances from each wall end (node) to the nearer jamb of an opening. */
-export function jambDistances(offset: number, width: number, length: number): { fromA: number; fromB: number } {
-  return { fromA: offset - width / 2, fromB: length - (offset + width / 2) };
-}
+// The interval an opening may occupy (the wall's core interval between corner joins) and jamb
+// distances measured from it live in derive/openings.ts: they need the mitered footprints.

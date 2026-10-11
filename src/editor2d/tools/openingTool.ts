@@ -1,8 +1,8 @@
 import { getFootprints, type Footprint } from '../../derive/footprint';
-import { displayCenter, openingsOnWall, wallPoint } from '../../derive/openings';
+import { coreInterval, displayCenter, jambDistances, liveFootprints, openingsOnWall, wallPoint } from '../../derive/openings';
 import { isVisible, phasesCoexist } from '../../derive/phase';
 import { dist, dot, sub } from '../../model/geometry';
-import { clampOpeningOffset, jambDistances, OPENING_DEFAULTS, OPENING_LABEL } from '../../model/openings';
+import { clampOpeningOffset, OPENING_DEFAULTS, OPENING_LABEL } from '../../model/openings';
 import type { Id, Opening, Vec2 } from '../../model/types';
 import { formatLength, tryParseLength } from '../../model/units';
 import type { Draft, OpeningPreview, OpeningToolName } from '../../store/uiStore';
@@ -16,7 +16,7 @@ export const OPENING_HOVER_PX = 12;
 export function findHoverWall(ctx: ToolContext, p: Vec2): Footprint | null {
   const level = ctx.level();
   const { viewport, viewMode } = ctx.ui();
-  const fps = getFootprints(level);
+  const fps = getFootprints(level, viewMode);
   let best: Footprint | null = null;
   let bestBody = OPENING_HOVER_PX / viewport.k;
   let bestCenter = Infinity;
@@ -52,6 +52,12 @@ function computePreview(ctx: ToolContext, type: OpeningToolName, d: Draft): Open
   const def = OPENING_DEFAULTS[type];
   const w = def.width;
   const nearEnd = s <= L / 2 ? 'a' : 'b';
+  const phase = ui.drawPhase;
+  // Where the store will let the opening sit: the core interval between the corner joins in every
+  // view the new opening shows in. Typed distances run from its ends, the inside faces of the
+  // corners, which is what a tape measure along the wall gives.
+  const interval = coreInterval(ctx.level(), fp.wallId, phase, liveFootprints(ctx.level())) ?? [fp.s0, fp.s1];
+  const [s0, s1] = interval;
 
   let want = s;
   let typed = false;
@@ -59,21 +65,19 @@ function computePreview(ctx: ToolContext, type: OpeningToolName, d: Draft): Open
   if (d.lengthBuffer) {
     const v = tryParseLength(d.lengthBuffer);
     if (v !== null && v >= 0) {
-      // Typed: distance from the nearer end (node) to the near jamb.
-      want = nearEnd === 'a' ? v + w / 2 : L - v - w / 2;
+      // Typed: distance from the nearer corner's inside face to the near jamb.
+      want = nearEnd === 'a' ? s0 + v + w / 2 : s1 - v - w / 2;
       typed = true;
     }
   }
-  const center = clampOpeningOffset(want, w, fp.s0, fp.s1);
+  const center = clampOpeningOffset(want, w, s0, s1);
   const denom = ctx.plan().settings.precisionDenominator;
-  if (fp.s1 - fp.s0 < w) {
+  if (s1 - s0 < w) {
     problem = `This wall is too short for a ${formatLength(w, denom)} ${type}.`;
   } else if (typed && Math.abs(center - want) > 1e-6) {
-    const max = nearEnd === 'a' ? fp.s1 - w : L - (fp.s0 + w);
-    problem = `Too far: at most ${formatLength(Math.max(0, max), denom)} from this end.`;
+    problem = `Too far: at most ${formatLength(Math.max(0, s1 - s0 - w), denom)} from this corner.`;
   }
 
-  const phase = ui.drawPhase;
   if (!problem) {
     for (const o of openingsOnWall(ctx.level(), fp.wallId)) {
       if (!isVisible(o.phase, ui.viewMode) || !phasesCoexist(o.phase, phase)) continue;
@@ -99,10 +103,10 @@ function computePreview(ctx: ToolContext, type: OpeningToolName, d: Draft): Open
       side: (cursorSide === 1) !== d.swingFlip ? 'left' : 'right',
     };
   }
-  const { fromA, fromB } = jambDistances(center, w, L);
+  const { fromA, fromB } = jambDistances(center, w, interval);
   return {
     wallId: fp.wallId,
-    geom: { a: fp.a, dir: fp.dir, normal: fp.normal, thickness: fp.thickness, length: L, s0: fp.s0, s1: fp.s1 },
+    geom: { a: fp.a, dir: fp.dir, normal: fp.normal, thickness: fp.thickness, length: L, s0, s1 },
     opening,
     fromA,
     fromB,
@@ -144,7 +148,7 @@ function makeOpeningTool(type: OpeningToolName): Tool {
       message:
         id === null
           ? `Could not place the ${type} here.`
-          : `${label} placed ${formatLength(pv.nearEnd === 'a' ? pv.fromA : pv.fromB, denom)} from the ${pv.nearEnd === 'a' ? 'start' : 'end'} of the wall.`,
+          : `${label} placed ${formatLength(pv.nearEnd === 'a' ? pv.fromA : pv.fromB, denom)} from the inside corner at the ${pv.nearEnd === 'a' ? 'start' : 'end'} of the wall.`,
     });
     return id;
   };

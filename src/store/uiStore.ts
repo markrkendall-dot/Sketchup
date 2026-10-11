@@ -3,7 +3,7 @@ import type { WallGeom } from '../derive/openings';
 import type { Id, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'room' | OpeningToolName;
 /** Phases the drawing tools can create; demo is applied to existing elements instead. */
 export type DrawPhase = Extract<Phase, 'existing' | 'new'>;
 
@@ -72,6 +72,8 @@ export interface Draft {
   chainFirstNodeId: Id | null;
   /** Wall tool: the previous wall's unit direction in this chain. */
   prevDirection: Vec2 | null;
+  /** Wall tool: thickness of the wall the next one starts from (for inside/outside lengths). */
+  prevThickness: number | null;
   /** Wall tool: current unit direction. */
   direction: Vec2;
   wallPreview: WallPreview | null;
@@ -94,6 +96,18 @@ export interface Selection {
   nodes: Id[];
   walls: Id[];
   openings: Id[];
+  rooms: Id[];
+}
+
+/** The inline room name editor (RoomNameEditor). */
+export interface RoomEdit {
+  /** Room being renamed, or null for a room that is created on commit. */
+  roomId: Id | null;
+  /** World point the editor is centered on. */
+  at: Vec2;
+  /** Anchor of a new room. */
+  anchor: Vec2;
+  initial: string;
 }
 
 export interface Hover {
@@ -109,6 +123,7 @@ export interface UiState {
   hover: Hover;
   viewport: Viewport;
   draft: Draft;
+  roomEdit: RoomEdit | null;
   showGrid: boolean;
   nextWallKind: WallKind;
   /** Which phases are shown (DESIGN.md ViewMode). */
@@ -128,6 +143,7 @@ export interface UiState {
   setHover: (hover: Partial<Hover>) => void;
   setViewport: (v: Viewport) => void;
   patchDraft: (patch: Partial<Draft>) => void;
+  setRoomEdit: (edit: RoomEdit | null) => void;
   resetDraft: () => void;
   toggleGrid: () => void;
   toggleWallKind: () => void;
@@ -146,6 +162,7 @@ export const emptyDraft = (): Draft => ({
   wallStart: null,
   chainFirstNodeId: null,
   prevDirection: null,
+  prevThickness: null,
   direction: { x: 1, y: 0 },
   wallPreview: null,
   lengthBuffer: '',
@@ -157,10 +174,11 @@ export const emptyDraft = (): Draft => ({
   hingeFlip: false,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
-export const selectionSize = (s: Selection): number => s.nodes.length + s.walls.length + s.openings.length;
+export const selectionSize = (s: Selection): number =>
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length;
 
 export const useUiStore = create<UiState>()((set) => ({
   activeTool: 'wall',
@@ -169,6 +187,7 @@ export const useUiStore = create<UiState>()((set) => ({
   hover: NO_HOVER,
   viewport: { tx: 300, ty: 200, k: 0.5 },
   draft: emptyDraft(),
+  roomEdit: null,
   showGrid: true,
   nextWallKind: 'exterior',
   viewMode: 'all',
@@ -181,9 +200,10 @@ export const useUiStore = create<UiState>()((set) => ({
       activeTool,
       draft: { ...emptyDraft(), cursor: s.draft.cursor },
       hover: NO_HOVER,
+      roomEdit: null,
     })),
   setActiveLevel: (activeLevelId) =>
-    set({ activeLevelId, selection: EMPTY_SELECTION, draft: emptyDraft(), hover: NO_HOVER }),
+    set({ activeLevelId, selection: EMPTY_SELECTION, draft: emptyDraft(), hover: NO_HOVER, roomEdit: null }),
   setSelection: (selection) => set({ selection }),
   clearSelection: () => set((s) => (selectionSize(s.selection) ? { selection: EMPTY_SELECTION } : s)),
   setHover: (h) =>
@@ -197,6 +217,7 @@ export const useUiStore = create<UiState>()((set) => ({
     }),
   setViewport: (viewport) => set({ viewport }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
+  setRoomEdit: (roomEdit) => set({ roomEdit }),
   resetDraft: () => set((s) => ({ draft: { ...emptyDraft(), cursor: s.draft.cursor } })),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   toggleWallKind: () =>

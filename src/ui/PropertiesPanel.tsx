@@ -1,10 +1,13 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { getLevelElevations } from '../derive/levels';
+import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
-import { jambDistances, OPENING_DEFAULTS, OPENING_LABEL, type OpeningType } from '../model/openings';
+import { getFaces } from '../derive/rooms';
+import { pointInPolygon } from '../model/geometry';
+import { OPENING_DEFAULTS, OPENING_LABEL, type OpeningType } from '../model/openings';
 import { wallLength } from '../model/plan';
-import type { Id, Level, Opening, Phase, Wall, WallKind } from '../model/types';
-import { formatLength, parseLength } from '../model/units';
+import type { Id, Level, Opening, Phase, Room, Wall, WallKind } from '../model/types';
+import { formatArea, formatLength, parseLength } from '../model/units';
 import { usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 
@@ -182,18 +185,20 @@ function SelectionActions({ levelId, walls, openings }: { levelId: Id; walls: Wa
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
   const items = [...walls, ...openings];
-  if (items.length === 0) return null;
-  const allDemo = items.every((i) => i.phase === 'demo');
+  if (items.length === 0 && selectionSize(selection) === 0) return null;
+  const allDemo = items.length > 0 && items.every((i) => i.phase === 'demo');
   const ids = { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id) };
   return (
     <div className="panel-actions">
-      <button
-        className={allDemo ? '' : 'danger'}
-        title={allDemo ? 'Mark the selection as existing again' : 'Mark the selection for demolition'}
-        onClick={() => setPhase(levelId, ids, allDemo ? 'existing' : 'demo')}
-      >
-        {allDemo ? 'Keep (existing)' : 'Mark demolish'}
-      </button>
+      {items.length > 0 && (
+        <button
+          className={allDemo ? '' : 'danger'}
+          title={allDemo ? 'Mark the selection as existing again' : 'Mark the selection for demolition'}
+          onClick={() => setPhase(levelId, ids, allDemo ? 'existing' : 'demo')}
+        >
+          {allDemo ? 'Keep (existing)' : 'Mark demolish'}
+        </button>
+      )}
       <button
         onClick={() => {
           deleteEntities(levelId, selection);
@@ -284,12 +289,17 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const wall = level.walls[opening.wallId];
   const L = wall ? wallLength(level, wall) : 0;
-  const { fromA, fromB } = jambDistances(opening.offset, opening.width, L);
-  const maxJamb = Math.max(0, L - opening.width);
+  // Jamb distances run from the core interval ends (the inside faces of the corners), as a tape
+  // measure along the wall would; the interval is the one the store clamps to.
+  const interval = coreInterval(level, opening.wallId, opening.phase, liveFootprints(level)) ?? [0, L];
+  const [s0, s1] = interval;
+  const clear = Math.max(0, s1 - s0);
+  const { fromA, fromB } = jambDistances(opening.offset, opening.width, interval);
+  const maxJamb = Math.max(0, clear - opening.width);
   const setJamb = (end: 'a' | 'b', v: number | null): string | null => {
     if (v === null) return null;
-    if (v > maxJamb + EPS) return `At most ${formatLength(maxJamb, denom)} on this ${formatLength(L, denom)} wall.`;
-    const offset = end === 'a' ? v + opening.width / 2 : L - v - opening.width / 2;
+    if (v > maxJamb + EPS) return `At most ${formatLength(maxJamb, denom)} here (${formatLength(clear, denom)} between corners).`;
+    const offset = end === 'a' ? s0 + v + opening.width / 2 : s1 - v - opening.width / 2;
     updateOpening(levelId, opening.id, { offset });
     return null;
   };
@@ -317,7 +327,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
         value={opening.width}
         onCommit={(v) => {
           if (v === null) return null;
-          if (v > L + EPS) return `Wider than the wall (${formatLength(L, denom)}).`;
+          if (v > clear + EPS) return `Wider than the wall between its corners (${formatLength(clear, denom)}).`;
           updateOpening(levelId, opening.id, { width: v });
           return null;
         }}
@@ -340,8 +350,20 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
           hint="Above the floor."
         />
       )}
-      <LengthField label="From start" value={fromA} bound="nonnegative" onCommit={(v) => setJamb('a', v)} hint="Wall start corner to the near jamb." />
-      <LengthField label="From end" value={fromB} bound="nonnegative" onCommit={(v) => setJamb('b', v)} hint="Wall end corner to the near jamb." />
+      <LengthField
+        label="From start"
+        value={fromA}
+        bound="nonnegative"
+        onCommit={(v) => setJamb('a', v)}
+        hint="Inside face of the start corner to the near jamb."
+      />
+      <LengthField
+        label="From end"
+        value={fromB}
+        bound="nonnegative"
+        onCommit={(v) => setJamb('b', v)}
+        hint="Inside face of the end corner to the near jamb."
+      />
       <SelectField
         label="Phase"
         value={opening.phase}
@@ -375,12 +397,64 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   );
 }
 
+function RoomProps({ level, room }: { level: Level; room: Room }) {
+  const updateRoom = usePlanStore((s) => s.updateRoom);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const set = usePlanStore((s) => {
+    const l = s.plan.levels[level.id];
+    return l ? getFaces(l, viewMode) : null;
+  });
+  const face = set?.faces.find((f) => f.roomId === room.id) ?? null;
+  // An orphan whose anchor is in a face that an earlier room already names.
+  const sharing = !face && set ? set.faces.find((f) => f.roomId && f.roomId !== room.id && pointInPolygon(room.anchor, f.polygon)) : null;
+  const [name, setName] = useState(room.name);
+  useEffect(() => setName(room.name), [room.name]);
+  const commitName = () => {
+    const v = name.trim();
+    if (v && v !== room.name) updateRoom(level.id, room.id, { name: v });
+    else setName(room.name);
+  };
+  return (
+    <>
+      <h3>Room</h3>
+      <div className="field">
+        <label htmlFor="room-name-input">Name</label>
+        <input
+          id="room-name-input"
+          aria-label="Room name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitName();
+            if (e.key === 'Escape') setName(room.name);
+          }}
+        />
+      </div>
+      {face ? (
+        <>
+          <ReadOnly label="Net area">{formatArea(face.netArea)}</ReadOnly>
+          <ReadOnly label="Gross area">{formatArea(face.grossArea)}</ReadOnly>
+          <p className="panel-note">Net is inside the wall faces; gross is to the wall centerlines.</p>
+        </>
+      ) : (
+        <p className="panel-note warning">
+          {sharing
+            ? `Shares an area with "${level.rooms[sharing.roomId!]?.name}" in this view. Drag the label into its own room.`
+            : 'Not inside an area closed in by walls in this view. Drag the label into a room, or close the walls around it.'}
+        </p>
+      )}
+    </>
+  );
+}
+
 function MixedProps({ levelId, sel, walls, openings }: { levelId: Id; sel: Selection; walls: Wall[]; openings: Opening[] }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const parts: string[] = [];
   if (walls.length) parts.push(`${walls.length} ${walls.length === 1 ? 'wall' : 'walls'}`);
   if (openings.length) parts.push(`${openings.length} ${openings.length === 1 ? 'opening' : 'openings'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
+  if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
   const items = [...walls, ...openings];
   return (
     <>
@@ -405,6 +479,13 @@ function LevelProps({ level }: { level: Level }) {
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop);
   const ceiling = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.ceiling);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const faces = usePlanStore((s) => {
+    const l = s.plan.levels[level.id];
+    return l ? getFaces(l, viewMode) : null;
+  });
+  const roomCount = Object.keys(level.rooms).length;
+  const unlabeled = faces ? faces.faces.filter((f) => !f.roomId).length : 0;
   const [name, setName] = useState(level.name);
   useEffect(() => setName(level.name), [level.name]);
   const commitName = () => {
@@ -447,7 +528,15 @@ function LevelProps({ level }: { level: Level }) {
           <ReadOnly label="Ceiling">{formatLength(ceiling, denom)}</ReadOnly>
         </>
       )}
-      <p className="panel-note">Select walls or openings to edit them.</p>
+      <ReadOnly label="Rooms">{roomCount}</ReadOnly>
+      <ReadOnly label="Unlabeled areas">{unlabeled}</ReadOnly>
+      {faces && faces.openEnds.length > 0 && (
+        <p className="panel-note warning">
+          {faces.openEnds.length} open wall {faces.openEnds.length === 1 ? 'end' : 'ends'} (red dots): areas are
+          only found where walls close a loop.
+        </p>
+      )}
+      <p className="panel-note">Select walls, openings or room labels to edit them. R names a room.</p>
     </>
   );
 }
@@ -460,7 +549,13 @@ export function PropertiesPanel() {
   const walls = sel.walls.map((id) => level.walls[id]).filter(Boolean);
   const openings = sel.openings.map((id) => level.openings[id]).filter(Boolean);
   const nodes = sel.nodes.filter((id) => level.nodes[id]);
-  const live: Selection = { nodes, walls: walls.map((w) => w.id), openings: openings.map((o) => o.id) };
+  const rooms = sel.rooms.map((id) => level.rooms[id]).filter(Boolean);
+  const live: Selection = {
+    nodes,
+    walls: walls.map((w) => w.id),
+    openings: openings.map((o) => o.id),
+    rooms: rooms.map((r) => r.id),
+  };
   const total = selectionSize(live);
 
   let body: ReactNode;
@@ -468,6 +563,7 @@ export function PropertiesPanel() {
   else if (total === 1 && walls.length === 1) body = <WallProps key={walls[0].id} level={level} wall={walls[0]} />;
   else if (total === 1 && openings.length === 1)
     body = <OpeningProps key={openings[0].id} level={level} opening={openings[0]} />;
+  else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
   else if (total === walls.length) body = <MultiWallProps levelId={level.id} walls={walls} />;
   else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} />;
 

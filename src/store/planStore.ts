@@ -2,7 +2,8 @@ import { create, useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { temporal } from 'zundo';
 import { dist } from '../model/geometry';
-import { clampOpeningOffset, openingInterval } from '../model/openings';
+import { coreInterval, draftFootprints } from '../derive/openings';
+import { clampOpeningOffset } from '../model/openings';
 import {
   clampOpenings,
   createEmptyPlan,
@@ -12,7 +13,7 @@ import {
   normalizeLevel,
   wallLength,
 } from '../model/plan';
-import type { Id, Level, Opening, Phase, Plan, PlanSettings, Vec2, Wall, WallKind } from '../model/types';
+import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Vec2, Wall, WallKind } from '../model/types';
 
 export interface AddWallOptions {
   kind: WallKind;
@@ -33,6 +34,8 @@ export interface AddWallResult {
 export type WallPatch = Partial<Omit<Wall, 'id'>>;
 export type OpeningPatch = Partial<Omit<Opening, 'id'>>;
 export type NewOpening = Omit<Opening, 'id'> & { id?: Id };
+export type RoomPatch = Partial<Omit<Room, 'id'>>;
+export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** Which end of a wall stays put when its length is edited. */
 export type LengthAnchor = 'start' | 'end';
@@ -41,6 +44,7 @@ export interface EntitySelection {
   nodes: Id[];
   walls: Id[];
   openings?: Id[];
+  rooms?: Id[];
 }
 
 export interface PlanState {
@@ -75,6 +79,11 @@ export interface PlanState {
   /** Patch an opening; the offset is re-clamped to its wall. */
   updateOpening: (levelId: Id, id: Id, patch: OpeningPatch) => void;
   deleteOpenings: (levelId: Id, ids: Id[]) => void;
+  /** Add a room label; returns its id, or null when the name is blank or the anchor is not finite. */
+  addRoom: (levelId: Id, room: NewRoom) => Id | null;
+  /** Rename or move a room. A blank name or non-finite anchor is ignored. */
+  updateRoom: (levelId: Id, id: Id, patch: RoomPatch) => void;
+  deleteRooms: (levelId: Id, ids: Id[]) => void;
   /** Set the phase of walls and openings together (e.g. "Mark demolish"). */
   setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[] }, phase: Phase) => void;
   /**
@@ -118,8 +127,9 @@ function moveNodesInPlace(level: Level, positions: Record<Id, Vec2>): void {
   }
 }
 
-function deleteInPlace(level: Level, nodeIds: Id[], wallIds: Id[], openingIds: Id[] = []): void {
+function deleteInPlace(level: Level, nodeIds: Id[], wallIds: Id[], openingIds: Id[] = [], roomIds: Id[] = []): void {
   for (const id of openingIds) delete level.openings[id];
+  for (const id of roomIds) delete level.rooms[id];
   const walls = new Set(wallIds);
   const nodes = new Set(nodeIds);
   for (const w of Object.values(level.walls)) if (nodes.has(w.a) || nodes.has(w.b)) walls.add(w.id);
@@ -236,12 +246,24 @@ export const usePlanStore = create<PlanState>()(
             normalizeLevel(level, moved ? new Set(moved) : undefined);
           }),
 
-        deleteWalls: (levelId, ids) => editLevel(levelId, (level) => deleteInPlace(level, [], ids)),
+        deleteWalls: (levelId, ids) =>
+          editLevel(levelId, (level) => {
+            deleteInPlace(level, [], ids);
+            clampOpenings(level);
+          }),
 
-        deleteNodes: (levelId, ids) => editLevel(levelId, (level) => deleteInPlace(level, ids, [])),
+        deleteNodes: (levelId, ids) =>
+          editLevel(levelId, (level) => {
+            deleteInPlace(level, ids, []);
+            clampOpenings(level);
+          }),
 
         deleteEntities: (levelId, sel) =>
-          editLevel(levelId, (level) => deleteInPlace(level, sel.nodes, sel.walls, sel.openings)),
+          editLevel(levelId, (level) => {
+            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms);
+            // Removing walls changes the corner joins of their neighbours.
+            if (sel.nodes.length || sel.walls.length) clampOpenings(level);
+          }),
 
         updateWall: (levelId, id, patch) =>
           editLevel(levelId, (level) => {
@@ -264,6 +286,8 @@ export const usePlanStore = create<PlanState>()(
                 } else if (w[key] !== value) (w as unknown as Record<string, unknown>)[key] = value;
               }
             }
+            // Thickness and phase change the corner joins, so the core intervals of neighbours.
+            if (patch.thickness !== undefined || patch.phase !== undefined) clampOpenings(level);
           }),
 
         setWallKind: (levelId, ids, kind) =>
@@ -279,6 +303,7 @@ export const usePlanStore = create<PlanState>()(
               if (Math.abs(w.thickness - def(w.kind)) < 1e-9) w.thickness = def(kind);
               w.kind = kind;
             }
+            clampOpenings(level);
             touch(s.plan);
           }),
 
@@ -311,7 +336,7 @@ export const usePlanStore = create<PlanState>()(
             if (!wall) return false;
             if (!(input.width > 0) || !(input.height > 0) || !(input.sill >= 0)) return false;
             if (!Number.isFinite(input.offset)) return false;
-            const [s0, s1] = openingInterval(wallLength(level, wall));
+            const [s0, s1] = coreInterval(level, wall.id, input.phase, draftFootprints(level))!;
             if (s1 - s0 < input.width) return false;
             const opening: Opening = {
               ...input,
@@ -348,6 +373,44 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete level.openings[id];
           }),
 
+        addRoom: (levelId, input) => {
+          let id: Id | null = null;
+          editLevel(levelId, (level) => {
+            const name = input.name.trim();
+            if (!name || !Number.isFinite(input.anchor.x) || !Number.isFinite(input.anchor.y)) return false;
+            const room: Room = { ...input, id: input.id ?? newId(), name, anchor: { x: input.anchor.x, y: input.anchor.y } };
+            level.rooms[room.id] = room;
+            id = room.id;
+          });
+          return id;
+        },
+
+        updateRoom: (levelId, id, patch) =>
+          editLevel(levelId, (level) => {
+            const r = level.rooms[id];
+            if (!r) return false;
+            if (patch.name !== undefined) {
+              const name = patch.name.trim();
+              if (!name) return false;
+              if (name === r.name && patch.anchor === undefined && patch.ceilingOverride === undefined) return false;
+              r.name = name;
+            }
+            if (patch.anchor !== undefined) {
+              if (!Number.isFinite(patch.anchor.x) || !Number.isFinite(patch.anchor.y)) return false;
+              r.anchor = { x: patch.anchor.x, y: patch.anchor.y };
+            }
+            if ('ceilingOverride' in patch) {
+              if (patch.ceilingOverride === undefined) delete r.ceilingOverride;
+              else r.ceilingOverride = patch.ceilingOverride;
+            }
+          }),
+
+        deleteRooms: (levelId, ids) =>
+          editLevel(levelId, (level) => {
+            if (!ids.some((id) => level.rooms[id])) return false;
+            for (const id of ids) delete level.rooms[id];
+          }),
+
         setPhase: (levelId, sel, phase) =>
           editLevel(levelId, (level) => {
             for (const id of sel.walls) {
@@ -358,6 +421,7 @@ export const usePlanStore = create<PlanState>()(
               const o = level.openings[id];
               if (o && o.phase !== phase) o.phase = phase;
             }
+            clampOpenings(level);
           }),
 
         copyWallsFromLevel: (fromId, toId) => {

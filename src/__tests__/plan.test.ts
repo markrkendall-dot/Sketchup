@@ -186,8 +186,8 @@ describe('derive memoization', () => {
   it('getFootprints keeps identity for unchanged walls', () => {
     const r1 = store().addWall(levelId(), { x: 0, y: 0 }, { x: 120, y: 0 }, opts)!;
     const r2 = store().addWall(levelId(), { x: 0, y: 100 }, { x: 120, y: 100 }, opts)!;
-    const f1 = getFootprints(level());
-    expect(getFootprints(level())).toBe(f1);
+    const f1 = getFootprints(level(), 'all');
+    expect(getFootprints(level(), 'all')).toBe(f1);
     const fp = f1.get(r1.wallIds[0])!;
     expect(fp.quad).toEqual([
       { x: 0, y: -3.25 },
@@ -198,14 +198,14 @@ describe('derive memoization', () => {
     expect([fp.s0, fp.s1]).toEqual([0, 120]);
 
     store().moveNode(levelId(), r2.b, { x: 130, y: 100 });
-    const f2 = getFootprints(level());
+    const f2 = getFootprints(level(), 'all');
     expect(f2).not.toBe(f1);
     expect(f2.get(r1.wallIds[0])).toBe(fp);
     expect(f2.get(r2.wallIds[0])).not.toBe(f1.get(r2.wallIds[0]));
 
     // A plan change that does not touch walls returns the previous map itself.
     store().renameLevel(levelId(), 'Main');
-    expect(getFootprints(level())).toBe(f2);
+    expect(getFootprints(level(), 'all')).toBe(f2);
   });
 
   it('getGraph survives node moves', () => {
@@ -227,6 +227,12 @@ describe('wall tool measureTo adjustment', () => {
     expect(adjustTypedLength(360, 'inside', 6.5, down, right)).toBe(366.5);
     expect(adjustTypedLength(360, 'outside', 6.5, down, right)).toBe(353.5);
     expect(adjustTypedLength(360, 'outside', 6.5, right, null)).toBe(353.5);
+  });
+  it('uses the thickness of the wall it starts from plus half its own (M3 rule)', () => {
+    // Previous wall 4.5" interior, new wall 6.5": inside adds 2.25 + 3.25, outside subtracts it.
+    expect(adjustTypedLength(120, 'inside', 6.5, down, right, 4.5)).toBe(125.5);
+    expect(adjustTypedLength(120, 'outside', 6.5, down, right, 4.5)).toBe(114.5);
+    expect(adjustTypedLength(-120, 'inside', 6.5, down, right, 4.5)).toBe(-125.5);
   });
   it('no adjustment when continuing straight or at an angle', () => {
     expect(adjustTypedLength(360, 'inside', 6.5, right, right)).toBe(360);

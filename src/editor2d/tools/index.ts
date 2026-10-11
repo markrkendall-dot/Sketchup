@@ -4,6 +4,7 @@ import { selectionSize, useUiStore, type SnapResult, type ToolName, type UiState
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint } from '../snap';
 import { doorTool, passageTool, windowTool } from './openingTool';
+import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
 import { wallTool } from './wallTool';
 
@@ -50,6 +51,7 @@ export interface Tool {
 const tools: Record<ToolName, Tool> = {
   select: selectTool,
   wall: wallTool,
+  room: roomTool,
   door: doorTool,
   window: windowTool,
   passage: passageTool,
@@ -143,9 +145,13 @@ export function pruneSelection(): void {
     const o = level.openings[id];
     return o && isOpeningVisible(o, level.walls[o.wallId], vm);
   });
-  if (nodes.length + walls.length + openings.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings });
+  const rooms = sel.rooms.filter((id) => level.rooms[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms });
   }
+  // An inline rename of a room that undo removed has nothing left to edit.
+  const edit = ui.roomEdit;
+  if (edit?.roomId && !level.rooms[edit.roomId]) ui.setRoomEdit(null);
 }
 
 /** Switch the active level: keeps the viewport, clears selection and any draft. */

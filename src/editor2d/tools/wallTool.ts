@@ -1,4 +1,4 @@
-import { visibleNodeIds } from '../../derive/phase';
+import { isVisible, visibleNodeIds } from '../../derive/phase';
 import { add, cross, dist, length, normalize, scale, sub } from '../../model/geometry';
 import { MERGE_EPS } from '../../model/plan';
 import type { Id, MeasureTo, PlanSettings, Vec2, WallKind } from '../../model/types';
@@ -12,13 +12,21 @@ export function thicknessFor(kind: WallKind, settings: PlanSettings): number {
   return kind === 'exterior' ? settings.defaultExteriorThickness : settings.defaultInteriorThickness;
 }
 
+/** Shown as the tooltip of the measure setting; keep in sync with adjustTypedLength. */
+export const MEASURE_RULE =
+  'Inside/outside face lengths: where the new wall turns a square corner from the wall it starts at, ' +
+  'the centerline is the typed face-to-face length plus (inside) or minus (outside) half that wall\'s ' +
+  'thickness plus half the new wall\'s own thickness (standing in for the wall that will meet its far end). ' +
+  'A chain that starts in open space assumes square corners of the new wall\'s thickness at both ends. ' +
+  'Straight runs and other angles are not adjusted.';
+
 /**
- * Convert a typed length to a centerline length according to `measureTo`.
- * Inside/outside faces: the typed number is face-to-face, so add (inside) or subtract (outside)
- * half a thickness at each end, approximated as one full thickness of the new wall.
- * Applied only where the new wall turns a square corner from the previous wall of the chain
- * (or starts a chain, assuming a square corner will close it).
- * TODO(M3): use the real thickness of the neighbouring walls at each end once mitred joins exist.
+ * Convert a typed length to a centerline length according to `measureTo` (see MEASURE_RULE).
+ * The typed number is face to face. At a square corner (|cross| > 0.99) the inside face of the new
+ * wall starts prevThickness/2 past the start node's centerline and ends `thickness`/2 short of the
+ * far one, so inside adds prevThickness/2 + thickness/2 and outside subtracts the same. The far
+ * wall is unknown while drawing, so the new wall's own thickness stands in for it. With no
+ * previous wall (a chain started in open space) prevThickness defaults to the new wall's own.
  */
 export function adjustTypedLength(
   typed: number,
@@ -26,13 +34,43 @@ export function adjustTypedLength(
   thickness: number,
   dir: Vec2,
   prevDir: Vec2 | null,
+  prevThickness: number = thickness,
 ): number {
   if (measureTo === 'center') return typed;
   const square = !prevDir || Math.abs(cross(prevDir, dir)) > 0.99;
   if (!square) return typed;
+  const delta = prevThickness / 2 + thickness / 2;
   const sign = typed < 0 ? -1 : 1;
-  const mag = Math.abs(typed) + (measureTo === 'inside' ? thickness : -thickness);
+  const mag = Math.abs(typed) + (measureTo === 'inside' ? delta : -delta);
   return sign * mag;
+}
+
+/**
+ * The wall the new one starts from, for inside/outside lengths: the previous wall of the chain,
+ * or when a chain starts on an existing corner, a visible wall there that is square to `dir`.
+ */
+function startJoin(ctx: ToolContext, d: Draft): { dir: Vec2 | null; thickness: number | undefined } {
+  if (d.prevDirection) return { dir: d.prevDirection, thickness: d.prevThickness ?? undefined };
+  const nodeId = d.wallStart?.nodeId;
+  const level = ctx.level();
+  if (!nodeId || !level.nodes[nodeId]) return { dir: null, thickness: undefined };
+  const vm = ctx.ui().viewMode;
+  let best: { dir: Vec2; thickness: number } | null = null;
+  for (const w of Object.values(level.walls)) {
+    if ((w.a !== nodeId && w.b !== nodeId) || !isVisible(w.phase, vm)) continue;
+    const wd = normalize(sub(level.nodes[w.b], level.nodes[w.a]));
+    if (Math.abs(cross(wd, d.direction)) > 0.99 && (!best || w.thickness > best.thickness)) {
+      best = { dir: wd, thickness: w.thickness };
+    }
+  }
+  return best ?? { dir: null, thickness: undefined };
+}
+
+function typedToCenterline(ctx: ToolContext, d: Draft, typed: number): number {
+  const { settings } = ctx.plan();
+  const thickness = thicknessFor(ctx.ui().nextWallKind, settings);
+  const join = startJoin(ctx, d);
+  return adjustTypedLength(typed, settings.measureTo, thickness, d.direction, join.dir, join.thickness);
 }
 
 function startRef(ctx: ToolContext, start: WallStart): Vec2 | Id {
@@ -47,7 +85,7 @@ function computePreview(ctx: ToolContext, d: Draft): WallPreview | null {
   if (d.lengthBuffer) {
     const typed = tryParseLength(d.lengthBuffer);
     if (typed === null || typed === 0) return null;
-    const len = adjustTypedLength(typed, settings.measureTo, thickness, d.direction, d.prevDirection);
+    const len = typedToCenterline(ctx, d, typed);
     return { a: start.point, b: add(start.point, scale(d.direction, len)), thickness, length: Math.abs(len), typed: true };
   }
   if (!d.snap) return null;
@@ -67,6 +105,7 @@ function endChain(ctx: ToolContext, message: string | null = null): void {
     wallStart: null,
     chainFirstNodeId: null,
     prevDirection: null,
+    prevThickness: null,
     lengthBuffer: '',
     error: false,
     message,
@@ -95,9 +134,10 @@ function commit(ctx: ToolContext, end: Vec2 | Id): void {
   if (!endPoint || dist(endPoint, start.point) < MERGE_EPS) return;
   const dir = normalize(sub(endPoint, start.point));
   const kind = ui.nextWallKind;
+  const thickness = thicknessFor(kind, ctx.plan().settings);
   const result = ctx.actions.addWall(ctx.levelId, startRef(ctx, start), end, {
     kind,
-    thickness: thicknessFor(kind, ctx.plan().settings),
+    thickness,
     phase: ui.drawPhase,
   });
   if (!result) return;
@@ -111,6 +151,7 @@ function commit(ctx: ToolContext, end: Vec2 | Id): void {
     wallStart: { point: { x: node.x, y: node.y }, nodeId: node.id },
     chainFirstNodeId: chainFirst,
     prevDirection: dir,
+    prevThickness: thickness,
     direction: dir,
     lengthBuffer: '',
     error: false,
@@ -125,10 +166,7 @@ function commitTyped(ctx: ToolContext): void {
   const start = d.wallStart;
   if (!start) return;
   const typed = tryParseLength(d.lengthBuffer);
-  const { settings } = ctx.plan();
-  const thickness = thicknessFor(ctx.ui().nextWallKind, settings);
-  const len =
-    typed === null ? 0 : adjustTypedLength(typed, settings.measureTo, thickness, d.direction, d.prevDirection);
+  const len = typed === null ? 0 : typedToCenterline(ctx, d, typed);
   if (typed === null || Math.abs(len) < MERGE_EPS || Math.sign(len) !== Math.sign(typed)) {
     patch(ctx, { error: true, message: `Can't read "${d.lengthBuffer}" as a length.` });
     return;
@@ -166,6 +204,7 @@ export const wallTool: Tool = {
         wallStart: { point: snap.point, nodeId: snap.nodeId },
         chainFirstNodeId: snap.nodeId ?? null,
         prevDirection: null,
+        prevThickness: null,
         lengthBuffer: '',
         error: false,
         message: null,
