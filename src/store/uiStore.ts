@@ -181,10 +181,30 @@ export interface Hover {
   openingId: Id | null;
 }
 
-/** A message in the status bar that is not tied to a tool (autosave, file actions). */
+/**
+ * A message in the status bar that is not tied to a tool (autosave, file actions). An info notice
+ * clears itself NOTICE_MS after it is set; an error stays. Either goes on the next notice or the
+ * next plan edit (main.tsx clears it from the plan-store subscription, `clearNoticeOnEdit`).
+ */
 export interface Notice {
   text: string;
   error: boolean;
+}
+
+/** How long an info notice stays in the status bar, ms (REVIEW-2 C3). */
+export const NOTICE_MS = 8000;
+
+/** Where walking starts when the user picked a point ("Walk from here" in the 2D context menu). */
+export interface WalkFrom {
+  levelId: Id;
+  point: Vec2;
+}
+
+/** The 2D canvas's right-click menu, at a canvas (screen) point, for a world point on a level. */
+export interface ContextMenu {
+  screen: Vec2;
+  world: Vec2;
+  levelId: Id;
 }
 
 /** localStorage keys of the editor preferences that are not plan data (so not undoable). */
@@ -286,6 +306,10 @@ export interface UiState {
   /** The keyboard help overlay is open. */
   helpOpen: boolean;
   notice: Notice | null;
+  /** The walk start the user picked in 2D (not part of the plan, so not saved or undone). */
+  walkFrom: WalkFrom | null;
+  /** The open 2D context menu, if any. */
+  contextMenu: ContextMenu | null;
   toggleLevelBar: () => void;
   toggleProperties: () => void;
   setOrthoLock: (on: boolean) => void;
@@ -328,7 +352,10 @@ export interface UiState {
   setWalkLevel: (id: Id | null) => void;
   setWalkLocked: (locked: boolean) => void;
   setHelpOpen: (open: boolean) => void;
+  /** Show (or clear) a notice; an info notice clears itself after NOTICE_MS. */
   setNotice: (notice: Notice | null) => void;
+  setWalkFrom: (walkFrom: WalkFrom | null) => void;
+  setContextMenu: (menu: ContextMenu | null) => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -404,6 +431,8 @@ export const useUiStore = create<UiState>()((set) => ({
   walkLocked: false,
   helpOpen: false,
   notice: null,
+  walkFrom: null,
+  contextMenu: null,
   toggleLevelBar: () => set((s) => ({ levelBarOpen: !s.levelBarOpen })),
   toggleProperties: () => set((s) => ({ propertiesOpen: !s.propertiesOpen })),
   setOrthoLock: (orthoLock) => {
@@ -421,6 +450,7 @@ export const useUiStore = create<UiState>()((set) => ({
       draft: { ...emptyDraft(), cursor: s.draft.cursor },
       hover: NO_HOVER,
       roomEdit: null,
+      contextMenu: null,
     })),
   setActiveLevel: (activeLevelId) =>
     set((s) => ({
@@ -433,6 +463,7 @@ export const useUiStore = create<UiState>()((set) => ({
       draft: emptyDraft(),
       hover: NO_HOVER,
       roomEdit: null,
+      contextMenu: null,
     })),
   enterSiteMode: (levelId) =>
     set((s) => ({
@@ -444,6 +475,7 @@ export const useUiStore = create<UiState>()((set) => ({
       draft: emptyDraft(),
       hover: NO_HOVER,
       roomEdit: null,
+      contextMenu: null,
     })),
   setSelection: (selection) =>
     set((s) => ({ selection, underlaySelected: selectionSize(selection) ? false : s.underlaySelected })),
@@ -509,8 +541,30 @@ export const useUiStore = create<UiState>()((set) => ({
   setWalkLevel: (walkLevelId) => set({ walkLevelId }),
   setWalkLocked: (walkLocked) => set((s) => (s.walkLocked === walkLocked ? s : { walkLocked })),
   setHelpOpen: (helpOpen) => set({ helpOpen }),
-  setNotice: (notice) => set({ notice }),
+  setNotice: (notice) => {
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = null;
+    set({ notice });
+    if (notice && !notice.error) {
+      noticeTimer = setTimeout(() => {
+        noticeTimer = null;
+        if (useUiStore.getState().notice === notice) set({ notice: null });
+      }, NOTICE_MS);
+    }
+  },
+  setWalkFrom: (walkFrom) => set({ walkFrom }),
+  setContextMenu: (contextMenu) => set((s) => (s.contextMenu === contextMenu ? s : { contextMenu })),
 }));
+
+let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Called on every plan-store change (main.tsx): a plan edit clears the notice, info or error. A
+ * notice set after the edit (Open, Undo's "Undid a change on ...") is set after this runs, so it stays.
+ */
+export function clearNoticeOnEdit(plan: object, prevPlan: object): void {
+  if (plan !== prevPlan && useUiStore.getState().notice) useUiStore.getState().setNotice(null);
+}
 
 export const useViewport = () => useUiStore((s) => s.viewport);
 export const useViewportScale = () => useUiStore((s) => s.viewport.k);

@@ -7,6 +7,31 @@ import type { Id, Level, Room, Vec2, ViewMode } from '../model/types';
 /** Baseline offsets of the name and area lines from the label point, screen px. */
 export const ROOM_NAME_DY = -7;
 export const ROOM_AREA_DY = 9;
+/** Spacing of the lines of a wrapped room name, screen px; the first line moves up by this much. */
+export const ROOM_NAME_LINE_PX = 15;
+/** Names longer than this wrap onto a second line (REVIEW-2 C2). */
+export const ROOM_NAME_WRAP = 18;
+
+/**
+ * A room name as one or two lines: up to ROOM_NAME_WRAP characters stay on one line. Longer names
+ * break before a parenthesis when both parts then fit ("Guest" / "(11'5\" adjusted)"), else at the
+ * last space that keeps the first line within the limit, with the rest on the second line. A name
+ * with no space to break at stays on one line.
+ */
+export function roomNameLines(name: string, max = ROOM_NAME_WRAP): string[] {
+  const text = name.trim();
+  if (text.length <= max) return [text];
+  const paren = text.indexOf(' (');
+  if (paren > 0) {
+    const a = text.slice(0, paren).trim();
+    const b = text.slice(paren + 1).trim();
+    if (a.length <= max && b.length <= max) return [a, b];
+  }
+  let cut = text.lastIndexOf(' ', max);
+  if (cut <= 0) cut = text.indexOf(' ');
+  if (cut <= 0) return [text];
+  return [text.slice(0, cut).trim(), text.slice(cut + 1).trim()];
+}
 /** Approximate glyph widths for the hit box, px per character. */
 const NAME_CHAR_PX = 7.6;
 const AREA_CHAR_PX = 6.6;
@@ -36,12 +61,34 @@ export function roomLabels(level: Level, set: FaceSet): RoomLabel[] {
   return out;
 }
 
+/** Width of a face's net polygon's bounding box, inches (cached per face). */
+const faceWidths = new WeakMap<Face, number>();
+export function faceWidth(face: Face): number {
+  let w = faceWidths.get(face);
+  if (w === undefined) {
+    const xs = face.netPolygon.map((p) => p.x);
+    faceWidths.set(face, (w = Math.max(...xs) - Math.min(...xs)));
+  }
+  return w;
+}
+
+/**
+ * Where a room name wraps in a face `width` inches wide (null: no face) at zoom k: after ROOM_NAME_WRAP characters, or sooner when one
+ * line would be wider than the room on screen (a closet's "Master closet" becomes two lines).
+ */
+export function nameWrapFor(width: number | null, k: number): number {
+  if (width === null) return ROOM_NAME_WRAP;
+  const fit = Math.floor((width * k - 8) / NAME_CHAR_PX);
+  return Math.max(1, Math.min(ROOM_NAME_WRAP, fit));
+}
+
 /** Half extents of a label's hit box in screen px (two lines: name, then area or warning). */
-function labelBox(label: RoomLabel): { half: number; up: number; down: number } {
-  const nameW = label.room ? label.room.name.length * NAME_CHAR_PX : 0;
+function labelBox(label: RoomLabel, k: number): { half: number; up: number; down: number } {
+  const lines = label.room ? roomNameLines(label.room.name, nameWrapFor(label.face ? faceWidth(label.face) : null, k)) : [];
+  const nameW = Math.max(0, ...lines.map((l) => l.length * NAME_CHAR_PX));
   const second = label.face ? 10 : 14; // "1,234 sq ft" / "shares an area"
   const half = Math.max(nameW, second * AREA_CHAR_PX, 24) / 2 + 4;
-  return { half, up: 16, down: 16 };
+  return { half, up: 16 + Math.max(0, lines.length - 1) * ROOM_NAME_LINE_PX, down: 16 };
 }
 
 /**
@@ -55,7 +102,7 @@ export function hitRoomLabel(level: Level, viewMode: ViewMode, p: Vec2, k: numbe
     if (!label.room) continue;
     const dx = (p.x - label.at.x) * k;
     const dy = (p.y - label.at.y) * k;
-    const box = labelBox(label);
+    const box = labelBox(label, k);
     if (Math.abs(dx) <= box.half && dy >= -box.up && dy <= box.down) {
       const d = Math.hypot(dx, dy);
       if (d < bestD) {

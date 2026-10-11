@@ -8,7 +8,8 @@ import { DEFAULT_EXTERIOR_COLOR, DEFAULT_INTERIOR_COLOR, normalizeHex, roofColor
 import { createEmptyPlan, createLevel, migrate } from '../model/plan';
 import type { Level, Opening, Plan, Wall } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
-import { brightness, courseBoundaries, seeded, shingleJoints, sidingTexture, TILE_INCHES } from '../view3d/textures';
+import { blendPixels, brightness, courseBoundaries, hexToRgb, newWorkColor, NEW_WORK_GREEN, seeded, shingleJoints, sidingTexture, TILE_INCHES } from '../view3d/textures';
+import { wallFlatColor } from '../view3d/materials';
 import { wallMaterial } from '../view3d/materials';
 
 const store = () => usePlanStore.getState();
@@ -437,5 +438,42 @@ describe('siding texture layout', () => {
     expect(typeof document).toBe('undefined');
     expect(sidingTexture('clapboard', '#5a3a35')).toBeNull();
     expect(sidingTexture('plain', '#e8e4dc')).toBeNull();
+  });
+});
+
+describe('new-work walls are washed green, not darkened (REVIEW-2 C4)', () => {
+  it('blendPixels moves each channel halfway to the green and keeps alpha', () => {
+    const px = [90, 58, 53, 255, 0, 0, 0, 128, 255, 255, 255, 0];
+    blendPixels(px, hexToRgb(NEW_WORK_GREEN), 0.5);
+    // #a9dcb7 is (169, 220, 183): the stain (90, 58, 53) lands halfway.
+    expect(px.slice(0, 4)).toEqual([130, 139, 118, 255]);
+    expect(px.slice(4, 8)).toEqual([85, 110, 92, 128]);
+    expect(px.slice(8, 12)).toEqual([212, 238, 219, 0]);
+    // t = 0 changes nothing, t = 1 is the green.
+    const q = [10, 20, 30, 40];
+    blendPixels(q, [200, 100, 0], 0);
+    expect(q).toEqual([10, 20, 30, 40]);
+    blendPixels(q, [200, 100, 0], 1);
+    expect(q).toEqual([200, 100, 0, 40]);
+    // Clamped arrays (canvas ImageData) round the same way.
+    const c = new Uint8ClampedArray([90, 58, 53, 255]);
+    blendPixels(c, hexToRgb(NEW_WORK_GREEN), 0.5);
+    expect([...c]).toEqual([130, 139, 118, 255]);
+  });
+
+  it('the flat colour of a new textured wall is the same blend; it is lighter than the stain', () => {
+    expect(newWorkColor('#5a3a35')).toBe('#828b76');
+    expect(wallFlatColor('new', 'shingle', '#5a3a35')).toBe('#828b76');
+    expect(wallFlatColor('existing', 'shingle', '#5a3a35')).toBe('#5a3a35');
+    expect(wallFlatColor('demo', 'shingle', '#5a3a35')).toBe('#e0413a');
+    const lum = (hex: string) => hexToRgb(hex).reduce((t, v) => t + v, 0);
+    expect(lum(wallFlatColor('new', 'shingle', '#5a3a35'))).toBeGreaterThan(lum('#5a3a35'));
+  });
+
+  it("a new wall's material is untinted (white) over its texture, or the blended colour without one", () => {
+    const m = wallMaterial('new', 'exterior', 'clapboard', '#5a3a35');
+    // No canvas in node, so the flat blended colour; with a canvas the map carries the blend and the tint is white.
+    expect(m.color.getHexString()).toBe('828b76');
+    expect(wallMaterial('demo', 'exterior', 'clapboard', '#5a3a35').opacity).toBeCloseTo(0.35, 9);
   });
 });

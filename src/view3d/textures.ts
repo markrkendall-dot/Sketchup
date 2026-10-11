@@ -75,6 +75,41 @@ export function shingleJoints(course: number, tile = TILE_INCHES, rand: () => nu
 /** Brightness factor of a course or board: a few percent either way. */
 export const brightness = (rand: () => number): number => 0.94 + rand() * 0.12;
 
+/** The new-work green the `new` variant of a texture is blended toward (DESIGN.md "Exterior appearance"). */
+export const NEW_WORK_GREEN = '#a9dcb7';
+/** How far the `new` variant moves each pixel toward NEW_WORK_GREEN. */
+export const NEW_WORK_BLEND = 0.5;
+
+/** A plain texture, or the new-work variant blended toward green (REVIEW-2 C4). */
+export type TextureVariant = 'plain' | 'new';
+
+/** `#rrggbb` as [r, g, b] in 0..255. */
+export function hexToRgb(hex: string): [number, number, number] {
+  const v = parseInt(hex.replace('#', ''), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+/**
+ * Blend RGBA pixels (canvas ImageData order) toward `target` by `t` in place: each channel becomes
+ * c + (target - c) * t, rounded; alpha is kept (a screen's see-through mesh stays see-through). The
+ * `new` variant of a siding texture is the drawn texture through this, so new work reads as the
+ * finish washed with light green instead of the dark stain multiplied by green (which went black).
+ */
+export function blendPixels(data: Uint8ClampedArray | number[], target: readonly [number, number, number], t: number): void {
+  for (let i = 0; i + 3 < data.length; i += 4) {
+    data[i] = Math.round(data[i] + (target[0] - data[i]) * t);
+    data[i + 1] = Math.round(data[i + 1] + (target[1] - data[i + 1]) * t);
+    data[i + 2] = Math.round(data[i + 2] + (target[2] - data[i + 2]) * t);
+  }
+}
+
+/** A flat colour blended toward the new-work green the same way (the new variant of a colour). */
+export function newWorkColor(hex: string): string {
+  const px = [...hexToRgb(hex), 255];
+  blendPixels(px, hexToRgb(NEW_WORK_GREEN), NEW_WORK_BLEND);
+  return `#${((px[0] << 16) | (px[1] << 8) | px[2]).toString(16).padStart(6, '0')}`;
+}
+
 const cache = new Map<string, CanvasTexture | null>();
 
 function shade(color: string, f: number): string {
@@ -158,12 +193,13 @@ function drawScreen(ctx: Ctx): void {
 }
 
 /**
- * The siding texture for a finish and colour, generated once and cached. Null for `plain` (a flat
- * colour needs no texture) and wherever there is no DOM canvas (node).
+ * The siding texture for a finish and colour, generated once and cached. The `new` variant is the
+ * same drawing blended 50% toward NEW_WORK_GREEN per pixel. Null for `plain` (a flat colour needs
+ * no texture) and wherever there is no DOM canvas (node).
  */
-export function sidingTexture(finish: WallFinish, color: string): CanvasTexture | null {
+export function sidingTexture(finish: WallFinish, color: string, variant: TextureVariant = 'plain'): CanvasTexture | null {
   if (finish === 'plain' || typeof document === 'undefined') return null;
-  const key = `${finish}|${color}`;
+  const key = `${finish}|${color}|${variant}`;
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
   const canvas = document.createElement('canvas');
@@ -178,6 +214,11 @@ export function sidingTexture(finish: WallFinish, color: string): CanvasTexture 
   else if (finish === 'shingle') drawShingle(ctx, color);
   else if (finish === 'board') drawBoard(ctx, color);
   else drawScreen(ctx);
+  if (variant === 'new') {
+    const img = ctx.getImageData(0, 0, TEXTURE_PX, TEXTURE_PX);
+    blendPixels(img.data, hexToRgb(NEW_WORK_GREEN), NEW_WORK_BLEND);
+    ctx.putImageData(img, 0, 0);
+  }
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = SRGBColorSpace;
   tex.wrapS = RepeatWrapping;

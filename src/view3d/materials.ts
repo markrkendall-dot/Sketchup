@@ -2,7 +2,7 @@ import { Color, DoubleSide, FrontSide, MeshStandardMaterial } from 'three';
 import type { FillPart } from '../derive/openings3d';
 import { defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, Phase, RoofFinish, WallFinish, WallKind } from '../model/types';
-import { sidingTexture } from './textures';
+import { newWorkColor, sidingTexture } from './textures';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
@@ -31,23 +31,27 @@ function make(color: string, opts: { transparent?: boolean; opacity?: number } =
 
 const wallMaterials = new Map<string, MeshStandardMaterial>();
 
-/** New work is tinted green: multiplied over a texture, pulled toward green on a flat colour. */
-const NEW_TINT = '#b4e4c2';
+/**
+ * New work is green: a textured wall uses the texture's `new` variant (blended 50% toward the
+ * new-work green, textures.ts) under a white tint, and its flat colour is the same blend; plain
+ * walls, roofs and trim are pulled toward a darker green.
+ */
 const NEW_GREEN = '#3f8f5f';
 const pullGreen = (hex: string) => `#${new Color(hex).lerp(new Color(NEW_GREEN), 0.45).getHexString()}`;
 
 /** The colour a wall shows without textures (export, and the fallback where no canvas exists). */
 export function wallFlatColor(phase: Phase, finish: WallFinish, color: string): string {
   if (phase === 'demo') return PHASE_COLOR.demo;
-  if (finish === 'screen') return phase === 'new' ? pullGreen('#4a4d4c') : '#4a4d4c';
-  return phase === 'new' ? pullGreen(color) : color;
+  if (finish === 'screen') return phase === 'new' ? newWorkColor('#4a4d4c') : '#4a4d4c';
+  if (phase !== 'new') return color;
+  return finish === 'plain' ? pullGreen(color) : newWorkColor(color);
 }
 
 /**
  * A wall's material. Exterior walls (and any wall given a finish) carry the procedural siding
  * texture of their finish and colour (textures.ts); the wall mesh is one merged geometry, so both
  * faces of an exterior wall show the siding. Plain walls are a flat colour. Demolished walls stay
- * translucent red whatever their finish; new ones are tinted green over the texture. A screen is
+ * translucent red whatever their finish; new ones use the texture's green-washed `new` variant. A screen is
  * a see-through mesh. Textures exist only where a canvas does: elsewhere (node, tests) the flat
  * colour is used.
  */
@@ -63,8 +67,8 @@ export function wallMaterial(
   if (!m) {
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
-      const tex = textured ? sidingTexture(finish, color) : null;
-      m = make(tex ? (phase === 'new' ? NEW_TINT : '#ffffff') : wallFlatColor(phase, finish, color));
+      const tex = textured ? sidingTexture(finish, color, phase === 'new' ? 'new' : 'plain') : null;
+      m = make(tex ? '#ffffff' : wallFlatColor(phase, finish, color));
       if (tex) m.map = tex;
       if (finish === 'screen') {
         m.transparent = true;

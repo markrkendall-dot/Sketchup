@@ -1,7 +1,9 @@
 import { getLevelElevations } from '../derive/levels';
 import { getFootprints } from '../derive/footprint';
+import { levelCentroid, outwardSide } from '../derive/meshes';
+import { isOpeningVisible } from '../derive/phase';
 import { getFaces } from '../derive/rooms';
-import { pointInPolygon, polygonSignedArea } from '../model/geometry';
+import { add, pointInPolygon, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Plan, Vec2, ViewMode } from '../model/types';
 import { planBox } from './bounds';
 import { active3dLevel, visible3dLevels } from './visibility';
@@ -49,13 +51,64 @@ export function eyeElevation(plan: Plan, levelId: Id): number {
   return (getLevelElevations(plan)[levelId]?.floorTop ?? 0) + EYE_HEIGHT;
 }
 
+/** How far inside the wall's centerline a walk through the entry door starts, inches. */
+export const ENTRY_INSET = 24;
+
+/** Where walking starts and the way the eye looks (a unit vector in plan coordinates). */
+export interface WalkPose {
+  at: Vec2;
+  dir: Vec2;
+}
+
+const EAST: Vec2 = { x: 1, y: 0 };
+
 /**
- * Where walking starts on a level, in plan coordinates: the centre of the level's outer face (the
- * bounding box of the largest closed outline). When that point is inside a wall (a divider across
- * the middle of the house), the middle of the largest room is used instead. A level without a
- * closed outline starts at the centre of the shown levels' bounding box.
+ * Just inside the level's entry door (REVIEW-2 C5): the first door, visible in the view mode, in an
+ * exterior wall; ENTRY_INSET inside the wall's centerline at the door's centre, looking into the
+ * house. The outside is the side with no closed room beside the wall when the other has one
+ * (facesBesideWall), else the side away from the middle of the level's nodes (meshes.ts
+ * outwardSide, the side the door fills face). Null when the level has no such door.
  */
-export function walkStart(plan: Plan, levelId: Id, viewMode: ViewMode, levels: readonly Id[]): Vec2 {
+export function entryDoorPose(plan: Plan, levelId: Id, viewMode: ViewMode): WalkPose | null {
+  const level = plan.levels[levelId];
+  if (!level) return null;
+  const fps = getFootprints(level, viewMode);
+  const faces = getFaces(level, viewMode);
+  const centroid = levelCentroid(level);
+  for (const o of Object.values(level.openings)) {
+    if (o.type !== 'door') continue;
+    const wall = level.walls[o.wallId];
+    if (!wall || wall.kind !== 'exterior' || !isOpeningVisible(o, wall, viewMode)) continue;
+    const fp = fps.get(wall.id);
+    if (!fp) continue;
+    const side = outwardSide(fp, wall, faces, centroid);
+    const dir = scale(fp.normal, -side);
+    const centre = add(fp.a, scale(fp.dir, o.offset));
+    return { at: add(centre, scale(dir, ENTRY_INSET)), dir };
+  }
+  return null;
+}
+
+/**
+ * Where walking starts on a level, in plan coordinates, and which way the eye looks:
+ * 1. the point picked with "Walk from here" in the 2D view (`walkFrom`), when it is on this level,
+ *    looking east;
+ * 2. just inside the level's entry door, looking in (entryDoorPose);
+ * 3. the centre of the level's outer face (the bounding box of the largest closed outline), or the
+ *    middle of the largest room when that centre is inside a wall (a divider across the middle of
+ *    the house), looking east;
+ * 4. on a level without a closed outline, the centre of the shown levels' bounding box.
+ */
+export function walkStart(
+  plan: Plan,
+  levelId: Id,
+  viewMode: ViewMode,
+  levels: readonly Id[],
+  walkFrom?: { levelId: Id; point: Vec2 } | null,
+): WalkPose {
+  if (walkFrom && walkFrom.levelId === levelId && plan.levels[levelId]) return { at: { ...walkFrom.point }, dir: EAST };
+  const door = entryDoorPose(plan, levelId, viewMode);
+  if (door) return door;
   const level = plan.levels[levelId];
   if (level) {
     const faces = getFaces(level, viewMode);
@@ -68,14 +121,13 @@ export function walkStart(plan: Plan, levelId: Id, viewMode: ViewMode, levels: r
       const ys = outer.map((p) => p.y);
       const c = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
       const inWall = [...getFootprints(level, viewMode).values()].some((fp) => pointInPolygon(c, fp.poly));
-      if (!inWall) return c;
+      if (!inWall) return { at: c, dir: EAST };
       const largest = [...faces.faces].sort((p, q) => q.grossArea - p.grossArea)[0];
-      if (largest) return largest.labelPoint;
-      return c;
+      return { at: largest ? largest.labelPoint : c, dir: EAST };
     }
   }
   const box = planBox(plan, levels);
-  return { x: (box.min[0] + box.max[0]) / 2, y: (box.min[2] + box.max[2]) / 2 };
+  return { at: { x: (box.min[0] + box.max[0]) / 2, y: (box.min[2] + box.max[2]) / 2 }, dir: EAST };
 }
 
 /**

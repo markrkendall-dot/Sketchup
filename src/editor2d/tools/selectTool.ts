@@ -245,6 +245,11 @@ function selectHit(sel: Selection, hit: NonNullable<Hit>): Selection {
 
 export const selectTool: Tool = {
   onPointerDown(e, ctx) {
+    // Right-click: the canvas menu ("Walk from here", PlanContextMenu.tsx) at the clicked point.
+    if (e.button === 2) {
+      ctx.ui().setContextMenu({ screen: e.screen, world: e.world, levelId: ctx.levelId });
+      return;
+    }
     if (e.button !== 0) return;
     const ui = ctx.ui();
     const level = ctx.level();

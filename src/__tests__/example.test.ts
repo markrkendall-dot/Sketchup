@@ -31,7 +31,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([b.wallHeight, b.floorThickness, f.wallHeight, f.floorThickness, s.wallHeight, s.floorThickness]).toEqual([90, 4, 96, 12, 96, 12]);
     const names = (id: string) => Object.values(plan.levels[id].rooms).map((r) => r.name);
     const [lb, lf, ls] = plan.levelOrder;
-    expect(names(lb)).toEqual(['Basement (unpartitioned, est.)']);
+    expect(names(lb)).toEqual(['Basement (unpartitioned, est.)', 'Utility (below)']);
     expect(names(lf).sort()).toEqual(['Bath', 'Entry hall', 'Entry porch (est.)', 'Kitchen (17\'2" adjusted: re-measure)', 'Living', 'Stair', 'Utility']);
     expect(names(ls).sort()).toEqual(['Bath', 'Bunk', 'Guest (11\'5" adjusted)', 'Master', 'Master closet', 'Office / hall (11\'11" adjusted)']);
   });

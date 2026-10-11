@@ -60,17 +60,18 @@ export function FirstPerson() {
   const lamp = useRef<PointLight>(null);
   const levelId = useRef<string | null>(null);
 
-  // Enter: eye height on the start level, at the start point, looking along +x.
+  // Enter: eye height on the start level, at the start point (the picked one, the entry door, or
+  // the middle of the house; walk.ts walkStart), looking the way it says.
   useEffect(() => {
     const plan = getPlan();
     const ui = useUiStore.getState();
     const levels = walkLevels(plan, ui);
     const id = walkStartLevel(plan, ui);
     if (!id) return;
-    const at = walkStart(plan, id, ui.viewMode, levels);
+    const { at, dir } = walkStart(plan, id, ui.viewMode, levels, ui.walkFrom);
     const y = eyeElevation(plan, id);
     camera.position.set(at.x, y, at.y);
-    camera.lookAt(at.x + 1, y, at.y);
+    camera.lookAt(at.x + dir.x, y, at.y + dir.y);
     levelId.current = id;
     ui.setWalkLevel(id);
     const fov = camera instanceof PerspectiveCamera ? camera.fov : null;

@@ -357,18 +357,22 @@ export function buildExamplePlan(): Plan {
   };
   if (!store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights() })) throw new Error('chimney rejected');
 
-  // ---- Room labels, one per area (names say where a number is an estimate).
+  // ---- Room labels, one per area (names say where a number is an estimate). A label is drawn at its
+  // anchor (else at the middle of the room's widest part), so the anchors are where each reads best.
   const label = (levelId: Id, name: string, at: Vec2) => {
     if (!store().addRoom(levelId, { name, anchor: at })) throw new Error(`room ${name} rejected`);
   };
   const mid = { x: MAIN.x1 / 2, y: MAIN.y1 / 2 };
   label(bId, 'Basement (unpartitioned, est.)', mid);
+  // The walkout bump under the wing is its own space until it is measured (README).
+  label(bId, 'Utility (below)', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 });
   // First Floor: one label in each face (anchors well inside the faces).
   label(fId, 'Entry hall', { x: 100, y: 52 });
   label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: 52 });
   label(fId, 'Kitchen (17\'2" adjusted: re-measure)', { x: (PART.kl + 2.5 + (CL.x1 - HALF)) / 2, y: (PART.line + 2.5 + (CL.y1 - HALF)) / 2 });
   label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 });
-  label(fId, 'Stair', { x: 100, y: STRIP_MID });
+  // On the treads below the UP arrow: the half above it has the UP mark and the hall wall's dimension.
+  label(fId, 'Stair', { x: 70, y: STRIP_MID + 9 });
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 });
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
   // Second Floor. The Office / hall is one face with the landing and the stair well.

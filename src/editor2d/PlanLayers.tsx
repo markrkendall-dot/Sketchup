@@ -12,8 +12,15 @@ import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/ty
 import { formatArea, formatLengthCompact } from '../model/units';
 import { useLayerPlan, useLayerUi } from './layerStores';
 import { outlinePath } from './outline';
-import { ROOM_AREA_DY, ROOM_NAME_DY } from './roomLabels';
+import { faceWidth, nameWrapFor, ROOM_AREA_DY, ROOM_NAME_DY, ROOM_NAME_LINE_PX, ROOM_NAME_WRAP, roomNameLines } from './roomLabels';
 
+/**
+ * A short wall of a small room has no dimension label (REVIEW-2 C2): under 4' long, and a face it
+ * bounds under 60 sq ft net (a closet's "3'" and "3'-2\"" would sit on its name). Any such face,
+ * not every one: a closet's partitions also bound the bigger room next door.
+ */
+const SMALL_WALL_LENGTH = 48;
+const SMALL_ROOM_AREA = 60 * 144;
 /** Gap between a wall face and its dimension label, in screen px. */
 const LABEL_GAP_PX = 11;
 /** Hide labels on walls shorter than this on screen. */
@@ -305,6 +312,17 @@ function faceSides(set: FaceSet, level: Level): Map<Id, number> {
   return m;
 }
 
+/** Smallest net area of the faces each wall bounds (walls bounding no face are absent). Per face set. */
+const wallAreaCache = new WeakMap<FaceSet, Map<Id, number>>();
+function smallestFaceBeside(set: FaceSet): Map<Id, number> {
+  let m = wallAreaCache.get(set);
+  if (!m) {
+    wallAreaCache.set(set, (m = new Map()));
+    for (const f of set.faces) for (const id of f.wallIds) m.set(id, Math.min(m.get(id) ?? Infinity, f.netArea));
+  }
+  return m;
+}
+
 /**
  * Where along a wall (distance from its a end) the dimension label goes, and how much room it has:
  * the middle of the longest stretch not crossed by the swing of a door that opens to the label's
@@ -348,7 +366,15 @@ const DimensionLabel = memo(function DimensionLabel({ levelId, wallId }: { level
     const bits = faceSides(getFaces(level, viewMode), level).get(wallId) ?? 0;
     return bits === 1 ? -1 : 1;
   });
+  // Beside a small room: a short wall's label would crowd the room's name.
+  const besideSmallRoom = useLayerPlan((s) => {
+    const level = s.plan.levels[levelId];
+    if (!level) return false;
+    const area = smallestFaceBeside(getFaces(level, viewMode)).get(wallId);
+    return area !== undefined && area < SMALL_ROOM_AREA;
+  });
   if (!fp || !wall || !visible || fp.length * k < MIN_LABEL_WALL_PX) return null;
+  if (besideSmallRoom && fp.length < SMALL_WALL_LENGTH) return null;
   const text = formatLengthCompact(fp.length, denom);
   const width = text.length * LABEL_CHAR_PX;
   // Drop a label that would be wider than the wall it belongs to.
@@ -361,7 +387,7 @@ const DimensionLabel = memo(function DimensionLabel({ levelId, wallId }: { level
   let angle = (Math.atan2(fp.dir.y, fp.dir.x) * 180) / Math.PI;
   if (angle > 90 || angle <= -90) angle += 180; // never upside down
   return (
-    <g transform={`translate(${pos.x} ${pos.y}) rotate(${angle}) scale(${1 / k})`}>
+    <g transform={`translate(${pos.x} ${pos.y}) rotate(${angle}) scale(${1 / k})`} data-dim-wall-id={wallId}>
       <text className="dim-label" textAnchor="middle" dominantBaseline="central">
         {text}
       </text>
@@ -697,6 +723,7 @@ function RoomLabelGroup({
   y,
   name,
   area,
+  wrap = ROOM_NAME_WRAP,
 }: {
   className: string;
   roomId: Id | undefined;
@@ -706,14 +733,25 @@ function RoomLabelGroup({
   name: string | null;
   /** Null hides the area line. */
   area: string | null;
+  /** The name wraps onto a second line past this many characters (roomLabels.ts nameWrapFor). */
+  wrap?: number;
 }) {
   const k = useLayerUi(viewportScale);
   if (name === null && area === null) return null;
+  // A long name wraps onto two lines; the first moves up so the last stays just above the area.
+  const lines = name !== null ? roomNameLines(name, wrap) : [];
+  const top = ROOM_NAME_DY - (lines.length - 1) * ROOM_NAME_LINE_PX;
   return (
     <g className={className} data-room-id={roomId} data-face-id={faceId} transform={`translate(${x} ${y}) scale(${1 / k})`}>
       {name !== null && (
-        <text className="room-name" y={ROOM_NAME_DY} textAnchor="middle" dominantBaseline="central">
-          {name}
+        <text className="room-name" y={top} textAnchor="middle" dominantBaseline="central">
+          {lines.length === 1
+            ? name
+            : lines.map((line, i) => (
+                <tspan key={i} x={0} y={top + i * ROOM_NAME_LINE_PX}>
+                  {line}
+                </tspan>
+              ))}
         </text>
       )}
       {area !== null && (
@@ -766,11 +804,16 @@ const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; fa
     const f = findFace(set, faceId);
     return f ? faceSpan(f) : 0;
   }, 0);
+  const width = useFaceSetValue(levelId, (set) => {
+    const f = findFace(set, faceId);
+    return f ? faceWidth(f) : 0;
+  }, 0);
   const k = useLayerUi(viewportScale);
   const selected = useLayerUi((s) => roomId !== null && s.selection.rooms.includes(roomId));
   const editing = useLayerUi((s) => roomId !== null && s.roomEdit?.roomId === roomId);
   if (editing) return null;
   const px = span * k;
+  const wrap = nameWrapFor(width, k);
   return (
     <RoomLabelGroup
       className={`room-label${roomId ? '' : ' unlabeled'}${selected ? ' is-selected' : ''}`}
@@ -780,6 +823,7 @@ const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; fa
       y={y}
       name={roomId && px >= MIN_ROOM_NAME_PX ? name : null}
       area={px >= MIN_ROOM_AREA_PX ? area : null}
+      wrap={wrap}
     />
   );
 });

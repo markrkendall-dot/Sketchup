@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type RefObject } from 'react';
 import { PlanCanvas } from './editor2d/PlanCanvas';
+import { PlanContextMenu } from './editor2d/PlanContextMenu';
 import { RoomNameEditor } from './editor2d/RoomNameEditor';
 import { dispatchKey, dispatchShift } from './editor2d/tools';
 import { useUiStore } from './store/uiStore';
@@ -144,6 +145,7 @@ function Views() {
       <main className="canvas-host" style={split ? { flex: `0 0 ${ratio * 100}%` } : undefined}>
         <PlanCanvas />
         <RoomNameEditor />
+        <PlanContextMenu />
         {layout === 'split' && narrow && (
           <p className="split-hint" role="status">
             The 3D view needs a window at least 900 px wide. Use the 3D button to see it full size.

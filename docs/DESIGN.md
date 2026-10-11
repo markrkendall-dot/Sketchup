@@ -198,6 +198,21 @@ no face render at the anchor in a warning colour. Net area: offset each edge inw
 bounding wall thickness; fall back to centerline area if the offset polygon self-intersects.
 Detection runs on the walls visible in the current ViewMode.
 
+**Label point** (REVIEW-2 C1): the room's anchor when it lies inside the face's net polygon (a label
+dragged by hand stays where it was put), else the net polygon's pole of inaccessibility
+(`derive/polylabel.ts`, the Mapbox polylabel cell search: square cells queued by the best distance
+they could hold, split until no cell can beat the best centre by more than 1", at most 200 cells),
+so an L-shaped room is labelled in the middle of its fatter arm, not on the concave corner. The pole
+is cached per traced face, so a room edit does not search again. `faceAt` and the orphan rules are
+unchanged (anchors are tested against the centerline polygon).
+
+**Label clutter** (C2, `PlanLayers.tsx`, `editor2d/roomLabels.ts`): a wall shorter than 48" that
+bounds a face under 60 sq ft net has no dimension label (a closet's partitions; any such face, since
+a closet partition also bounds the room next door). A room name longer than 18 characters, or wider
+on screen than its room (`nameWrapFor`), wraps onto two `<tspan>` lines (`roomNameLines`: before a
+parenthesis when both parts fit, else at the last space that fits); the area stays the line below,
+and the label's hit box grows by the extra line.
+
 ## Openings in 3D (`derive/meshes.ts`)
 
 No CSG. `prism(polygon, y0, y1, holes?, opts?)` triangulates the cap with `ShapeUtils.triangulateShape`,
@@ -438,8 +453,11 @@ on a translucent grey, material `transparent`, opacity 0.4, no depth write, `Dou
 (`courseBoundaries`, `shingleJoints`, `seeded`) is pure and tested; drawing needs `document`, and
 `sidingTexture` returns null without it (node, tests), where materials fall back to the flat colour.
 `wallMaterial(phase, kind, finish, color)` keys its shared materials by phase, finish and colour: existing walls
-use the texture with a white tint, new ones multiply it by a light green, demolished walls stay translucent red
-with no texture, plain walls are the colour itself (pulled toward green when new). The wall mesh is one merged
+use the texture with a white tint, new ones use the texture's `new` variant (REVIEW-2 C4: the drawn canvas
+blended 50% toward `#a9dcb7` per pixel, `blendPixels`, alpha kept) also with a white tint, so new siding reads
+as the finish washed with light green rather than the stain multiplied into near-black; their flat colour
+(`wallFlatColor`, export and no-canvas fallback) is the same blend (`newWorkColor`). Demolished walls stay
+translucent red with no texture, plain walls are the colour itself (pulled toward green when new). The wall mesh is one merged
 geometry with one material, so it cannot tell the faces of a wall apart: **both faces of an exterior wall show the
 siding** (the inside of a window reveal shows shingle too); interior walls are plain unless given a finish.
 
@@ -672,8 +690,16 @@ in 3D), the 3D canvas mounts only when shown. Camera near 1, far 20000 (scene in
 First-person walk (`uiStore.cameraMode`, overlay "Walk" button or `F` while the 3D view shows;
 `view3d/FirstPerson.tsx`, pure helpers in `view3d/walk.ts`): the orbit controls unmount (saving
 their pose) and drei `PointerLockControls` mount, so only one controls component exists at a time.
-Entry at the centre of the active level's outer face (the largest room's label point if that is
-inside a wall), eye 66" above the floor top, looking along +x, fov 65. A click on the canvas
+Entry (`walkStart`, REVIEW-2 C5): the point picked with "Walk from here" when it is on the start level
+(looking +x); else 24" inside the level's first visible door in an exterior wall, at the door's
+centre, looking in (`entryDoorPose`; the outside is `outwardSide`'s: the side with no closed room
+when the other has one, else away from the level's node centroid, so the starter's house door from
+the porch looks east into the hall); else the centre of the active level's outer face (the largest
+room's label point if that is inside a wall), looking along +x. Eye 66" above the floor top, fov 65.
+"Walk from here" is the select tool's right-click menu (`editor2d/PlanContextMenu.tsx`, absolutely
+positioned over the canvas, closed by Esc, a click elsewhere, a tool or level switch); it sets
+`uiStore.walkFrom {levelId, point}` (not plan data: not saved, not undone; dropped when its level
+goes away), and "Clear walk start" appears once one is set. A click on the canvas
 requests the pointer lock (our own call, so a refusal is caught; drei's document-wide click-to-lock
 is disabled with a selector that matches nothing); while unlocked, dragging with the left button
 looks around instead. WASD / arrows (by `KeyboardEvent.code`) move at 60"/s in the horizontal plane
@@ -698,7 +724,11 @@ console warning naming it). New and Open replace the plan and
 clear the undo history (New confirms when the plan has walls, rooms, stairs, roofs, site elements or an image). Autosave
 to IndexedDB (idb-keyval) on every plan change (debounced), restored on load; a failed save
 (storage full, IndexedDB unavailable) shows "Autosave failed: ..." in the status bar until a later
-save works, and is never thrown. Underlays downscaled to <= 2048px JPEG data URLs.
+save works (or the next edit, below), and is never thrown. Status bar notices (`uiStore.notice`, REVIEW-2
+C3): an info notice clears itself 8 s after it is set (`NOTICE_MS`, the timer lives in `setNotice`, so
+every caller gets it); an error stays until the next notice; any plan edit clears either
+(`clearNoticeOnEdit`, from the plan-store subscription in `main.tsx`), so a notice that belongs to an
+edit is set after it (Open, Undo's "Undid a change on ...", the duplicate room name). Underlays downscaled to <= 2048px JPEG data URLs.
 3D export (`io/export3d.ts`, toolbar "Export" menu, loaded on first use): `buildExportScene` builds
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels

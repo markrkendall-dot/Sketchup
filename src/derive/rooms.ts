@@ -1,6 +1,7 @@
 import { add, lineIntersection, pointInPolygon, polygonSignedArea, scale, segmentIntersection, sub } from '../model/geometry';
 import type { Id, Level, Vec2, ViewMode } from '../model/types';
 import { isVisible } from './phase';
+import { polylabel } from './polylabel';
 
 // Rooms (DESIGN.md "Rooms"): planar face enumeration of the walls visible in a view mode.
 //
@@ -30,7 +31,10 @@ export interface Face {
   netArea: number;
   /** Room whose anchor lies in this face (the first one, if several do). */
   roomId?: Id;
-  /** Where the face's label goes: the net polygon's centroid, or a fallback inside the face. */
+  /**
+   * Where the face's label goes: its room's anchor when that lies inside the net polygon (a label
+   * dragged by hand stays put), else the net polygon's pole of inaccessibility (polylabel.ts).
+   */
   labelPoint: Vec2;
 }
 
@@ -253,7 +257,28 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
   return { faces, outerFaces, outerFaceThickness, openEnds };
 }
 
-/** Label rooms: each room's anchor goes to the smallest face containing it; first come, first served. */
+/**
+ * The face's pole of inaccessibility (the centre of the largest circle that fits in the net
+ * polygon, to 1"), cached per face geometry: labels are re-done on every room edit, the pole only
+ * when the walls change. Falls back to a point inside the centerline polygon when the search finds
+ * nothing inside the net one.
+ */
+const poleCache = new WeakMap<Geometry['faces'][number], Vec2>();
+function poleOf(f: Geometry['faces'][number]): Vec2 {
+  let p = poleCache.get(f);
+  if (!p) {
+    const pole = polylabel(f.netPolygon, 1, 200);
+    p = pole.distance > 0 ? pole.point : interiorPoint(f.polygon);
+    poleCache.set(f, p);
+  }
+  return p;
+}
+
+/**
+ * Label rooms: each room's anchor goes to the smallest face containing it; first come, first
+ * served. Each face's label point is its room's anchor when that is inside the net polygon, else
+ * the pole of inaccessibility.
+ */
 export function labelFaces(geo: Geometry, rooms: Level['rooms']): FaceSet {
   const owner = new Map<string, Id>();
   const orphanRoomIds: Id[] = [];
@@ -271,8 +296,8 @@ export function labelFaces(geo: Geometry, rooms: Level['rooms']): FaceSet {
   }
   const faces: Face[] = geo.faces.map((f) => {
     const roomId = owner.get(f.id);
-    const c = polygonCentroid(f.netPolygon);
-    const labelPoint = pointInPolygon(c, f.netPolygon) ? c : roomId ? anchorOf.get(roomId)! : interiorPoint(f.polygon);
+    const anchor = roomId ? anchorOf.get(roomId)! : null;
+    const labelPoint = anchor && pointInPolygon(anchor, f.netPolygon) ? anchor : poleOf(f);
     return roomId ? { ...f, roomId, labelPoint } : { ...f, labelPoint };
   });
   return { faces, outerFaces: geo.outerFaces, outerFaceThickness: geo.outerFaceThickness, openEnds: geo.openEnds, orphanRoomIds };

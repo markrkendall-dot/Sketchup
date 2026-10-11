@@ -948,8 +948,6 @@ export function onHistoryStep(fn: HistoryListener): () => void {
   return () => void historyListeners.delete(fn);
 }
 
-let historyNoticeTimer: ReturnType<typeof setTimeout> | null = null;
-
 /**
  * Undo or redo, then make a change on another level visible: when the step changed a level that
  * is not the active one, switch to it and say so in the status bar.
@@ -966,12 +964,8 @@ function stepHistory(kind: 'undo' | 'redo'): void {
       const id = changed[0];
       ui.setActiveLevel(id);
       const text = `${kind === 'undo' ? 'Undid' : 'Redid'} a change on ${after.levels[id].name}`;
+      // Clears itself after NOTICE_MS (uiStore.setNotice).
       useUiStore.getState().setNotice({ text, error: false });
-      if (historyNoticeTimer) clearTimeout(historyNoticeTimer);
-      historyNoticeTimer = setTimeout(() => {
-        historyNoticeTimer = null;
-        if (useUiStore.getState().notice?.text === text) useUiStore.getState().setNotice(null);
-      }, 4000);
     }
   }
   for (const fn of historyListeners) fn(kind);

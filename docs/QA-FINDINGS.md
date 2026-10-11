@@ -92,3 +92,31 @@ Typed-length drawing and loop closing, T and crossing splits, miters, room detec
 **Batch C (Sonnet 5.5): items 8 to 14, 17 to 22.** Verify with screenshots at 1280x800, 1024x700 and 800x600 of the m7 house in All view and inspect them: no label collisions at fit zoom, grid visible at max zoom, toolbar at most two rows at 1024, panel collapsible at 800; ghost snapping shown by drawing a Second Floor wall onto a First Floor corner and asserting the node coordinates match exactly.
 
 After all three batches: run every e2e script once more, commit, push, and give MK a short changelog.
+
+## Review pass 2 (docs/REVIEW-2.md)
+
+A second pass on the house itself (the 146 Mick Road starter) and MK's renovation, done through the
+UI. Findings and fixes are in `docs/REVIEW-2.md`; one commit per batch on `claude/cool-mccarthy-rqi8ka`.
+
+| Item | Finding | Status |
+| --- | --- | --- |
+| A1 | Drawing a wall on top of an existing one silently replaced a piece of it | Fixed: `addWall`, copy and node drags refuse collinear overlaps ("A wall is already there..."); `normalizeLevel` prefers the existing wall and the one with openings |
+| A2 | The stair cut the whole floor above, including the closet over its low end | Fixed: the hole starts where headroom drops under 80" (`Stairs.headroom`, `holeStart` override, shown in the panel) |
+| A3 | The terrain passed through the basement | Fixed: the ground drops to 2" below the lowest slab under the footprint |
+| A4 | "Only active level and below" and the walk start used the lowest level in site mode | Fixed: both use the first floor, the level the site view shows |
+| B1 | No way to move a wall by a typed distance | Fixed: "Move" in the wall panel (toward the room on each side), Shift+arrows nudge 1" |
+| B2 | No rectangle tool | Fixed: Box tool (`B`), typed `12' x 10'` obeying "Lengths to" |
+| B3 | No measure tool | Fixed: Measure (`M`), and the distance moved while dragging a wall |
+| B4 | No way to export the 2D plan | Fixed: Export plan (.svg / .png) at 1/4" = 1'-0" with a title block |
+| B5 | Clicking a wall where a window sits grabbed the window | Fixed: the opening's own rectangle picks it; a second click selects its wall |
+| C1 | Room labels in L-shaped rooms sat on the concave corner | Fixed: label at the room's anchor when inside, else the pole of inaccessibility (`derive/polylabel.ts`); the starter's Stair label re-anchored onto the treads |
+| C2 | Closet dimension labels and long names cluttered small rooms | Fixed: no dimension on walls under 4' beside a room under 60 sq ft; names over 18 characters (or wider than the room) wrap to two lines |
+| C3 | Status notices stayed for the whole session | Fixed: info notices clear after 8 s, any notice on the next plan edit; errors stay until then |
+| C4 | New-phase walls looked black in 3D | Fixed: a green-washed `new` variant of each siding texture (50% toward `#a9dcb7`), untinted |
+| C5 | Walk started in the biggest room facing a wall | Fixed: 24" inside the level's entry door looking in; "Walk from here" in the 2D right-click menu |
+| C6 | The basement's walkout bump had no label | Fixed: "Utility (below)" in the starter; README says it is a separate space until measured |
+
+Not done on purpose (unchanged): decks, exterior stairs, retaining wall and garage as modelled
+objects, roof valleys, elevation drawings, furniture. The README's "Known limitations" list matches
+the app after this pass.
+

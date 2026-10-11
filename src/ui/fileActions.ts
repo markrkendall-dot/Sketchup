@@ -9,37 +9,33 @@ import type { Plan } from '../model/types';
 import { clearHistory, getPlan, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
 
-let noticeTimer: ReturnType<typeof setTimeout> | null = null;
-
 /**
- * Show a message in the status bar. Info messages clear themselves after `ms`; errors stay until
- * replaced (or cleared with null).
+ * Show a message in the status bar (null clears it). Info messages clear themselves after
+ * NOTICE_MS (the store's setter keeps the timer); errors stay until replaced. A plan edit clears
+ * either (main.tsx).
  */
-export function showNotice(text: string | null, error = false, ms = 4000): void {
-  if (noticeTimer) clearTimeout(noticeTimer);
-  noticeTimer = null;
-  const ui = useUiStore.getState();
-  ui.setNotice(text === null ? null : { text, error });
-  if (text !== null && !error) {
-    noticeTimer = setTimeout(() => {
-      noticeTimer = null;
-      if (useUiStore.getState().notice?.text === text) useUiStore.getState().setNotice(null);
-    }, ms);
-  }
+export function showNotice(text: string | null, error = false): void {
+  useUiStore.getState().setNotice(text === null ? null : { text, error });
+}
+
+/** The status bar message for a room name another room on the level already has, or null. */
+export function duplicateRoomNotice(levelId: string, name: string, exceptRoomId?: string | null): string | null {
+  const level = getPlan().levels[levelId];
+  if (!level) return null;
+  const wanted = name.trim().toLowerCase();
+  const dup = Object.values(level.rooms).find((r) => r.id !== exceptRoomId && r.name.trim().toLowerCase() === wanted);
+  return dup ? `There is already a ${dup.name} on this level` : null;
 }
 
 /**
  * Item 17: naming a room the same as another room on the level is allowed, but says so in the
- * status bar. Call it before the add or rename, with the room being renamed (if any) excluded.
+ * status bar. Call it after the add or rename (a plan edit clears the notice, C3), with the
+ * duplicate found before it (`duplicateRoomNotice`), or call this with the room excluded.
  */
 export function noteDuplicateRoomName(levelId: string, name: string, exceptRoomId?: string | null): boolean {
-  const level = getPlan().levels[levelId];
-  if (!level) return false;
-  const wanted = name.trim().toLowerCase();
-  const dup = Object.values(level.rooms).find((r) => r.id !== exceptRoomId && r.name.trim().toLowerCase() === wanted);
-  if (!dup) return false;
-  showNotice(`There is already a ${dup.name} on this level`);
-  return true;
+  const text = duplicateRoomNotice(levelId, name, exceptRoomId);
+  if (text) showNotice(text);
+  return text !== null;
 }
 
 /** Fit the active level (and its underlay, when shown) into the 2D view; in site mode the first floor under the site layer. */
@@ -108,7 +104,7 @@ export async function openExample(): Promise<void> {
     const { default: example } = await import('../../docs/examples/146-mick-road.json');
     const plan = migrate(example);
     replacePlan(plan);
-    showNotice(`Opened the example: ${plan.name}. Replace its estimates with your measurements.`, false, 8000);
+    showNotice(`Opened the example: ${plan.name}. Replace its estimates with your measurements.`);
   } catch (err) {
     showNotice(`Could not open the example: ${err instanceof Error ? err.message : String(err)}`, true);
   }

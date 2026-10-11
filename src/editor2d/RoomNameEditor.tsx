@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { noteDuplicateRoomName } from '../ui/fileActions';
+import { duplicateRoomNotice, showNotice } from '../ui/fileActions';
 import { usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore, type RoomEdit } from '../store/uiStore';
 import { worldToScreen } from './viewport';
@@ -46,12 +46,14 @@ function Editor({ edit }: { edit: RoomEdit }) {
     const name = text.trim();
     const levelId = ui.activeLevelId;
     if (name) {
-      noteDuplicateRoomName(levelId, name, edit.roomId);
+      const dup = duplicateRoomNotice(levelId, name, edit.roomId);
       if (edit.roomId) plan.updateRoom(levelId, edit.roomId, { name });
       else {
         const id = plan.addRoom(levelId, { name, anchor: edit.anchor });
         if (id) ui.setSelection({ ...EMPTY_SELECTION, rooms: [id] });
       }
+      // After the edit, which clears the status bar's notice.
+      if (dup) showNotice(dup);
     }
     close();
   };

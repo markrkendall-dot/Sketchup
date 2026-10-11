@@ -19,7 +19,7 @@ import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, R
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
-import { noteDuplicateRoomName } from './fileActions';
+import { duplicateRoomNotice, showNotice } from './fileActions';
 import { roomNameOf, runWallMove, wallSideNames } from './wallMove';
 import type { WallSide } from '../model/offset';
 import { releaseFocus } from './focus';
@@ -796,8 +796,10 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
   const commitName = () => {
     const v = name.trim();
     if (v && v !== room.name) {
-      noteDuplicateRoomName(level.id, v, room.id);
+      const dup = duplicateRoomNotice(level.id, v, room.id);
       updateRoom(level.id, room.id, { name: v });
+      // After the edit, which clears the status bar's notice.
+      if (dup) showNotice(dup);
     }
     else setName(room.name);
   };

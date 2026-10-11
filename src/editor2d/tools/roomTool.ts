@@ -8,8 +8,10 @@ import type { Tool, ToolContext, ToolPointerEvent } from './index';
 
 const DRAG_THRESHOLD_PX = 3;
 
-// Dragging a room label moves the room's anchor (shared with the select tool). The label itself
-// sits at its face's centroid, so it jumps when the anchor crosses into another face.
+// Dragging a room label moves the room's anchor (shared with the select tool). The label is drawn
+// at the anchor while it is inside the face's net polygon (derive/rooms.ts labelPoint), so it
+// follows the drag; inside a wall it falls back to the face's pole, and it moves to another face
+// when the anchor crosses into one.
 export interface RoomDrag {
   id: Id;
   grab: Vec2;

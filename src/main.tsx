@@ -11,7 +11,7 @@ import { pruneSelection } from './editor2d/tools';
 import { loadAutosave, startAutosave } from './io/file';
 import { defaultLevelId } from './model/plan';
 import { clearHistory, usePlanStore } from './store/planStore';
-import { useUiStore } from './store/uiStore';
+import { clearNoticeOnEdit, useUiStore } from './store/uiStore';
 import { showNotice } from './ui/fileActions';
 import './index.css';
 import { PLAN_STYLES } from './editor2d/planStyles';
@@ -60,8 +60,15 @@ async function boot(): Promise<void> {
     const ui = useUiStore.getState();
     if (!s.plan.levels[ui.activeLevelId]) ui.setActiveLevel(defaultLevelId(s.plan));
     else if (s.plan !== prev.plan) pruneSelection();
-    // Levels went away (New, Open): forget what the derive caches kept per level id.
-    if (s.plan.levelOrder !== prev.plan.levelOrder) pruneDerivedCaches(s.plan);
+    // Levels went away (New, Open): forget what the derive caches kept per level id, and a walk
+    // start picked on a level that is gone.
+    if (s.plan.levelOrder !== prev.plan.levelOrder) {
+      pruneDerivedCaches(s.plan);
+      const from = useUiStore.getState().walkFrom;
+      if (from && !s.plan.levels[from.levelId]) useUiStore.getState().setWalkFrom(null);
+    }
+    // Any edit clears the status bar's notice (REVIEW-2 C3).
+    clearNoticeOnEdit(s.plan, prev.plan);
   });
   startAutosave(usePlanStore, {
     // A failure stays in the status bar until a later save works.

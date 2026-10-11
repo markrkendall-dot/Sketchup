@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { facesBesideWall, getFaces } from '../derive/rooms';
+import { facesBesideWall, getFaces, type Face } from '../derive/rooms';
 import { wallPreviewText } from '../editor2d/previewLabel';
 import { dispatchKey, dispatchPointer, type ToolPointerEvent } from '../editor2d/tools';
 import { centerlineToFace } from '../editor2d/tools/wallTool';
@@ -8,6 +8,12 @@ import type { Vec2 } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import { isNarrow, useUiStore } from '../store/uiStore';
 import { noteDuplicateRoomName, openPlanFile, showNotice } from '../ui/fileActions';
+import { clearNoticeOnEdit, NOTICE_MS } from '../store/uiStore';
+import { roomNameLines } from '../editor2d/roomLabels';
+import { planSvg } from '../io/exportPlan';
+import { getFootprints } from '../derive/footprint';
+import { migrate } from '../model/plan';
+import example from '../../docs/examples/146-mick-road.json';
 import { bindingFor } from '../ui/keymap';
 
 const plan = () => usePlanStore.getState();
@@ -223,5 +229,113 @@ describe('item 12: panel keys', () => {
     expect(ui().levelBarOpen).toBe(levelBarOpen);
     ui().toggleLevelBar();
     expect(ui().levelBarOpen).toBe(!levelBarOpen);
+  });
+});
+
+describe('REVIEW-2 C2: small-room clutter', () => {
+  it('room names over 18 characters wrap onto two lines', () => {
+    expect(roomNameLines('Entry porch (est.)')).toEqual(['Entry porch (est.)']);
+    expect(roomNameLines('Kitchen (17\'2" adjusted: re-measure)')).toEqual(['Kitchen (17\'2"', 'adjusted: re-measure)']);
+    expect(roomNameLines('Office / hall (11\'11" adjusted)')).toEqual(['Office / hall', '(11\'11" adjusted)']);
+    expect(roomNameLines('Guest (11\'5" adjusted)')).toEqual(['Guest', '(11\'5" adjusted)']);
+    expect(roomNameLines('Basement (unpartitioned, est.)')).toEqual(['Basement', '(unpartitioned, est.)']);
+    expect(roomNameLines('A very long room name without parentheses')).toEqual(['A very long room', 'name without parentheses']);
+    expect(roomNameLines('Supercalifragilisticexpialidocious')).toEqual(['Supercalifragilisticexpialidocious']);
+  });
+
+  it('the plan drawing wraps the Kitchen name and drops the closet walls\' dimensions', () => {
+    const p = migrate(example);
+    const [, f, s2] = p.levelOrder;
+    const first = planSvg(p, f, 'all');
+    expect(first).toMatch(/<tspan[^>]*>Kitchen \(17&#x27;2&quot;<\/tspan><tspan[^>]*>adjusted: re-measure\)<\/tspan>/);
+    const second = planSvg(p, s2, 'all');
+    const level = p.levels[s2];
+    const closet = getFacesOf(level, 'Master closet');
+    const fps = getFootprints(level, 'all');
+    const short = closet.wallIds.filter((id) => fps.get(id)!.length < 48);
+    expect(short.length).toBeGreaterThan(0);
+    for (const id of short) expect(second).not.toContain(`data-dim-wall-id="${id}"`);
+    // A long wall of the same level keeps its label.
+    const long = [...fps.values()].find((fp) => fp.length > 160)!;
+    expect(second).toContain(`data-dim-wall-id="${long.wallId}"`);
+  });
+});
+
+describe('REVIEW-2 C3: notices clear themselves', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('an info notice clears 8 s after it is set; a newer one restarts the clock', () => {
+    expect(NOTICE_MS).toBe(8000);
+    showNotice('Opened the example');
+    vi.advanceTimersByTime(7999);
+    expect(ui().notice?.text).toBe('Opened the example');
+    showNotice('Saved a copy');
+    vi.advanceTimersByTime(7999);
+    expect(ui().notice?.text).toBe('Saved a copy');
+    vi.advanceTimersByTime(1);
+    expect(ui().notice).toBeNull();
+  });
+
+  it('an error stays until the next notice or edit', () => {
+    showNotice('Autosave failed', true);
+    vi.advanceTimersByTime(60_000);
+    expect(ui().notice).toEqual({ text: 'Autosave failed', error: true });
+    showNotice('Saved a copy');
+    expect(ui().notice?.error).toBe(false);
+    showNotice('Could not open', true);
+    const before = plan().plan;
+    plan().addWall(lower, { x: 0, y: 0 }, { x: 120, y: 0 }, ext);
+    clearNoticeOnEdit(plan().plan, before);
+    expect(ui().notice).toBeNull();
+  });
+
+  it('a plan edit clears an info notice early; a notice set after the edit stays', () => {
+    showNotice('Opened the example');
+    const before = plan().plan;
+    clearNoticeOnEdit(before, before);
+    expect(ui().notice?.text).toBe('Opened the example');
+    plan().addWall(lower, { x: 0, y: 0 }, { x: 120, y: 0 }, ext);
+    clearNoticeOnEdit(plan().plan, before);
+    expect(ui().notice).toBeNull();
+    // The old timer does not clear a later notice early.
+    showNotice('Later');
+    vi.advanceTimersByTime(7000);
+    expect(ui().notice?.text).toBe('Later');
+  });
+});
+
+function getFacesOf(level: ReturnType<typeof migrate>['levels'][string], name: string): Face {
+  const room = Object.values(level.rooms).find((r) => r.name === name)!;
+  return getFaces(level, 'all').faces.find((f) => f.roomId === room.id)!;
+}
+
+describe('REVIEW-2 C5: the select tool right-click menu', () => {
+  it('a right-click opens the menu at the clicked point; switching tools closes it', () => {
+    ui().setActiveLevel(lower);
+    ui().setTool('select');
+    box(lower, 0, 0, 240, 240);
+    dispatchPointer('down', { ...ptr(120, 100), button: 2 });
+    dispatchPointer('up', { ...ptr(120, 100), button: 2 });
+    expect(ui().contextMenu).toEqual({ screen: { x: 120, y: 100 }, world: { x: 120, y: 100 }, levelId: lower });
+    // Nothing was selected or dragged by the right button.
+    expect(ui().selection.walls).toEqual([]);
+    ui().setWalkFrom({ levelId: lower, point: ui().contextMenu!.world });
+    expect(ui().walkFrom).toEqual({ levelId: lower, point: { x: 120, y: 100 } });
+    ui().setTool('wall');
+    expect(ui().contextMenu).toBeNull();
+    ui().setWalkFrom(null);
+  });
+});
+
+describe('REVIEW-2 C2: names narrower than their room', () => {
+  it('a name wraps sooner when one line would be wider than the room on screen', async () => {
+    const { nameWrapFor } = await import('../editor2d/roomLabels');
+    expect(nameWrapFor(null, 1)).toBe(18);
+    expect(nameWrapFor(1000, 1)).toBe(18);
+    // A 30" closet at 2 px/in: 60 px holds 6 characters.
+    expect(nameWrapFor(30, 2)).toBe(6);
+    expect(roomNameLines('Master closet', nameWrapFor(30, 2))).toEqual(['Master', 'closet']);
+    expect(roomNameLines('Entry porch (est.)', nameWrapFor(59, 1.67))).toEqual(['Entry porch', '(est.)']);
   });
 });

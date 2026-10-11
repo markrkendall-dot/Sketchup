@@ -672,7 +672,7 @@ function boxGeometry(fp: Footprint, b: FillBox, side: 1 | -1): BufferGeometry {
 }
 
 /** Mean of a level's node positions (the fallback for telling a wall's outside from its inside). */
-function levelCentroid(level: Level): Vec2 {
+export function levelCentroid(level: Level): Vec2 {
   const nodes = Object.values(level.nodes);
   if (!nodes.length) return { x: 0, y: 0 };
   return { x: nodes.reduce((t, n) => t + n.x, 0) / nodes.length, y: nodes.reduce((t, n) => t + n.y, 0) / nodes.length };

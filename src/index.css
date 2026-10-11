@@ -990,6 +990,12 @@ button.primary:hover:not(:disabled) {
   font-size: 11px;
 }
 
+.plan-context-menu {
+  top: auto;
+  right: auto;
+  width: 190px;
+}
+
 .menu-note {
   margin: 4px 6px 2px;
   color: var(--muted);

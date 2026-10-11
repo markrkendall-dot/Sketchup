@@ -71,7 +71,9 @@ Before you start, measure on paper. Then follow these steps in order.
    adjust "From start" / "From end", width, height and sill in the properties panel. For doors,
    Tab flips the swing side and Shift+Tab the hinge.
 7. **Name the rooms and check them against the tape.** Press `R` and click inside each room,
-   type its name, Enter. Select a room label: the panel shows its net area and its sides
+   type its name, Enter. The label sits where you clicked and stays where you drag it (one left
+   outside the room's floor moves to the middle of the room's widest part). Select a room label:
+   the panel shows its net area and its sides
    measured face to face (width x depth for a rectangular room). If a number disagrees with
    your notes, fix the wall that is off rather than the room.
 8. **Copy the walls to the next level and adjust.** Click the level tab (or press `3` for the
@@ -152,7 +154,10 @@ Once the walls are in, these make the 3D model look like the house.
 
 The **Split** and **3D** layouts (or the backtick key) show the model, built from the plan and
 updated as you edit. Drag to orbit, right-drag to pan, scroll to zoom, **Fit 3D** to frame it.
-The checkboxes hide levels. **Walk** (or `F`) drops you inside at eye height: click the view to
+The checkboxes hide levels. **Walk** (or `F`) drops you in at eye height just inside the level's
+entry door (the first door in an outside wall), looking into the house; on a level without one, in
+the middle of the house. To start somewhere else, right-click that spot in the 2D plan (select
+tool) and choose **Walk from here** ("Clear walk start" goes back to the door). Click the view to
 look with the mouse, WASD or the arrows to move, Shift to go faster, Q/E to change level, Esc to
 leave. Walls are not solid in walk mode.
 
@@ -301,7 +306,10 @@ and the plan's north angle is 0.
   12'9" (adjusted), Office / hall 7'4" x 11'11" (adjusted). The Office / hall is one face with the
   landing and the stair well, with no wall between them, so its net bounding box is wide
   (x 42 to 311) and its panel lists the sides of the L. Also no open wall ends.
-- The basement has no partitions yet.
+- **Basement**: no partitions yet. The main block is one area ("Basement (unpartitioned, est.)")
+  and the walkout bump under the wing is labelled separately as "Utility (below)": it is closed off
+  from the main block by the block's east wall in the starter, and stays a separate space until you
+  measure how the two connect (delete or move the wall and the labels as you go).
 - Not modelled: the deck and its stairs, the concrete retaining wall, the lot, the entry porch
   floor and steps, the foundation under the wing and porches (the ground meets them where the
   grade points say it does).
@@ -426,10 +434,19 @@ parts green. Export from Existing and from Proposed to give the contractor or Sk
   no foundation under a wing or porch that has no basement).
 - A wall has one thickness; layered walls (siding, sheathing, studs, drywall) are not modeled, and
   both faces of an exterior wall show the siding.
-- At most one wall between two corners, and walls are straight (no curved walls).
+- At most one wall between two corners, and walls are straight (no curved walls). A wall cannot
+  be drawn on top of another one: to rebuild a wall, mark the old one *demolish* and draw the new
+  one beside it.
+- Moving a wall (by dragging or by a typed distance) does not move the roofs: adjust the roof's
+  outline yourself.
 - "Lengths to" inside/outside assumes square corners; at other angles a typed length is
   measured along the centerline.
 - Dimensions on the plan are centerline lengths of each wall piece; face-to-face sizes are in
-  the room's properties.
+  the room's properties. Walls under 4' around a room under 60 sq ft (a closet) show no dimension
+  on the plan, to keep the room's name readable; select the wall for its length.
 - Openings are rectangular holes with a fixed frame and sash design; arched or bay windows are
   not modeled.
+- The plan export (SVG or PNG) is one level per file at 1/4" = 1'-0"; there is no sheet layout
+  with several levels or elevation drawings.
+- A walk start picked with "Walk from here" lasts until you clear it or reload the page; it is not
+  saved with the plan.
