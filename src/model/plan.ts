@@ -1,8 +1,8 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
-import { dist, projectPointToSegment } from './geometry';
-import { clampOpeningOffset } from './openings';
-import type { Id, Level, Phase, Plan, PlanSettings, Underlay, Vec2, Wall } from './types';
+import { dist, projectPointToSegment, segmentIntersection } from './geometry';
+import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
+import type { Id, Level, Opening, Phase, Plan, PlanSettings, Room, Stairs, Underlay, Vec2, Wall } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 1 as const;
@@ -123,9 +123,52 @@ function deleteWallInPlace(level: Level, wallId: Id): void {
 }
 
 /**
+ * Find one pair of walls that cross strictly inside both (farther than MERGE_EPS from every end,
+ * not parallel, no shared node) and add a node at the crossing, so the node-on-wall pass splits
+ * both. Pairs whose crossing lands on an existing node are remembered in `skip` and not retried.
+ * Returns true when a node was added.
+ */
+function insertCrossingNode(level: Level, skip: Set<string>): boolean {
+  const walls = Object.values(level.walls);
+  const boxes = walls.map((w) => {
+    const a = level.nodes[w.a];
+    const b = level.nodes[w.b];
+    return { a, b, minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) };
+  });
+  for (let i = 0; i < walls.length; i++) {
+    const p = walls[i];
+    const P = boxes[i];
+    for (let j = i + 1; j < walls.length; j++) {
+      const q = walls[j];
+      const Q = boxes[j];
+      if (P.maxX < Q.minX || Q.maxX < P.minX || P.maxY < Q.minY || Q.maxY < P.minY) continue;
+      if (p.a === q.a || p.a === q.b || p.b === q.a || p.b === q.b) continue;
+      const key = p.id < q.id ? `${p.id}|${q.id}` : `${q.id}|${p.id}`;
+      if (skip.has(key)) continue;
+      const hit = segmentIntersection(P.a, P.b, Q.a, Q.b);
+      if (!hit) continue;
+      const lp = dist(P.a, P.b);
+      const lq = dist(Q.a, Q.b);
+      const sp = hit.t * lp;
+      const sq = hit.u * lq;
+      if (sp <= MERGE_EPS || sp >= lp - MERGE_EPS || sq <= MERGE_EPS || sq >= lq - MERGE_EPS) continue;
+      if (findNodeNear(level, hit.point)) {
+        skip.add(key);
+        continue;
+      }
+      const id = newId();
+      level.nodes[id] = { id, x: hit.point.x, y: hit.point.y };
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Restore the planar-graph invariant on a (draft) level, in place:
  * merge nodes within MERGE_EPS, drop zero-length and duplicate walls, split walls at nodes lying
- * on their interior, and remove nodes with no walls. Nodes in `moved` are absorbed into
+ * on their interior, split walls that cross each other at a new shared node, and remove nodes with
+ * no walls. Nodes in `moved` are absorbed into
  * stationary neighbours when merging. Returns a map from absorbed node ids to survivors.
  */
 export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, Id> {
@@ -181,8 +224,12 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
     } else seen.set(key, w.id);
   }
 
-  // 3. Split walls at nodes lying on their interior.
-  for (let guard = 0; guard < 1000; guard++) {
+  // 3. Split walls at nodes lying on their interior; then insert a node where two walls cross
+  // (strictly inside both) and let the next pass split both at it. Each pass changes one thing, so
+  // the guard grows with the size of the level.
+  const skipCrossing = new Set<string>();
+  const passes = 1000 + 4 * Object.keys(level.walls).length ** 2;
+  for (let guard = 0; guard < passes; guard++) {
     let split = false;
     outer: for (const n of Object.values(level.nodes)) {
       for (const w of Object.values(level.walls)) {
@@ -228,6 +275,7 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
         break outer;
       }
     }
+    if (!split) split = insertCrossingNode(level, skipCrossing);
     if (!split) break;
   }
 
@@ -249,11 +297,18 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
 
 // ---------------------------------------------------------------------------------------------
 // Loading / migration
+//
+// A file is upgraded one schema version at a time by MIGRATIONS (version N -> N + 1), then read
+// into a Plan built from known fields only: unknown keys in the file are dropped, missing optional
+// values get defaults, and broken entities are dropped (or the load fails with a readable message
+// when nothing sensible can be made of it). Known keys keep the order they have in the file, so a
+// current file round-trips byte for byte through JSON.stringify.
 
 type Json = Record<string, unknown>;
 
 const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isPoint = (v: unknown): v is Vec2 => isObject(v) && isNum(v.x) && isNum(v.y);
 
 function fail(msg: string): never {
   throw new Error(`Not a valid HomePlan file: ${msg}`);
@@ -265,35 +320,164 @@ function record(v: unknown, where: string): Json {
   return v;
 }
 
-function migrateLevel(raw: unknown, id: string): Level {
-  if (!isObject(raw)) fail(`level ${id} is not an object`);
-  const nodes = record(raw.nodes, `level ${id} nodes`);
-  const walls = record(raw.walls, `level ${id} walls`);
-  for (const [nid, n] of Object.entries(nodes)) {
-    if (!isObject(n) || !isNum(n.x) || !isNum(n.y)) fail(`node ${nid} needs numeric x and y`);
+/**
+ * The keys of `raw` that are in `keys`, in raw's order. Values that need checking are assigned
+ * afterwards: an existing key keeps its position, a missing one is appended.
+ */
+function pick(raw: Json, keys: readonly string[]): Json {
+  const out: Json = {};
+  for (const k of Object.keys(raw)) if (keys.includes(k)) out[k] = raw[k];
+  return out;
+}
+
+/** Set (or, for undefined, remove) a key on a picked object. */
+function put(out: Json, key: string, value: unknown): void {
+  if (value === undefined) delete out[key];
+  else out[key] = value;
+}
+
+/** Previous-version upgrades: MIGRATIONS[n] turns a version n document into version n + 1. */
+export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
+  /**
+   * Version 0 (pre-release files): levels, and the nodes, walls, openings, rooms and stairs of each
+   * level, could be arrays of objects with ids instead of records keyed by id; levelOrder could be
+   * missing (the order of the levels array); settings could lack later fields (filled on load).
+   */
+  0: (doc) => {
+    const toRecord = (v: unknown, where: string): unknown => {
+      if (!Array.isArray(v)) return v;
+      const out: Json = {};
+      v.forEach((item, i) => {
+        if (!isObject(item)) fail(`${where}[${i}] is not an object`);
+        const id = typeof item.id === 'string' && item.id ? item.id : `${where}-${i}`;
+        out[id] = { ...item, id };
+      });
+      return out;
+    };
+    const next: Json = { ...doc };
+    if (Array.isArray(doc.levels) && doc.levelOrder === undefined) {
+      next.levelOrder = doc.levels.map((l, i) => (isObject(l) && typeof l.id === 'string' && l.id ? l.id : `levels-${i}`));
+    }
+    const levels = toRecord(doc.levels, 'levels');
+    if (isObject(levels)) {
+      const upgraded: Json = {};
+      for (const [id, raw] of Object.entries(levels)) {
+        if (!isObject(raw)) {
+          upgraded[id] = raw;
+          continue;
+        }
+        const level: Json = { ...raw };
+        for (const k of ['nodes', 'walls', 'openings', 'rooms', 'stairs']) level[k] = toRecord(raw[k], `${id}.${k}`);
+        upgraded[id] = level;
+      }
+      next.levels = upgraded;
+    }
+    next.settings = { ...DEFAULT_SETTINGS, ...(isObject(doc.settings) ? doc.settings : {}) };
+    next.schemaVersion = 1;
+    return next;
+  },
+};
+
+const PHASES = new Set(['existing', 'demo', 'new']);
+const phaseOf = (v: unknown): Phase => (typeof v === 'string' && PHASES.has(v) ? (v as Phase) : 'existing');
+const OPENING_TYPES = new Set(['door', 'window', 'passage']);
+
+const NODE_KEYS = ['id', 'x', 'y'] as const;
+const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride'] as const;
+const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing'] as const;
+const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride'] as const;
+const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove'] as const;
+const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
+const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'underlay'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'modifiedAt'] as const;
+const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
+const MEASURE_TO = new Set(['center', 'inside', 'outside']);
+
+function migrateNodes(raw: Json, where: string): Level['nodes'] {
+  const out: Level['nodes'] = {};
+  for (const [nid, n] of Object.entries(raw)) {
+    if (!isObject(n) || !isNum(n.x) || !isNum(n.y)) fail(`${where}: node ${nid} needs numeric x and y`);
+    const node = pick(n, NODE_KEYS);
+    node.id = nid;
+    out[nid] = node as unknown as Level['nodes'][Id];
   }
-  for (const [wid, w] of Object.entries(walls)) {
-    if (!isObject(w) || typeof w.a !== 'string' || typeof w.b !== 'string')
-      fail(`wall ${wid} needs node ids a and b`);
-    if (!(w.a in nodes) || !(w.b in nodes)) fail(`wall ${wid} references a missing node`);
-    if (!isNum(w.thickness) || w.thickness <= 0) fail(`wall ${wid} needs a positive thickness`);
+  return out;
+}
+
+function migrateWalls(raw: Json, nodes: Level['nodes'], where: string): Level['walls'] {
+  const out: Level['walls'] = {};
+  for (const [wid, w] of Object.entries(raw)) {
+    if (!isObject(w) || typeof w.a !== 'string' || typeof w.b !== 'string') fail(`${where}: wall ${wid} needs node ids a and b`);
+    if (!(w.a in nodes) || !(w.b in nodes)) fail(`${where}: wall ${wid} references a missing node`);
+    if (!isNum(w.thickness) || w.thickness <= 0) fail(`${where}: wall ${wid} needs a positive thickness`);
+    const wall = pick(w, WALL_KEYS);
+    wall.id = wid;
+    wall.kind = w.kind === 'exterior' || w.kind === 'interior' ? w.kind : w.thickness >= 6 ? 'exterior' : 'interior';
+    wall.phase = phaseOf(w.phase);
+    put(wall, 'heightOverride', isNum(w.heightOverride) && w.heightOverride > 0 ? w.heightOverride : undefined);
+    out[wid] = wall as unknown as Wall;
   }
-  const level: Level = {
-    ...(raw as unknown as Level),
-    id,
-    name: typeof raw.name === 'string' ? raw.name : 'Level',
-    wallHeight: isNum(raw.wallHeight) ? raw.wallHeight : 96,
-    floorThickness: isNum(raw.floorThickness) ? raw.floorThickness : 12,
-    nodes: nodes as Level['nodes'],
-    walls: walls as Level['walls'],
-    openings: record(raw.openings, `level ${id} openings`) as Level['openings'],
-    rooms: record(raw.rooms, `level ${id} rooms`) as Level['rooms'],
-    stairs: migrateStairs(record(raw.stairs, `level ${id} stairs`)),
-  };
-  const underlay = migrateUnderlay(raw.underlay);
-  if (underlay) level.underlay = underlay;
-  else delete level.underlay;
-  return level;
+  return out;
+}
+
+/** Openings on an existing wall with a usable size; the rest are dropped. */
+function migrateOpenings(raw: Json, walls: Level['walls']): Level['openings'] {
+  const out: Level['openings'] = {};
+  for (const [oid, o] of Object.entries(raw)) {
+    if (!isObject(o) || typeof o.wallId !== 'string' || !walls[o.wallId]) continue;
+    if (typeof o.type !== 'string' || !OPENING_TYPES.has(o.type) || !isNum(o.offset) || !isNum(o.width) || o.width <= 0) continue;
+    const type = o.type as Opening['type'];
+    const def = OPENING_DEFAULTS[type];
+    const opening = pick(o, OPENING_KEYS);
+    opening.id = oid;
+    opening.height = isNum(o.height) && o.height > 0 ? o.height : def.height;
+    opening.sill = isNum(o.sill) && o.sill >= 0 ? o.sill : def.sill;
+    opening.phase = phaseOf(o.phase);
+    const sw = o.swing;
+    put(
+      opening,
+      'swing',
+      type === 'door'
+        ? {
+            hinge: isObject(sw) && sw.hinge === 'b' ? 'b' : 'a',
+            side: isObject(sw) && sw.side === 'right' ? 'right' : 'left',
+          }
+        : undefined,
+    );
+    out[oid] = opening as unknown as Opening;
+  }
+  return out;
+}
+
+function migrateRooms(raw: Json): Level['rooms'] {
+  const out: Level['rooms'] = {};
+  for (const [rid, r] of Object.entries(raw)) {
+    if (!isObject(r) || !isPoint(r.anchor)) continue;
+    const room = pick(r, ROOM_KEYS);
+    room.id = rid;
+    room.name = typeof r.name === 'string' && r.name.trim() ? r.name : 'Room';
+    room.anchor = { x: r.anchor.x, y: r.anchor.y };
+    put(room, 'ceilingOverride', isNum(r.ceilingOverride) && r.ceilingOverride > 0 ? r.ceilingOverride : undefined);
+    out[rid] = room as unknown as Room;
+  }
+  return out;
+}
+
+/** Keep stairs with a usable position and size; fill in phase and cutsFloorAbove when missing. */
+function migrateStairs(raw: Json): Level['stairs'] {
+  const out: Level['stairs'] = {};
+  for (const [sid, st] of Object.entries(raw)) {
+    if (!isObject(st) || !isPoint(st.origin)) continue;
+    if (!isNum(st.width) || st.width <= 0 || !isNum(st.run) || st.run <= 0) continue;
+    const stairs = pick(st, STAIRS_KEYS);
+    stairs.id = sid;
+    stairs.origin = { x: st.origin.x, y: st.origin.y };
+    stairs.direction = isNum(st.direction) ? st.direction : 0;
+    stairs.phase = phaseOf(st.phase);
+    stairs.cutsFloorAbove = typeof st.cutsFloorAbove === 'boolean' ? st.cutsFloorAbove : true;
+    out[sid] = stairs as unknown as Stairs;
+  }
+  return out;
 }
 
 /**
@@ -301,66 +485,83 @@ function migrateLevel(raw: unknown, id: string): Level {
  * A broken one is dropped rather than failing the whole file.
  */
 function migrateUnderlay(raw: unknown): Underlay | undefined {
-  if (!isObject(raw) || !isObject(raw.origin)) return undefined;
-  const u: Underlay = {
-    image: raw.image as string,
-    pixelWidth: raw.pixelWidth as number,
-    pixelHeight: raw.pixelHeight as number,
-    origin: { x: raw.origin.x as number, y: raw.origin.y as number },
-    scale: raw.scale as number,
-    rotation: isNum(raw.rotation) ? normalizeRotation(raw.rotation) : 0,
-    opacity: isNum(raw.opacity) ? Math.min(1, Math.max(0, raw.opacity)) : 0.6,
-    locked: typeof raw.locked === 'boolean' ? raw.locked : false,
-  };
-  return isValidUnderlay(u) ? u : undefined;
+  if (!isObject(raw) || !isPoint(raw.origin)) return undefined;
+  const u = pick(raw, UNDERLAY_KEYS);
+  u.origin = { x: raw.origin.x, y: raw.origin.y };
+  u.rotation = isNum(raw.rotation) ? normalizeRotation(raw.rotation) : 0;
+  u.opacity = isNum(raw.opacity) ? Math.min(1, Math.max(0, raw.opacity)) : 0.6;
+  u.locked = typeof raw.locked === 'boolean' ? raw.locked : false;
+  return isValidUnderlay(u as unknown as Underlay) ? (u as unknown as Underlay) : undefined;
 }
 
-const PHASES = new Set(['existing', 'demo', 'new']);
+function migrateLevel(raw: unknown, id: string): Level {
+  if (!isObject(raw)) fail(`level ${id} is not an object`);
+  const where = `level ${id}`;
+  const nodes = migrateNodes(record(raw.nodes, `${where} nodes`), where);
+  const walls = migrateWalls(record(raw.walls, `${where} walls`), nodes, where);
+  const level = pick(raw, LEVEL_KEYS);
+  level.id = id;
+  level.name = typeof raw.name === 'string' && raw.name.trim() ? raw.name : 'Level';
+  level.wallHeight = isNum(raw.wallHeight) && raw.wallHeight > 0 ? raw.wallHeight : 96;
+  level.floorThickness = isNum(raw.floorThickness) && raw.floorThickness >= 0 ? raw.floorThickness : 12;
+  level.nodes = nodes;
+  level.walls = walls;
+  level.openings = migrateOpenings(record(raw.openings, `${where} openings`), walls);
+  level.rooms = migrateRooms(record(raw.rooms, `${where} rooms`));
+  level.stairs = migrateStairs(record(raw.stairs, `${where} stairs`));
+  put(level, 'underlay', migrateUnderlay(raw.underlay));
+  return level as unknown as Level;
+}
 
-/** Keep stairs with a usable position and size; fill in phase and cutsFloorAbove when missing. */
-function migrateStairs(raw: Json): Level['stairs'] {
-  const out: Level['stairs'] = {};
-  for (const [sid, st] of Object.entries(raw)) {
-    if (!isObject(st) || !isObject(st.origin) || !isNum(st.origin.x) || !isNum(st.origin.y)) continue;
-    if (!isNum(st.width) || st.width <= 0 || !isNum(st.run) || st.run <= 0) continue;
-    out[sid] = {
-      id: sid,
-      origin: { x: st.origin.x, y: st.origin.y },
-      direction: isNum(st.direction) ? st.direction : 0,
-      width: st.width,
-      run: st.run,
-      phase: typeof st.phase === 'string' && PHASES.has(st.phase) ? (st.phase as Phase) : 'existing',
-      cutsFloorAbove: typeof st.cutsFloorAbove === 'boolean' ? st.cutsFloorAbove : true,
-    };
-  }
-  return out;
+function migrateSettings(raw: Json): PlanSettings {
+  const out = pick(raw, SETTINGS_KEYS);
+  const d = DEFAULT_SETTINGS;
+  const num = (k: keyof PlanSettings, ok: (v: number) => boolean) => {
+    const v = raw[k];
+    out[k] = isNum(v) && ok(v) ? v : d[k];
+  };
+  num('snapGrid', (v) => v >= 0);
+  num('displayGrid', (v) => v > 0);
+  num('precisionDenominator', (v) => [1, 2, 4, 8, 16].includes(v));
+  num('defaultExteriorThickness', (v) => v > 0);
+  num('defaultInteriorThickness', (v) => v > 0);
+  out.orthoLock = typeof raw.orthoLock === 'boolean' ? raw.orthoLock : d.orthoLock;
+  out.measureTo = typeof raw.measureTo === 'string' && MEASURE_TO.has(raw.measureTo) ? raw.measureTo : d.measureTo;
+  return out as unknown as PlanSettings;
 }
 
 /** Validate (loosely) and upgrade a parsed JSON document to the current Plan schema. */
 export function migrate(json: unknown): Plan {
   if (!isObject(json)) fail('expected a JSON object');
   if (json.schemaVersion === undefined) fail('missing schemaVersion');
-  if (json.schemaVersion !== SCHEMA_VERSION) {
-    fail(`unsupported schemaVersion ${String(json.schemaVersion)} (expected ${SCHEMA_VERSION})`);
+  let doc: Json = json;
+  let version = doc.schemaVersion;
+  if (!isNum(version) || !Number.isInteger(version) || version < 0 || version > SCHEMA_VERSION) {
+    fail(`unsupported schemaVersion ${String(version)} (expected ${SCHEMA_VERSION} or older)`);
   }
-  if (!Array.isArray(json.levelOrder) || json.levelOrder.length === 0)
-    fail('levelOrder must be a non-empty array');
-  const rawLevels = record(json.levels, 'levels');
+  while ((version as number) < SCHEMA_VERSION) {
+    const step = MIGRATIONS[version as number];
+    if (!step) fail(`no upgrade from schemaVersion ${String(version)}`);
+    doc = step(doc);
+    version = doc.schemaVersion;
+  }
+  if (!Array.isArray(doc.levelOrder) || doc.levelOrder.length === 0) fail('levelOrder must be a non-empty array');
+  const rawLevels = record(doc.levels, 'levels');
   const levels: Record<string, Level> = {};
-  for (const id of json.levelOrder) {
+  for (const id of doc.levelOrder) {
     if (typeof id !== 'string') fail('levelOrder must contain level ids');
     if (!(id in rawLevels)) fail(`level ${id} is listed in levelOrder but missing`);
+    if (id in levels) fail(`level ${id} is listed twice in levelOrder`);
     levels[id] = migrateLevel(rawLevels[id], id);
   }
-  const settings = record(json.settings, 'settings');
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    id: typeof json.id === 'string' ? json.id : newId(),
-    name: typeof json.name === 'string' ? json.name : 'Untitled plan',
-    levelOrder: [...(json.levelOrder as string[])],
-    levels,
-    baseFloorElevation: isNum(json.baseFloorElevation) ? json.baseFloorElevation : 0,
-    settings: { ...DEFAULT_SETTINGS, ...(settings as Partial<PlanSettings>) },
-    modifiedAt: typeof json.modifiedAt === 'string' ? json.modifiedAt : new Date().toISOString(),
-  };
+  const plan = pick(doc, PLAN_KEYS);
+  plan.schemaVersion = SCHEMA_VERSION;
+  plan.id = typeof doc.id === 'string' && doc.id ? doc.id : newId();
+  plan.name = typeof doc.name === 'string' && doc.name.trim() ? doc.name : 'Untitled plan';
+  plan.levelOrder = [...(doc.levelOrder as string[])];
+  plan.levels = levels;
+  plan.baseFloorElevation = isNum(doc.baseFloorElevation) ? doc.baseFloorElevation : 0;
+  plan.settings = migrateSettings(record(doc.settings, 'settings'));
+  plan.modifiedAt = typeof doc.modifiedAt === 'string' ? doc.modifiedAt : new Date().toISOString();
+  return plan as unknown as Plan;
 }

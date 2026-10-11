@@ -315,3 +315,70 @@ export function faceAt(set: FaceSet, p: Vec2): Face | null {
   for (const f of set.faces) if ((!best || f.grossArea < best.grossArea) && pointInPolygon(p, f.polygon)) best = f;
   return best;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Room dimensions, face to face (what a tape measure across the room gives).
+
+export interface RoomDimensions {
+  /**
+   * Edge lengths of the net polygon with collinear vertices merged (a wall meeting the room's side
+   * at a T does not break the side), clockwise on screen from the top-left corner.
+   */
+  edges: number[];
+  /** Corner points matching `edges` (edge i runs corners[i] -> corners[i + 1]). */
+  corners: Vec2[];
+  /** For a rectangle: its horizontal and vertical sides (width x depth), else null. */
+  rect: { width: number; depth: number } | null;
+}
+
+/** Face-to-face dimensions of a room's net polygon (Face.netPolygon). */
+export function roomDimensions(netPolygon: readonly Vec2[]): RoomDimensions {
+  // Drop repeated points, then vertices where the outline runs straight on.
+  let pts = netPolygon.filter((p, i) => {
+    const q = netPolygon[(i + 1) % netPolygon.length];
+    return Math.hypot(q.x - p.x, q.y - p.y) > 1e-6;
+  });
+  let changed = true;
+  while (changed && pts.length > 3) {
+    changed = false;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[(i - 1 + pts.length) % pts.length];
+      const q = pts[i];
+      const r = pts[(i + 1) % pts.length];
+      const u = sub(q, p);
+      const v = sub(r, q);
+      const lu = Math.hypot(u.x, u.y);
+      const lv = Math.hypot(v.x, v.y);
+      if (Math.abs(u.x * v.y - u.y * v.x) / (lu * lv) < 1e-9 && u.x * v.x + u.y * v.y > 0) {
+        pts = pts.filter((_, k) => k !== i);
+        changed = true;
+        break;
+      }
+    }
+  }
+  if (pts.length < 3 || Math.abs(polygonSignedArea(pts)) < 1e-9) return { edges: [], corners: [], rect: null };
+  // Start at the top-left corner: smallest y (up the screen), then smallest x.
+  let start = 0;
+  pts.forEach((p, i) => {
+    const s = pts[start];
+    if (p.y < s.y - 1e-6 || (Math.abs(p.y - s.y) <= 1e-6 && p.x < s.x)) start = i;
+  });
+  const corners = [...pts.slice(start), ...pts.slice(0, start)];
+  const edges = corners.map((p, i) => {
+    const q = corners[(i + 1) % corners.length];
+    return Math.hypot(q.x - p.x, q.y - p.y);
+  });
+  let rect: RoomDimensions['rect'] = null;
+  if (corners.length === 4) {
+    const dirs = corners.map((p, i) => {
+      const q = corners[(i + 1) % 4];
+      return { x: (q.x - p.x) / edges[i], y: (q.y - p.y) / edges[i] };
+    });
+    const square = dirs.every((d, i) => Math.abs(d.x * dirs[(i + 1) % 4].x + d.y * dirs[(i + 1) % 4].y) < 1e-6);
+    if (square) {
+      const horizontal = Math.abs(dirs[0].x) >= Math.abs(dirs[0].y) ? 0 : 1;
+      rect = { width: edges[horizontal], depth: edges[1 - horizontal] };
+    }
+  }
+  return { edges, corners, rect };
+}

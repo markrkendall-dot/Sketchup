@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
-import { getFaces } from '../derive/rooms';
+import { getFaces, roomDimensions, type Face } from '../derive/rooms';
 import { floorToFloor, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool } from '../editor2d/tools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
@@ -14,6 +14,7 @@ import type { Id, Level, Opening, Phase, Room, Stairs, Wall, WallKind } from '..
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
+import { releaseFocus } from './focus';
 
 const PHASES: Phase[] = ['existing', 'demo', 'new'];
 const EPS = 1e-9;
@@ -49,47 +50,51 @@ function LengthField({ label, value, onCommit, bound = 'positive', allowEmpty, p
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const id = useId();
+  // Set when Enter or Escape already handled the field, so the blur that follows does not commit.
+  const skipBlur = useRef(false);
 
   useEffect(() => {
     if (!focused) setText(value === undefined ? '' : formatLength(value, denom));
   }, [value, denom, focused]);
 
-  const commit = () => {
+  /** Returns true when the field holds a committed (or unchanged) value. */
+  const commit = (): boolean => {
     const t = text.trim();
     if (t === '') {
       if (allowEmpty && value !== undefined) {
         const err = onCommit(null);
         setError(err || null);
-      } else {
-        setText(fmt(value));
-        setError(null);
+        return !err;
       }
-      return;
+      setText(fmt(value));
+      setError(null);
+      return true;
     }
     let v: number;
     try {
       v = parseLength(t);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      return;
+      return false;
     }
     const rangeErr = checkBound(v, bound);
     if (rangeErr) {
       setError(rangeErr);
-      return;
+      return false;
     }
     if (value !== undefined && Math.abs(v - value) < EPS) {
       setText(fmt(value));
       setError(null);
-      return;
+      return true;
     }
     const err = onCommit(v);
     if (err) {
       setError(err);
-      return;
+      return false;
     }
     setError(null);
     setText(fmt(v));
+    return true;
   };
 
   return (
@@ -110,15 +115,23 @@ function LengthField({ label, value, onCommit, bound = 'positive', allowEmpty, p
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => {
-          commit();
+          if (!skipBlur.current) commit();
+          skipBlur.current = false;
           setFocused(false);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          else if (e.key === 'Escape') {
+          if (e.key === 'Enter') {
+            // A good value hands the keyboard back to the plan (Ctrl+Z then undoes the edit);
+            // a bad one keeps the field focused with its error.
+            if (commit()) {
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            }
+          } else if (e.key === 'Escape') {
             setText(fmt(value));
             setError(null);
-            e.currentTarget.blur();
+            skipBlur.current = true;
+            releaseFocus(e.currentTarget);
           }
         }}
       />
@@ -144,7 +157,15 @@ function SelectField<T extends string>({
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      <select id={id} aria-label={label} value={value ?? ''} onChange={(e) => onChange(e.target.value as T)}>
+      <select
+        id={id}
+        aria-label={label}
+        value={value ?? ''}
+        onChange={(e) => {
+          onChange(e.target.value as T);
+          releaseFocus(e.currentTarget);
+        }}
+      >
         {value === null && (
           <option value="" disabled>
             mixed
@@ -401,6 +422,42 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   );
 }
 
+/**
+ * The room's sides measured face to face (the net outline), so typed lengths can be checked against
+ * the tape: width x depth for a rectangle, and every side clockwise from the top-left corner.
+ */
+function RoomDimensionsReadout({ face }: { face: Face }) {
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const dims = roomDimensions(face.netPolygon);
+  if (dims.edges.length === 0) return null;
+  const centerline = face.netPolygon === face.polygon;
+  return (
+    <div className="room-dims">
+      {dims.rect && (
+        <ReadOnly label="Net size">
+          <span className="room-dims-rect">
+            <span className="nowrap">{formatLength(dims.rect.width, denom)}</span> x{' '}
+            <span className="nowrap">{formatLength(dims.rect.depth, denom)}</span>
+          </span>
+        </ReadOnly>
+      )}
+      <div className="field readonly">
+        <span className="label">Sides</span>
+        <ol className="room-dims-edges" aria-label="Room sides, face to face">
+          {dims.edges.map((len, i) => (
+            <li key={i}>{formatLength(len, denom)}</li>
+          ))}
+        </ol>
+      </div>
+      <p className="panel-note">
+        {centerline
+          ? 'Measured to the wall centerlines (the wall faces could not be traced here).'
+          : 'Face to face, clockwise from the top-left corner: check these against your tape.'}
+      </p>
+    </div>
+  );
+}
+
 function RoomProps({ level, room }: { level: Level; room: Room }) {
   const updateRoom = usePlanStore((s) => s.updateRoom);
   const viewMode = useUiStore((s) => s.viewMode);
@@ -412,6 +469,7 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
   // An orphan whose anchor is in a face that an earlier room already names.
   const sharing = !face && set ? set.faces.find((f) => f.roomId && f.roomId !== room.id && pointInPolygon(room.anchor, f.polygon)) : null;
   const [name, setName] = useState(room.name);
+  const skipBlur = useRef(false);
   useEffect(() => setName(room.name), [room.name]);
   const commitName = () => {
     const v = name.trim();
@@ -428,10 +486,21 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
           aria-label="Room name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onBlur={commitName}
+          onBlur={() => {
+            if (!skipBlur.current) commitName();
+            skipBlur.current = false;
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commitName();
-            if (e.key === 'Escape') setName(room.name);
+            if (e.key === 'Enter') {
+              commitName();
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            }
+            if (e.key === 'Escape') {
+              setName(room.name);
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            }
           }}
         />
       </div>
@@ -439,6 +508,7 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
         <>
           <ReadOnly label="Net area">{formatArea(face.netArea)}</ReadOnly>
           <ReadOnly label="Gross area">{formatArea(face.grossArea)}</ReadOnly>
+          <RoomDimensionsReadout face={face} />
           <p className="panel-note">Net is inside the wall faces; gross is to the wall centerlines.</p>
         </>
       ) : (
@@ -572,14 +642,16 @@ function DegreesField({ label, value, onCommit, disabled }: { label: string; val
   useEffect(() => {
     if (!focused) setText(fmt(value));
   }, [value, focused]);
-  const commit = () => {
+  const skipBlur = useRef(false);
+  const commit = (): boolean => {
     const v = Number(text.trim().replace(/°$/, ''));
     if (text.trim() === '' || !Number.isFinite(v)) {
       setError('Enter an angle in degrees.');
-      return;
+      return false;
     }
     setError(null);
     if (Math.abs(v - value) > 1e-9) onCommit(v);
+    return true;
   };
   return (
     <div className={`field${error ? ' has-error' : ''}`}>
@@ -596,15 +668,21 @@ function DegreesField({ label, value, onCommit, disabled }: { label: string; val
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => {
-          commit();
+          if (!skipBlur.current) commit();
+          skipBlur.current = false;
           setFocused(false);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          else if (e.key === 'Escape') {
+          if (e.key === 'Enter') {
+            if (commit()) {
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            }
+          } else if (e.key === 'Escape') {
             setText(fmt(value));
             setError(null);
-            e.currentTarget.blur();
+            skipBlur.current = true;
+            releaseFocus(e.currentTarget);
           }
         }}
       />
@@ -774,7 +852,9 @@ function UnderlayRow({ level }: { level: Level }) {
 }
 
 function LevelProps({ level }: { level: Level }) {
-  const { updateLevel, setBaseFloorElevation } = usePlanStore.getState();
+  const { updateLevel, setBaseFloorElevation, updateSettings } = usePlanStore.getState();
+  const extThickness = usePlanStore((s) => s.plan.settings.defaultExteriorThickness);
+  const intThickness = usePlanStore((s) => s.plan.settings.defaultInteriorThickness);
   const base = usePlanStore((s) => s.plan.baseFloorElevation);
   // Select primitives: an object built in a selector would never compare equal.
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop);
@@ -788,6 +868,7 @@ function LevelProps({ level }: { level: Level }) {
   const roomCount = Object.keys(level.rooms).length;
   const unlabeled = faces ? faces.faces.filter((f) => !f.roomId).length : 0;
   const [name, setName] = useState(level.name);
+  const skipBlur = useRef(false);
   useEffect(() => setName(level.name), [level.name]);
   const commitName = () => {
     const v = name.trim();
@@ -804,8 +885,21 @@ function LevelProps({ level }: { level: Level }) {
           aria-label="Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => e.key === 'Enter' && commitName()}
+          onBlur={() => {
+            if (!skipBlur.current) commitName();
+            skipBlur.current = false;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              commitName();
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            } else if (e.key === 'Escape') {
+              setName(level.name);
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            }
+          }}
         />
       </div>
       <LengthField label="Wall height" value={level.wallHeight} onCommit={(v) => void (v !== null && updateLevel(level.id, { wallHeight: v }))} hint="Floor top to the underside of the floor above." />
@@ -822,6 +916,18 @@ function LevelProps({ level }: { level: Level }) {
         bound="any"
         onCommit={(v) => void (v !== null && setBaseFloorElevation(v))}
         hint="Floor top of the lowest level (plan setting)."
+      />
+      <LengthField
+        label="New exterior walls"
+        value={extThickness}
+        onCommit={(v) => void (v !== null && updateSettings({ defaultExteriorThickness: v }))}
+        hint="For exterior walls drawn from now on."
+      />
+      <LengthField
+        label="New interior walls"
+        value={intThickness}
+        onCommit={(v) => void (v !== null && updateSettings({ defaultInteriorThickness: v }))}
+        hint="For interior walls (X). To change drawn walls, select them."
       />
       {floorTop !== undefined && ceiling !== undefined && (
         <>

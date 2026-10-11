@@ -1,7 +1,7 @@
 import { add, cross, dist, dot, scale, sub } from '../model/geometry';
 import { clampOpeningOffset } from '../model/openings';
-import type { Id, Level, Opening, Phase, Vec2, ViewMode } from '../model/types';
-import { computeFootprints, getFootprints, type Footprint, type Footprints } from './footprint';
+import type { Id, Level, Opening, Phase, Plan, Vec2, ViewMode } from '../model/types';
+import { computeFootprints, forgetFootprintLevels, getFootprints, type Footprint, type Footprints } from './footprint';
 import { isVisible } from './phase';
 
 /** The parts of a wall footprint opening geometry needs (a Footprint satisfies it). */
@@ -203,6 +203,21 @@ export function getOpeningsByWall(level: Level): ReadonlyMap<Id, readonly Openin
   byWallCache.set(level.openings, out);
   previousByLevel.set(level.id, out);
   return out;
+}
+
+/** Drop the previous-result entries of levels that are gone (see forgetFootprintLevels). */
+export function forgetOpeningLevels(alive: ReadonlySet<Id>): void {
+  for (const id of previousByLevel.keys()) if (!alive.has(id)) previousByLevel.delete(id);
+}
+
+/** Number of levels with a previous result (tests). */
+export const openingLevelCount = (): number => previousByLevel.size;
+
+/** Forget per-level-id derive state of levels that are not in `plan` any more. */
+export function pruneDerivedCaches(plan: Pick<Plan, 'levelOrder'>): void {
+  const alive = new Set(plan.levelOrder);
+  forgetFootprintLevels(alive);
+  forgetOpeningLevels(alive);
 }
 
 export const openingsOnWall = (level: Level, wallId: Id): readonly Opening[] =>

@@ -2,13 +2,12 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
 import { activateUnderlayTool, setViewMode, switchTool } from '../editor2d/tools';
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
-import { fitLevel, initialViewport } from '../editor2d/viewport';
-import { downloadPlan, readPlanFile } from '../io/file';
-import { createEmptyPlan, defaultLevelId } from '../model/plan';
-import type { MeasureTo, Plan } from '../model/types';
+import type { MeasureTo } from '../model/types';
 import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planStore';
 import { useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
 import { visible3dLevels } from '../view3d/visibility';
+import { choosePlanFile, newPlan, savePlan, zoomToFit } from './fileActions';
+import { releaseFocus } from './focus';
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
@@ -30,20 +29,6 @@ const LAYOUT_BUTTONS: { layout: Layout; label: string }[] = [
   { layout: 'split', label: 'Split' },
   { layout: '3d', label: '3D' },
 ];
-
-function zoomToFit(): void {
-  const ui = useUiStore.getState();
-  const level = getPlan().levels[ui.activeLevelId];
-  if (!level || ui.canvasSize.width === 0) return;
-  ui.setViewport(fitLevel(level, ui.canvasSize, ui.showUnderlay) ?? initialViewport(ui.canvasSize));
-}
-
-/** Replace the whole plan (New/Open); undoable like any other edit. */
-function loadPlan(plan: Plan): void {
-  usePlanStore.getState().setPlan(plan);
-  useUiStore.getState().setActiveLevel(defaultLevelId(plan));
-  zoomToFit();
-}
 
 /**
  * Export menu: the 3D model as binary glTF (metres) or OBJ (inches), exactly as the 3D view shows
@@ -141,7 +126,7 @@ function PlanName() {
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Enter') releaseFocus(e.currentTarget);
         if (e.key === 'Escape') {
           setValue(name);
           e.currentTarget.blur();
@@ -150,6 +135,9 @@ function PlanName() {
     />
   );
 }
+
+/** Blur a select after a choice so the plan's hotkeys work again straight away. */
+const blurAfter = (e: ChangeEvent<HTMLSelectElement>) => e.currentTarget.blur();
 
 export function Toolbar() {
   const activeTool = useUiStore((s) => s.activeTool);
@@ -162,125 +150,134 @@ export function Toolbar() {
   const setDrawPhase = useUiStore((s) => s.setDrawPhase);
   const layout = useUiStore((s) => s.layout);
   const setLayout = useUiStore((s) => s.setLayout);
+  const helpOpen = useUiStore((s) => s.helpOpen);
   const updateSettings = usePlanStore((s) => s.updateSettings);
   const { canUndo, canRedo } = useTemporal();
-  const fileInput = useRef<HTMLInputElement>(null);
-
-  const onOpen = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    try {
-      loadPlan(await readPlanFile(file));
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const onNew = () => {
-    if (window.confirm('Start a new, empty plan? The current plan can be restored with Undo.')) {
-      loadPlan(createEmptyPlan());
-    }
-  };
 
   return (
     <header className="toolbar">
-      <span className="brand">HomePlan</span>
-      <PlanName />
-      <div className="group" role="group" aria-label="Tools">
-        {TOOLS.map((t) => (
-          <button
-            key={t.name}
-            className={activeTool === t.name ? 'active' : ''}
-            aria-pressed={activeTool === t.name}
-            title={TOOL_TITLE[t.name] ?? `${t.label} (${t.key})`}
-            onClick={() => (t.name === 'underlay' ? activateUnderlayTool() : switchTool(t.name))}
-          >
-            {t.label} <kbd>{t.key}</kbd>
+      <div className="toolbar-row">
+        <span className="brand">HomePlan</span>
+        <PlanName />
+        <div className="group view-modes" role="group" aria-label="View mode">
+          {VIEW_MODES.map((m) => (
+            <button
+              key={m}
+              className={viewMode === m ? `active view-${m}` : `view-${m}`}
+              aria-pressed={viewMode === m}
+              title="View mode (V cycles): Existing shows existing + demolished, Proposed shows existing + new, All shows everything"
+              onClick={() => setViewMode(m)}
+            >
+              {VIEW_MODE_LABEL[m]}
+            </button>
+          ))}
+        </div>
+        <div className="group" role="group" aria-label="Layout">
+          {LAYOUT_BUTTONS.map((b) => (
+            <button
+              key={b.layout}
+              className={layout === b.layout ? 'active' : ''}
+              aria-pressed={layout === b.layout}
+              title="Layout: 2D plan, plan and 3D side by side, or 3D model (` cycles)"
+              onClick={() => setLayout(b.layout)}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+        <div className="spacer" />
+        <div className="group" role="group" aria-label="History">
+          <button disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)">
+            Undo
           </button>
-        ))}
-      </div>
-      <div className="group" role="group" aria-label="History">
-        <button disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)">
-          Undo
-        </button>
-        <button disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)">
-          Redo
-        </button>
-      </div>
-      <div className="group" role="group" aria-label="View">
-        <button className={showGrid ? 'active' : ''} aria-pressed={showGrid} onClick={toggleGrid} title="Grid (G)">
-          Grid
-        </button>
+          <button disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Shift+Z)">
+            Redo
+          </button>
+        </div>
+        <div className="group" role="group" aria-label="File">
+          <button onClick={newPlan} title="Start a new, empty plan">
+            New
+          </button>
+          <button onClick={choosePlanFile} title="Open a plan file (Ctrl+O); replaces this plan">
+            Open
+          </button>
+          <button onClick={savePlan} title="Download the plan as a JSON file (Ctrl+S)">
+            Save
+          </button>
+        </div>
+        <ExportMenu />
         <button
-          className={orthoLock ? 'active' : ''}
-          aria-pressed={orthoLock}
-          onClick={() => updateSettings({ orthoLock: !orthoLock })}
-          title="Ortho lock (O); hold Shift to invert"
+          className={`help-button${helpOpen ? ' active' : ''}`}
+          aria-pressed={helpOpen}
+          title="Keyboard shortcuts (?)"
+          aria-label="Keyboard shortcuts"
+          onClick={() => useUiStore.getState().setHelpOpen(!helpOpen)}
         >
-          Ortho {orthoLock ? 'on' : 'off'}
-        </button>
-        <button onClick={zoomToFit} title="Zoom to fit">
-          Fit
+          ?
         </button>
       </div>
-      <div className="group view-modes" role="group" aria-label="View mode">
-        {VIEW_MODES.map((m) => (
-          <button
-            key={m}
-            className={viewMode === m ? `active view-${m}` : `view-${m}`}
-            aria-pressed={viewMode === m}
-            title="View mode (V cycles): Existing shows existing + demolished, Proposed shows existing + new, All shows everything"
-            onClick={() => setViewMode(m)}
+      <div className="toolbar-row">
+        <div className="group" role="group" aria-label="Tools">
+          {TOOLS.map((t) => (
+            <button
+              key={t.name}
+              className={activeTool === t.name ? 'active' : ''}
+              aria-pressed={activeTool === t.name}
+              title={TOOL_TITLE[t.name] ?? `${t.label} (${t.key})`}
+              onClick={() => (t.name === 'underlay' ? activateUnderlayTool() : switchTool(t.name))}
+            >
+              {t.label} <kbd>{t.key}</kbd>
+            </button>
+          ))}
+        </div>
+        <label className="measure">
+          Draw as
+          <select
+            aria-label="Phase for new elements"
+            className={`phase-select phase-${drawPhase}`}
+            value={drawPhase}
+            onChange={(e) => {
+              setDrawPhase(e.target.value as DrawPhase);
+              blurAfter(e);
+            }}
           >
-            {VIEW_MODE_LABEL[m]}
-          </button>
-        ))}
-      </div>
-      <label className="measure">
-        Draw as
-        <select
-          aria-label="Phase for new elements"
-          className={`phase-select phase-${drawPhase}`}
-          value={drawPhase}
-          onChange={(e) => setDrawPhase(e.target.value as DrawPhase)}
-        >
-          <option value="existing">existing</option>
-          <option value="new">new</option>
-        </select>
-      </label>
-      <label className="measure" title={MEASURE_RULE}>
-        Lengths to
-        <select
-          value={measureTo}
-          onChange={(e) => updateSettings({ measureTo: e.target.value as MeasureTo })}
-        >
-          <option value="center">center</option>
-          <option value="inside">inside face</option>
-          <option value="outside">outside face</option>
-        </select>
-      </label>
-      <div className="spacer" />
-      <div className="group" role="group" aria-label="Layout">
-        {LAYOUT_BUTTONS.map((b) => (
-          <button
-            key={b.layout}
-            className={layout === b.layout ? 'active' : ''}
-            aria-pressed={layout === b.layout}
-            title="Layout: 2D plan, plan and 3D side by side, or 3D model (` cycles)"
-            onClick={() => setLayout(b.layout)}
+            <option value="existing">existing</option>
+            <option value="new">new</option>
+          </select>
+        </label>
+        <label className="measure" title={MEASURE_RULE}>
+          Lengths to
+          <select
+            aria-label="Typed wall lengths measure to"
+            value={measureTo}
+            onChange={(e) => {
+              updateSettings({ measureTo: e.target.value as MeasureTo });
+              blurAfter(e);
+            }}
           >
-            {b.label}
+            <option value="center">center</option>
+            <option value="inside">inside face</option>
+            <option value="outside">outside face</option>
+          </select>
+        </label>
+        <div className="spacer" />
+        <div className="group" role="group" aria-label="Plan view">
+          <button className={showGrid ? 'active' : ''} aria-pressed={showGrid} onClick={toggleGrid} title="Grid (G)">
+            Grid
           </button>
-        ))}
+          <button
+            className={orthoLock ? 'active' : ''}
+            aria-pressed={orthoLock}
+            onClick={() => updateSettings({ orthoLock: !orthoLock })}
+            title="Ortho lock (O); hold Shift to invert"
+          >
+            Ortho {orthoLock ? 'on' : 'off'}
+          </button>
+          <button onClick={zoomToFit} title="Zoom the plan to fit (Z)">
+            Fit
+          </button>
+        </div>
       </div>
-      <div className="group" role="group" aria-label="File">
-        <button onClick={onNew}>New</button>
-        <button onClick={() => fileInput.current?.click()}>Open</button>
-        <button onClick={() => downloadPlan(getPlan())}>Save</button>
-        <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={onOpen} />
-      </div>
-      <ExportMenu />
     </header>
   );
 }

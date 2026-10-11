@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { computeFaceGeometry, getFaces, insetPolygon } from '../derive/rooms';
+import { computeFaceGeometry, getFaces, insetPolygon, roomDimensions } from '../derive/rooms';
 import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, createLevel, defaultLevelId } from '../model/plan';
 import type { Level, Phase, Vec2 } from '../model/types';
@@ -224,5 +224,51 @@ describe('room store actions', () => {
     expect(level().rooms[id].name).toBe('Study');
     store().deleteRooms(levelId(), [id]);
     expect(level().rooms).toEqual({});
+  });
+});
+
+describe('roomDimensions (face to face)', () => {
+  it('a 32\' x 26\' house of 6.5" walls measures 31\'-5 1/2" x 25\'-5 1/2" inside', () => {
+    loop(rect(0, 0, 384, 312));
+    const face = getFaces(level(), 'all').faces[0];
+    const d = roomDimensions(face.netPolygon);
+    expect(d.edges).toHaveLength(4);
+    expect(d.rect!.width).toBeCloseTo(384 - 6.5);
+    expect(d.rect!.depth).toBeCloseTo(312 - 6.5);
+    // Clockwise on screen from the top-left corner: top, right, bottom, left.
+    expect(d.corners[0].x).toBeCloseTo(3.25);
+    expect(d.corners[0].y).toBeCloseTo(3.25);
+    expect(d.edges.map((e) => Math.round(e * 100) / 100)).toEqual([377.5, 305.5, 377.5, 305.5]);
+  });
+
+  it('merges a side broken by a T junction and reports width x depth for a tall room', () => {
+    loop(rect(0, 0, 120, 240));
+    // A wall teeing into the right side from outside splits that side at y = 100.
+    store().addWall(levelId(), { x: 120, y: 100 }, { x: 200, y: 100 }, ext);
+    const face = getFaces(level(), 'all').faces.find((f) => f.grossArea > 120 * 200)!;
+    expect(face.nodeIds.length).toBe(5);
+    const d = roomDimensions(face.netPolygon);
+    expect(d.edges).toHaveLength(4);
+    expect(d.rect!.width).toBeCloseTo(113.5);
+    expect(d.rect!.depth).toBeCloseTo(233.5);
+  });
+
+  it('lists every side of an L-shaped room and has no rect', () => {
+    loop([
+      { x: 0, y: 0 },
+      { x: 240, y: 0 },
+      { x: 240, y: 120 },
+      { x: 120, y: 120 },
+      { x: 120, y: 240 },
+      { x: 0, y: 240 },
+    ]);
+    const d = roomDimensions(getFaces(level(), 'all').faces[0].netPolygon);
+    expect(d.rect).toBeNull();
+    expect(d.edges.map((e) => Math.round(e * 100) / 100)).toEqual([233.5, 113.5, 120, 120, 113.5, 233.5]);
+  });
+
+  it('handles degenerate input', () => {
+    expect(roomDimensions([]).edges).toEqual([]);
+    expect(roomDimensions([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }]).edges).toEqual([]);
   });
 });

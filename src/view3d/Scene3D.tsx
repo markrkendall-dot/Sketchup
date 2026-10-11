@@ -92,7 +92,7 @@ function Levels() {
   );
 }
 
-/** Small overlay toolbar: level visibility, Fit, and the walk mode toggle. */
+/** Small overlay toolbar: level visibility, Fit 3D, and the walk mode toggle. */
 function View3dToolbar() {
   const order = usePlanStore((s) => s.plan.levelOrder);
   const names = usePlanStore((s) => s.plan.levelOrder.map((id) => s.plan.levels[id]?.name ?? '').join('\u0000'));
@@ -115,8 +115,8 @@ function View3dToolbar() {
         Only active level and below
       </label>
       <span className="sep" />
-      <button onClick={requestFit3d} disabled={walking} title="Frame the visible levels">
-        Fit
+      <button onClick={requestFit3d} disabled={walking} title="Frame the visible levels in the 3D view">
+        Fit 3D
       </button>
       <button
         className={walking ? 'active' : ''}

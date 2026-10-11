@@ -109,7 +109,10 @@ the level is a planar straight-line graph, no node lies in the interior of a wal
 within `MERGE_EPS = 0.5"`. Steps: merge close nodes (rewrite references, drop a===b walls); for every
 node and every non-incident wall, if the node projects onto the wall interior within MERGE_EPS, split
 that wall at the node (new walls inherit thickness/kind/phase; openings reassigned by offset and
-clamped). Crossings without a node are not auto-split in v1 (the on-wall snap creates the node).
+clamped). Two walls that cross strictly inside both (farther than MERGE_EPS from every end, not
+parallel, no shared node) get a node at the crossing, which the same pass then splits both at, so
+an X becomes four walls at one node. One change per pass; the pass count is bounded by the level
+size, and a crossing that lands on an existing node is skipped rather than retried.
 Simple graph, not multigraph: at most one wall between two nodes.
 
 ## Corner joins (`derive/footprint.ts`)
@@ -240,6 +243,19 @@ Leading `-` negates. `3/0`, `12'6'`, empty -> error. Never rounded on parse.
 `150.5`->`12'-6 1/2"`, `-150`->`-12'-6"`. Compact variant for labels drops `-0"`: `144`->`12'`.
 `formatArea(sqIn)` -> `184 sq ft`.
 
+### Keyboard (`ui/keymap.ts`)
+
+One table, `KEY_BINDINGS`, drives both the global hotkey handler (App.tsx) and the `?` help
+overlay. A binding has display keys, a label, a group, and optionally normalized combos
+(`comboOf`: `mod+` for Ctrl or Cmd, `shift+` only for letters and named keys, so `?` is `?`) with
+a runner; rows without combos are keys the tools or the walk view handle, listed for the help.
+Order of handling: focused text fields, selects and sliders keep their keys (except Ctrl/Cmd+S
+and +O, which commit the field and run); walk mode keeps its keys; an open help dialog takes all
+plain keys (Esc or `?` closes it); then the active tool; then, while a typed length is pending,
+every other plain key is swallowed; while a wall chain or calibration is in progress only bindings
+marked `whileDrawing` run. Committing a properties field with Enter (or a select change) blurs it
+and focuses the canvas, so the next Ctrl+Z undoes the plan, not the text.
+
 ## Undo/redo
 
 zundo `temporal` on planStore only, `partialize: s => ({plan: s.plan})`, limit 200. uiStore is not
@@ -254,7 +270,15 @@ labels by the rooms record). Store actions run on immer drafts and use the unmem
 `computeFootprints` (a draft keeps its identity while mutated, so it must never key a cache). `getFootprints` compares each
 wall's new footprint with the previous one by value and returns the previous object if equal, so
 `<WallMesh3D>` can `useMemo` on the footprint reference and rebuild only changed walls. Dispose old
-geometry in effect cleanup.
+geometry in effect cleanup. That previous result (and the openings-by-wall one) is kept per level
+id, not per Level object, so `pruneDerivedCaches(plan)` drops the entries of levels that are gone;
+main.tsx calls it whenever `levelOrder` changes (New, Open). `getLevelMeshes` prunes its own
+per-level-id caches, disposing geometry, on its next miss.
+
+Room dimensions (`roomDimensions(face.netPolygon)`): the net outline with collinear vertices
+merged (a T on a room's side does not break it), clockwise from the top-left corner; width x depth
+when it is a rectangle. The room properties list them so typed lengths can be checked against the
+tape.
 
 ### Image underlay (`model/underlay.ts`, `tools/underlayTool.ts`)
 
@@ -304,8 +328,16 @@ Crosshair and a hint ("Walls are not solid in walk mode": no collision in v1).
 
 ## Persistence and export
 
-JSON download/upload with `schemaVersion` and `migrate()`. Autosave to IndexedDB (idb-keyval) on
-every plan change (debounced), restored on load. Underlays downscaled to <= 2048px JPEG data URLs.
+JSON download/upload with `schemaVersion` and `migrate()`. `MIGRATIONS[n]` upgrades a version n
+document to n + 1 and they run in order (0 -> 1: entity arrays become records keyed by id, a
+missing `levelOrder` comes from the levels array, settings are filled). The upgraded document is
+then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
+file's order so a current file round-trips byte for byte), with defaults for missing optional
+values and broken openings, rooms, stairs and underlays dropped. New and Open replace the plan and
+clear the undo history (New confirms when the plan has walls, rooms, stairs or an image). Autosave
+to IndexedDB (idb-keyval) on every plan change (debounced), restored on load; a failed save
+(storage full, IndexedDB unavailable) shows "Autosave failed: ..." in the status bar until a later
+save works, and is never thrown. Underlays downscaled to <= 2048px JPEG data URLs.
 3D export (`io/export3d.ts`, toolbar "Export" menu, loaded on first use): `buildExportScene` builds
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels

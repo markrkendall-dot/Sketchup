@@ -378,3 +378,14 @@ export function getFootprints(level: Level, viewMode: ViewMode): Footprints {
   previous.set(prevKey, result);
   return result;
 }
+
+/**
+ * Drop the previous-result entries of levels that are gone (deleted, or a New/Open replaced the
+ * plan). The per-Level cache is a WeakMap and needs no help; this map is keyed by level id.
+ */
+export function forgetFootprintLevels(alive: ReadonlySet<Id>): void {
+  for (const key of previous.keys()) if (!alive.has(key.slice(0, key.lastIndexOf('|')))) previous.delete(key);
+}
+
+/** Number of levels with a previous result (tests). */
+export const footprintLevelCount = (): number => new Set([...previous.keys()].map((k) => k.slice(0, k.lastIndexOf('|')))).size;

@@ -45,20 +45,68 @@ export async function readPlanFile(file: File): Promise<Plan> {
   return migrate(json);
 }
 
+/** Why an autosave failed, in words for the status bar. */
+export function autosaveFailureReason(err: unknown): string {
+  const name = err instanceof Error || err instanceof DOMException ? err.name : '';
+  if (name === 'QuotaExceededError') return 'the browser storage for this site is full. Use Save to keep a copy';
+  const msg = err instanceof Error || err instanceof DOMException ? err.message : String(err);
+  return msg || name || 'unknown error';
+}
+
+export interface AutosaveOptions {
+  /** Store function; defaults to idb-keyval's set (tests pass their own). */
+  save?: (key: string, plan: Plan) => Promise<void>;
+  /**
+   * Told about failures and recoveries: a message after a failed save, null after the next save
+   * that works. Never throws into the caller.
+   */
+  onStatus?: (error: string | null) => void;
+}
+
 /**
  * Persist the plan to IndexedDB whenever it changes (debounced). Also flushes when the page is
- * hidden. Returns an unsubscribe function.
+ * hidden. A failed save (storage full, IndexedDB unavailable) is reported through onStatus and
+ * retried with the next change. Returns an unsubscribe function.
  */
-export function startAutosave(store: typeof usePlanStore): () => void {
+export function startAutosave(store: typeof usePlanStore, opts: AutosaveOptions = {}): () => void {
+  const save = opts.save ?? ((key: string, plan: Plan) => set(key, plan));
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Plan | null = null;
+  let failing = false;
+  const report = (error: string | null) => {
+    try {
+      opts.onStatus?.(error);
+    } catch (err) {
+      console.warn('Autosave status handler failed', err);
+    }
+  };
+  const failed = (err: unknown) => {
+    console.warn('Autosave failed', err);
+    failing = true;
+    report(`Autosave failed: ${autosaveFailureReason(err)}.`);
+  };
   const flush = () => {
     if (timer) clearTimeout(timer);
     timer = null;
     if (!pending) return;
     const plan = pending;
     pending = null;
-    set(AUTOSAVE_KEY, plan).catch((err: unknown) => console.warn('Autosave failed', err));
+    let result: Promise<void>;
+    try {
+      result = save(AUTOSAVE_KEY, plan);
+    } catch (err) {
+      failed(err);
+      return;
+    }
+    result.then(
+      () => {
+        if (failing) {
+          failing = false;
+          report(null);
+        }
+      },
+      failed,
+    );
   };
   const unsubscribe = store.subscribe((state, prev) => {
     if (state.plan === prev.plan) return;

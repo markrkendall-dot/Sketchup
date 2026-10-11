@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState, type RefObject } from 'react';
 import { PlanCanvas } from './editor2d/PlanCanvas';
 import { RoomNameEditor } from './editor2d/RoomNameEditor';
-import { activateUnderlayTool, cycleViewMode, dispatchKey, dispatchShift, switchLevelByIndex, switchTool } from './editor2d/tools';
-import { redo, undo, usePlanStore } from './store/planStore';
-import { LAYOUTS, useUiStore, type ToolName } from './store/uiStore';
+import { dispatchKey, dispatchShift } from './editor2d/tools';
+import { useUiStore } from './store/uiStore';
+import { HelpOverlay } from './ui/HelpOverlay';
+import { bindingFor } from './ui/keymap';
 import { LevelBar } from './ui/LevelBar';
 import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
@@ -13,83 +14,74 @@ import { UnderlayFileInput } from './ui/UnderlayImport';
 // The 3D view (three, fiber, drei) loads on first use, so the 2D editor starts fast.
 const Scene3D = lazy(() => import('./view3d/Scene3D'));
 
-function cycleLayout(): void {
-  const ui = useUiStore.getState();
-  ui.setLayout(LAYOUTS[(LAYOUTS.indexOf(ui.layout) + 1) % LAYOUTS.length]);
-}
+/** Inputs that do not take typed text: hotkeys still work while one of them has focus. */
+const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'color', 'image']);
 
-const TOOL_KEYS: Record<string, ToolName> = {
-  s: 'select',
-  w: 'wall',
-  r: 'room',
-  d: 'door',
-  n: 'window',
-  p: 'passage',
-  t: 'stairs',
-  u: 'underlay',
-};
-
+/** A focused element that takes typed keys: text fields, selects, text areas, sliders. */
 function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+  if (target.isContentEditable || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return true;
+  return target instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(target.type);
 }
 
 /**
- * One keyboard entry point: the active tool sees keys first (length buffer, Esc, Delete), then
- * global hotkeys. While the wall tool is drawing, single-letter hotkeys other than the tool keys
- * are suppressed so typing a length never toggles anything. Digits reach the level hotkeys only
- * when no tool took them for a length buffer.
+ * One keyboard entry point. Keys typed into a text field, select or text area never reach the
+ * plan; neither do keys while walking (FirstPerson.tsx captures them) or while the help is open
+ * (Esc or ? closes it). Otherwise the active tool sees keys first (length buffer, Esc, Delete),
+ * then the keyboard map (ui/keymap.ts). While a typed length is being entered every other plain
+ * key is swallowed, and while a wall chain or calibration is in progress only the bindings marked
+ * whileDrawing run (tool switches, layout, undo, save), so typing never toggles anything.
  */
 function onKeyDown(e: KeyboardEvent): void {
-  if (isEditable(e.target)) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (isEditable(e.target)) {
+    // Save and Open still work from a text field (committing it first), instead of the browser's
+    // own Save page / Open file dialogs. Everything else belongs to the field.
+    const binding = mod ? bindingFor(e) : undefined;
+    if (binding && (binding.combos?.includes('mod+s') || binding.combos?.includes('mod+o'))) {
+      e.preventDefault();
+      if (!e.repeat) {
+        (e.target as HTMLElement).blur();
+        binding.run?.(e);
+      }
+    }
+    return;
+  }
+  const ui = useUiStore.getState();
   // Walk mode owns the keyboard (view3d/FirstPerson.tsx captures keys before they get here).
-  if (document.pointerLockElement || useUiStore.getState().cameraMode === 'walk') return;
+  if (document.pointerLockElement || ui.cameraMode === 'walk') return;
+  if (ui.helpOpen && !mod) {
+    if (e.key === 'Escape' || e.key === '?') ui.setHelpOpen(false);
+    e.preventDefault();
+    return;
+  }
   if (e.key === 'Shift') dispatchShift(true);
   if (dispatchKey(e)) {
     e.preventDefault();
     return;
   }
-  const ui = useUiStore.getState();
-  const mod = e.ctrlKey || e.metaKey;
-  const key = e.key.toLowerCase();
-  if (mod && !e.altKey) {
-    if (key === 'z' && e.shiftKey) redo();
-    else if (key === 'z') undo();
-    else if (key === 'y') redo();
-    else return;
+  const after = useUiStore.getState();
+  if (after.draft.lengthBuffer !== '' && !mod) {
+    // A half-typed length: a stray letter must not switch tools or levels and lose it.
+    if (e.key.length === 1) e.preventDefault();
+    return;
+  }
+  if (e.key === ' ' && !mod) {
+    after.setSpaceHeld(true);
     e.preventDefault();
     return;
   }
-  if (e.key === ' ') {
-    ui.setSpaceHeld(true);
-    e.preventDefault();
-    return;
-  }
-  if (e.altKey || mod || e.repeat) return;
-  if (e.key === '`') {
-    cycleLayout();
-    e.preventDefault();
-    return;
-  }
-  if (Object.hasOwn(TOOL_KEYS, key)) {
-    // The underlay tool opens the image picker when the level has no image yet.
-    if (TOOL_KEYS[key] === 'underlay') activateUnderlayTool();
-    else switchTool(TOOL_KEYS[key]);
-    e.preventDefault();
+  const binding = bindingFor(e);
+  if (!binding?.run) return;
+  if (e.repeat && !binding.repeat) {
+    if (mod) e.preventDefault();
     return;
   }
   const drawing =
-    (ui.activeTool === 'wall' && ui.draft.wallStart !== null) ||
-    (ui.activeTool === 'underlay' && ui.draft.underlayPoints.length > 0);
-  if (drawing) return;
-  if (key === 'o') {
-    const { plan, updateSettings } = usePlanStore.getState();
-    updateSettings({ orthoLock: !plan.settings.orthoLock });
-  } else if (key === 'g') ui.toggleGrid();
-  else if (key === 'v') cycleViewMode();
-  else if (key === 'f' && ui.layout !== '2d') ui.setCameraMode('walk');
-  else if (/^[1-9]$/.test(key)) switchLevelByIndex(Number(key) - 1);
-  else return;
+    (after.activeTool === 'wall' && after.draft.wallStart !== null) ||
+    (after.activeTool === 'underlay' && after.draft.underlayPoints.length > 0);
+  if (drawing && !binding.whileDrawing) return;
+  if (binding.run(e) === false) return;
   e.preventDefault();
 }
 
@@ -178,6 +170,7 @@ export function App() {
       </div>
       <StatusBar />
       <UnderlayFileInput />
+      <HelpOverlay />
     </div>
   );
 }

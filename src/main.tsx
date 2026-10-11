@@ -5,11 +5,13 @@ import { App } from './App';
 import { getLevelElevations } from './derive/levels';
 import { getFootprints } from './derive/footprint';
 import { getFaces } from './derive/rooms';
+import { pruneDerivedCaches } from './derive/openings';
 import { pruneSelection } from './editor2d/tools';
 import { loadAutosave, startAutosave } from './io/file';
 import { defaultLevelId } from './model/plan';
 import { clearHistory, usePlanStore } from './store/planStore';
 import { useUiStore } from './store/uiStore';
+import { showNotice } from './ui/fileActions';
 import './index.css';
 
 declare global {
@@ -44,8 +46,16 @@ async function boot(): Promise<void> {
     const ui = useUiStore.getState();
     if (!s.plan.levels[ui.activeLevelId]) ui.setActiveLevel(defaultLevelId(s.plan));
     else if (s.plan !== prev.plan) pruneSelection();
+    // Levels went away (New, Open): forget what the derive caches kept per level id.
+    if (s.plan.levelOrder !== prev.plan.levelOrder) pruneDerivedCaches(s.plan);
   });
-  startAutosave(usePlanStore);
+  startAutosave(usePlanStore, {
+    // A failure stays in the status bar until a later save works.
+    onStatus: (error) => {
+      if (error) showNotice(error, true);
+      else if (useUiStore.getState().notice?.error) showNotice(null);
+    },
+  });
 
   if (import.meta.env.DEV) {
     const handle = {

@@ -17,7 +17,7 @@ const SNAP_LABEL: Record<SnapKind, string> = {
 
 const HINTS: Record<ToolName, { idle: string; busy: string }> = {
   wall: {
-    idle: "Click to start. Type a length like 12'6 or 150 then Enter. Esc to finish.",
+    idle: "Click to start. Type a length like 12'6 or 150 then Enter. Esc to finish. ? lists all keys.",
     busy: "Move to aim, type a length like 12'6 or 150 then Enter, or click. X: interior/exterior. Esc to finish.",
   },
   select: {
@@ -95,6 +95,7 @@ export function StatusBar() {
   const hasUnderlay = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
   const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
   const underlayMode = useUiStore((s) => s.underlayMode);
+  const notice = useUiStore((s) => s.notice);
   const p = draft.snap?.point ?? draft.cursor;
   const drawing = draft.wallStart !== null || draft.lengthBuffer !== '';
 
@@ -119,6 +120,11 @@ export function StatusBar() {
               : HINTS[tool].idle)}
       </span>
       <span className="spacer" />
+      {notice && (
+        <span className={`status-notice${notice.error ? ' error' : ''}`} role={notice.error ? 'alert' : 'status'}>
+          {notice.text}
+        </span>
+      )}
       {openEnds > 0 && (
         <span className="status-open-ends" title="Wall ends that join nothing (red dots). Rooms are only found where walls close a loop.">
           {openEnds} open wall {openEnds === 1 ? 'end' : 'ends'}

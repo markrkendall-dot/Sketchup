@@ -130,6 +130,12 @@ export interface Hover {
   openingId: Id | null;
 }
 
+/** A message in the status bar that is not tied to a tool (autosave, file actions). */
+export interface Notice {
+  text: string;
+  error: boolean;
+}
+
 export interface UiState {
   activeTool: ToolName;
   activeLevelId: Id;
@@ -170,6 +176,9 @@ export interface UiState {
   walkLevelId: Id | null;
   /** Walk mode: the pointer is locked to the 3D canvas (mouse looks around). */
   walkLocked: boolean;
+  /** The keyboard help overlay is open. */
+  helpOpen: boolean;
+  notice: Notice | null;
   setTool: (tool: ToolName) => void;
   setActiveLevel: (id: Id) => void;
   setSelection: (sel: Selection) => void;
@@ -203,6 +212,8 @@ export interface UiState {
   setCameraMode: (mode: CameraMode) => void;
   setWalkLevel: (id: Id | null) => void;
   setWalkLocked: (locked: boolean) => void;
+  setHelpOpen: (open: boolean) => void;
+  setNotice: (notice: Notice | null) => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -262,6 +273,8 @@ export const useUiStore = create<UiState>()((set) => ({
   cameraMode: 'orbit',
   walkLevelId: null,
   walkLocked: false,
+  helpOpen: false,
+  notice: null,
   setTool: (activeTool) =>
     set((s) => ({
       activeTool,
@@ -341,6 +354,8 @@ export const useUiStore = create<UiState>()((set) => ({
     ),
   setWalkLevel: (walkLevelId) => set({ walkLevelId }),
   setWalkLocked: (walkLocked) => set((s) => (s.walkLocked === walkLocked ? s : { walkLocked })),
+  setHelpOpen: (helpOpen) => set({ helpOpen }),
+  setNotice: (notice) => set({ notice }),
 }));
 
 export const useViewport = () => useUiStore((s) => s.viewport);
