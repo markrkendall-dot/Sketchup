@@ -1,11 +1,14 @@
 import { getFootprints } from '../../derive/footprint';
 import { roofOutlineWithOverhang } from '../../derive/roofs';
-import { hitOpening } from '../../derive/openings';
+import { hitOpeningRect, hitOpeningSwing } from '../../derive/openings';
 import { hitStairs } from '../../derive/stairs';
 import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase';
 import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../../model/geometry';
 import { WALL_OVERLAP_MESSAGE } from '../../model/plan';
+import { nudgeShifts } from '../../model/offset';
 import type { Id, Level, Vec2, ViewMode } from '../../model/types';
+import { formatLength } from '../../model/units';
+import { runWallMove } from '../../ui/wallMove';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection } from '../../store/uiStore';
 import { hitRoomLabel } from '../roomLabels';
@@ -20,6 +23,10 @@ const DRAG_THRESHOLD_PX = 3;
 const WALL_PICK_PX = 4;
 /** Pick radius around opening symbols (door leaf and arc), in screen px. */
 const OPENING_PICK_PX = 4;
+/** An opening's own rectangle (the hole across the wall) picks this much past its edges, screen px. */
+const OPENING_RECT_PX = 2;
+/** Shown while one opening is selected: a second click on it selects its wall. */
+export const OPENING_CYCLE_HINT = 'Click again for the wall';
 
 export type Hit =
   | { kind: 'node'; id: Id }
@@ -54,9 +61,10 @@ export function hitRoofHandle(level: Level, roofIds: readonly Id[], p: Vec2, k: 
 }
 
 /**
- * Priority: nodes within 10px, then opening symbols, then walls, then room labels, then stairs, then
- * roofs (inside the outline grown by the overhang; the most recently added on top). Elements
- * hidden in `viewMode` are never hit.
+ * Priority: nodes within 10px, then an opening's own rectangle (the hole between its jambs across
+ * the wall, plus 2 px), then walls (so the wall either side of a window is the wall), then door
+ * leaves and swings, then room labels, then stairs, then roofs (inside the outline grown by the
+ * overhang; the most recently added on top). Elements hidden in `viewMode` are never hit.
  */
 export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all'): Hit {
   let best: Hit = null;
@@ -73,10 +81,10 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   if (best) return best;
 
   const fps = getFootprints(level, viewMode);
-  for (const o of Object.values(level.openings)) {
-    if (!isOpeningVisible(o, level.walls[o.wallId], viewMode)) continue;
+  const openings = Object.values(level.openings).filter((o) => isOpeningVisible(o, level.walls[o.wallId], viewMode));
+  for (const o of openings) {
     const fp = fps.get(o.wallId);
-    if (fp && hitOpening(fp, o, p, OPENING_PICK_PX / k)) return { kind: 'opening', id: o.id };
+    if (fp && hitOpeningRect(fp, o, p, OPENING_RECT_PX / k)) return { kind: 'opening', id: o.id };
   }
 
   bestD = Infinity;
@@ -93,6 +101,10 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
     }
   }
   if (best) return best;
+  for (const o of openings) {
+    const fp = fps.get(o.wallId);
+    if (fp && hitOpeningSwing(fp, o, p, OPENING_PICK_PX / k)) return { kind: 'opening', id: o.id };
+  }
   const room = hitRoomLabel(level, viewMode, p, k);
   if (room) return { kind: 'room', id: room };
   // Topmost (last drawn) stairs first.
@@ -122,6 +134,8 @@ type DragState =
       /** Opening offset minus the cursor's position along the wall at grab time. */
       grabDelta: number;
       started: boolean;
+      /** The opening was already the only thing selected: a click (no drag) selects this wall. */
+      cycleTo: Id | null;
     }
   | ({ kind: 'room' } & RoomDrag)
   | { kind: 'stairs'; id: Id; grab: Vec2; origin: Vec2; startScreen: Vec2; started: boolean }
@@ -166,7 +180,42 @@ function pruneSelection(ctx: ToolContext): void {
   }
 }
 
+/** A drag's displacement in words, e.g. `moved 6 1/2" east` or `moved 2" east, 1'-0" south`. */
+export function displacementText(d: Vec2, denom: number): string {
+  const parts: string[] = [];
+  const tiny = 0.5 / denom;
+  if (Math.abs(d.x) >= tiny) parts.push(`${formatLength(Math.abs(d.x), denom)} ${d.x > 0 ? 'east' : 'west'}`);
+  if (Math.abs(d.y) >= tiny) parts.push(`${formatLength(Math.abs(d.y), denom)} ${d.y > 0 ? 'south' : 'north'}`);
+  return parts.length ? `moved ${parts.join(', ')}` : 'moved 0"';
+}
+
+/** Screen directions of the arrow keys on the plan (y down). */
+const ARROW_DIRS: Record<string, { v: Vec2; name: string }> = {
+  ArrowUp: { v: { x: 0, y: -1 }, name: 'north' },
+  ArrowDown: { v: { x: 0, y: 1 }, name: 'south' },
+  ArrowLeft: { v: { x: -1, y: 0 }, name: 'west' },
+  ArrowRight: { v: { x: 1, y: 0 }, name: 'east' },
+};
+
+/** Shift+arrow with walls selected: move them 1" across, the way the arrow points. True when handled. */
+function nudgeWalls(ctx: ToolContext, e: KeyboardEvent): boolean {
+  const arrow = ARROW_DIRS[e.key];
+  const ui = ctx.ui();
+  const walls = ui.selection.walls.filter((id) => ctx.level().walls[id]);
+  if (!arrow || !e.shiftKey || ui.underlaySelected || walls.length === 0) return false;
+  const shifts = nudgeShifts(ctx.level(), walls, arrow.v, 1);
+  if (shifts.size === 0) {
+    const along = arrow.v.x === 0 ? 'north-south' : 'east-west';
+    ui.patchDraft({ message: `The selected ${walls.length === 1 ? 'wall runs' : 'walls run'} ${along}: use an arrow across ${walls.length === 1 ? 'it' : 'them'}.`, error: true });
+    return true;
+  }
+  const n = shifts.size;
+  runWallMove(ctx.levelId, n === 1 ? [...shifts.keys()][0] : null, () => ctx.actions.shiftWalls(ctx.levelId, Object.fromEntries(shifts)), `Moved ${n === 1 ? 'the wall' : `${n} walls`} 1" ${arrow.name}`);
+  return true;
+}
+
 function finishDrag(ctx: ToolContext): void {
+  if (ctx.ui().draft.dragReadout) ctx.ui().patchDraft({ dragReadout: null });
   if (drag?.kind === 'move' && drag.started) {
     // Still paused: the normalize pass belongs to the same undo step as the drag.
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
@@ -200,7 +249,8 @@ export const selectTool: Tool = {
     const ui = ctx.ui();
     const level = ctx.level();
     const sel = ui.selection;
-    if (ui.draft.message === WALL_OVERLAP_MESSAGE) ui.patchDraft({ message: null, error: false });
+    // Messages from the last action (a refused drag, a wall move) last until the next click.
+    if (ui.draft.message) ui.patchDraft({ message: null, error: false });
     // A selected roof's corner handle: drag it (snapping like the roof tool).
     const handle = e.shiftKey ? null : hitRoofHandle(level, sel.roofs, e.world, ui.viewport.k);
     if (handle) {
@@ -242,6 +292,8 @@ export const selectTool: Tool = {
       return;
     }
     if (hit.kind === 'opening') {
+      // Already the only thing selected: a click (not a drag) goes on to its wall.
+      const sole = selectionSize(sel) === 1 && sel.openings[0] === hit.id;
       const s = alongWall(ctx, hit.id, e.world);
       drag =
         s === null
@@ -252,6 +304,7 @@ export const selectTool: Tool = {
               startScreen: e.screen,
               grabDelta: level.openings[hit.id].offset - s,
               started: false,
+              cycleTo: sole ? level.openings[hit.id].wallId : null,
             };
       return;
     }
@@ -368,6 +421,9 @@ export const selectTool: Tool = {
       return;
     }
     if (ui.draft.message === WALL_OVERLAP_MESSAGE) ui.patchDraft({ message: null, error: false });
+    // Live displacement of the drag in the status bar (REVIEW-2 B3).
+    const key = drag.single ?? Object.keys(positions)[0];
+    if (key) ui.patchDraft({ dragReadout: displacementText(sub(positions[key], drag.origins[key]), ctx.plan().settings.precisionDenominator) });
     if (!drag.started) {
       // First set of the drag that changes the plan is tracked; the rest are folded into it.
       drag.started = true;
@@ -377,6 +433,9 @@ export const selectTool: Tool = {
 
   onPointerUp(e, ctx) {
     const ui = ctx.ui();
+    if (drag?.kind === 'opening' && !drag.started && drag.cycleTo && ctx.level().walls[drag.cycleTo]) {
+      ui.setSelection({ ...EMPTY_SELECTION, walls: [drag.cycleTo] });
+    }
     if (drag && drag.kind !== 'box') finishDrag(ctx);
     else if (drag?.kind === 'box') {
       const a = drag.a;
@@ -428,6 +487,7 @@ export const selectTool: Tool = {
         return true;
       }
     }
+    if (!drag && nudgeWalls(ctx, e)) return true;
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (!selectionSize(sel)) return false;
       ctx.actions.deleteEntities(ctx.levelId, sel);
@@ -450,6 +510,6 @@ export const selectTool: Tool = {
   cancel(ctx) {
     finishDrag(ctx);
     drag = null;
-    ctx.ui().patchDraft({ box: null, snap: null });
+    ctx.ui().patchDraft({ box: null, snap: null, dragReadout: null });
   },
 };

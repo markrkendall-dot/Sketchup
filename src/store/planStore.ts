@@ -18,6 +18,7 @@ import {
   wallLength,
   wallOverlapping,
 } from '../model/plan';
+import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { normalizeDegrees, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
@@ -78,6 +79,19 @@ export interface PlanState {
    * would lie on top of a wall already there (then the draft message says so).
    */
   addWall: (levelId: Id, a: Vec2 | Id, b: Vec2 | Id, opts: AddWallOptions) => AddWallResult | null;
+  /**
+   * Add several walls in one undo step, all or nothing: null (and no change) when any of them is
+   * degenerate or would lie on top of a wall already there (the draft message then says so).
+   */
+  addWalls: (levelId: Id, segments: readonly { a: Vec2 | Id; b: Vec2 | Id }[], opts: AddWallOptions) => AddWallResult[] | null;
+  /**
+   * Move walls sideways by `distance` to one side of each wall (relative to its a->b direction),
+   * dragging their neighbours along (model/offset.ts), in one undo step. Returns null when done,
+   * else why not (nothing changes).
+   */
+  offsetWalls: (levelId: Id, ids: readonly Id[], distance: number, side: WallSide) => string | null;
+  /** Like offsetWalls with a shift vector per wall (perpendicular to it). Null when done, else why not. */
+  shiftWalls: (levelId: Id, shifts: Record<Id, Vec2>) => string | null;
   moveNode: (levelId: Id, nodeId: Id, pos: Vec2, opts?: { normalize?: boolean }) => void;
   /** Move nodes; a move that would lay a wall on top of another wall is refused (nothing changes). */
   moveNodes: (levelId: Id, positions: Record<Id, Vec2>, opts?: { normalize?: boolean }) => void;
@@ -258,6 +272,39 @@ function cleanColumn(c: Column): Column {
   return { ...c, at: { x: c.at.x, y: c.at.y }, rotation: Number.isFinite(c.rotation) ? normalizeDegrees(c.rotation) : c.rotation };
 }
 
+/**
+ * Add one wall to a (draft) level and normalize it: the body of `addWall`. Null when the segment
+ * is degenerate, 'overlap' when it would lie on top of a wall already there (nothing changed).
+ */
+function addWallInPlace(level: Level, aRef: Vec2 | Id, bRef: Vec2 | Id, opts: AddWallOptions): AddWallResult | 'overlap' | null {
+  // Where each end lands: a node id, an existing node within MERGE_EPS, or a new point.
+  const locate = (ref: Vec2 | Id): { id: Id | null; at: Vec2 } | null => {
+    if (typeof ref === 'string') return level.nodes[ref] ? { id: ref, at: level.nodes[ref] } : null;
+    const near = findNodeNear(level, ref);
+    return near ? { id: near, at: level.nodes[near] } : { id: null, at: ref };
+  };
+  const la = locate(aRef);
+  const lb = locate(bRef);
+  if (!la || !lb || (la.id !== null && la.id === lb.id) || dist(la.at, lb.at) <= MERGE_EPS) return null;
+  // A wall on top of a wall already there (any phase) would replace a piece of it when the level
+  // is normalized: refuse it instead (docs/REVIEW-2.md A1).
+  if (wallOverlapping(level, la.at, lb.at)) return 'overlap';
+  const place = (l: { id: Id | null; at: Vec2 }): { id: Id; existing: boolean } => {
+    if (l.id) return { id: l.id, existing: true };
+    const id = newId();
+    level.nodes[id] = { id, x: l.at.x, y: l.at.y };
+    return { id, existing: false };
+  };
+  const a = place(la);
+  const b = place(lb);
+  const wall: Wall = { id: newId(), a: a.id, b: b.id, thickness: opts.thickness, kind: opts.kind, phase: opts.phase };
+  level.walls[wall.id] = wall;
+  const remap = normalizeLevel(level);
+  const finalA = remap.get(a.id) ?? a.id;
+  const finalB = remap.get(b.id) ?? b.id;
+  return { a: finalA, b: finalB, wallIds: wallsAlong(level, finalA, finalB), bWasExisting: b.existing };
+}
+
 /** Walls lying along the straight path a..b, following the graph after splits. */
 function wallsAlong(level: Level, a: Id, b: Id): Id[] {
   const A = level.nodes[a];
@@ -280,7 +327,7 @@ function wallsAlong(level: Level, a: Id, b: Id): Id[] {
 
 export const usePlanStore = create<PlanState>()(
   temporal(
-    immer((set) => {
+    immer((set, get) => {
       // `fn` returns false when it rejected the edit without changing anything, so the plan
       // keeps its identity and no empty undo step is recorded.
       const editLevel = (levelId: Id, fn: (level: Level, plan: Plan) => void | boolean) =>
@@ -313,50 +360,68 @@ export const usePlanStore = create<PlanState>()(
           let result: AddWallResult | null = null;
           let overlap = false;
           editLevel(levelId, (level) => {
-            // Where each end lands: a node id, an existing node within MERGE_EPS, or a new point.
-            const locate = (ref: Vec2 | Id): { id: Id | null; at: Vec2 } | null => {
-              if (typeof ref === 'string') return level.nodes[ref] ? { id: ref, at: level.nodes[ref] } : null;
-              const near = findNodeNear(level, ref);
-              return near ? { id: near, at: level.nodes[near] } : { id: null, at: ref };
-            };
-            const la = locate(aRef);
-            const lb = locate(bRef);
-            if (!la || !lb || (la.id !== null && la.id === lb.id) || dist(la.at, lb.at) <= MERGE_EPS) return false;
-            // A wall on top of a wall already there (any phase) would replace a piece of it when
-            // the level is normalized: refuse it instead (docs/REVIEW-2.md A1).
-            if (wallOverlapping(level, la.at, lb.at)) {
-              overlap = true;
-              return false;
-            }
-            const place = (l: { id: Id | null; at: Vec2 }): { id: Id; existing: boolean } => {
-              if (l.id) return { id: l.id, existing: true };
-              const id = newId();
-              level.nodes[id] = { id, x: l.at.x, y: l.at.y };
-              return { id, existing: false };
-            };
-            const a = place(la);
-            const b = place(lb);
-            const wall: Wall = {
-              id: newId(),
-              a: a.id,
-              b: b.id,
-              thickness: opts.thickness,
-              kind: opts.kind,
-              phase: opts.phase,
-            };
-            level.walls[wall.id] = wall;
-            const remap = normalizeLevel(level);
-            const finalA = remap.get(a.id) ?? a.id;
-            const finalB = remap.get(b.id) ?? b.id;
-            result = {
-              a: finalA,
-              b: finalB,
-              wallIds: wallsAlong(level, finalA, finalB),
-              bWasExisting: b.existing,
-            };
+            const r = addWallInPlace(level, aRef, bRef, opts);
+            if (r === 'overlap') overlap = true;
+            if (r === null || r === 'overlap') return false;
+            result = r;
           });
           if (overlap) useUiStore.getState().patchDraft({ message: WALL_OVERLAP_MESSAGE, error: true });
           return result;
+        },
+
+        addWalls: (levelId, segments, opts) => {
+          const current = get().plan.levels[levelId];
+          if (!current || segments.length === 0) return null;
+          // Dry run on a copy first: the walls go in together or not at all (one undo step).
+          const trial = structuredClone(current) as Level;
+          for (const s of segments) {
+            const r = addWallInPlace(trial, s.a, s.b, opts);
+            if (r === null || r === 'overlap') {
+              if (r === 'overlap') useUiStore.getState().patchDraft({ message: WALL_OVERLAP_MESSAGE, error: true });
+              return null;
+            }
+          }
+          const results: AddWallResult[] = [];
+          editLevel(levelId, (level) => {
+            for (const s of segments) {
+              const r = addWallInPlace(level, s.a, s.b, opts);
+              if (r && r !== 'overlap') results.push(r);
+            }
+          });
+          return results;
+        },
+
+        offsetWalls: (levelId, ids, distance, side) => {
+          const level = get().plan.levels[levelId];
+          if (!level) return 'No such level.';
+          if (!Number.isFinite(distance) || !(distance > 0)) return 'Must be greater than 0.';
+          const shifts = new Map<Id, Vec2>();
+          for (const id of ids) if (level.walls[id]) shifts.set(id, wallShift(level, id, distance, side));
+          return get().shiftWalls(levelId, Object.fromEntries(shifts));
+        },
+
+        shiftWalls: (levelId, shiftsIn) => {
+          let problem: string | null = null;
+          editLevel(levelId, (level) => {
+            const shifts = new Map(Object.entries(shiftsIn).filter(([, s]) => isPoint(s) && Math.hypot(s.x, s.y) > 1e-9));
+            if (shifts.size === 0) return false;
+            const planned = planWallOffset(level, shifts);
+            if ('error' in planned) {
+              problem = planned.error;
+              return false;
+            }
+            if (Object.keys(planned.positions).length === 0) return false;
+            if (movesCreateOverlap(level, planned.positions)) {
+              problem = WALL_OVERLAP_MESSAGE;
+              return false;
+            }
+            // Openings on the moved walls keep their offset from the a end; on a neighbour whose a
+            // end slides they keep their distance from its fixed b end (moveNodesInPlace). Clamped
+            // by normalize.
+            moveNodesInPlace(level, planned.positions);
+            normalizeLevel(level, new Set(Object.keys(planned.positions)));
+          });
+          return problem;
         },
 
         moveNode: (levelId, nodeId, pos, opts) =>

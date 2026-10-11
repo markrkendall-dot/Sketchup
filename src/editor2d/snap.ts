@@ -156,7 +156,25 @@ export function snapPoint(raw: Vec2, ctx: SnapContext): SnapResult {
       onWall = { p, wallId: w.id };
     }
   }
-  if (onWall) return { point: onWall.p, kind: 'wall', wallId: onWall.wallId, guides: [] };
+  if (onWall) {
+    // A corner of the level below that lies on this wall, within the node radius: that exact
+    // point (a new room over a wing starts at the wing's corner, not a hair beside it).
+    const w = ctx.level.walls[onWall.wallId];
+    const a = ctx.level.nodes[w.a];
+    const b = ctx.level.nodes[w.b];
+    let ghostOnIt: Vec2 | null = null;
+    let gd = r(SNAP_RADIUS_PX.node);
+    for (const n of ctx.ghostNodes ?? []) {
+      const d = dist(n, target);
+      const pr = projectPointToSegment(n, a, b);
+      if (d <= gd && pr.distance < 1e-6 && pr.tRaw > 0 && pr.tRaw < 1 && onLine(n)) {
+        gd = d;
+        ghostOnIt = n;
+      }
+    }
+    if (ghostOnIt) return { point: { x: ghostOnIt.x, y: ghostOnIt.y }, kind: 'ghost-node', guides: [] };
+    return { point: onWall.p, kind: 'wall', wallId: onWall.wallId, guides: [] };
+  }
 
   // 3b. The level below (ghost): its corners, then its wall centerlines. Same radii as the
   // level's own; the point is new on this level, never a reference to the other level's ids.

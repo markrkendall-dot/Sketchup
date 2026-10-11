@@ -153,13 +153,21 @@ export function wallPieces(
   return { fills, edges, gaps };
 }
 
-/** True when p is on the opening: inside its gap, or on a door's leaf or swing arc. */
-export function hitOpening(g: WallGeom, o: Opening, p: Vec2, pickRadius: number): boolean {
+/**
+ * True when p is in the opening's own rectangle: the hole between its jambs, across the wall
+ * thickness, grown by `margin` on every side. Elsewhere on the wall the wall is what is hit.
+ */
+export function hitOpeningRect(g: WallGeom, o: Opening, p: Vec2, margin: number): boolean {
   const sym = openingSymbol(g, o);
   const rel = sub(p, g.a);
   const s = dot(rel, g.dir);
   const off = dot(rel, g.normal);
-  if (s >= sym.j0 && s <= sym.j1 && Math.abs(off) <= Math.max(g.thickness / 2, pickRadius)) return true;
+  return s >= sym.j0 - margin && s <= sym.j1 + margin && Math.abs(off) <= g.thickness / 2 + margin;
+}
+
+/** True when p is on a door's leaf or swing arc (within pickRadius). */
+export function hitOpeningSwing(g: WallGeom, o: Opening, p: Vec2, pickRadius: number): boolean {
+  const sym = openingSymbol(g, o);
   if (sym.leaf) {
     const [hinge, tip] = sym.leaf;
     const d = sub(tip, hinge);

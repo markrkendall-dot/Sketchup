@@ -20,6 +20,8 @@ import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { noteDuplicateRoomName } from './fileActions';
+import { roomNameOf, runWallMove, wallSideNames } from './wallMove';
+import type { WallSide } from '../model/offset';
 import { releaseFocus } from './focus';
 
 const PHASES: Phase[] = ['existing', 'demo', 'new'];
@@ -363,11 +365,69 @@ function SelectionActions({
   );
 }
 
-/** Name of the room a face belongs to, or null (no face, or a face no room names). */
-function roomNameOf(level: Level, face: Face | null): string | null {
-  const room = face?.roomId ? level.rooms[face.roomId] : undefined;
-  const name = room?.name.trim();
-  return name ? name : null;
+/**
+ * Move a wall across by a typed distance, toward the room on either side (docs/REVIEW-2.md B1).
+ * Its neighbours slide so they stay attached and straight; collinear walls move with it. The status
+ * bar then gives the new net sizes of the rooms either side.
+ */
+function MoveWall({ level, wall }: { level: Level; wall: Wall }) {
+  const id = useId();
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const [text, setText] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const names = wallSideNames(level, getFaces(level, viewMode), wall);
+  const move = (side: WallSide) => {
+    let v: number;
+    try {
+      v = parseLength(text);
+    } catch (e) {
+      setError(text.trim() ? (e instanceof Error ? e.message : String(e)) : 'Type how far to move it.');
+      return;
+    }
+    if (!(v > 0)) {
+      setError('Must be greater than 0.');
+      return;
+    }
+    const what = `Moved the wall ${formatLength(v, denom)} toward ${names[side]}`;
+    const problem = runWallMove(level.id, wall.id, () => usePlanStore.getState().offsetWalls(level.id, [wall.id], v, side), what);
+    setError(problem);
+  };
+  return (
+    <div className={`field move-wall${error ? ' has-error' : ''}`}>
+      <label htmlFor={id}>Move</label>
+      <input
+        id={id}
+        className="length-input"
+        aria-label="Move"
+        aria-invalid={!!error}
+        value={text}
+        placeholder={`e.g. 6 or 1'-2"`}
+        spellCheck={false}
+        autoComplete="off"
+        onChange={(e) => {
+          setText(e.target.value);
+          setError(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            setText('');
+            setError(null);
+            releaseFocus(e.currentTarget);
+          }
+        }}
+      />
+      <div className="panel-buttons move-buttons">
+        {(['left', 'right'] as const).map((side) => (
+          <button key={side} type="button" onClick={() => move(side)} title={`Move the wall across, toward ${names[side]}`}>
+            toward {names[side]}
+          </button>
+        ))}
+      </div>
+      {error && <div className="field-error" role="alert">{error}</div>}
+      {!error && <div className="field-hint">Neighbouring walls stretch to stay attached. Roofs do not follow.</div>}
+    </div>
+  );
 }
 
 /**
@@ -452,6 +512,7 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
         hint={wall.kind === 'exterior' ? 'Both faces of an exterior wall show the siding.' : undefined}
       />
       <WallFaceLengths level={level} wall={wall} />
+      <MoveWall level={level} wall={wall} />
       <ReadOnly label="Openings">{openingCount}</ReadOnly>
     </>
   );

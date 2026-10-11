@@ -3,11 +3,11 @@ import type { WallGeom } from '../derive/openings';
 import type { Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | 'roof' | 'underlay' | 'gradePoint' | 'column' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'underlay' | 'gradePoint' | 'column' | OpeningToolName;
 /** Tools that work on the site (E, C); the others edit a level and are off in site mode. */
 export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column'];
-/** Tools allowed in site mode: select, the site tools. */
-export const isSiteModeTool = (tool: ToolName): boolean => tool === 'select' || SITE_TOOLS.includes(tool);
+/** Tools allowed in site mode: select, measure, the site tools. */
+export const isSiteModeTool = (tool: ToolName): boolean => tool === 'select' || tool === 'measure' || SITE_TOOLS.includes(tool);
 /** Shown in the status bar when a level tool is asked for in site mode. */
 export const SITE_MODE_TOOL_HINT = 'Choose a level to draw walls';
 /** Underlay tool modes: drag the image, or calibrate its scale / rotation from two clicked points. */
@@ -91,6 +91,16 @@ export interface OpeningPreview {
   problem: string | null;
 }
 
+/** Rectangle tool: the box about to be drawn (centerline corners, clockwise from the first click). */
+export interface RectPreview {
+  corners: [Vec2, Vec2, Vec2, Vec2];
+  thickness: number;
+  /** Its size as the status bar and the label say it, e.g. `12'-1" x 9'-5" inside`. */
+  label: string;
+  /** Both sizes come from the typed buffer. */
+  typed: boolean;
+}
+
 export interface Draft {
   /** World point under the pointer (raw, unsnapped). */
   cursor: Vec2 | null;
@@ -133,6 +143,13 @@ export interface Draft {
   columnKind: 'chimney' | 'post';
   /** Column tool: the column about to be placed, following the snapped cursor. */
   columnPreview: { at: Vec2; kind: 'chimney' | 'post'; width: number; depth: number } | null;
+  /** Rectangle tool: the first corner clicked, null when idle. */
+  rectStart: WallStart | null;
+  rectPreview: RectPreview | null;
+  /** Measure tool: the first point and the second (null while it follows the cursor). */
+  measure: { a: Vec2; b: Vec2 | null } | null;
+  /** Select tool: how far the current wall or corner drag has moved, e.g. `moved 6 1/2" east`. */
+  dragReadout: string | null;
 }
 
 export interface Selection {
@@ -337,6 +354,10 @@ export const emptyDraft = (): Draft => ({
   gradePending: null,
   columnKind: 'chimney',
   columnPreview: null,
+  rectStart: null,
+  rectPreview: null,
+  measure: null,
+  dragReadout: null,
 });
 
 export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], gradePoints: [], columns: [] };

@@ -216,6 +216,15 @@ describe('ghost snapping (level below)', () => {
     expect(r.wallId).toBe('w1');
   });
 
+  it('a ghost corner lying on one of this level\'s walls wins over the projection onto it (REVIEW-2 B2)', () => {
+    const own = level([node('n1', 0, 0), node('n2', 100, 0)], [wall('w1', 'n1', 'n2')]);
+    const r = snapPoint({ x: 30.3, y: 2.7 }, { ...ctx, level: own, ghostNodes: [{ x: 34, y: 0 }], ghostWalls: [] });
+    expect(r.kind).toBe('ghost-node');
+    expect(r.point).toEqual({ x: 34, y: 0 });
+    // Beyond the node radius the projection stays.
+    expect(snapPoint({ x: 20, y: 2 }, { ...ctx, level: own, ghostNodes: [{ x: 34, y: 0 }], ghostWalls: [] }).kind).toBe('wall');
+  });
+
   it('ghost snaps beat alignment guides and the grid', () => {
     // 4" from the ghost corner, and within 6px of the own node's x: ghost wins.
     const own = level([node('n3', 504, 900)], []);

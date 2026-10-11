@@ -126,6 +126,28 @@ Once the walls are in, these make the 3D model look like the house.
    demolished become one, with its new net area. Roofs and posts follow the view too, and walls
    rise to a roof only in the views where that roof is shown.
 
+## Editing walls
+
+- **Move a wall by a distance.** Select the wall; in the properties panel type the distance in
+  **Move** and click the side to move it to ("toward Living" / "toward Kitchen", named after the
+  rooms either side). The walls at its ends stretch or shorten so they stay attached and straight
+  (corners stay square), walls running straight on from it move with it, and windows and doors
+  keep their place along it. The status bar then gives both rooms' new net sizes. `Shift` + an
+  arrow key moves the selected walls 1" that way. A move that would put a wall on top of another,
+  or a corner whose walls meet at odd angles, is refused with a message. Roofs do not follow.
+- **Draw a box (`B`).** For a room, an addition or a garage: click a corner (it snaps like the
+  wall tool, including the corners of the level below), move the mouse toward where the box goes,
+  type the two sizes, `12' x 10'` (or `12' by 10'`, or `12'` Tab `10'`) and Enter; or click the
+  opposite corner. "Lengths to" applies: with inside face the room inside is exactly the typed
+  size. A side that lies along a wall already there reuses that wall. One undo step.
+- **Measure (`M`).** Click two points (the corners of wall faces snap, so inside corners measure
+  the room); the overlay shows the distance with its x and y parts, and the status bar keeps
+  "Measured 12'-6" (dx 10'-0", dy 7'-6")" until Esc. Dragging a wall or a corner with the select
+  tool shows how far it has moved in the status bar.
+- **Selecting a wall where a window is.** A click inside a window's or door's own opening selects
+  it; anywhere else on the wall selects the wall. Click a selected opening again to select its
+  wall.
+
 ## 3D and walk mode
 
 The **Split** and **3D** layouts (or the backtick key) show the model, built from the plan and
@@ -145,6 +167,16 @@ visible levels): to export the proposed design, switch to Proposed first.
 - **OBJ (.obj)**, in inches: when importing, set the units to inches.
 - Siding textures are not exported, colours are.
 
+## Export the plan
+
+**Export > Export plan (.svg)** saves the active level's 2D plan as a drawing for a contractor or a
+permit: the walls, openings, rooms with their names and areas, dimension labels, stairs and roofs
+exactly as the plan shows them in the current view mode (switch to Proposed or Existing first),
+without the selection or the image underlay, at 1/4" = 1'-0" (96 dpi), with a title block (plan
+name, level, view, scale, date, a scale bar and a north arrow). The SVG prints at that scale and
+opens in a browser or a drawing program. **Export plan (.png)** is the same drawing as an image at
+twice the resolution (48 pixels per foot).
+
 ## Keyboard shortcuts
 
 Press `?` in the app for the full list (it is generated from the same table the shortcuts run
@@ -154,6 +186,8 @@ keyboard back to the plan.
 | Keys | Action |
 | --- | --- |
 | `S` `W` `R` `D` `N` `P` `T` `K` `U` | Select, Wall, Room, Door, Window, Passage, Stairs, Roof, Underlay |
+| `B` | Box: four walls; click a corner, type `12' x 10'` (or `12'` Tab `10'`), Enter |
+| `M` | Measure between two points; Esc clears |
 | `E` `C` (Site tab only) | Grade point, Column (chimney; Tab before the click for a post) |
 | digits, `'`, `"`, space, `/`, then Enter | Type a length or a distance while drawing |
 | `Enter` or click | Walls: with nothing typed, commit the wall at the cursor; roof: close the outline |
@@ -165,6 +199,7 @@ keyboard back to the plan.
 | `Delete` | Delete the selection |
 | `Enter` / `F2` | Rename the selected room |
 | `Arrows` (`Shift`) | Nudge the selected underlay 1" (1') |
+| `Shift` + arrows | Move the selected walls 1" across, the way the arrow points |
 | `1` `2` `3` | Levels, bottom to top |
 | `V` | Cycle view: Existing, Proposed, All |
 | `O` / `G` | Ortho lock / grid |
@@ -338,7 +373,8 @@ level and a tape or a laser, and edit them in the Site tab.
    first-floor sill, corner to corner; thickness at a jamb. Set "Lengths to: outside face". Fix the
    main block if it is not square, then the basement walls.
 2. **The wing and the porch**, outside faces: size, where each starts, and where its roof
-   meets the wall. Move their walls by selecting the walls and typing positions in the panel; drag
+   meets the wall. Move their walls by selecting a wall and typing the distance in the panel's
+   Move field (see "Editing walls"); drag
    the roof outline's corners to match, or press "Fit to walls".
 3. **The windows and doors, by jamb distance** from the nearer corner's inside face to the near
    edge, then rough width, height and sill. The starter's positions are centres from photos; the
@@ -364,9 +400,11 @@ Set the view to **All** and **Draw as: new**, then:
 - **The porch.** Select the existing porch's three walls and its roof, **Mark demolish**. Draw the
   larger porch as new: its walls (with openings above the knee walls, or posts from the Site tab,
   `C`, Tab for a post), its roof, and any steps. The entry door stays unless you change it.
-- **The garage.** From the sketch: 24' x 26', 55' west of the house and 20' from the road. Draw its
-  walls on the First Floor as *new*, outside the house (the retaining walls themselves are not
-  modelled).
+- **The garage.** From the sketch: 24' x 26', 55' west of the house and 20' from the road. Draw it
+  on the First Floor as *new* with the Box tool (`B`, then `24' x 26'` and Enter), outside the house
+  (the retaining walls themselves are not modelled). A new room over the wing on the Second Floor
+  is the same: turn on "Show level below", press `B`, click the wing's corner and type its inside
+  size with Lengths to set to inside face.
 
 Existing then shows the house as it stands with the demolished porch and no extension; Proposed shows
 the extension and the new porch only; All shows both, the demolished parts dashed red and the new

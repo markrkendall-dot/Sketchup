@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
 import { defaultGradeElevation } from '../derive/site';
 import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
-import { add, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
+import { add, dist, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
 import type { Underlay, Vec2 } from '../model/types';
 import { formatPxScale, nearestAxis, pixelDistance } from '../model/underlay';
 import { formatLength, formatLengthCompact, parseLength } from '../model/units';
@@ -11,6 +11,7 @@ import {
   useUiStore,
   type Draft,
   type OpeningPreview,
+  type RectPreview,
   type UnderlayMode,
   type SnapResult,
   type Viewport,
@@ -118,6 +119,56 @@ function RubberBand({ preview, v, denom }: { preview: WallPreview; v: Viewport; 
           {wallPreviewText(preview, denom)}
         </text>
       </g>
+    </g>
+  );
+}
+
+/** Rectangle tool: the box's walls as one band (outside minus inside outline) and its size. */
+function RectGhost({ preview, v }: { preview: RectPreview; v: Viewport }) {
+  const xs = preview.corners.map((p) => p.x);
+  const ys = preview.corners.map((p) => p.y);
+  const h = preview.thickness / 2;
+  const box = (grow: number) => {
+    const a = worldToScreen(v, { x: Math.min(...xs) - grow, y: Math.min(...ys) - grow });
+    const b = worldToScreen(v, { x: Math.max(...xs) + grow, y: Math.max(...ys) + grow });
+    return `M${a.x},${a.y}H${b.x}V${b.y}H${a.x}Z`;
+  };
+  const inner = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) > preview.thickness;
+  const center = preview.corners.map((p) => worldToScreen(v, p));
+  const mid = worldToScreen(v, { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 });
+  return (
+    <g className={preview.typed ? 'rubber typed rect-ghost' : 'rubber rect-ghost'}>
+      <path className="rubber-body" d={box(h) + (inner ? box(-h) : '')} fillRule="evenodd" />
+      <polygon className="rubber-center" points={pts(center)} fill="none" />
+      <Pill at={mid} text={preview.label} className="measure-readout" />
+    </g>
+  );
+}
+
+/**
+ * Measure tool: a dimension line from the first point to the second (or the cursor) with its
+ * length, and dashed x and y legs with theirs.
+ */
+function MeasureOverlay({ a: wa, b: wb, v, denom }: { a: Vec2; b: Vec2; v: Viewport; denom: number }) {
+  const a = worldToScreen(v, wa);
+  const b = worldToScreen(v, wb);
+  const corner = worldToScreen(v, { x: wb.x, y: wa.y });
+  const along = sub(b, a);
+  const len = Math.hypot(along.x, along.y);
+  const n = len > 1e-6 ? perpLeft(scale(along, 1 / len)) : { x: 0, y: -1 };
+  const tick = (p: Vec2) => `M${p.x + n.x * 6},${p.y + n.y * 6}L${p.x - n.x * 6},${p.y - n.y * 6}`;
+  const dx = Math.abs(wb.x - wa.x);
+  const dy = Math.abs(wb.y - wa.y);
+  // Keep the main readout above the line on screen.
+  const off = scale(n.y > 0 ? scale(n, -1) : n, 16);
+  const legs = dx > 0.5 && dy > 0.5;
+  return (
+    <g className="measure">
+      {legs && <path className="measure-leg" d={`M${a.x},${a.y}L${corner.x},${corner.y}L${b.x},${b.y}`} />}
+      <path className="measure-line" d={`M${a.x},${a.y}L${b.x},${b.y}${tick(a)}${tick(b)}`} />
+      {legs && <Pill at={{ x: (a.x + corner.x) / 2, y: corner.y + (b.y > a.y ? -12 : 12) }} text={`dx ${formatLengthCompact(dx, denom)}`} className="measure-leg-label" />}
+      {legs && <Pill at={{ x: corner.x + (b.x > a.x ? 30 : -30), y: (corner.y + b.y) / 2 }} text={`dy ${formatLengthCompact(dy, denom)}`} className="measure-leg-label" />}
+      {len > 1 && <Pill at={add(midpoint(a, b), off)} text={formatLength(dist(wa, wb), denom)} className="measure-readout" />}
     </g>
   );
 }
@@ -380,6 +431,10 @@ export const Overlay = memo(function Overlay() {
   return (
     <g className="overlay" pointerEvents="none">
       {draft.wallPreview && <RubberBand preview={draft.wallPreview} v={v} denom={denom} />}
+      {tool === 'rect' && draft.rectStart && draft.rectPreview && <RectGhost preview={draft.rectPreview} v={v} />}
+      {tool === 'measure' && draft.measure && (draft.measure.b ?? draft.snap?.point) && (
+        <MeasureOverlay a={draft.measure.a} b={(draft.measure.b ?? draft.snap?.point)!} v={v} denom={denom} />
+      )}
       {draft.openingPreview && <OpeningGhost preview={draft.openingPreview} v={v} denom={denom} />}
       {draft.stairsPreview && <StairsGhost origin={draft.stairsPreview.origin} direction={draft.stairsPreview.direction} v={v} />}
       {tool === 'roof' && draft.roofPoints.length > 0 && <RoofDraft points={draft.roofPoints} cursor={draft.snap?.point ?? draft.cursor} v={v} />}

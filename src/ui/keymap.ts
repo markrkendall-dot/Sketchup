@@ -74,6 +74,8 @@ function cycleLayout(): void {
 export const KEY_BINDINGS: readonly KeyBinding[] = [
   tool('s', 'select', 'Select, move and delete: click a wall, corner, opening or room label; drag to move; drag empty space to box-select'),
   tool('w', 'wall', 'Draw walls: click to start, click or type a length for each wall; Esc, double-click or right-click ends the chain'),
+  tool('b', 'rect', "Draw a box of four walls: click a corner, move toward where it goes, type 12' x 10' (or 12' Tab 10') and Enter, or click the opposite corner; Lengths to applies"),
+  tool('m', 'measure', 'Measure: click two points (wall-face corners snap); the distance, dx and dy stay in the status bar until Esc'),
   tool('r', 'room', 'Name a room: click inside a closed area; click a label to select it, drag to move it, double-click to rename'),
   tool('d', 'door', 'Place a door: point at a wall, click to place, or type the distance from the nearer corner and press Enter'),
   tool('n', 'window', 'Place a window: point at a wall, click to place, or type the distance from the nearer corner and press Enter'),
@@ -101,6 +103,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: 'Delete', label: 'Delete the selection', group: 'While drawing' },
   { keys: 'Enter / F2', label: 'Rename the selected room', group: 'While drawing' },
   { keys: 'Arrows (Shift)', label: 'Nudge the selected underlay 1" (1\')', group: 'While drawing' },
+  { keys: 'Shift+arrows', label: 'Move the selected walls 1" across, the way the arrow points (one undo step each)', group: 'While drawing' },
+  { keys: "12' x 10', Tab", label: 'Box: the two sizes, separated by x, by, or Tab', group: 'While drawing' },
 
   {
     keys: '1 2 3',

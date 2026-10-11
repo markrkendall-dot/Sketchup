@@ -14,6 +14,13 @@ import { clearHistory, usePlanStore } from './store/planStore';
 import { useUiStore } from './store/uiStore';
 import { showNotice } from './ui/fileActions';
 import './index.css';
+import { PLAN_STYLES } from './editor2d/planStyles';
+
+// The plan layers' styles, shared with the plan export (editor2d/planStyles.ts).
+const planStyle = document.createElement('style');
+planStyle.dataset.homeplan = 'plan-styles';
+planStyle.textContent = PLAN_STYLES;
+document.head.appendChild(planStyle);
 
 declare global {
   interface Window {

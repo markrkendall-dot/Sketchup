@@ -14,6 +14,8 @@ import {
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint, type GhostWall } from '../snap';
 import { doorTool, passageTool, windowTool } from './openingTool';
+import { measureTool } from './measureTool';
+import { rectTool } from './rectTool';
 import { roofTool } from './roofTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
@@ -65,6 +67,8 @@ export interface Tool {
 const tools: Record<ToolName, Tool> = {
   select: selectTool,
   wall: wallTool,
+  rect: rectTool,
+  measure: measureTool,
   room: roomTool,
   door: doorTool,
   window: windowTool,

@@ -13,12 +13,14 @@ import { focusCanvas, releaseFocus } from './focus';
 const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = [
   { name: 'select', label: 'Select', key: 'S' },
   { name: 'wall', label: 'Wall', key: 'W' },
+  { name: 'rect', label: 'Box', key: 'B' },
   { name: 'room', label: 'Room', key: 'R' },
   { name: 'door', label: 'Door', key: 'D' },
   { name: 'window', label: 'Window', key: 'N' },
   { name: 'passage', label: 'Passage', short: 'Opening', key: 'P' },
   { name: 'stairs', label: 'Stairs', key: 'T' },
   { name: 'roof', label: 'Roof', key: 'K' },
+  { name: 'measure', label: 'Measure', short: 'Tape', key: 'M' },
   { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
 ];
 
@@ -29,6 +31,8 @@ const SITE_TOOL_BUTTONS: { name: ToolName; label: string; key: string; title: st
 ];
 
 const TOOL_TITLE: Partial<Record<ToolName, string>> = {
+  rect: "Box (B): click a corner, type 12' x 10' and Enter (or click the opposite corner) for four walls",
+  measure: 'Measure (M): click two points; the distance stays in the status bar until Esc',
   roof: 'Roof (K): click the outline corners on the outside wall faces, close on the first corner or Enter',
   underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
 };
@@ -63,6 +67,20 @@ function ExportMenu() {
     document.addEventListener('pointerdown', onDown);
     return () => document.removeEventListener('pointerdown', onDown);
   }, [open]);
+
+  const runPlan = async (format: 'svg' | 'png') => {
+    setBusy(true);
+    try {
+      const { downloadPlanExport } = await import('../io/exportPlan');
+      const ui = useUiStore.getState();
+      await downloadPlanExport(format, getPlan(), ui.activeLevelId, ui.viewMode);
+      setOpen(false);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const run = async (format: 'glb' | 'obj') => {
     setBusy(true);
@@ -112,6 +130,17 @@ function ExportMenu() {
           <p className="menu-note">Siding textures are not exported; colours are.</p>
           <p className="menu-note">
             Import in SketchUp: File &gt; Import, choose glTF; OBJ: set units to inches.
+          </p>
+          <button role="menuitem" disabled={busy} onClick={() => void runPlan('svg')}>
+            Export plan (.svg)
+            <small>The 2D plan as a drawing, 1/4" = 1'-0"</small>
+          </button>
+          <button role="menuitem" disabled={busy} onClick={() => void runPlan('png')}>
+            Export plan (.png)
+            <small>The same as an image at 2x (48 px per foot)</small>
+          </button>
+          <p className="menu-note">
+            Plan: {levels[active]?.name ?? 'the active level'} in the {VIEW_MODE_LABEL[viewMode]} view, with a title block.
           </p>
         </div>
       )}

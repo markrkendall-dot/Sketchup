@@ -523,6 +523,53 @@ right-click.
    the next start; direction persists.
 5. Click without typing commits at the snapped cursor.
 
+### Editing tools (docs/REVIEW-2.md batch B)
+
+- **Move a wall by a distance** (`model/offset.ts planWallOffset`, store `offsetWalls(levelId, ids,
+  distance, side)` / `shiftWalls(levelId, shifts)`, one undo step, null or the refusal message).
+  `side` is relative to each wall's a->b direction; the shift is the left normal times the distance
+  (negated for right). Walls collinear with a moved wall at its nodes move with it (followed node to
+  node; two shifts on one line refuse). Each node of a moved wall: where two moved walls meet at an
+  angle, the crossing of their target lines; with one target line and no other wall, the shift;
+  otherwise the target line crossed with the neighbour closest to perpendicular, every other
+  neighbour agreeing within 0.01" or "That corner has walls at odd angles; move its corner instead".
+  A wall that would shrink to nothing or turn round refuses; `movesCreateOverlap` (batch A) refuses
+  overlaps. Nodes move with `moveNodesInPlace` (openings keep their offset on the moved walls and
+  their distance from the fixed end on the stretched ones), then `normalizeLevel`. The wall panel
+  has "Move" plus two buttons named by `ui/wallMove.ts wallSideNames` (room, "outside", or "left /
+  right of wall"); `runWallMove` puts the rooms' new net sizes in the status bar. Shift+arrows in
+  the select tool shift the selected walls 1" (`nudgeShifts`: side by dot product, walls along the
+  arrow skipped).
+- **Box tool** (`tools/rectTool.ts`, B): first corner snaps like the wall tool (`ctx.snap`, no
+  ortho); the box goes toward the cursor's quadrant. The buffer holds two sizes split by `x`, `×`,
+  `by` (`lengthBuffer.ts splitSizePair`; Tab inserts ` x `). Typed sizes follow "Lengths to": each
+  side's centerline is the face size plus (inside) or minus (outside) half the thicknesses at its
+  two ends; a side through the first corner that lies along a visible wall takes that wall's
+  thickness. Parts of a side already covered by a visible wall are left out (reused); the rest go to
+  the store's `addWalls`, which dry-runs the segments on a copy of the level and adds all of them in
+  one set (one undo step) or none (overlap message, first corner kept).
+- **Measure tool** (`tools/measureTool.ts`, M): `measureSnap` takes the nearer of a wall-face
+  corner and a node, then the usual snaps, then face edges. `draft.measure {a, b}`; the second click
+  sets `draft.message` to "Measured …" (kept until Esc or the next measurement); the overlay draws
+  the dimension line and dashed dx / dy legs. No plan change. The select tool's wall and corner
+  drags put `draft.dragReadout` ("moved 6 1/2" east") in the status bar.
+- **Hit priority** (`selectTool.hitTest`): nodes, then an opening's own rectangle (`hitOpeningRect`:
+  jambs and wall faces plus 2 px), then walls, then door leaves and swings (`hitOpeningSwing`), then
+  room labels, stairs, roofs. A click (no drag) on the opening that is the whole selection selects
+  its wall; the status bar says "Click again for the wall" while one opening is selected.
+- **Plan export** (`io/exportPlan.ts`, loaded on first use): `PlanLayers` reads its stores through
+  `editor2d/layerStores.ts` (`useLayerPlan` / `useLayerUi`, the app's stores unless a
+  `LayerStoresContext` provider gives others). `planSvg(plan, levelId, viewMode)` renders the layers
+  with `renderToStaticMarkup` inside a provider of two throwaway zustand stores holding the plan and
+  a UI snapshot (no selection, hover, draft or underlay; zoom = `EXPORT_PX_PER_INCH` = 2, i.e. 1/4" =
+  1'-0" at 96 dpi). A server render reads a store's initial state, which for those stores is the
+  snapshot, so the layers needed no export props. The viewBox is the level's drawing bounds
+  (footprints, roofs with overhangs, stairs) plus 24" and a 96 px title block (plan, level, view,
+  scale, date, scale bar, north arrow turned by `site.northAngle`), in whole pixels, at least 560 px
+  wide; width and height are given in inches so it prints at scale. The layers' CSS lives in
+  `editor2d/planStyles.ts` (`PLAN_STYLES`: the plan colours on `:root` and the layer rules), which
+  `main.tsx` injects into the page and the export inlines. `planPng` draws the SVG on a canvas at 2x.
+
 ### Feet-inch parsing (`model/units.ts`)
 
 Whitespace-insensitive, case-insensitive, `ft`/`in` synonyms for `'`/`"`.
@@ -558,8 +605,8 @@ and focuses the canvas, so the next Ctrl+Z undoes the plan, not the text.
 
 ### Narrow windows
 
-Below 1100 px the toolbar drops the hotkey suffixes and uses short tool names (Image, Opening) so it
-stays within two rows (CSS only; the long names stay in the DOM, hidden). Below 900 px (`NARROW_QUERY`
+Below 1400 px the toolbar drops the hotkey suffixes (the tooltips keep them), and below 1100 px it
+also uses short tool names (Image, Opening, Tape) so it stays within two rows (CSS only; the long names stay in the DOM, hidden). Below 900 px (`NARROW_QUERY`
 in `uiStore.ts`, mirrored in `index.css`) the level bar and properties panel float over the plan
 instead of squeezing it, start closed, and toggle with the toolbar's Levels / Properties buttons or
 the `[` and `]` keys (`levelBarOpen` / `propertiesOpen`; the keys do nothing in a wide window). The

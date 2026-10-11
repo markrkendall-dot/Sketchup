@@ -4,7 +4,9 @@ import { wallPreviewText } from '../editor2d/previewLabel';
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import { formatLength } from '../model/units';
 import { usePlanStore } from '../store/planStore';
-import { useUiStore, type SnapKind, type ToolName, type UnderlayMode } from '../store/uiStore';
+import { selectionSize, useUiStore, type SnapKind, type ToolName, type UnderlayMode } from '../store/uiStore';
+import { measureText } from '../editor2d/tools/measureTool';
+import { OPENING_CYCLE_HINT } from '../editor2d/tools/selectTool';
 
 const SNAP_LABEL: Record<SnapKind, string> = {
   node: 'corner',
@@ -32,6 +34,14 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
   select: {
     idle: 'Click to select, drag to move, drag empty space to box-select.',
     busy: 'Click to select, drag to move, drag empty space to box-select.',
+  },
+  rect: {
+    idle: 'Click a corner of the box, or snap to one.',
+    busy: "Type 12' x 10' (or 12' Tab 10') and Enter, or click a corner.",
+  },
+  measure: {
+    idle: 'Click the first point to measure from.',
+    busy: 'Click the second point. Esc clears.',
   },
   room: {
     idle: 'Click a closed area to name it. Double-click a label to rename.',
@@ -82,8 +92,16 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: "Move to aim, type a length like 12'6 or 150 then Enter, or click. Enter or click commits at the cursor. X: interior/exterior. Esc to finish.",
   },
   select: {
-    idle: 'Click a wall, corner, opening or room label to select, drag to move, drag on empty space to box-select. Delete removes.',
-    busy: 'Click a wall, corner, opening or room label to select, drag to move, drag on empty space to box-select. Delete removes.',
+    idle: 'Click a wall, corner, opening or room label to select, drag to move, drag on empty space to box-select. Delete removes. Shift+arrows move the selected walls 1".',
+    busy: 'Click a wall, corner, opening or room label to select, drag to move, drag on empty space to box-select. Delete removes. Shift+arrows move the selected walls 1".',
+  },
+  rect: {
+    idle: 'Click the first corner of a box of four walls (it snaps like the wall tool, including the level below). X: interior/exterior.',
+    busy: "Move toward the side the box goes, then type the two sizes (12' x 10', 12' by 10', or 12' Tab 10') and Enter, or click the opposite corner. Lengths to applies: inside face gives the room's inside size. Esc cancels.",
+  },
+  measure: {
+    idle: 'Click two points to measure between them; corners of wall faces and walls snap. Nothing in the plan changes.',
+    busy: 'Click the second point. The distance stays in the status bar until Esc or the next measurement.',
   },
   room: {
     idle: 'Click inside a closed area to name it. Click a label to select, drag to move it, double-click to rename. Delete removes.',
@@ -186,7 +204,22 @@ function SnapKindLabel() {
 
 function PreviewLength({ denom }: { denom: number }) {
   const preview = useUiStore((s) => s.draft.wallPreview);
+  const box = useUiStore((s) => s.draft.rectPreview?.label);
+  if (box) return <span>Box: {box}</span>;
   return preview ? <span>Length: {wallPreviewText(preview, denom, false)}</span> : null;
+}
+
+/** Select tool: how far the current wall or corner drag has moved. */
+function DragReadout() {
+  const text = useUiStore((s) => s.draft.dragReadout);
+  return text ? <span className="drag-readout">{text}</span> : null;
+}
+
+/** Measure tool: the distance to the cursor while the second point is being chosen. */
+function MeasureLive({ denom }: { denom: number }) {
+  const a = useUiStore((s) => (s.activeTool === 'measure' && s.draft.measure && !s.draft.measure.b ? s.draft.measure.a : null));
+  const b = useUiStore((s) => s.draft.snap?.point ?? null);
+  return a && b ? <span className="measure-live">Distance {measureText(a, b, denom)}</span> : null;
 }
 
 export function StatusBar() {
@@ -195,7 +228,13 @@ export function StatusBar() {
   const error = useUiStore((s) => s.draft.error);
   const message = useUiStore((s) => s.draft.message);
   const drawing = useUiStore(
-    (s) => s.draft.wallStart !== null || s.draft.lengthBuffer !== '' || s.draft.roofPoints.length > 0 || s.draft.gradePending !== null,
+    (s) =>
+      s.draft.wallStart !== null ||
+      s.draft.lengthBuffer !== '' ||
+      s.draft.roofPoints.length > 0 ||
+      s.draft.gradePending !== null ||
+      s.draft.rectStart !== null ||
+      (s.draft.measure !== null && s.draft.measure.b === null),
   );
   const underlayPoints = useUiStore((s) => s.draft.underlayPoints.length);
   const kind = useUiStore((s) => s.nextWallKind);
@@ -241,6 +280,8 @@ export function StatusBar() {
   const notice = useUiStore((s) => s.notice);
   const layout = useUiStore((s) => s.layout);
   const walking = useUiStore((s) => s.cameraMode === 'walk');
+  // One opening selected (and nothing else): a second click on it selects its wall.
+  const oneOpening = useUiStore((s) => s.selection.openings.length === 1 && selectionSize(s.selection) === 1);
 
   let hint: { text: string; full: string; error: boolean };
   if (layout === '3d') {
@@ -252,6 +293,8 @@ export function StatusBar() {
     hint = { text, full, error };
   } else if (siteMode && tool === 'select') {
     hint = { text: SITE_SELECT_HINT[0], full: SITE_SELECT_HINT[1], error };
+  } else if (tool === 'select' && oneOpening) {
+    hint = { text: OPENING_CYCLE_HINT, full: `${OPENING_CYCLE_HINT}: a second click on the selected opening selects the wall it is in; dragging it slides it along the wall.`, error };
   } else {
     const phase = drawing ? 'busy' : 'idle';
     hint = { text: HINTS[tool][phase], full: FULL_HINTS[tool][phase], error };
@@ -262,6 +305,8 @@ export function StatusBar() {
       <CursorCoords denom={denom} />
       <SnapKindLabel />
       <PreviewLength denom={denom} />
+      <DragReadout />
+      <MeasureLive denom={denom} />
       {lengthBuffer && (
         <span className={error ? 'buffer error' : 'buffer'}>
           Typed: <code>{lengthBuffer}</code>

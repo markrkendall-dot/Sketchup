@@ -10,8 +10,7 @@ import { floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, stairSt
 import { add, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
-import { usePlanStore } from '../store/planStore';
-import { useUiStore, useViewportScale } from '../store/uiStore';
+import { useLayerPlan, useLayerUi } from './layerStores';
 import { outlinePath } from './outline';
 import { ROOM_AREA_DY, ROOM_NAME_DY } from './roomLabels';
 
@@ -34,14 +33,15 @@ const ROOM_TINTS = 4;
 export const HATCH_DEMO_ID = 'hp-hatch-demo';
 export const HATCH_CHIMNEY_ID = 'hp-hatch-chimney';
 
+const viewportScale = (s: { viewport: { k: number } }) => s.viewport.k;
 const pt = (p: Vec2) => `${p.x},${p.y}`;
 const segPath = (segs: readonly (readonly [Vec2, Vec2])[]) => segs.map(([p, q]) => `M${pt(p)}L${pt(q)}`).join('');
 const polyPath = (poly: readonly Vec2[]) => `M${poly.map(pt).join('L')}Z`;
 
 /** A wall's footprint in the current view mode (undefined while the wall is hidden). */
 function useFootprint(levelId: Id, wallId: Id | undefined): Footprint | undefined {
-  const viewMode = useUiStore((s) => s.viewMode);
-  return usePlanStore((s) => {
+  const viewMode = useLayerUi((s) => s.viewMode);
+  return useLayerPlan((s) => {
     const level = s.plan.levels[levelId];
     return level && wallId ? getFootprints(level, viewMode).get(wallId) : undefined;
   });
@@ -49,8 +49,8 @@ function useFootprint(levelId: Id, wallId: Id | undefined): Footprint | undefine
 
 /** Faces, open ends and room labels of a level in the current view mode (memoized). */
 function useFaceSet(levelId: Id): FaceSet | null {
-  const viewMode = useUiStore((s) => s.viewMode);
-  return usePlanStore((s) => {
+  const viewMode = useLayerUi((s) => s.viewMode);
+  return useLayerPlan((s) => {
     const level = s.plan.levels[levelId];
     return level ? getFaces(level, viewMode) : null;
   });
@@ -58,7 +58,7 @@ function useFaceSet(levelId: Id): FaceSet | null {
 
 /** Hatch pattern for demolished walls; sized in world units so it stays constant on screen. */
 const PatternDefs = memo(function PatternDefs() {
-  const k = useViewportScale();
+  const k = useLayerUi(viewportScale);
   const size = HATCH_PX / k;
   return (
     <defs>
@@ -119,13 +119,13 @@ interface StyleGroup {
 
 /** A level's walls, footprints and openings by wall in the current view mode, each by reference. */
 function useWallSources(levelId: Id) {
-  const viewMode = useUiStore((s) => s.viewMode);
-  const walls = usePlanStore((s) => s.plan.levels[levelId]?.walls);
-  const fps = usePlanStore((s) => {
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const walls = useLayerPlan((s) => s.plan.levels[levelId]?.walls);
+  const fps = useLayerPlan((s) => {
     const level = s.plan.levels[levelId];
     return level ? getFootprints(level, viewMode) : undefined;
   });
-  const byWall = usePlanStore((s) => {
+  const byWall = useLayerPlan((s) => {
     const level = s.plan.levels[levelId];
     return level ? getOpeningsByWall(level) : undefined;
   });
@@ -200,8 +200,8 @@ function useWallGroups(levelId: Id): StyleGroup[] {
 function useHighlightGroups(levelId: Id): StyleGroup[] {
   const { viewMode, walls, fps, byWall } = useWallSources(levelId);
   // Replaced only when the selection changes, so selecting it by reference is stable.
-  const selected = useUiStore((s) => s.selection.walls);
-  const hovered = useUiStore((s) => s.hover.wallId);
+  const selected = useLayerUi((s) => s.selection.walls);
+  const hovered = useLayerUi((s) => s.hover.wallId);
   return useMemo(() => {
     if (!walls || !fps || !byWall || (selected.length === 0 && !hovered)) return [];
     const map = new Map<string, StyleGroup>();
@@ -264,12 +264,12 @@ const WallsLayer = memo(function WallsLayer({ levelId }: { levelId: Id }) {
 });
 
 const OpeningShape = memo(function OpeningShape({ levelId, openingId }: { levelId: Id; openingId: Id }) {
-  const o = usePlanStore((s) => s.plan.levels[levelId]?.openings[openingId]);
-  const wall = usePlanStore((s) => (o ? s.plan.levels[levelId]?.walls[o.wallId] : undefined));
+  const o = useLayerPlan((s) => s.plan.levels[levelId]?.openings[openingId]);
+  const wall = useLayerPlan((s) => (o ? s.plan.levels[levelId]?.walls[o.wallId] : undefined));
   const fp = useFootprint(levelId, o?.wallId);
-  const viewMode = useUiStore((s) => s.viewMode);
-  const selected = useUiStore((s) => s.selection.openings.includes(openingId));
-  const hovered = useUiStore((s) => s.hover.openingId === openingId);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => s.selection.openings.includes(openingId));
+  const hovered = useLayerUi((s) => s.hover.openingId === openingId);
   const sym = useMemo(() => (fp && o ? openingSymbol(fp, o) : null), [fp, o]);
   if (!o || !sym || !isOpeningVisible(o, wall, viewMode)) return null;
   const cls = `opening opening-${o.type} phase-${o.phase}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}`;
@@ -331,18 +331,18 @@ function labelSpan(fp: Footprint, wall: Wall, openings: readonly Opening[] | und
 
 const DimensionLabel = memo(function DimensionLabel({ levelId, wallId }: { levelId: Id; wallId: Id }) {
   const fp = useFootprint(levelId, wallId);
-  const wall = usePlanStore((s) => s.plan.levels[levelId]?.walls[wallId]);
-  const openings = usePlanStore((s) => {
+  const wall = useLayerPlan((s) => s.plan.levels[levelId]?.walls[wallId]);
+  const openings = useLayerPlan((s) => {
     const level = s.plan.levels[levelId];
     return level ? getOpeningsByWall(level).get(wallId) : undefined;
   });
-  const viewMode = useUiStore((s) => s.viewMode);
+  const viewMode = useLayerUi((s) => s.viewMode);
   const visible = !!wall && isVisible(wall.phase, viewMode);
-  const k = useViewportScale();
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const k = useLayerUi(viewportScale);
+  const denom = useLayerPlan((s) => s.plan.settings.precisionDenominator);
   // An exterior wall with a face on exactly one side is labeled on the other (outside) side: +1
   // is the left (+normal) side, the default; -1 the right.
-  const side = usePlanStore((s): 1 | -1 => {
+  const side = useLayerPlan((s): 1 | -1 => {
     const level = s.plan.levels[levelId];
     if (!level || level.walls[wallId]?.kind !== 'exterior') return 1;
     const bits = faceSides(getFaces(level, viewMode), level).get(wallId) ?? 0;
@@ -370,10 +370,10 @@ const DimensionLabel = memo(function DimensionLabel({ levelId, wallId }: { level
 });
 
 const NodeDot = memo(function NodeDot({ levelId, nodeId }: { levelId: Id; nodeId: Id }) {
-  const visible = useUiStore((s) => s.selection.nodes.includes(nodeId) || s.hover.nodeId === nodeId);
-  const selected = useUiStore((s) => s.selection.nodes.includes(nodeId));
-  const node = usePlanStore((s) => s.plan.levels[levelId]?.nodes[nodeId]);
-  const k = useViewportScale();
+  const visible = useLayerUi((s) => s.selection.nodes.includes(nodeId) || s.hover.nodeId === nodeId);
+  const selected = useLayerUi((s) => s.selection.nodes.includes(nodeId));
+  const node = useLayerPlan((s) => s.plan.levels[levelId]?.nodes[nodeId]);
+  const k = useLayerUi(viewportScale);
   if (!visible || !node) return null;
   return (
     <circle
@@ -394,7 +394,7 @@ const NO_RECORD: Readonly<Record<Id, unknown>> = {};
  * only changes, e.g. on every step of a corner drag. The children select their own entity.
  */
 function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs'): Id[] {
-  return usePlanStore(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
+  return useLayerPlan(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
 }
 
 /** Stairs symbol: outline, nosing lines, and an UP arrow pointing the way the flight climbs. */
@@ -415,11 +415,11 @@ export function StairsGlyph({ sym, k, className, id }: { sym: StairsSymbol; k: n
 }
 
 const StairsShape = memo(function StairsShape({ levelId, stairsId }: { levelId: Id; stairsId: Id }) {
-  const st = usePlanStore((s) => s.plan.levels[levelId]?.stairs[stairsId]);
-  const ftf = usePlanStore((s) => floorToFloor(s.plan, levelId));
-  const viewMode = useUiStore((s) => s.viewMode);
-  const selected = useUiStore((s) => s.selection.stairs.includes(stairsId));
-  const k = useViewportScale();
+  const st = useLayerPlan((s) => s.plan.levels[levelId]?.stairs[stairsId]);
+  const ftf = useLayerPlan((s) => floorToFloor(s.plan, levelId));
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => s.selection.stairs.includes(stairsId));
+  const k = useLayerUi(viewportScale);
   const sym = useMemo(() => (st ? stairsSymbol(st, stairSteps(ftf).risers) : null), [st, ftf]);
   if (!st || !sym || !isVisible(st.phase, viewMode)) return null;
   return <StairsGlyph sym={sym} k={k} id={stairsId} className={`stairs phase-${st.phase}${selected ? ' is-selected' : ''}`} />;
@@ -443,13 +443,13 @@ const StairsLayer = memo(function StairsLayer({ levelId }: { levelId: Id }) {
  * usual "open to below" mark, and the treads below it, faint. Nothing where the flight is not cut.
  */
 const StairHolesLayer = memo(function StairHolesLayer({ levelId }: { levelId: Id }) {
-  const belowId = usePlanStore((s) => {
+  const belowId = useLayerPlan((s) => {
     const i = s.plan.levelOrder.indexOf(levelId);
     return i > 0 ? s.plan.levelOrder[i - 1] : null;
   });
-  const stairs = usePlanStore((s) => (belowId ? s.plan.levels[belowId]?.stairs : undefined));
-  const ftf = usePlanStore((s) => (belowId ? floorToFloor(s.plan, belowId) : 0));
-  const viewMode = useUiStore((s) => s.viewMode);
+  const stairs = useLayerPlan((s) => (belowId ? s.plan.levels[belowId]?.stairs : undefined));
+  const ftf = useLayerPlan((s) => (belowId ? floorToFloor(s.plan, belowId) : 0));
+  const viewMode = useLayerUi((s) => s.viewMode);
   const holes = useMemo(() => {
     const out: { id: Id; start: number; outline: string; cross: string; treads: string }[] = [];
     for (const st of Object.values(stairs ?? {})) {
@@ -497,9 +497,9 @@ function roofPaths(roof: Roof) {
  * below's roof, faint and never selected.
  */
 const RoofShape = memo(function RoofShape({ levelId, roofId, ghost }: { levelId: Id; roofId: Id; ghost?: boolean }) {
-  const roof = usePlanStore((s) => s.plan.levels[levelId]?.roofs?.[roofId]);
-  const viewMode = useUiStore((s) => s.viewMode);
-  const selected = useUiStore((s) => !ghost && s.selection.roofs.includes(roofId));
+  const roof = useLayerPlan((s) => s.plan.levels[levelId]?.roofs?.[roofId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => !ghost && s.selection.roofs.includes(roofId));
   if (!roof || !isVisible(roof.phase, viewMode)) return null;
   const d = roofPaths(roof);
   return (
@@ -514,7 +514,7 @@ const RoofShape = memo(function RoofShape({ levelId, roofId, ghost }: { levelId:
 
 /** Corner handles of a selected roof, constant on screen (only these follow the zoom). */
 function RoofHandles({ outline }: { outline: readonly Vec2[] }) {
-  const k = useViewportScale();
+  const k = useLayerUi(viewportScale);
   return (
     <>
       {outline.map((p, i) => (
@@ -531,7 +531,7 @@ function RoofHandles({ outline }: { outline: readonly Vec2[] }) {
  */
 const RoofsLayer = memo(function RoofsLayer({ levelId }: { levelId: Id }) {
   const ids = useEntityIds(levelId, 'roofs');
-  const tool = useUiStore((s) => s.activeTool);
+  const tool = useLayerUi((s) => s.activeTool);
   if (ids.length === 0) return null;
   return (
     <g className="layer-roofs" pointerEvents={tool === 'select' || tool === 'roof' ? 'auto' : 'none'}>
@@ -544,11 +544,11 @@ const RoofsLayer = memo(function RoofsLayer({ levelId }: { levelId: Id }) {
 
 /** The roofs of the level below, faint, so an upper floor is drawn knowing where a lower roof is. */
 const RoofGhostLayer = memo(function RoofGhostLayer({ levelId }: { levelId: Id }) {
-  const belowId = usePlanStore((s) => {
+  const belowId = useLayerPlan((s) => {
     const i = s.plan.levelOrder.indexOf(levelId);
     return i > 0 ? s.plan.levelOrder[i - 1] : null;
   });
-  const ids = usePlanStore(useShallow((s) => Object.keys((belowId && s.plan.levels[belowId]?.roofs) || NO_RECORD)));
+  const ids = useLayerPlan(useShallow((s) => Object.keys((belowId && s.plan.levels[belowId]?.roofs) || NO_RECORD)));
   if (!belowId || ids.length === 0) return null;
   return (
     <g className="layer-roof-ghost" pointerEvents="none" data-ghost-roofs={belowId}>
@@ -561,8 +561,8 @@ const RoofGhostLayer = memo(function RoofGhostLayer({ levelId }: { levelId: Id }
 
 /** The level has an underlay and it is not hidden. */
 function useUnderlayShown(levelId: Id): boolean {
-  const has = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
-  const show = useUiStore((s) => s.showUnderlay);
+  const has = useLayerPlan((s) => !!s.plan.levels[levelId]?.underlay);
+  const show = useLayerUi((s) => s.showUnderlay);
   return has && show;
 }
 
@@ -573,10 +573,10 @@ function useUnderlayShown(levelId: Id): boolean {
  * active, or it is selected and unlocked. Never in the wall tool, and snapping ignores it.
  */
 const UnderlayLayer = memo(function UnderlayLayer({ levelId }: { levelId: Id }) {
-  const u = usePlanStore((s) => s.plan.levels[levelId]?.underlay);
-  const show = useUiStore((s) => s.showUnderlay);
-  const tool = useUiStore((s) => s.activeTool);
-  const selected = useUiStore((s) => s.underlaySelected);
+  const u = useLayerPlan((s) => s.plan.levels[levelId]?.underlay);
+  const show = useLayerUi((s) => s.showUnderlay);
+  const tool = useLayerUi((s) => s.activeTool);
+  const selected = useLayerUi((s) => s.underlaySelected);
   if (!u || !show) return null;
   const interactive = !u.locked && (tool === 'underlay' || (selected && tool === 'select'));
   const transform = `translate(${u.origin.x} ${u.origin.y}) rotate(${u.rotation}) scale(${u.scale})`;
@@ -626,8 +626,8 @@ function findFace(set: FaceSet, id: string): Face | undefined {
 
 /** A primitive value of the level's face set in the current view mode, `fallback` when absent. */
 function useFaceSetValue<T extends string | number | boolean | null>(levelId: Id, pick: (set: FaceSet, level: Level) => T, fallback: T): T {
-  const viewMode = useUiStore((s) => s.viewMode);
-  return usePlanStore((s) => {
+  const viewMode = useLayerUi((s) => s.viewMode);
+  return useLayerPlan((s) => {
     const level = s.plan.levels[levelId];
     return level ? pick(getFaces(level, viewMode), level) : fallback;
   });
@@ -635,8 +635,8 @@ function useFaceSetValue<T extends string | number | boolean | null>(levelId: Id
 
 /** Ids of an array-valued part of the level's face set, as the same array while they are unchanged. */
 function useFaceSetIds(levelId: Id, pick: (set: FaceSet) => readonly Id[]): readonly Id[] {
-  const viewMode = useUiStore((s) => s.viewMode);
-  return usePlanStore(
+  const viewMode = useLayerUi((s) => s.viewMode);
+  return useLayerPlan(
     useShallow((s) => {
       const level = s.plan.levels[levelId];
       return level ? pick(getFaces(level, viewMode)) : NO_IDS;
@@ -661,7 +661,7 @@ const RoomFill = memo(function RoomFill({ levelId, faceId, tint }: { levelId: Id
     return f ? facePath(f) : null;
   }, null);
   const roomId = useFaceSetValue(levelId, (set) => findFace(set, faceId)?.roomId ?? null, null);
-  const selected = useUiStore((s) => roomId !== null && s.selection.rooms.includes(roomId));
+  const selected = useLayerUi((s) => roomId !== null && s.selection.rooms.includes(roomId));
   if (d === null) return null;
   return (
     <path
@@ -707,7 +707,7 @@ function RoomLabelGroup({
   /** Null hides the area line. */
   area: string | null;
 }) {
-  const k = useViewportScale();
+  const k = useLayerUi(viewportScale);
   if (name === null && area === null) return null;
   return (
     <g className={className} data-room-id={roomId} data-face-id={faceId} transform={`translate(${x} ${y}) scale(${1 / k})`}>
@@ -761,14 +761,14 @@ const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; fa
     const id = findFace(set, faceId)?.roomId;
     return id && level.rooms[id] ? id : null;
   }, null);
-  const name = usePlanStore((s) => (roomId ? (s.plan.levels[levelId]?.rooms[roomId]?.name ?? null) : null));
+  const name = useLayerPlan((s) => (roomId ? (s.plan.levels[levelId]?.rooms[roomId]?.name ?? null) : null));
   const span = useFaceSetValue(levelId, (set) => {
     const f = findFace(set, faceId);
     return f ? faceSpan(f) : 0;
   }, 0);
-  const k = useViewportScale();
-  const selected = useUiStore((s) => roomId !== null && s.selection.rooms.includes(roomId));
-  const editing = useUiStore((s) => roomId !== null && s.roomEdit?.roomId === roomId);
+  const k = useLayerUi(viewportScale);
+  const selected = useLayerUi((s) => roomId !== null && s.selection.rooms.includes(roomId));
+  const editing = useLayerUi((s) => roomId !== null && s.roomEdit?.roomId === roomId);
   if (editing) return null;
   const px = span * k;
   return (
@@ -786,13 +786,13 @@ const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; fa
 
 /** A room whose anchor is in no face, or in one an earlier room names: a warning at its anchor. */
 const OrphanLabel = memo(function OrphanLabel({ levelId, roomId }: { levelId: Id; roomId: Id }) {
-  const room = usePlanStore((s) => s.plan.levels[levelId]?.rooms[roomId]);
+  const room = useLayerPlan((s) => s.plan.levels[levelId]?.rooms[roomId]);
   const shared = useFaceSetValue(levelId, (set, level) => {
     const r = level.rooms[roomId];
     return !!r && !!faceAt(set, r.anchor);
   }, false);
-  const selected = useUiStore((s) => s.selection.rooms.includes(roomId));
-  const editing = useUiStore((s) => s.roomEdit?.roomId === roomId);
+  const selected = useLayerUi((s) => s.selection.rooms.includes(roomId));
+  const editing = useLayerUi((s) => s.roomEdit?.roomId === roomId);
   if (!room || editing) return null;
   return (
     <RoomLabelGroup
@@ -808,8 +808,8 @@ const OrphanLabel = memo(function OrphanLabel({ levelId, roomId }: { levelId: Id
 });
 
 const RoomAnchor = memo(function RoomAnchor({ levelId, roomId }: { levelId: Id; roomId: Id }) {
-  const anchor = usePlanStore((s) => s.plan.levels[levelId]?.rooms[roomId]?.anchor);
-  const k = useViewportScale();
+  const anchor = useLayerPlan((s) => s.plan.levels[levelId]?.rooms[roomId]?.anchor);
+  const k = useLayerUi(viewportScale);
   return anchor ? <circle className="room-anchor" cx={anchor.x} cy={anchor.y} r={3.5 / k} /> : null;
 });
 
@@ -823,8 +823,8 @@ const RoomAnchor = memo(function RoomAnchor({ levelId, roomId }: { levelId: Id; 
 const RoomLabelsLayer = memo(function RoomLabelsLayer({ levelId }: { levelId: Id }) {
   const faceIds = useFaceSetIds(levelId, faceIdsOf);
   const orphanIds = useFaceSetIds(levelId, orphanIdsOf);
-  const tool = useUiStore((s) => s.activeTool);
-  const selected = useUiStore((s) => s.selection.rooms);
+  const tool = useLayerUi((s) => s.activeTool);
+  const selected = useLayerUi((s) => s.selection.rooms);
   if (faceIds.length === 0 && orphanIds.length === 0) return null;
   const pickable = tool === 'select' || tool === 'room';
   return (
@@ -845,8 +845,8 @@ const RoomLabelsLayer = memo(function RoomLabelsLayer({ levelId }: { levelId: Id
 /** Small red circles on wall ends that join nothing (the loop is not closed there). */
 const OpenEndsLayer = memo(function OpenEndsLayer({ levelId }: { levelId: Id }) {
   const set = useFaceSet(levelId);
-  const nodes = usePlanStore((s) => s.plan.levels[levelId]?.nodes);
-  const k = useViewportScale();
+  const nodes = useLayerPlan((s) => s.plan.levels[levelId]?.nodes);
+  const k = useLayerUi(viewportScale);
   if (!set || !nodes || set.openEnds.length === 0) return null;
   return (
     <g className="layer-open-ends" pointerEvents="none">
@@ -896,8 +896,8 @@ const NodesLayer = memo(function NodesLayer({ levelId }: { levelId: Id }) {
  * floors. Openings are ignored; the view mode still applies.
  */
 export const GhostLevel = memo(function GhostLevel({ levelId }: { levelId: Id }) {
-  const level = usePlanStore((s) => s.plan.levels[levelId]);
-  const viewMode = useUiStore((s) => s.viewMode);
+  const level = useLayerPlan((s) => s.plan.levels[levelId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
   const d = useMemo(() => {
     if (!level) return '';
     let path = '';
@@ -917,10 +917,10 @@ export const GhostLevel = memo(function GhostLevel({ levelId }: { levelId: Id })
 
 /** A grade point: a small triangle with its elevation beside it, constant on screen. */
 const GradePointShape = memo(function GradePointShape({ pointId }: { pointId: Id }) {
-  const g = usePlanStore((s) => s.plan.site.gradePoints[pointId]);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const selected = useUiStore((s) => s.selection.gradePoints.includes(pointId));
-  const k = useViewportScale();
+  const g = useLayerPlan((s) => s.plan.site.gradePoints[pointId]);
+  const denom = useLayerPlan((s) => s.plan.settings.precisionDenominator);
+  const selected = useLayerUi((s) => s.selection.gradePoints.includes(pointId));
+  const k = useLayerUi(viewportScale);
   if (!g) return null;
   return (
     <g className={`grade-point${selected ? ' is-selected' : ''}`} data-grade-id={pointId} transform={`translate(${g.at.x} ${g.at.y}) scale(${1 / k})`}>
@@ -934,9 +934,9 @@ const GradePointShape = memo(function GradePointShape({ pointId }: { pointId: Id
 
 /** A column's plan rectangle: chimneys hatched like brick, posts solid; demo hatched red, new green. */
 const ColumnShape = memo(function ColumnShape({ columnId }: { columnId: Id }) {
-  const c = usePlanStore((s) => s.plan.site.columns[columnId]);
-  const viewMode = useUiStore((s) => s.viewMode);
-  const selected = useUiStore((s) => s.selection.columns.includes(columnId));
+  const c = useLayerPlan((s) => s.plan.site.columns[columnId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => s.selection.columns.includes(columnId));
   if (!c || !isVisible(c.phase, viewMode)) return null;
   return (
     <g
@@ -951,8 +951,8 @@ const ColumnShape = memo(function ColumnShape({ columnId }: { columnId: Id }) {
 
 /** The site's grade points and columns (picking is done by the select tool, hitSite). */
 const SiteLayer = memo(function SiteLayer() {
-  const pointIds = usePlanStore(useShallow((s) => Object.keys(s.plan.site.gradePoints)));
-  const columnIds = usePlanStore(useShallow((s) => Object.keys(s.plan.site.columns)));
+  const pointIds = useLayerPlan(useShallow((s) => Object.keys(s.plan.site.gradePoints)));
+  const columnIds = useLayerPlan(useShallow((s) => Object.keys(s.plan.site.columns)));
   return (
     <g className="layer-site" pointerEvents="none">
       <g className="layer-columns">
@@ -971,7 +971,7 @@ const SiteLayer = memo(function SiteLayer() {
 
 /** Every level's roofs as faint ghosts, so a post is placed knowing where the roofs are. */
 const SiteRoofGhosts = memo(function SiteRoofGhosts() {
-  const keys = usePlanStore(
+  const keys = useLayerPlan(
     useShallow((s) => s.plan.levelOrder.flatMap((lid) => Object.keys(s.plan.levels[lid]?.roofs ?? NO_RECORD).map((rid) => `${lid}|${rid}`))),
   );
   if (keys.length === 0) return null;
@@ -987,7 +987,7 @@ const SiteRoofGhosts = memo(function SiteRoofGhosts() {
 
 /** What the 2D view shows in site mode: the first floor as a ghost, the roofs faintly, the site layer on top. */
 export const SiteView = memo(function SiteView() {
-  const ghostId = usePlanStore((s) => siteGhostLevelId(s.plan));
+  const ghostId = useLayerPlan((s) => siteGhostLevelId(s.plan));
   return (
     <>
       <PatternDefs />

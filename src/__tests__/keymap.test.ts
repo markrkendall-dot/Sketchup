@@ -56,6 +56,8 @@ describe('KEY_BINDINGS', () => {
       [key('p'), 'passage'],
       [key('t'), 'stairs'],
       [key('k'), 'roof'],
+      [key('b'), 'box'],
+      [key('m'), 'measure'],
       [key('u'), 'underlay'],
       [key('1'), 'level'],
       [key('3'), 'level'],
@@ -84,6 +86,10 @@ describe('KEY_BINDINGS', () => {
   it('runs tool, level and toggle bindings', () => {
     const ui = useUiStore.getState;
     ui().setActiveLevel(usePlanStore.getState().plan.levelOrder[1]);
+    bindingFor(key('b'))!.run!(new KeyboardEventLike('b') as unknown as KeyboardEvent);
+    expect(ui().activeTool).toBe('rect');
+    bindingFor(key('m'))!.run!(new KeyboardEventLike('m') as unknown as KeyboardEvent);
+    expect(ui().activeTool).toBe('measure');
     bindingFor(key('s'))!.run!(new KeyboardEventLike('s') as unknown as KeyboardEvent);
     expect(ui().activeTool).toBe('select');
     bindingFor(key('1'))!.run!(new KeyboardEventLike('1') as unknown as KeyboardEvent);
