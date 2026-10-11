@@ -5,15 +5,16 @@ import { coreInterval, jambDistances, liveFootprints } from '../derive/openings'
 import { PHASE_LABEL } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
+import { columnDefaults, groundAt } from '../derive/site';
 import { floorToFloor, STAIRS_LIMITS, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool } from '../editor2d/tools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
 import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
-import { MAX_ROOF_PITCH, wallLength } from '../model/plan';
+import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
-import type { Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Stairs, Wall, WallKind } from '../model/types';
+import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -216,14 +217,34 @@ function common<T, V>(items: T[], get: (t: T) => V): V | null {
 
 // ---------------------------------------------------------------------------------------------
 
-function SelectionActions({ levelId, walls, openings, stairs, roofs }: { levelId: Id; walls: Wall[]; openings: Opening[]; stairs: Stairs[]; roofs: Roof[] }) {
+function SelectionActions({
+  levelId,
+  walls,
+  openings,
+  stairs,
+  roofs,
+  columns,
+}: {
+  levelId: Id;
+  walls: Wall[];
+  openings: Opening[];
+  stairs: Stairs[];
+  roofs: Roof[];
+  columns: Column[];
+}) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const items = [...walls, ...openings, ...stairs, ...roofs];
+  const items = [...walls, ...openings, ...stairs, ...roofs, ...columns];
   if (items.length === 0 && selectionSize(selection) === 0) return null;
   const allDemo = items.length > 0 && items.every((i) => i.phase === 'demo');
-  const ids = { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id), roofs: roofs.map((r) => r.id) };
+  const ids = {
+    walls: walls.map((w) => w.id),
+    openings: openings.map((o) => o.id),
+    stairs: stairs.map((st) => st.id),
+    roofs: roofs.map((r) => r.id),
+    columns: columns.map((c) => c.id),
+  };
   return (
     <div className="panel-actions">
       {items.length > 0 && (
@@ -806,6 +827,124 @@ function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
   );
 }
 
+const columnKindOptions: { value: Column['kind']; label: string }[] = [
+  { value: 'chimney', label: 'Chimney' },
+  { value: 'post', label: 'Post' },
+];
+
+function GradePointProps({ point }: { point: GradePoint }) {
+  const updateGradePoint = usePlanStore((s) => s.updateGradePoint);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const firstTop = usePlanStore((s) => {
+    const id = s.plan.levelOrder[1] ?? s.plan.levelOrder[0];
+    return id ? getLevelElevations(s.plan)[id]?.floorTop : undefined;
+  });
+  return (
+    <>
+      <h3>Grade point</h3>
+      <LengthField
+        label="Elevation"
+        value={point.elevation}
+        bound="any"
+        onCommit={(v) => void (v !== null && updateGradePoint(point.id, { elevation: v }))}
+        hint="Height of the ground here, in feet and inches; a minus sign is allowed."
+      />
+      {firstTop !== undefined && (
+        <ReadOnly label="Against the first floor">
+          {point.elevation === firstTop ? 'level with it' : `${formatLength(Math.abs(point.elevation - firstTop), denom)} ${point.elevation < firstTop ? 'below' : 'above'}`}
+        </ReadOnly>
+      )}
+      <ReadOnly label="Position">
+        x {formatLength(point.at.x, denom)}, y {formatLength(point.at.y, denom)}
+      </ReadOnly>
+      <p className="panel-note">Drag it with the select tool to move it. The ground between grade points is interpolated.</p>
+    </>
+  );
+}
+
+function ColumnProps({ column }: { column: Column }) {
+  const updateColumn = usePlanStore((s) => s.updateColumn);
+  const ground = usePlanStore((s) => groundAt(s.plan, column.at));
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const set = (patch: Partial<Column>): string | null => {
+    const problem = columnProblem({ ...column, ...patch });
+    if (problem) return problem[0].toUpperCase() + problem.slice(1) + '.';
+    updateColumn(column.id, patch);
+    return null;
+  };
+  const length = (key: 'width' | 'depth' | 'base' | 'top', label: string, bound: 'positive' | 'any', hint?: string) => (
+    <LengthField label={label} value={column[key]} bound={bound} onCommit={(v) => (v === null ? null : set({ [key]: v }))} hint={hint} />
+  );
+  const resetHeights = () => {
+    const plan = usePlanStore.getState().plan;
+    const def = columnDefaults(plan, column.kind, column.at, column.phase);
+    updateColumn(column.id, { base: def.base, top: def.top });
+  };
+  return (
+    <>
+      <h3>{column.kind === 'chimney' ? 'Chimney' : 'Post'}</h3>
+      <SelectField label="Kind" value={column.kind} options={columnKindOptions} onChange={(kind) => updateColumn(column.id, { kind })} />
+      {length('width', 'Width', 'positive', 'Along the plan x axis before rotation.')}
+      {length('depth', 'Depth', 'positive', 'Along the plan y axis before rotation.')}
+      <NumberField label="Rotation" value={column.rotation} onCommit={(v) => updateColumn(column.id, { rotation: v })} hint="Degrees, clockwise on the plan." />
+      {length('base', 'Base', 'any', 'Bottom, as an elevation (the ground here is shown below).')}
+      {length('top', 'Top', 'any', 'Top, as an elevation.')}
+      <SelectField label="Phase" value={column.phase} options={phaseOptions} onChange={(phase) => updateColumn(column.id, { phase })} />
+      <ReadOnly label="Height">{formatLength(column.top - column.base, denom)}</ReadOnly>
+      <ReadOnly label="Position">
+        x {formatLength(column.at.x, denom)}, y {formatLength(column.at.y, denom)}
+      </ReadOnly>
+      <div className="panel-buttons">
+        <button
+          onClick={resetHeights}
+          title={column.kind === 'chimney' ? 'Base 12" below the ground here, top 48" above the highest ridge' : 'Base on the ground here, top at the lowest roof underside over it'}
+        >
+          Reset heights
+        </button>
+      </div>
+      <p className="panel-note">Ground here: {formatLength(ground, denom)}. Drag it with the select tool to move it.</p>
+    </>
+  );
+}
+
+/** Nothing selected in site mode: the north angle, the counts and the way to start over. */
+function SiteProps({ site }: { site: Site }) {
+  const setNorthAngle = usePlanStore((s) => s.setNorthAngle);
+  const clearGradePoints = usePlanStore((s) => s.clearGradePoints);
+  const points = Object.keys(site.gradePoints).length;
+  const columns = Object.keys(site.columns).length;
+  return (
+    <>
+      <h3>Site</h3>
+      <NumberField
+        label="North angle"
+        value={site.northAngle}
+        onCommit={(v) => setNorthAngle(v)}
+        hint="Degrees clockwise from the top of the plan to true north. The 3D sun follows it."
+      />
+      <div className="panel-buttons">
+        <button className={site.northAngle === 0 ? 'active' : ''} aria-pressed={site.northAngle === 0} onClick={() => setNorthAngle(0)} title="North is up the plan (the road side of the house)">
+          Road is north
+        </button>
+      </div>
+      <ReadOnly label="Grade points">{points}</ReadOnly>
+      <ReadOnly label="Columns">{columns}</ReadOnly>
+      <div className="panel-buttons">
+        <button
+          className="danger"
+          disabled={points === 0}
+          onClick={() => {
+            if (window.confirm(`Remove all ${points} grade ${points === 1 ? 'point' : 'points'}? The ground goes flat again. (Undo brings them back.)`)) clearGradePoints();
+          }}
+        >
+          Clear grade points
+        </button>
+      </div>
+      <p className="panel-note">E places a grade point (click, type the elevation, Enter). C places a chimney or post. The ground is interpolated between grade points.</p>
+    </>
+  );
+}
+
 function MixedProps({
   levelId,
   sel,
@@ -813,6 +952,7 @@ function MixedProps({
   openings,
   stairs,
   roofs,
+  columns,
 }: {
   levelId: Id;
   sel: Selection;
@@ -820,6 +960,7 @@ function MixedProps({
   openings: Opening[];
   stairs: Stairs[];
   roofs: Roof[];
+  columns: Column[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const parts: string[] = [];
@@ -827,9 +968,11 @@ function MixedProps({
   if (openings.length) parts.push(`${openings.length} ${openings.length === 1 ? 'opening' : 'openings'}`);
   if (stairs.length) parts.push(`${stairs.length} stairs`);
   if (roofs.length) parts.push(`${roofs.length} ${roofs.length === 1 ? 'roof' : 'roofs'}`);
+  if (columns.length) parts.push(`${columns.length} ${columns.length === 1 ? 'column' : 'columns'}`);
+  if (sel.gradePoints.length) parts.push(`${sel.gradePoints.length} grade ${sel.gradePoints.length === 1 ? 'point' : 'points'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const items = [...walls, ...openings, ...stairs, ...roofs];
+  const items = [...walls, ...openings, ...stairs, ...roofs, ...columns];
   return (
     <>
       <h3>{parts.join(', ')}</h3>
@@ -841,13 +984,19 @@ function MixedProps({
           onChange={(p) =>
             setPhase(
               levelId,
-              { walls: walls.map((w) => w.id), openings: openings.map((o) => o.id), stairs: stairs.map((st) => st.id), roofs: roofs.map((r) => r.id) },
+              {
+                walls: walls.map((w) => w.id),
+                openings: openings.map((o) => o.id),
+                stairs: stairs.map((st) => st.id),
+                roofs: roofs.map((r) => r.id),
+                columns: columns.map((c) => c.id),
+              },
               p,
             )
           }
         />
       )}
-      {items.length === 0 && <p className="panel-note">Drag corners with the select tool to move them.</p>}
+      {items.length === 0 && <p className="panel-note">{sel.gradePoints.length ? 'Drag grade points with the select tool to move them.' : 'Drag corners with the select tool to move them.'}</p>}
     </>
   );
 }
@@ -1203,6 +1352,8 @@ export function PropertiesPanel() {
   const underlaySelected = useUiStore((s) => s.underlaySelected);
   const underlayTool = useUiStore((s) => s.activeTool === 'underlay');
   const level = usePlanStore((s) => s.plan.levels[levelId]);
+  const site = usePlanStore((s) => s.plan.site);
+  const siteMode = useUiStore((s) => s.siteMode);
   if (!level) return <aside className="side-panel" />;
   const walls = sel.walls.map((id) => level.walls[id]).filter(Boolean);
   const openings = sel.openings.map((id) => level.openings[id]).filter(Boolean);
@@ -1210,6 +1361,8 @@ export function PropertiesPanel() {
   const rooms = sel.rooms.map((id) => level.rooms[id]).filter(Boolean);
   const stairs = sel.stairs.map((id) => level.stairs[id]).filter(Boolean);
   const roofs = sel.roofs.map((id) => level.roofs[id]).filter(Boolean);
+  const gradePoints = sel.gradePoints.map((id) => site.gradePoints[id]).filter(Boolean);
+  const columns = sel.columns.map((id) => site.columns[id]).filter(Boolean);
   const live: Selection = {
     nodes,
     walls: walls.map((w) => w.id),
@@ -1217,11 +1370,14 @@ export function PropertiesPanel() {
     rooms: rooms.map((r) => r.id),
     stairs: stairs.map((st) => st.id),
     roofs: roofs.map((r) => r.id),
+    gradePoints: gradePoints.map((g) => g.id),
+    columns: columns.map((c) => c.id),
   };
   const total = selectionSize(live);
 
   let body: ReactNode;
-  if (total === 0 && (underlayTool || (underlaySelected && level.underlay))) body = <UnderlayProps key={level.id} level={level} />;
+  if (total === 0 && siteMode) body = <SiteProps key="site" site={site} />;
+  else if (total === 0 && (underlayTool || (underlaySelected && level.underlay))) body = <UnderlayProps key={level.id} level={level} />;
   else if (total === 0) body = <LevelProps key={level.id} level={level} />;
   else if (total === 1 && walls.length === 1) body = <WallProps key={walls[0].id} level={level} wall={walls[0]} />;
   else if (total === 1 && openings.length === 1)
@@ -1229,15 +1385,17 @@ export function PropertiesPanel() {
   else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
   else if (total === 1 && stairs.length === 1) body = <StairsProps key={stairs[0].id} level={level} stairs={stairs[0]} />;
   else if (total === 1 && roofs.length === 1) body = <RoofProps key={roofs[0].id} level={level} roof={roofs[0]} />;
+  else if (total === 1 && gradePoints.length === 1) body = <GradePointProps key={gradePoints[0].id} point={gradePoints[0]} />;
+  else if (total === 1 && columns.length === 1) body = <ColumnProps key={columns[0].id} column={columns[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} columns={columns} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} columns={columns} />}
       </div>
     </aside>
   );

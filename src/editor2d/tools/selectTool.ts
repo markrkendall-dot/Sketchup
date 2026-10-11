@@ -160,8 +160,8 @@ function pruneSelection(ctx: ToolContext): void {
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
   const stairs = sel.stairs.filter((id) => level.stairs[id]);
   const roofs = sel.roofs.filter((id) => level.roofs[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ nodes, walls, openings, rooms, stairs, roofs });
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs });
   }
 }
 

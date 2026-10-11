@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
+import { defaultGradeElevation } from '../derive/site';
 import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
 import { add, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
 import type { Underlay, Vec2 } from '../model/types';
@@ -336,6 +337,32 @@ function RoofDraft({ points, cursor, v }: { points: Vec2[]; cursor: Vec2 | null;
   );
 }
 
+/** Grade point tool: the clicked spot with the elevation box (what is typed, or the default as a placeholder). */
+function GradeDraft({ at, text, error, v, placeholder }: { at: Vec2; text: string; error: boolean; v: Viewport; placeholder: string }) {
+  const p = worldToScreen(v, at);
+  return (
+    <g className="grade-draft">
+      <path className="grade-draft-tri" d={`M${p.x} ${p.y - 8}L${p.x + 7.5} ${p.y + 6}L${p.x - 7.5} ${p.y + 6}Z`} />
+      <LengthBox text={text} at={p} error={error} placeholder={placeholder} />
+    </g>
+  );
+}
+
+/** Column tool: the column about to be placed (rotated rectangle at the snapped cursor), in screen space. */
+function ColumnGhost({ at, kind, width, depth, v }: { at: Vec2; kind: 'chimney' | 'post'; width: number; depth: number; v: Viewport }) {
+  const p = worldToScreen(v, at);
+  const w = Math.max(width * v.k, 6);
+  const d = Math.max(depth * v.k, 6);
+  return (
+    <g className={`column-ghost column-${kind}`} transform={`translate(${p.x} ${p.y})`}>
+      <rect x={-w / 2} y={-d / 2} width={w} height={d} />
+      <text x={w / 2 + 6} y={-d / 2 - 4}>
+        {kind === 'chimney' ? 'Chimney (Tab: post)' : 'Post (Tab: chimney)'}
+      </text>
+    </g>
+  );
+}
+
 export const Overlay = memo(function Overlay() {
   const draft = useUiStore((s) => s.draft);
   const v = useUiStore((s) => s.viewport);
@@ -345,6 +372,7 @@ export const Overlay = memo(function Overlay() {
   const levelId = useUiStore((s) => s.activeLevelId);
   const underlay = usePlanStore((s) => s.plan.levels[levelId]?.underlay);
   const calibrating = tool === 'underlay' && underlayMode !== 'move' && !!underlay;
+  const gradeDefault = usePlanStore((s) => (tool === 'gradePoint' ? formatLength(defaultGradeElevation(s.plan), denom) : ''));
   const cursor = draft.cursor ? worldToScreen(v, draft.cursor) : null;
   const box = draft.box
     ? { a: worldToScreen(v, draft.box.a), b: worldToScreen(v, draft.box.b) }
@@ -355,6 +383,10 @@ export const Overlay = memo(function Overlay() {
       {draft.openingPreview && <OpeningGhost preview={draft.openingPreview} v={v} denom={denom} />}
       {draft.stairsPreview && <StairsGhost origin={draft.stairsPreview.origin} direction={draft.stairsPreview.direction} v={v} />}
       {tool === 'roof' && draft.roofPoints.length > 0 && <RoofDraft points={draft.roofPoints} cursor={draft.snap?.point ?? draft.cursor} v={v} />}
+      {tool === 'column' && draft.columnPreview && <ColumnGhost {...draft.columnPreview} v={v} />}
+      {tool === 'gradePoint' && draft.gradePending && (
+        <GradeDraft at={draft.gradePending} text={draft.lengthBuffer} error={draft.error} v={v} placeholder={gradeDefault} />
+      )}
       {draft.snap && <SnapMarker snap={draft.snap} v={v} />}
       {box && (
         <rect
@@ -366,7 +398,7 @@ export const Overlay = memo(function Overlay() {
         />
       )}
       {calibrating && <UnderlayCalibration u={underlay} mode={underlayMode} draft={draft} v={v} denom={denom} />}
-      {cursor && draft.lengthBuffer && !calibrating && <LengthBox text={draft.lengthBuffer} at={cursor} error={draft.error} />}
+      {cursor && draft.lengthBuffer && !calibrating && tool !== 'gradePoint' && <LengthBox text={draft.lengthBuffer} at={cursor} error={draft.error} />}
     </g>
   );
 });

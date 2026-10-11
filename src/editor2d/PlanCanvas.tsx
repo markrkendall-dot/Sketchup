@@ -10,7 +10,7 @@ import {
 import { getPlan, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { Overlay } from './Overlay';
-import { GhostLevel, PlanLayers } from './PlanLayers';
+import { GhostLevel, PlanLayers, SiteView } from './PlanLayers';
 import { dispatchPointer, type ToolPointerEvent } from './tools';
 import { fitLevel, initialViewport, screenToWorld, visibleBounds, zoomAt, type Size } from './viewport';
 
@@ -71,6 +71,27 @@ const Grid = memo(function Grid({ size }: { size: Size }) {
   );
 });
 
+/** North arrow in the canvas corner (site mode): points to true north, turned by the plan's north angle. */
+const NorthArrow = memo(function NorthArrow() {
+  const angle = usePlanStore((s) => s.plan.site.northAngle);
+  const r = (angle * Math.PI) / 180;
+  // The N sits past the tip and stays upright.
+  const tip = { x: Math.sin(r) * 36, y: -Math.cos(r) * 36 };
+  return (
+    <g className="north-arrow" transform="translate(52 62)" pointerEvents="none" data-north-angle={angle}>
+      <circle className="north-ring" r={28} />
+      <g transform={`rotate(${angle})`}>
+        <path className="north-head" d="M0 -24L8 10L0 4L-8 10Z" />
+      </g>
+      <g transform={`translate(${tip.x} ${tip.y})`}>
+        <text className="north-label" textAnchor="middle" dominantBaseline="central">
+          N
+        </text>
+      </g>
+    </g>
+  );
+});
+
 export function PlanCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const panRef = useRef<PanState | null>(null);
@@ -82,6 +103,7 @@ export function PlanCanvas() {
   const activeTool = useUiStore((s) => s.activeTool);
   const underlayMode = useUiStore((s) => s.underlayMode);
   const showBelow = useUiStore((s) => s.showLevelBelow);
+  const siteMode = useUiStore((s) => s.siteMode);
   const belowId = usePlanStore((s) => {
     const i = s.plan.levelOrder.indexOf(levelId);
     return i > 0 ? s.plan.levelOrder[i - 1] : null;
@@ -178,6 +200,7 @@ export function PlanCanvas() {
     // Opening tools: no ghost while the pointer is off the canvas.
     if (ui.draft.openingPreview) ui.patchDraft({ openingPreview: null });
     if (ui.draft.stairsPreview) ui.patchDraft({ stairsPreview: null });
+    if (ui.draft.columnPreview) ui.patchDraft({ columnPreview: null });
   };
 
   const cursor =
@@ -207,9 +230,16 @@ export function PlanCanvas() {
       <rect className="plan-bg" width="100%" height="100%" />
       <Grid size={size} />
       <g transform={`translate(${viewport.tx} ${viewport.ty}) scale(${viewport.k})`}>
-        {showBelow && belowId && <GhostLevel levelId={belowId} />}
-        {levelId && <PlanLayers levelId={levelId} />}
+        {siteMode ? (
+          <SiteView />
+        ) : (
+          <>
+            {showBelow && belowId && <GhostLevel levelId={belowId} />}
+            {levelId && <PlanLayers levelId={levelId} />}
+          </>
+        )}
       </g>
+      {siteMode && <NorthArrow />}
       <Overlay />
     </svg>
   );

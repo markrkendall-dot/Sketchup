@@ -1,0 +1,341 @@
+import { getFootprints } from '../../derive/footprint';
+import { columnDefaults, defaultGradeElevation, pointInColumn, siteGhostLevelId } from '../../derive/site';
+import { isVisible } from '../../derive/phase';
+import { add, dist, sub } from '../../model/geometry';
+import type { Id, Site, Vec2, ViewMode } from '../../model/types';
+import { formatLength, tryParseLength } from '../../model/units';
+import { pauseHistory, resumeHistory } from '../../store/planStore';
+import { EMPTY_SELECTION, selectionSize, type Selection, type SnapResult } from '../../store/uiStore';
+import { faceSnapSources, snapFaceCorner, snapFaceEdge, snapPoint } from '../snap';
+import type { Tool, ToolContext, ToolPointerEvent } from './index';
+import { applyBufferKey } from './lengthBuffer';
+
+// The site tools (DESIGN.md "Site and terrain"): grade point (E), column (C), and the select tool
+// as it works in site mode. All of them work on plan.site, over the ghost of the first floor.
+
+const DRAG_THRESHOLD_PX = 3;
+/** Pick radius of a grade point's triangle, in screen px. */
+export const GRADE_PICK_PX = 10;
+/** A column is picked within this many screen px of its rectangle. */
+export const COLUMN_PICK_PX = 4;
+
+export type SiteHit = { kind: 'gradePoint'; id: Id } | { kind: 'column'; id: Id } | null;
+
+/**
+ * Grade points first (within GRADE_PICK_PX of the marker), then columns (inside the rectangle
+ * grown by COLUMN_PICK_PX; the most recently added on top). Elements hidden in `viewMode` are
+ * never hit; grade points belong to no phase.
+ */
+export function hitSite(site: Site, p: Vec2, k: number, viewMode: ViewMode = 'all'): SiteHit {
+  let best: SiteHit = null;
+  let bestD = GRADE_PICK_PX / k;
+  for (const g of Object.values(site.gradePoints)) {
+    const d = dist(g.at, p);
+    if (d <= bestD) {
+      bestD = d;
+      best = { kind: 'gradePoint', id: g.id };
+    }
+  }
+  if (best) return best;
+  const cols = Object.values(site.columns).reverse();
+  const c = cols.find((col) => isVisible(col.phase, viewMode) && pointInColumn(col, p, COLUMN_PICK_PX / k));
+  return c ? { kind: 'column', id: c.id } : null;
+}
+
+/**
+ * Snap for the site tools: corners and faces of the first floor's walls (the ghost under the site
+ * layer), then that level's nodes, midpoints and wall lines, then alignment guides and the grid.
+ * No ortho lock: there is nothing being drawn from.
+ */
+export function siteSnap(ctx: ToolContext, raw: Vec2): SnapResult {
+  const plan = ctx.plan();
+  const ui = ctx.ui();
+  const level = plan.levels[siteGhostLevelId(plan) ?? ctx.levelId] ?? ctx.level();
+  const k = ui.viewport.k;
+  const src = faceSnapSources(getFootprints(level, ui.viewMode), level.walls);
+  const corner = snapFaceCorner(raw, src, k);
+  if (corner) return corner;
+  const std = snapPoint(raw, { level, k, snapGrid: plan.settings.snapGrid, orthoLock: false, shift: false, viewMode: ui.viewMode });
+  if (std.kind === 'node') return { ...std, nodeId: undefined, wallId: undefined };
+  return snapFaceEdge(raw, src, k) ?? { ...std, nodeId: undefined, wallId: undefined };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Grade point tool
+
+function elevationText(ctx: ToolContext, elevation: number): string {
+  return formatLength(elevation, ctx.plan().settings.precisionDenominator);
+}
+
+function placeGradePoint(ctx: ToolContext): void {
+  const ui = ctx.ui();
+  const d = ui.draft;
+  const at = d.gradePending;
+  if (!at) return;
+  let elevation = defaultGradeElevation(ctx.plan());
+  if (d.lengthBuffer.trim() !== '') {
+    const typed = tryParseLength(d.lengthBuffer);
+    if (typed === null) {
+      ui.patchDraft({ error: true, message: `Can't read "${d.lengthBuffer}" as an elevation.` });
+      return;
+    }
+    elevation = typed;
+  }
+  const id = ctx.actions.addGradePoint({ at, elevation });
+  if (!id) {
+    ui.patchDraft({ error: true, message: 'Could not place a grade point here.' });
+    return;
+  }
+  ui.setSelection({ ...EMPTY_SELECTION, gradePoints: [id] });
+  ui.patchDraft({ gradePending: null, lengthBuffer: '', error: false, message: `Grade point at ${elevationText(ctx, elevation)}.` });
+}
+
+/**
+ * Grade point tool (E in site mode): click the spot, then type its elevation in feet and inches
+ * (a minus sign is allowed; below the first floor is negative) and press Enter. With nothing typed
+ * Enter uses the first floor's floor top. Esc clears the typed elevation, then the spot.
+ */
+export const gradePointTool: Tool = {
+  onPointerDown(e, ctx) {
+    if (e.button !== 0) return;
+    const ui = ctx.ui();
+    const snap = siteSnap(ctx, e.world);
+    ui.patchDraft({ cursor: e.world, snap, gradePending: snap.point, lengthBuffer: '', error: false, message: null });
+  },
+
+  onPointerMove(e, ctx) {
+    const ui = ctx.ui();
+    // While an elevation is being typed the marker stays on the clicked spot.
+    ui.patchDraft({ cursor: e.world, snap: ui.draft.gradePending ? null : siteSnap(ctx, e.world) });
+  },
+
+  onPointerUp() {},
+  onDoubleClick() {},
+
+  onKeyDown(e, ctx) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const ui = ctx.ui();
+    const d = ui.draft;
+    if (e.key === 'Escape') {
+      if (d.lengthBuffer) ui.patchDraft({ lengthBuffer: '', error: false, message: null });
+      else if (d.gradePending) ui.patchDraft({ gradePending: null, error: false, message: null });
+      else return false;
+      return true;
+    }
+    if (!d.gradePending) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && ui.selection.gradePoints.length) {
+        ctx.actions.deleteGradePoints(ui.selection.gradePoints);
+        ui.clearSelection();
+        return true;
+      }
+      return false;
+    }
+    if (e.key === 'Enter') {
+      placeGradePoint(ctx);
+      return true;
+    }
+    const next = applyBufferKey(d.lengthBuffer, e.key);
+    if (next !== null) {
+      ui.patchDraft({ lengthBuffer: next, error: false, message: null });
+      return true;
+    }
+    return e.key === 'Backspace';
+  },
+
+  cancel(ctx) {
+    ctx.ui().patchDraft({ gradePending: null, lengthBuffer: '', snap: null, error: false });
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// Column tool
+
+function columnPreview(ctx: ToolContext, at: Vec2, kind: 'chimney' | 'post') {
+  const ui = ctx.ui();
+  const def = columnDefaults(ctx.plan(), kind, at, ui.drawPhase);
+  ui.patchDraft({ columnKind: kind, columnPreview: { at, kind, width: def.width, depth: def.depth } });
+}
+
+/**
+ * Column tool (C in site mode): the column follows the snapped cursor; click places it with the
+ * defaults of its kind in the toolbar's "Draw as" phase, Tab toggles chimney / post before the
+ * click. Size, heights and rotation are then edited in the properties panel.
+ */
+export const columnTool: Tool = {
+  onPointerDown(e, ctx) {
+    if (e.button !== 0) return;
+    const ui = ctx.ui();
+    const snap = siteSnap(ctx, e.world);
+    const kind = ui.draft.columnKind;
+    const def = columnDefaults(ctx.plan(), kind, snap.point, ui.drawPhase);
+    const id = ctx.actions.addColumn({ at: snap.point, kind, phase: ui.drawPhase, ...def });
+    if (!id) {
+      ui.patchDraft({ error: true, message: 'Could not place a column here.' });
+      return;
+    }
+    ui.setSelection({ ...EMPTY_SELECTION, columns: [id] });
+    ui.patchDraft({ cursor: e.world, snap, error: false, message: `${kind === 'chimney' ? 'Chimney' : 'Post'} placed. Set its size and heights in the properties panel.` });
+    columnPreview(ctx, snap.point, kind);
+  },
+
+  onPointerMove(e, ctx) {
+    const snap = siteSnap(ctx, e.world);
+    ctx.ui().patchDraft({ cursor: e.world, snap });
+    columnPreview(ctx, snap.point, ctx.ui().draft.columnKind);
+  },
+
+  onPointerUp() {},
+  onDoubleClick() {},
+
+  onKeyDown(e, ctx) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const ui = ctx.ui();
+    if (e.key === 'Tab') {
+      const kind = ui.draft.columnKind === 'chimney' ? 'post' : 'chimney';
+      const at = ui.draft.columnPreview?.at ?? ui.draft.snap?.point ?? ui.draft.cursor ?? { x: 0, y: 0 };
+      ui.patchDraft({ message: `Next: ${kind === 'chimney' ? 'chimney' : 'post'}. Click to place it.`, error: false });
+      columnPreview(ctx, at, kind);
+      return true;
+    }
+    if (e.key === 'Escape' && ui.draft.message) {
+      ui.patchDraft({ error: false, message: null });
+      return true;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && ui.selection.columns.length) {
+      ctx.actions.deleteColumns(ui.selection.columns);
+      ui.clearSelection();
+      return true;
+    }
+    return false;
+  },
+
+  cancel(ctx) {
+    ctx.ui().patchDraft({ columnPreview: null, snap: null });
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// Select tool in site mode
+
+type SiteDrag =
+  | { kind: 'move'; startScreen: Vec2; grab: Vec2; points: Record<Id, Vec2>; columns: Record<Id, Vec2>; started: boolean }
+  | { kind: 'box'; a: Vec2; additive: boolean };
+
+let drag: SiteDrag | null = null;
+
+const toggle = (list: Id[], id: Id) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
+function finishDrag(): void {
+  if (drag?.kind === 'move' && drag.started) resumeHistory();
+}
+
+/** Select, move and delete grade points and columns. The wall, opening, room, stairs and roof picking is off. */
+export const siteSelectTool: Tool = {
+  onPointerDown(e: ToolPointerEvent, ctx) {
+    if (e.button !== 0) return;
+    const ui = ctx.ui();
+    const site = ctx.plan().site;
+    const sel = ui.selection;
+    const hit = hitSite(site, e.world, ui.viewport.k, ui.viewMode);
+    if (!hit) {
+      if (!e.shiftKey) ui.clearSelection();
+      drag = { kind: 'box', a: e.world, additive: e.shiftKey };
+      return;
+    }
+    const key = hit.kind === 'gradePoint' ? 'gradePoints' : 'columns';
+    if (e.shiftKey) {
+      ui.setSelection({ ...sel, [key]: toggle(sel[key], hit.id) });
+      drag = null;
+      return;
+    }
+    const next: Selection = sel[key].includes(hit.id) ? sel : { ...EMPTY_SELECTION, [key]: [hit.id] };
+    if (next !== sel) ui.setSelection(next);
+    const points: Record<Id, Vec2> = {};
+    const columns: Record<Id, Vec2> = {};
+    for (const id of next.gradePoints) if (site.gradePoints[id]) points[id] = { ...site.gradePoints[id].at };
+    for (const id of next.columns) if (site.columns[id]) columns[id] = { ...site.columns[id].at };
+    drag = { kind: 'move', startScreen: e.screen, grab: e.world, points, columns, started: false };
+  },
+
+  onPointerMove(e, ctx) {
+    const ui = ctx.ui();
+    if (!drag) {
+      ui.patchDraft({ cursor: e.world, snap: null });
+      return;
+    }
+    if (drag.kind === 'box') {
+      ui.patchDraft({ cursor: e.world, box: { a: drag.a, b: e.world } });
+      return;
+    }
+    if (!drag.started && dist(e.screen, drag.startScreen) < DRAG_THRESHOLD_PX) return;
+    const grid = ctx.plan().settings.snapGrid;
+    const round = (v: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
+    const d = sub(e.world, drag.grab);
+    const step = { x: round(d.x), y: round(d.y) };
+    const moved = (o: Record<Id, Vec2>) => Object.fromEntries(Object.entries(o).map(([id, p]) => [id, add(p, step)]));
+    ui.patchDraft({ cursor: e.world, snap: null });
+    const before = ctx.plan();
+    ctx.actions.moveSiteItems(moved(drag.points), moved(drag.columns));
+    if (!drag.started && ctx.plan() !== before) {
+      // The first set that changes the plan is tracked; the rest fold into it (one undo step).
+      drag.started = true;
+      pauseHistory();
+    }
+  },
+
+  onPointerUp(e, ctx) {
+    const ui = ctx.ui();
+    if (drag?.kind === 'box') {
+      const { a } = drag;
+      const b = e.world;
+      const minX = Math.min(a.x, b.x);
+      const maxX = Math.max(a.x, b.x);
+      const minY = Math.min(a.y, b.y);
+      const maxY = Math.max(a.y, b.y);
+      if (Math.max(maxX - minX, maxY - minY) * ui.viewport.k > DRAG_THRESHOLD_PX) {
+        const inside = (p: Vec2) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+        const site = ctx.plan().site;
+        const gradePoints = Object.values(site.gradePoints).filter((g) => inside(g.at)).map((g) => g.id);
+        const columns = Object.values(site.columns).filter((c) => isVisible(c.phase, ui.viewMode) && inside(c.at)).map((c) => c.id);
+        const sel = ui.selection;
+        ui.setSelection(
+          drag.additive
+            ? { ...sel, gradePoints: [...new Set([...sel.gradePoints, ...gradePoints])], columns: [...new Set([...sel.columns, ...columns])] }
+            : { ...EMPTY_SELECTION, gradePoints, columns },
+        );
+      }
+      ui.patchDraft({ box: null });
+    } else finishDrag();
+    drag = null;
+  },
+
+  onDoubleClick() {},
+
+  onKeyDown(e, ctx) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const ui = ctx.ui();
+    const sel = ui.selection;
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (!selectionSize(sel)) return false;
+      ctx.actions.deleteEntities(ctx.levelId, { nodes: [], walls: [], gradePoints: sel.gradePoints, columns: sel.columns });
+      ui.clearSelection();
+      return true;
+    }
+    if (e.key === 'Escape') {
+      if (drag) {
+        siteSelectTool.cancel(ctx);
+        return true;
+      }
+      if (!selectionSize(sel)) return false;
+      ui.clearSelection();
+      return true;
+    }
+    return false;
+  },
+
+  cancel(ctx) {
+    finishDrag();
+    drag = null;
+    ctx.ui().patchDraft({ box: null, snap: null });
+  },
+};

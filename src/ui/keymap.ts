@@ -53,6 +53,19 @@ const tool = (key: string, name: ToolName, label: string): KeyBinding => ({
   whileDrawing: true,
 });
 
+/** A tool that only exists in site mode (E, C); elsewhere the key does nothing. */
+const siteTool = (key: string, name: ToolName, label: string): KeyBinding => ({
+  keys: key.toUpperCase(),
+  label,
+  group: 'Tools',
+  combos: [key],
+  run: () => {
+    if (!useUiStore.getState().siteMode) return false;
+    switchTool(name);
+  },
+  whileDrawing: true,
+});
+
 function cycleLayout(): void {
   const ui = useUiStore.getState();
   ui.setLayout(LAYOUTS[(LAYOUTS.indexOf(ui.layout) + 1) % LAYOUTS.length]);
@@ -67,6 +80,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   tool('p', 'passage', 'Place a passage (an opening without a door), the same way as a door'),
   tool('t', 'stairs', 'Place stairs: move the mouse the way they go up, click to place the bottom step; edit the size in the properties panel'),
   tool('k', 'roof', 'Draw a roof: click the outline corners (they snap to the outside wall faces), click the first corner or press Enter to close; set the shape, ridge and slope in the properties panel'),
+  siteTool('e', 'gradePoint', 'Site only: place a grade point: click a spot on the ground, type its elevation (-4, -6\'4), Enter'),
+  siteTool('c', 'column', 'Site only: place a chimney; Tab before the click switches to a post'),
   tool('u', 'underlay', 'Image underlay: load, move, scale by two points; lock it, then trace walls with W'),
 
   { keys: "12'6  150  6 1/2\"", label: "Type a length (walls), or the distance from the nearer corner's inside face to the near edge (doors, windows, passages); Enter commits", group: 'While drawing' },

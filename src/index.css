@@ -1629,3 +1629,141 @@ button.primary:hover:not(:disabled) {
 .ridge-buttons button {
   font-size: 12px;
 }
+
+/* Site (grade points, columns, north) --------------------------------------------------------- */
+
+/* The first floor under the site layer: clearer than the level-below ghost. */
+.site-ghost .ghost-wall {
+  fill: rgba(91, 97, 112, 0.22);
+  stroke: rgba(63, 70, 86, 0.8);
+  stroke-width: 1.2;
+  stroke-dasharray: none;
+}
+
+.hatch-chimney-bg {
+  fill: #f3ddd5;
+}
+
+.hatch-chimney-line {
+  stroke: #a85a4a;
+}
+
+.grade-point .grade-tri {
+  fill: #fef3c7;
+  stroke: #92400e;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.grade-point .grade-label {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  fill: #78350f;
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.grade-point.is-selected .grade-tri {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+
+.grade-point.is-selected .grade-label {
+  fill: var(--accent);
+}
+
+.column .column-body {
+  stroke-width: 1.5;
+}
+
+.column-chimney .column-body {
+  fill: url(#hp-hatch-chimney);
+  stroke: #7a3b2c;
+}
+
+.column-post .column-body {
+  fill: #c9b58c;
+  stroke: #5c4a2a;
+}
+
+.column.phase-new .column-body {
+  stroke: var(--new-edge);
+}
+
+.column-post.phase-new .column-body {
+  fill: #86c79a;
+}
+
+.column.phase-demo .column-body {
+  stroke: var(--demo);
+  stroke-dasharray: 5 3;
+}
+
+.column-post.phase-demo .column-body,
+.column-chimney.phase-demo .column-body {
+  fill: url(#hp-hatch-demo);
+}
+
+.column.is-selected .column-body {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+
+.column-ghost rect {
+  fill: rgba(122, 59, 44, 0.18);
+  stroke: #7a3b2c;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.column-ghost.column-post rect {
+  fill: rgba(201, 181, 140, 0.4);
+  stroke: #5c4a2a;
+}
+
+.column-ghost text {
+  font-size: 12px;
+  fill: #52525b;
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+}
+
+.grade-draft-tri {
+  fill: #fef3c7;
+  stroke: #92400e;
+  stroke-width: 1.5;
+}
+
+.north-arrow .north-ring {
+  fill: rgba(251, 251, 250, 0.9);
+  stroke: #a1a1aa;
+  stroke-width: 1;
+}
+
+.north-arrow .north-head {
+  fill: #27272a;
+  stroke: none;
+}
+
+.north-arrow .north-label {
+  font-size: 13px;
+  font-weight: 650;
+  fill: #27272a;
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+}
+
+/* Level tools in site mode: still clickable (they say why not), but dimmed. */
+.toolbar button.tool-off {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.level-tab.site-tab {
+  margin-top: 6px;
+  border-style: dashed;
+}

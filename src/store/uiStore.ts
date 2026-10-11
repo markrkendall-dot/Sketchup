@@ -3,7 +3,13 @@ import type { WallGeom } from '../derive/openings';
 import type { Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | 'roof' | 'underlay' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'room' | 'stairs' | 'roof' | 'underlay' | 'gradePoint' | 'column' | OpeningToolName;
+/** Tools that work on the site (E, C); the others edit a level and are off in site mode. */
+export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column'];
+/** Tools allowed in site mode: select, the site tools. */
+export const isSiteModeTool = (tool: ToolName): boolean => tool === 'select' || SITE_TOOLS.includes(tool);
+/** Shown in the status bar when a level tool is asked for in site mode. */
+export const SITE_MODE_TOOL_HINT = 'Choose a level to draw walls';
 /** Underlay tool modes: drag the image, or calibrate its scale / rotation from two clicked points. */
 export type UnderlayMode = 'move' | 'scale' | 'rotate';
 /** Which views the workspace shows. */
@@ -121,6 +127,12 @@ export interface Draft {
   underlayPoints: Vec2[];
   /** Roof tool: the outline corners clicked so far (world). */
   roofPoints: Vec2[];
+  /** Grade point tool: the spot clicked, waiting for its elevation (typed in the length buffer, Enter places). */
+  gradePending: Vec2 | null;
+  /** Column tool: what the next click places (Tab toggles). */
+  columnKind: 'chimney' | 'post';
+  /** Column tool: the column about to be placed, following the snapped cursor. */
+  columnPreview: { at: Vec2; kind: 'chimney' | 'post'; width: number; depth: number } | null;
 }
 
 export interface Selection {
@@ -130,6 +142,9 @@ export interface Selection {
   rooms: Id[];
   stairs: Id[];
   roofs: Id[];
+  /** Site elements (plan.site), selectable in site mode. */
+  gradePoints: Id[];
+  columns: Id[];
 }
 
 /** The inline room name editor (RoomNameEditor). */
@@ -207,6 +222,11 @@ export interface UiState {
   measureTo: MeasureTo;
   activeTool: ToolName;
   activeLevelId: Id;
+  /**
+   * The Site pseudo-level: the lowest level is active (for tools and the panel), the 2D view shows
+   * the first floor as a ghost with the site layer, and only select and the site tools work.
+   */
+  siteMode: boolean;
   selection: Selection;
   hover: Hover;
   viewport: Viewport;
@@ -231,6 +251,8 @@ export interface UiState {
   hidden3dLevels: Id[];
   /** 3D view: show only the active level and the ones below it. */
   only3dActiveAndBelow: boolean;
+  /** 3D view: the drei grid overlay on the ground. */
+  show3dGrid: boolean;
   /** Bumped to ask the 3D view to re-fit the camera to the plan. */
   fit3dRequest: number;
   /** Draw the active level's image underlay (a temporary hide; the plan keeps it). */
@@ -252,7 +274,10 @@ export interface UiState {
   setOrthoLock: (on: boolean) => void;
   setMeasureTo: (measureTo: MeasureTo) => void;
   setTool: (tool: ToolName) => void;
+  /** Switching level always leaves site mode. */
   setActiveLevel: (id: Id) => void;
+  /** Enter the Site pseudo-level on `levelId` (the lowest level); clears the selection and the draft. */
+  enterSiteMode: (levelId: Id) => void;
   setSelection: (sel: Selection) => void;
   clearSelection: () => void;
   /** Missing fields are null. */
@@ -275,6 +300,7 @@ export interface UiState {
   toggle3dLevel: (id: Id) => void;
   setOnly3dActiveAndBelow: (on: boolean) => void;
   requestFit3d: () => void;
+  setShow3dGrid: (on: boolean) => void;
   toggleShowUnderlay: () => void;
   /** Select the underlay (clears the entity selection) or deselect it. */
   selectUnderlay: (on: boolean) => void;
@@ -308,13 +334,16 @@ export const emptyDraft = (): Draft => ({
   stairsDirection: 0,
   underlayPoints: [],
   roofPoints: [],
+  gradePending: null,
+  columnKind: 'chimney',
+  columnPreview: null,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], gradePoints: [], columns: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.gradePoints.length + s.columns.length;
 
 /** Split ratio bounds, so neither view collapses. */
 export const MIN_SPLIT = 0.2;
@@ -327,6 +356,7 @@ export const useUiStore = create<UiState>()((set) => ({
   measureTo: loadMeasureTo(),
   activeTool: 'wall',
   activeLevelId: '',
+  siteMode: false,
   selection: EMPTY_SELECTION,
   hover: NO_HOVER,
   viewport: { tx: 300, ty: 200, k: 0.5 },
@@ -343,6 +373,7 @@ export const useUiStore = create<UiState>()((set) => ({
   splitRatio: 0.5,
   hidden3dLevels: [],
   only3dActiveAndBelow: false,
+  show3dGrid: true,
   fit3dRequest: 0,
   showUnderlay: true,
   underlaySelected: false,
@@ -371,14 +402,28 @@ export const useUiStore = create<UiState>()((set) => ({
       roomEdit: null,
     })),
   setActiveLevel: (activeLevelId) =>
-    set({
+    set((s) => ({
       activeLevelId,
+      siteMode: false,
+      // The site tools only exist in site mode.
+      activeTool: SITE_TOOLS.includes(s.activeTool) ? 'select' : s.activeTool,
       selection: EMPTY_SELECTION,
       underlaySelected: false,
       draft: emptyDraft(),
       hover: NO_HOVER,
       roomEdit: null,
-    }),
+    })),
+  enterSiteMode: (levelId) =>
+    set((s) => ({
+      activeLevelId: levelId,
+      siteMode: true,
+      activeTool: isSiteModeTool(s.activeTool) ? s.activeTool : 'select',
+      selection: EMPTY_SELECTION,
+      underlaySelected: false,
+      draft: emptyDraft(),
+      hover: NO_HOVER,
+      roomEdit: null,
+    })),
   setSelection: (selection) =>
     set((s) => ({ selection, underlaySelected: selectionSize(selection) ? false : s.underlaySelected })),
   clearSelection: () =>
@@ -421,6 +466,7 @@ export const useUiStore = create<UiState>()((set) => ({
     })),
   setOnly3dActiveAndBelow: (only3dActiveAndBelow) => set({ only3dActiveAndBelow }),
   requestFit3d: () => set((s) => ({ fit3dRequest: s.fit3dRequest + 1 })),
+  setShow3dGrid: (show3dGrid) => set({ show3dGrid }),
   toggleShowUnderlay: () => set((s) => ({ showUnderlay: !s.showUnderlay })),
   selectUnderlay: (on) =>
     set((s) =>

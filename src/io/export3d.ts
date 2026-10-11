@@ -2,10 +2,10 @@ import { Group, Mesh, type BufferGeometry, type Material, type MeshStandardMater
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
-import { getLevelMeshes } from '../derive/meshes';
-import type { Phase, Plan, RoofFinish, ViewMode, WallKind } from '../model/types';
+import { getLevelMeshes, getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
+import type { Column, Phase, Plan, RoofFinish, ViewMode, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { floorMaterial, roofMaterial, stairsMaterial, wallMaterial } from '../view3d/materials';
+import { columnMaterial, floorMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -17,7 +17,7 @@ import { downloadBlob, planFileName } from './file';
 export const METRES_PER_INCH = 0.0254;
 
 /** The 3D view's level visibility (which levels the export includes). */
-export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'>;
+export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode'>>;
 
 export type ExportFormat = 'glb' | 'obj';
 
@@ -25,11 +25,15 @@ export type ExportFormat = 'glb' | 'obj';
 const wallMaterialName = (phase: Phase, kind: WallKind) => `wall_${phase}_${kind}`;
 const stairsMaterialName = (phase: Phase) => `stairs_${phase}`;
 const roofMaterialName = (finish: RoofFinish, phase: Phase) => `roof_${finish}_${phase}`;
+const columnMaterialName = (kind: Column['kind'], phase: Phase) => `column_${kind}_${phase}`;
 
 /**
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
  * with one group per visible level at its floor-top elevation holding `Wall <n> (<kind>, <phase>)`,
- * `Floor`, `Stairs` and `Roof` meshes. Levels with nothing to show are left out. Geometries are clones (the
+ * `Floor`, `Stairs` and `Roof` meshes. Levels with nothing to show are left out. A `Site` group (at
+ * elevation 0, absolute heights) follows with the `Chimney` and `Post` meshes the view mode shows
+ * and, when the site has grade points, the `Terrain` (material `terrain`; without grade points the
+ * ground is a flat plane at the slab and is left out). Geometries are clones (the
  * mesh cache owns the originals) and materials are clones of the live view's, one per phase/kind
  * combination; free both with disposeExportScene().
  */
@@ -79,6 +83,17 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     }
     root.add(group);
   }
+  const site = new Group();
+  site.name = 'Site';
+  if (Object.keys(plan.site.gradePoints).length) {
+    site.add(mesh('Terrain', getTerrainGeometry(plan), material('terrain', terrainMaterial)));
+  }
+  for (const c of getSiteMeshes(plan, viewMode).columns) {
+    const m = mesh(c.kind === 'chimney' ? 'Chimney' : 'Post', c.geometry, material(columnMaterialName(c.kind, c.phase), columnMaterial(c.kind, c.phase)));
+    if (c.phase === 'demo') m.renderOrder = 1;
+    site.add(m);
+  }
+  if (site.children.length) root.add(site);
   root.updateMatrixWorld(true);
   return root;
 }
@@ -128,7 +143,7 @@ export async function downloadExport(
 ): Promise<void> {
   const root = buildExportScene(plan, viewMode, levelVisibility);
   try {
-    if (!root.children.length) throw new Error('Nothing to export: the visible levels have no walls, floors, stairs or roofs.');
+    if (!root.children.length) throw new Error('Nothing to export: the visible levels have no walls, floors, stairs, roofs or site elements.');
     const blob =
       format === 'glb'
         ? new Blob([await toGlb(root)], { type: 'model/gltf-binary' })

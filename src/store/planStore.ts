@@ -6,6 +6,7 @@ import { coreInterval, draftFootprints } from '../derive/openings';
 import { clampOpeningHeight, clampOpeningOffset, openingFitsHeight, wallHeightOf } from '../model/openings';
 import {
   clampOpenings,
+  columnProblem,
   createEmptyPlan,
   roofProblem,
   findNodeNear,
@@ -14,7 +15,7 @@ import {
   normalizeLevel,
   wallLength,
 } from '../model/plan';
-import type { Id, Level, Opening, Phase, Plan, PlanSettings, Roof, Room, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { normalizeDegrees, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
@@ -44,6 +45,10 @@ export type StairsPatch = Partial<Omit<Stairs, 'id'>>;
 export type NewStairs = Omit<Stairs, 'id'> & { id?: Id };
 export type RoofPatch = Partial<Omit<Roof, 'id'>>;
 export type NewRoof = Omit<Roof, 'id'> & { id?: Id };
+export type GradePointPatch = Partial<Omit<GradePoint, 'id'>>;
+export type NewGradePoint = Omit<GradePoint, 'id'> & { id?: Id };
+export type ColumnPatch = Partial<Omit<Column, 'id'>>;
+export type NewColumn = Omit<Column, 'id'> & { id?: Id };
 export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** Which end of a wall stays put when its length is edited. */
@@ -56,6 +61,9 @@ export interface EntitySelection {
   rooms?: Id[];
   stairs?: Id[];
   roofs?: Id[];
+  /** Site elements (plan.site); the level id the action is given only scopes the other kinds. */
+  gradePoints?: Id[];
+  columns?: Id[];
 }
 
 export interface PlanState {
@@ -105,8 +113,24 @@ export interface PlanState {
   /** Patch a roof; an unusable outline or size is rejected, the ridge angle is normalized to [0, 360). */
   updateRoof: (levelId: Id, id: Id, patch: RoofPatch) => void;
   deleteRoofs: (levelId: Id, ids: Id[]) => void;
-  /** Set the phase of walls, openings, stairs and roofs together (e.g. "Mark demolish"). */
-  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[] }, phase: Phase) => void;
+  /** Add a grade point (a spot elevation of the ground); returns the id, or null for a non-finite value. */
+  addGradePoint: (point: NewGradePoint) => Id | null;
+  /** Move a grade point or change its elevation. */
+  updateGradePoint: (id: Id, patch: GradePointPatch) => void;
+  deleteGradePoints: (ids: Id[]) => void;
+  /** Add a post or chimney; returns the id, or null when its size or heights are not usable. */
+  addColumn: (column: NewColumn) => Id | null;
+  /** Patch a column; an unusable size or height (top not above base) is rejected, the rotation is normalized to [0, 360). */
+  updateColumn: (id: Id, patch: ColumnPatch) => void;
+  deleteColumns: (ids: Id[]) => void;
+  /** Move grade points and columns to new positions in one set (a drag of the site selection). */
+  moveSiteItems: (points: Record<Id, Vec2>, columns: Record<Id, Vec2>) => void;
+  /** Turn the plan relative to true north (normalized to [0, 360)). */
+  setNorthAngle: (degrees: number) => void;
+  /** Delete every grade point (the terrain goes flat again) in one undo step. */
+  clearGradePoints: () => void;
+  /** Set the phase of walls, openings, stairs, roofs and columns together (e.g. "Mark demolish"). */
+  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; columns?: Id[] }, phase: Phase) => void;
   /**
    * Copy the nodes and walls (not openings) of one level into another, merged with whatever is
    * there, in one undo step. Returns the number of walls copied.
@@ -213,6 +237,13 @@ function cleanRoof(r: Roof): Roof {
   return { ...r, outline: r.outline.map((p) => ({ x: p.x, y: p.y })), ridgeAngle: normalizeDegrees(r.ridgeAngle) };
 }
 
+const isPoint = (p: Vec2 | undefined): p is Vec2 => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+/** A column's stored form: position copied, rotation in [0, 360). */
+function cleanColumn(c: Column): Column {
+  return { ...c, at: { x: c.at.x, y: c.at.y }, rotation: Number.isFinite(c.rotation) ? normalizeDegrees(c.rotation) : c.rotation };
+}
+
 /** Walls lying along the straight path a..b, following the graph after splits. */
 function wallsAlong(level: Level, a: Id, b: Id): Id[] {
   const A = level.nodes[a];
@@ -243,6 +274,13 @@ export const usePlanStore = create<PlanState>()(
           const level = s.plan.levels[levelId];
           if (!level) return;
           if (fn(level, s.plan) === false) return;
+          touch(s.plan);
+        });
+
+      // Same for the site (plan.site: grade points, columns, north angle).
+      const editSite = (fn: (site: Site, plan: Plan) => void | boolean) =>
+        set((s) => {
+          if (fn(s.plan.site, s.plan) === false) return;
           touch(s.plan);
         });
 
@@ -328,8 +366,10 @@ export const usePlanStore = create<PlanState>()(
           }),
 
         deleteEntities: (levelId, sel) =>
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs, sel.roofs);
+            for (const id of sel.gradePoints ?? []) delete plan.site.gradePoints[id];
+            for (const id of sel.columns ?? []) delete plan.site.columns[id];
             // Removing walls changes the corner joins of their neighbours.
             if (sel.nodes.length || sel.walls.length) clampOpenings(level);
           }),
@@ -557,8 +597,103 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete level.roofs[id];
           }),
 
+        addGradePoint: (input) => {
+          let id: Id | null = null;
+          editSite((site) => {
+            if (!isPoint(input.at) || !Number.isFinite(input.elevation)) return false;
+            const gp: GradePoint = { id: input.id ?? newId(), at: { x: input.at.x, y: input.at.y }, elevation: input.elevation };
+            site.gradePoints[gp.id] = gp;
+            id = gp.id;
+          });
+          return id;
+        },
+
+        updateGradePoint: (id, patch) =>
+          editSite((site) => {
+            const g = site.gradePoints[id];
+            if (!g) return false;
+            if (patch.at && !isPoint(patch.at)) return false;
+            if (patch.elevation !== undefined && !Number.isFinite(patch.elevation)) return false;
+            const moved = !!patch.at && (patch.at.x !== g.at.x || patch.at.y !== g.at.y);
+            const raised = patch.elevation !== undefined && patch.elevation !== g.elevation;
+            if (!moved && !raised) return false;
+            if (moved) g.at = { x: patch.at!.x, y: patch.at!.y };
+            if (raised) g.elevation = patch.elevation!;
+          }),
+
+        deleteGradePoints: (ids) =>
+          editSite((site) => {
+            if (!ids.some((id) => site.gradePoints[id])) return false;
+            for (const id of ids) delete site.gradePoints[id];
+          }),
+
+        clearGradePoints: () =>
+          editSite((site) => {
+            if (Object.keys(site.gradePoints).length === 0) return false;
+            site.gradePoints = {};
+          }),
+
+        addColumn: (input) => {
+          let id: Id | null = null;
+          editSite((site) => {
+            const col = cleanColumn({ ...input, id: input.id ?? newId() });
+            if (columnProblem(col)) return false;
+            site.columns[col.id] = col;
+            id = col.id;
+          });
+          return id;
+        },
+
+        updateColumn: (id, patch) =>
+          editSite((site) => {
+            const c = site.columns[id];
+            if (!c) return false;
+            const next = cleanColumn({ ...c, ...patch, id });
+            if (columnProblem(next)) return false;
+            const keys = Object.keys(patch) as (keyof ColumnPatch)[];
+            const same = (k: keyof ColumnPatch) => (k === 'at' ? next.at.x === c.at.x && next.at.y === c.at.y : next[k] === c[k]);
+            if (keys.every(same)) return false;
+            for (const k of keys) if (!same(k)) (c as unknown as Record<string, unknown>)[k] = next[k];
+          }),
+
+        deleteColumns: (ids) =>
+          editSite((site) => {
+            if (!ids.some((id) => site.columns[id])) return false;
+            for (const id of ids) delete site.columns[id];
+          }),
+
+        moveSiteItems: (points, columns) =>
+          editSite((site) => {
+            let changed = false;
+            for (const [id, p] of Object.entries(points)) {
+              const g = site.gradePoints[id];
+              if (!g || !isPoint(p) || (g.at.x === p.x && g.at.y === p.y)) continue;
+              g.at = { x: p.x, y: p.y };
+              changed = true;
+            }
+            for (const [id, p] of Object.entries(columns)) {
+              const c = site.columns[id];
+              if (!c || !isPoint(p) || (c.at.x === p.x && c.at.y === p.y)) continue;
+              c.at = { x: p.x, y: p.y };
+              changed = true;
+            }
+            if (!changed) return false;
+          }),
+
+        setNorthAngle: (degrees) =>
+          editSite((site) => {
+            if (!Number.isFinite(degrees)) return false;
+            const next = normalizeDegrees(degrees);
+            if (next === site.northAngle) return false;
+            site.northAngle = next;
+          }),
+
         setPhase: (levelId, sel, phase) =>
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
+            for (const id of sel.columns ?? []) {
+              const c = plan.site.columns[id];
+              if (c && c.phase !== phase) c.phase = phase;
+            }
             for (const id of sel.roofs ?? []) {
               const r = level.roofs[id];
               if (r && r.phase !== phase) r.phase = phase;

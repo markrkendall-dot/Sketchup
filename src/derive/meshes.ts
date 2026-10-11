@@ -1,11 +1,12 @@
-import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Vector2 } from 'three';
+import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Uint32BufferAttribute, Vector2 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Stairs, Vec2, ViewMode, Wall, WallKind } from '../model/types';
+import type { Column, Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallKind } from '../model/types';
 import { getFootprints, type Footprint } from './footprint';
 import { getOpeningsByWall, openingSymbol } from './openings';
 import { isOpeningVisible, isVisible } from './phase';
 import { getFaces, slabOutlines, type FaceSet } from './rooms';
+import { columnOutline, planTerrain, type TerrainGrid } from './site';
 import { profileAt, roofBearing, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { floorToFloor, stairsFrame, stairsOutline, stairsPoint, stairSteps } from './stairs';
 
@@ -896,8 +897,96 @@ export function clearMeshCache(): void {
   for (const m of stairsCache.values()) for (const e of m.values()) e.geometry.dispose();
   for (const m of roofCache.values()) for (const e of m.values()) e.geometry.dispose();
   roofCache.clear();
+  clearSiteCache();
   wallCache.clear();
   floorCache.clear();
   stairsCache.clear();
   levelCache.clear();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Site: terrain and columns (DESIGN.md "Site and terrain"). Unlike the level meshes these are in
+// absolute elevation (Y = the plan's elevation), so the view puts them in a group at the origin.
+
+/** A column as a box from its base to its top, turned by its rotation about its centre. */
+export function buildColumnGeometry(column: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top'>): BufferGeometry {
+  return prism(columnOutline(column), column.base, column.top);
+}
+
+/** The terrain grid (site.ts) as an indexed geometry with smooth upward normals. */
+export function buildTerrainGeometry(grid: TerrainGrid): BufferGeometry {
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(grid.positions, 3));
+  g.setIndex(new Uint32BufferAttribute(grid.indices, 1));
+  g.computeVertexNormals();
+  return g;
+}
+
+let terrainEntry: { grid: TerrainGrid; geometry: BufferGeometry } | null = null;
+
+/**
+ * The terrain's geometry: the same object while the grid (site.ts planTerrain, which is memoized
+ * by the grade points, the plan bounds and the fallback elevation) is the same, so a 2D edit that
+ * touches neither rebuilds nothing. The replaced geometry is disposed.
+ */
+export function getTerrainGeometry(plan: Plan): BufferGeometry {
+  const grid = planTerrain(plan);
+  if (terrainEntry && terrainEntry.grid === grid) return terrainEntry.geometry;
+  terrainEntry?.geometry.dispose();
+  terrainEntry = { grid, geometry: buildTerrainGeometry(grid) };
+  return terrainEntry.geometry;
+}
+
+export interface ColumnMesh {
+  id: Id;
+  geometry: BufferGeometry;
+  phase: Phase;
+  kind: Column['kind'];
+}
+
+export interface SiteMeshes {
+  /** The columns the view mode shows. */
+  columns: ColumnMesh[];
+}
+
+interface ColumnEntry {
+  column: Column;
+  geometry: BufferGeometry;
+}
+
+const columnCache = new Map<ViewMode, Map<Id, ColumnEntry>>();
+const siteResultCache = new Map<ViewMode, { columns: Site['columns']; result: SiteMeshes }>();
+
+/**
+ * The columns visible in a view mode as meshes, memoized: the same result object while the
+ * columns record is unchanged, and a column's geometry is reused while its object is unchanged
+ * (geometry that drops out is disposed).
+ */
+export function getSiteMeshes(plan: Plan, viewMode: ViewMode): SiteMeshes {
+  const columns = plan.site.columns;
+  const hit = siteResultCache.get(viewMode);
+  if (hit && hit.columns === columns) return hit.result;
+  const prev = columnCache.get(viewMode);
+  const next = new Map<Id, ColumnEntry>();
+  const out: ColumnMesh[] = [];
+  for (const c of Object.values(columns)) {
+    if (!isVisible(c.phase, viewMode)) continue;
+    const old = prev?.get(c.id);
+    const entry = old && old.column === c ? old : { column: c, geometry: buildColumnGeometry(c) };
+    next.set(c.id, entry);
+    out.push({ id: c.id, geometry: entry.geometry, phase: c.phase, kind: c.kind });
+  }
+  if (prev) for (const [id, e] of prev) if (next.get(id) !== e) e.geometry.dispose();
+  columnCache.set(viewMode, next);
+  const result: SiteMeshes = { columns: out };
+  siteResultCache.set(viewMode, { columns, result });
+  return result;
+}
+
+function clearSiteCache(): void {
+  for (const m of columnCache.values()) for (const e of m.values()) e.geometry.dispose();
+  columnCache.clear();
+  siteResultCache.clear();
+  terrainEntry?.geometry.dispose();
+  terrainEntry = null;
 }

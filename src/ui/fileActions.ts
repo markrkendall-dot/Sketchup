@@ -1,5 +1,6 @@
 // Plan-level commands shared by the toolbar buttons and the keyboard map: New, Open, Save, zoom to
 // fit, and the status bar notices they report with.
+import { siteGhostLevelId } from '../derive/site';
 import { cancelActiveTool } from '../editor2d/tools';
 import { fitLevel, initialViewport } from '../editor2d/viewport';
 import { downloadPlan, planFileName, readPlanFile } from '../io/file';
@@ -41,19 +42,25 @@ export function noteDuplicateRoomName(levelId: string, name: string, exceptRoomI
   return true;
 }
 
-/** Fit the active level (and its underlay, when shown) into the 2D view. */
+/** Fit the active level (and its underlay, when shown) into the 2D view; in site mode the first floor under the site layer. */
 export function zoomToFit(): void {
   const ui = useUiStore.getState();
-  const level = getPlan().levels[ui.activeLevelId];
+  const plan = getPlan();
+  const level = plan.levels[ui.siteMode ? (siteGhostLevelId(plan) ?? ui.activeLevelId) : ui.activeLevelId];
   if (!level || ui.canvasSize.width === 0) return;
   ui.setViewport(fitLevel(level, ui.canvasSize, ui.showUnderlay) ?? initialViewport(ui.canvasSize));
 }
 
 /** True when the plan has anything worth asking about before it is replaced. */
 export function planHasContent(plan: Plan): boolean {
+  const site = plan.site;
+  if (site && (Object.keys(site.gradePoints).length > 0 || Object.keys(site.columns).length > 0)) return true;
   return plan.levelOrder.some((id) => {
     const l = plan.levels[id];
-    return l && (Object.keys(l.walls).length > 0 || Object.keys(l.rooms).length > 0 || Object.keys(l.stairs).length > 0 || !!l.underlay);
+    return (
+      l &&
+      (Object.keys(l.walls).length > 0 || Object.keys(l.rooms).length > 0 || Object.keys(l.stairs).length > 0 || Object.keys(l.roofs ?? {}).length > 0 || !!l.underlay)
+    );
   });
 }
 

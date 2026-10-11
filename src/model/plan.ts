@@ -520,6 +520,16 @@ export function roofProblem(r: Pick<Roof, 'outline' | 'pitch' | 'overhang' | 'th
   return null;
 }
 
+/** Why a column cannot be used (a non-positive size, top not above base, a non-finite number), or null. */
+export function columnProblem(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top'>): string | null {
+  if (!isPoint(c.at)) return 'needs a position';
+  if (!isNum(c.width) || c.width <= 0 || !isNum(c.depth) || c.depth <= 0) return 'width and depth must be positive';
+  if (!isNum(c.rotation)) return 'needs a rotation';
+  if (!isNum(c.base) || !isNum(c.top)) return 'needs a base and a top';
+  if (!(c.top > c.base)) return 'the top must be above the base';
+  return null;
+}
+
 /**
  * Roofs read field by field: an unknown shape, an unusable outline or an out-of-range size drops
  * the roof (with a console warning naming it); a missing phase or finish gets its default.

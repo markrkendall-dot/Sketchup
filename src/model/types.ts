@@ -107,7 +107,7 @@ export interface GradePoint {
 }
 
 export interface Site {
-  /** Plan rotation to true north; 0 = north is up the screen. */
+  /** Degrees clockwise from the top of the plan to true north; 0 = north is up the screen. */
   northAngle: Degrees;
   gradePoints: Record<Id, GradePoint>;
   columns: Record<Id, Column>;

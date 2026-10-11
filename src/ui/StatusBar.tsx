@@ -59,7 +59,21 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
   },
   // Replaced by underlayHint(); kept for the Record type.
   underlay: { idle: '', busy: '' },
+  gradePoint: {
+    idle: 'Click a spot on the ground, then type its elevation.',
+    busy: "Type the elevation (-4, -6'4), Enter places it. Esc cancels.",
+  },
+  column: {
+    idle: 'Click to place; Tab switches chimney and post.',
+    busy: 'Click to place; Tab switches chimney and post.',
+  },
 };
+
+/** Site mode's select tool. */
+const SITE_SELECT_HINT: [string, string] = [
+  'Click a grade point or column, drag to move. E and C place them.',
+  'Click a grade point or column to select it, drag to move, Delete removes. E places a grade point, C a chimney or post. Choose a level to draw walls.',
+];
 
 /** The same hints in full, shown as the tooltip. */
 const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
@@ -96,6 +110,14 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
   },
   underlay: { idle: '', busy: '' },
+  gradePoint: {
+    idle: 'Click a spot on the ground. Then type its elevation in feet and inches (minus allowed, e.g. -4 or -6\'4) and press Enter; with nothing typed Enter uses the first floor level.',
+    busy: "Type the elevation in feet and inches (-4, -6'4, 8'), then Enter places the grade point. Esc clears it, then cancels.",
+  },
+  column: {
+    idle: 'Click to place a column. Tab switches between a chimney (24" x 40") and a post (6" x 6"); set the size and heights in the properties panel.',
+    busy: 'Click to place a column. Tab switches between a chimney and a post.',
+  },
 };
 
 /** 3D layout: orbit hints in place of the 2D tool hints (the walk view has its own overlay hint). */
@@ -172,7 +194,9 @@ export function StatusBar() {
   const lengthBuffer = useUiStore((s) => s.draft.lengthBuffer);
   const error = useUiStore((s) => s.draft.error);
   const message = useUiStore((s) => s.draft.message);
-  const drawing = useUiStore((s) => s.draft.wallStart !== null || s.draft.lengthBuffer !== '' || s.draft.roofPoints.length > 0);
+  const drawing = useUiStore(
+    (s) => s.draft.wallStart !== null || s.draft.lengthBuffer !== '' || s.draft.roofPoints.length > 0 || s.draft.gradePending !== null,
+  );
   const underlayPoints = useUiStore((s) => s.draft.underlayPoints.length);
   const kind = useUiStore((s) => s.nextWallKind);
   const levelId = useUiStore((s) => s.activeLevelId);
@@ -199,6 +223,18 @@ export function StatusBar() {
     return level ? getFaces(level, viewMode).openEnds.length : 0;
   });
   const measureTo = useUiStore((s) => s.measureTo);
+  const siteMode = useUiStore((s) => s.siteMode);
+  const roofCount = usePlanStore((s) => {
+    let n = 0;
+    for (const r of Object.values(s.plan.levels[levelId]?.roofs ?? {})) if (isVisible(r.phase, viewMode)) n++;
+    return n;
+  });
+  const gradeCount = usePlanStore((s) => Object.keys(s.plan.site.gradePoints).length);
+  const columnCount = usePlanStore((s) => {
+    let n = 0;
+    for (const c of Object.values(s.plan.site.columns)) if (isVisible(c.phase, viewMode)) n++;
+    return n;
+  });
   const hasUnderlay = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
   const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
   const underlayMode = useUiStore((s) => s.underlayMode);
@@ -214,6 +250,8 @@ export function StatusBar() {
   else if (tool === 'underlay') {
     const [text, full] = underlayHint(hasUnderlay, underlayLocked, underlayMode, underlayPoints);
     hint = { text, full, error };
+  } else if (siteMode && tool === 'select') {
+    hint = { text: SITE_SELECT_HINT[0], full: SITE_SELECT_HINT[1], error };
   } else {
     const phase = drawing ? 'busy' : 'idle';
     hint = { text: HINTS[tool][phase], full: FULL_HINTS[tool][phase], error };
@@ -256,12 +294,24 @@ export function StatusBar() {
       <span className="status-view" title="View mode (V)">
         View: {VIEW_MODE_LABEL[viewMode]}
       </span>
-      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls and openings">
+      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs and columns">
         Drawing: {PHASE_LABEL[drawPhase].toLowerCase()}
       </span>
       <span className="status-counts">
-        {levelName}: {wallCount} {wallCount === 1 ? 'wall' : 'walls'}, {openingCount}{' '}
-        {openingCount === 1 ? 'opening' : 'openings'}
+        {siteMode ? (
+          <>
+            Site: {gradeCount} {gradeCount === 1 ? 'grade point' : 'grade points'}, {columnCount} {columnCount === 1 ? 'column' : 'columns'}
+          </>
+        ) : (
+          <>
+            {levelName}: {wallCount} {wallCount === 1 ? 'wall' : 'walls'}, {openingCount} {openingCount === 1 ? 'opening' : 'openings'}
+            {roofCount > 0 && (
+              <>
+                , {roofCount} {roofCount === 1 ? 'roof' : 'roofs'}
+              </>
+            )}
+          </>
+        )}
       </span>
     </footer>
   );

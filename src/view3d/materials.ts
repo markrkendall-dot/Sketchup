@@ -1,5 +1,5 @@
 import { Color, FrontSide, MeshStandardMaterial } from 'three';
-import type { Phase, RoofFinish, WallKind } from '../model/types';
+import type { Column, Phase, RoofFinish, WallKind } from '../model/types';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
@@ -78,6 +78,34 @@ export function roofMaterial(finish: RoofFinish, phase: Phase): MeshStandardMate
       }
     }
     roofMaterials.set(key, m);
+  }
+  return m;
+}
+
+/** The ground: grass green, matte, smooth shaded (the terrain geometry has smooth normals). */
+export const terrainMaterial = new MeshStandardMaterial({
+  color: new Color('#7f9a63'),
+  roughness: 1,
+  metalness: 0,
+  side: FrontSide,
+});
+
+/** Column colours: brick red for chimneys, trim tan for posts. */
+const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c' };
+
+const columnMaterials = new Map<string, MeshStandardMaterial>();
+
+/** A column's material: by kind; demolished translucent red like walls, new pulled toward the new-work green. */
+export function columnMaterial(kind: Column['kind'], phase: Phase): MeshStandardMaterial {
+  const key = `${kind}|${phase}`;
+  let m = columnMaterials.get(key);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      const base = new Color(COLUMN_COLOR[kind]);
+      m = make(phase === 'new' ? `#${base.lerp(new Color('#3f8f5f'), 0.45).getHexString()}` : COLUMN_COLOR[kind]);
+    }
+    columnMaterials.set(key, m);
   }
   return m;
 }

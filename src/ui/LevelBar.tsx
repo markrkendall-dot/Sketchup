@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getLevelElevations } from '../derive/levels';
-import { switchLevel } from '../editor2d/tools';
+import { enterSiteMode, switchLevel } from '../editor2d/tools';
 import type { Id } from '../model/types';
 import { formatLength } from '../model/units';
 import { getPlan, usePlanStore } from '../store/planStore';
@@ -12,7 +12,7 @@ function LevelTab({ levelId, index }: { levelId: Id; index: number }) {
   const wallCount = usePlanStore((s) => Object.keys(s.plan.levels[levelId]?.walls ?? {}).length);
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const active = useUiStore((s) => s.activeLevelId === levelId);
+  const active = useUiStore((s) => s.activeLevelId === levelId && !s.siteMode);
   const updateLevel = usePlanStore((s) => s.updateLevel);
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -61,6 +61,33 @@ function LevelTab({ levelId, index }: { levelId: Id; index: number }) {
   );
 }
 
+/**
+ * The Site pseudo-level, below the lowest level: grade points, chimney and posts, the north angle.
+ * The 2D view shows the first floor as a ghost under the site layer.
+ */
+function SiteTab() {
+  const active = useUiStore((s) => s.siteMode);
+  const points = usePlanStore((s) => Object.keys(s.plan.site.gradePoints).length);
+  const columns = usePlanStore((s) => Object.keys(s.plan.site.columns).length);
+  return (
+    <button
+      className={`level-tab site-tab${active ? ' active' : ''}`}
+      aria-pressed={active}
+      data-site-tab
+      title="Site: grade points (the ground), chimney and posts, north. Pick any level to go back to editing it."
+      onClick={() => {
+        enterSiteMode();
+        focusCanvas();
+      }}
+    >
+      <span className="level-name">Site</span>
+      <span className="level-meta">
+        {points} grade {points === 1 ? 'point' : 'points'} · {columns} {columns === 1 ? 'column' : 'columns'}
+      </span>
+    </button>
+  );
+}
+
 function copyWallsFromBelow(activeId: Id, belowId: Id): void {
   const plan = getPlan();
   const active = plan.levels[activeId];
@@ -102,6 +129,7 @@ export function LevelBar() {
           .map(({ id, i }) => (
             <LevelTab key={id} levelId={id} index={i} />
           ))}
+        <SiteTab />
       </div>
       <label className="level-option" title={belowName ? `Draw ${belowName} faintly under this level` : 'No level below'}>
         <input type="checkbox" checked={showBelow} disabled={!belowId} onChange={toggleShowBelow} />

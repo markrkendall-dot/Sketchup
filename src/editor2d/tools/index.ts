@@ -1,7 +1,10 @@
 import { isOpeningVisible, isVisible, VIEW_MODES, visibleNodeIds } from '../../derive/phase';
 import { getPlan, usePlanStore, type PlanState } from '../../store/planStore';
 import {
+  isSiteModeTool,
   selectionSize,
+  SITE_MODE_TOOL_HINT,
+  SITE_TOOLS,
   useUiStore,
   type SnapResult,
   type ToolName,
@@ -14,6 +17,7 @@ import { doorTool, passageTool, windowTool } from './openingTool';
 import { roofTool } from './roofTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
+import { columnTool, gradePointTool, siteSelectTool } from './siteTools';
 import { stairsTool } from './stairsTool';
 import { requestUnderlayImage, underlayTool } from './underlayTool';
 import { wallTool } from './wallTool';
@@ -68,9 +72,12 @@ const tools: Record<ToolName, Tool> = {
   stairs: stairsTool,
   roof: roofTool,
   underlay: underlayTool,
+  gradePoint: gradePointTool,
+  column: columnTool,
 };
 
-export const getTool = (name: ToolName): Tool => tools[name];
+/** The tool object for a name; in site mode the select tool is the site one (grade points and columns). */
+export const getTool = (name: ToolName): Tool => (name === 'select' && useUiStore.getState().siteMode ? siteSelectTool : tools[name]);
 
 interface GhostSnapSources {
   nodes: Vec2[];
@@ -170,8 +177,17 @@ export function dispatchShift(shiftKey: boolean): void {
   dispatchPointer('move', { ...lastPointer, shiftKey });
 }
 
-/** Cancel the active tool and switch to another. */
+/**
+ * Cancel the active tool and switch to another. In site mode the level tools (wall, room, openings,
+ * stairs, roof, underlay) are off and say why in the status bar; outside it the site tools are off.
+ */
 export function switchTool(name: ToolName): void {
+  const ui = useUiStore.getState();
+  if (ui.siteMode && !isSiteModeTool(name)) {
+    ui.patchDraft({ message: SITE_MODE_TOOL_HINT, error: false });
+    return;
+  }
+  if (!ui.siteMode && SITE_TOOLS.includes(name)) return;
   const ctx = makeToolContext();
   if (ctx) getTool(ctx.ui().activeTool).cancel(ctx);
   useUiStore.getState().setTool(name);
@@ -204,20 +220,40 @@ export function pruneSelection(): void {
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
   const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
   const roofs = sel.roofs.filter((id) => level.roofs[id] && isVisible(level.roofs[id].phase, vm));
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs });
+  const site = getPlan().site;
+  const gradePoints = sel.gradePoints.filter((id) => site.gradePoints[id]);
+  const columns = sel.columns.filter((id) => site.columns[id] && isVisible(site.columns[id].phase, vm));
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + gradePoints.length + columns.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, gradePoints, columns });
   }
   // An inline rename of a room that undo removed has nothing left to edit.
   const edit = ui.roomEdit;
   if (edit?.roomId && !level.rooms[edit.roomId]) ui.setRoomEdit(null);
 }
 
-/** Switch the active level: keeps the viewport, clears selection and any draft. */
+/**
+ * Switch the active level: keeps the viewport, clears selection and any draft. Choosing any level
+ * (the lowest one too) leaves site mode.
+ */
 export function switchLevel(levelId: Id): void {
   const ui = useUiStore.getState();
-  if (ui.activeLevelId === levelId || !getPlan().levels[levelId]) return;
+  if ((ui.activeLevelId === levelId && !ui.siteMode) || !getPlan().levels[levelId]) return;
   cancelActiveTool();
   ui.setActiveLevel(levelId);
+  if (lastPointer) dispatchPointer('move', lastPointer);
+}
+
+/**
+ * Open the Site pseudo-level: the lowest level becomes active (so the panel and store actions have
+ * a level), the 2D view shows the first floor as a ghost under the site layer, and only select and
+ * the site tools work. Entering it again does nothing.
+ */
+export function enterSiteMode(): void {
+  const ui = useUiStore.getState();
+  const id = getPlan().levelOrder[0];
+  if (!id || ui.siteMode) return;
+  cancelActiveTool();
+  ui.enterSiteMode(id);
   if (lastPointer) dispatchPointer('move', lastPointer);
 }
 
@@ -249,6 +285,10 @@ export function activateUnderlayTool(mode: UnderlayMode = 'move'): void {
   const ui = useUiStore.getState();
   const level = getPlan().levels[ui.activeLevelId];
   if (!level) return;
+  if (ui.siteMode) {
+    switchTool('underlay'); // says why not
+    return;
+  }
   if (ui.activeTool !== 'underlay') switchTool('underlay');
   if (!level.underlay) {
     requestUnderlayImage(level.id);

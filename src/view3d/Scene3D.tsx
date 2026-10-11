@@ -1,12 +1,13 @@
 import { Grid } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
-import { getLevelElevations } from '../derive/levels';
+import { fallbackElevation, sunPosition } from '../derive/site';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { focusCanvas } from '../ui/focus';
 import { Controls } from './Controls';
 import { LevelMeshes } from './LevelMeshes';
+import { SiteColumns, Terrain } from './SiteMeshes';
 import { visible3dLevels } from './visibility';
 
 /** Re-render the demand-driven canvas when the plan or a 3D-relevant UI setting changes. */
@@ -23,6 +24,8 @@ function InvalidateOnChange() {
         s.activeLevelId !== prev.activeLevelId ||
         s.hidden3dLevels !== prev.hidden3dLevels ||
         s.only3dActiveAndBelow !== prev.only3dActiveAndBelow ||
+        s.show3dGrid !== prev.show3dGrid ||
+        s.siteMode !== prev.siteMode ||
         s.layout !== prev.layout ||
         s.splitRatio !== prev.splitRatio
       )
@@ -52,15 +55,18 @@ function DebugHandle() {
   return null;
 }
 
-/** 12" cells, 10' sections, at the bottom of the lowest slab. */
+/**
+ * 12" cells, 10' sections, an overlay on the ground ("Grid" in the 3D bar). It sits 1" above the
+ * flat ground used without grade points (the bottom of the lowest slab), so it never z-fights the
+ * terrain; terrain that rises above it hides it, which is what a grid under the ground should do.
+ */
 function GroundGrid() {
-  const y = usePlanStore((s) => {
-    const id = s.plan.levelOrder[0];
-    return id ? (getLevelElevations(s.plan)[id]?.slabBottom ?? 0) : 0;
-  });
+  const on = useUiStore((s) => s.show3dGrid);
+  const y = usePlanStore((s) => fallbackElevation(s.plan));
+  if (!on) return null;
   return (
     <Grid
-      position={[0, y - 0.25, 0]}
+      position={[0, y + 1, 0]}
       args={[1, 1]}
       cellSize={12}
       sectionSize={120}
@@ -73,6 +79,12 @@ function GroundGrid() {
       fadeStrength={1.2}
     />
   );
+}
+
+/** The directional light: the sun from the south-west in plan terms, turned with the plan's north angle. */
+function Sun() {
+  const north = usePlanStore((s) => s.plan.site.northAngle);
+  return <directionalLight position={sunPosition(north)} intensity={1.9} />;
 }
 
 function Levels() {
@@ -99,8 +111,9 @@ function View3dToolbar() {
   const names = usePlanStore((s) => s.plan.levelOrder.map((id) => s.plan.levels[id]?.name ?? '').join('\u0000'));
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
+  const grid = useUiStore((s) => s.show3dGrid);
   const walking = useUiStore((s) => s.cameraMode === 'walk');
-  const { toggle3dLevel, setOnly3dActiveAndBelow, requestFit3d, setCameraMode } = useUiStore.getState();
+  const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, requestFit3d, setCameraMode } = useUiStore.getState();
   const nameList = names.split('\u0000');
   return (
     <div className="view3d-toolbar" role="toolbar" aria-label="3D view">
@@ -114,6 +127,10 @@ function View3dToolbar() {
       <label title="Hide the levels above the one being edited">
         <input type="checkbox" checked={only} onChange={(e) => setOnly3dActiveAndBelow(e.target.checked)} />
         Only active level and below
+      </label>
+      <label title="Grid lines on the ground (12 inch cells, 10 foot sections)">
+        <input type="checkbox" checked={grid} onChange={(e) => setShow3dGrid(e.target.checked)} />
+        Grid
       </label>
       <span className="sep" />
       <button
@@ -169,7 +186,8 @@ function WalkOverlay() {
 }
 
 /**
- * The 3D model: one group per level at its elevation, orbit or walk controls, a ground grid.
+ * The 3D model: the terrain, one group per level at its elevation, the site's columns, orbit or walk
+ * controls, an optional ground grid.
  * Renders on demand only (frameloop="demand") while orbiting, so an idle model costs nothing.
  */
 export default function Scene3D() {
@@ -186,9 +204,11 @@ export default function Scene3D() {
       >
         <color attach="background" args={['#e9edf1']} />
         <hemisphereLight args={['#ffffff', '#b8b0a2', 1.7]} />
-        <directionalLight position={[-700, 1600, 1100]} intensity={1.9} />
+        <Sun />
+        <Terrain />
         <GroundGrid />
         <Levels />
+        <SiteColumns />
         <Controls />
         <InvalidateOnChange />
         <DebugHandle />

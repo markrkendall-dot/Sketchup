@@ -1,5 +1,6 @@
 import { getLevelElevations } from '../derive/levels';
 import { roofBearing, roofExtremes, roofOutlineWithOverhang } from '../derive/roofs';
+import { columnOutline, fallbackElevation, terrainHeightAt } from '../derive/site';
 import type { Id, Plan } from '../model/types';
 
 export interface Box3d {
@@ -9,7 +10,8 @@ export interface Box3d {
 
 /**
  * Bounding box of the given levels in three coordinates (x, Y up, plan y): the nodes and roof
- * overhangs in plan, from the lowest slab bottom to the highest ceiling or roof top. An empty plan
+ * overhangs in plan, from the lowest slab bottom to the highest ceiling or roof top, the site's
+ * columns, and the terrain's height over the house area (never its 40' margin). An empty plan
  * gives a 20' box at the origin.
  */
 export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): Box3d {
@@ -42,6 +44,16 @@ export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): 
       maxY = Math.max(maxY, e.floorTop + roofExtremes(roof, roofBearing(level.wallHeight, roof)).ridge + roof.thickness);
     }
   }
+  for (const c of Object.values(plan.site.columns)) {
+    for (const p of columnOutline(c)) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minZ = Math.min(minZ, p.y);
+      maxZ = Math.max(maxZ, p.y);
+    }
+    minY = Math.min(minY, c.base);
+    maxY = Math.max(maxY, c.top);
+  }
   if (!Number.isFinite(minX)) {
     minX = 0;
     minZ = 0;
@@ -51,6 +63,18 @@ export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): 
   if (!Number.isFinite(minY)) {
     minY = 0;
     maxY = 96;
+  }
+  // The ground over the house area, sampled on a coarse grid (terrain, not its margin).
+  if (Object.keys(plan.site.gradePoints).length) {
+    const fallback = fallbackElevation(plan);
+    const N = 6;
+    for (let i = 0; i <= N; i++) {
+      for (let j = 0; j <= N; j++) {
+        const h = terrainHeightAt(plan.site, { x: minX + ((maxX - minX) * i) / N, y: minZ + ((maxZ - minZ) * j) / N }, fallback);
+        minY = Math.min(minY, h);
+        maxY = Math.max(maxY, h);
+      }
+    }
   }
   return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
 }

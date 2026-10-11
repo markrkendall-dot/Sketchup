@@ -90,8 +90,17 @@ export interface Level {
   rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; roofs: Record<Id, Roof>; underlay?: Underlay;
 }
 
-// The site (M9 gives these behaviour; the file carries them from schema version 2).
-export interface Site { northAngle: Degrees; gradePoints: Record<Id, GradePoint>; columns: Record<Id, Column> }
+// The site (see "Site and terrain"; the file carries it from schema version 2).
+export interface GradePoint { id: Id; at: Vec2; elevation: Inches }   // elevation: absolute, like floor tops
+export interface Column {
+  id: Id; at: Vec2; width: Inches; depth: Inches; rotation: Degrees; // plan rectangle, turned clockwise
+  base: Inches; top: Inches;                                         // absolute elevations
+  kind: 'post' | 'chimney'; phase: Phase;
+}
+export interface Site {
+  northAngle: Degrees;      // degrees clockwise from the top of the plan to true north
+  gradePoints: Record<Id, GradePoint>; columns: Record<Id, Column>;
+}
 
 export interface PlanSettings {
   snapGrid: Inches;          // 1
@@ -259,6 +268,89 @@ the bounding box, 8:12, 24" overhang, 8" thick, 6" fascia, metal, the toolbar's 
 "Fit to walls" in the panel sets the outline to the level's outer-face polygon when the walls close
 exactly one ring.
 
+## Site and terrain (`derive/site.ts`, `editor2d/tools/siteTools.ts`)
+
+The plan's `site` holds the ground (grade points: spot elevations), the columns (chimney, posts) and
+the north angle. None of it belongs to a level.
+
+**Terrain** (`site.ts`, pure, position arrays like `roofs.ts`; `meshes.ts` wraps them). `terrainHeightAt`
+is the inverse-distance-weighted (power 2) average of the grade points: exactly a point's elevation
+within 1" of it, flat for a single point, `fallback` (the bottom of the lowest level's slab,
+`fallbackElevation`) without points. `terrainGrid(site, bounds, fallback)` samples it on a 24" grid over
+the plan bounds (`siteBounds`: nodes of every level, roof outlines, columns, grade points) plus 480",
+rounded outward to whole cells, so a wall moving about does not change the grid; the step grows when
+that would exceed 200 cells along an axis. The result is an indexed
+surface (vertex = plan x, elevation, plan y; two triangles per cell, all facing +Y) plus its `bounds`
+(`terrainBounds`). The memo `terrainFor` is keyed by the site's `gradePoints` record (immer keeps its
+identity while a grade point is untouched, so a column, the north angle or a wall inside the bounds
+never rebuilds anything), then by the rounded bounds and the fallback. `getTerrainGeometry(plan)` keeps
+one `BufferGeometry` per grid (smooth normals) and disposes the one it replaces. The terrain is
+opaque and FrontSide (`#7f9a63`, roughness 1) and replaces the infinite grid as the ground, so the
+basement walls below grade are buried and the walkout side shows. The drei grid stays as an overlay
+("Grid" checkbox in the 3D bar, `uiStore.show3dGrid`, default on) 1" above the fallback elevation: with
+grade points the terrain is above it and hides it, which is the point (no z-fighting). The terrain also
+passes through the basement's interior volume (the ground is not cut away under the house), so it
+shows through basement openings and in the walk view inside the basement. A weighted average never
+leaves the range of the grade points' elevations, so with every grade point at or below the First Floor
+slab's underside (the "north pair at first floor top minus 12 inches" of the renovation scenario) the
+ground never reaches that slab; a grade point above it would, and nothing clamps it.
+
+**Columns** are boxes from `base` to `top` (absolute elevations) over a plan rectangle turned by
+`rotation` (`columnOutline`, `buildColumnGeometry` = `prism`). Defaults (`columnDefaults`): chimney
+24" x 40", base 12" below the ground at its point (`groundAt`), top 48" above the highest roof ridge
+on the plan (the top surface at the ridge; above the top ceiling without roofs); post 6" x 6", base on
+the ground, top at the lowest roof underside over it among roofs it can be seen with (a new post
+ignores a roof being demolished; `phasesCoexist`), else the first floor's ceiling. `getSiteMeshes(plan,
+viewMode)` returns the visible columns' geometry, memoized per view mode by the `columns` record and per
+column object, disposing what drops out. The `Terrain` and the columns render in `view3d/SiteMeshes.tsx`
+(columns: brick `#7a4a3e`, post tan `#c9b58c`, demolished translucent red, new pulled toward green).
+
+**Site mode** (`uiStore.siteMode`, the "Site" tab below the lowest level in the level bar): entering it
+makes the lowest level active (so the panel and store actions have a level), clears the selection and
+shows, in place of the level's layers (`PlanLayers.tsx SiteView`), the first floor (the level above the
+lowest, or the lowest if alone) as a ghost, every level's roofs as faint ghosts, and the site layer: grade
+points as small triangles with their elevation, columns as rectangles (chimney hatched like brick, post
+solid; demolished hatched red, new green; hidden in the views that hide them), a north arrow in the
+canvas corner turned by `northAngle`. Choosing any level (the lowest too) leaves site mode
+(`setActiveLevel` clears the flag). In site mode only select, grade point (E) and column (C) work;
+`switchTool` refuses the level tools and says "Choose a level to draw walls" in the status bar (the
+toolbar buttons stay clickable but dimmed and `aria-disabled`; E and C do nothing outside it). The 3D
+view ignores "Only active level and below" in site mode (the active level is the lowest then).
+
+**Site tools** (`siteTools.ts`): `siteSnap` snaps to the first floor's wall-face corners and faces, nodes,
+midpoints and the grid. Grade point: a click stores the spot in `draft.gradePending`; the length buffer
+takes the elevation in feet-inches (a minus sign is allowed); Enter places it, with nothing typed at the
+first floor's floor top (the level the view shows; `defaultGradeElevation`); Esc clears the buffer, then
+the spot. Column: the column follows the cursor (`draft.columnPreview`), Tab toggles chimney / post,
+the click places it with the defaults above in the toolbar's "Draw as" phase. The site select tool
+(`getTool('select')` returns it in site mode) picks grade points (10 px) before columns (visible ones, with
+a 4 px slack), shift-click and box-select add, a drag moves the whole selection with `moveSiteItems`
+(one set; the first changing step is tracked and the rest folded in, one undo step), Delete removes
+through `deleteEntities`. Store actions: `addGradePoint`, `updateGradePoint`, `deleteGradePoints`,
+`clearGradePoints`, `addColumn`, `updateColumn`, `deleteColumns` (`columnProblem` rejects a non-positive
+size or a top at or below the base), `moveSiteItems`, `setNorthAngle` (normalized to [0, 360)); each is
+one undo step and a no-op leaves the plan object alone. `setPhase` and `deleteEntities` take `columns`
+(and `deleteEntities` `gradePoints`). `Selection` gains `gradePoints` and `columns`. The panel has Grade
+point (elevation, position, against the first floor), Column (kind, size, rotation, base, top, phase,
+"Reset heights") and, with nothing selected in site mode, Site (north angle, "Road is north", counts,
+"Clear grade points" with a confirm).
+
+**North and light**: `sunPosition(northAngle)` is the directional light's position, the south-west offset
+(-700, 1100) in plan turned clockwise by the angle, so the sun comes from the south-west once north is
+applied.
+
+**Phases** apply to roofs and columns exactly like walls: `isVisible(phase, viewMode)` in `RoofShape` and
+`ColumnShape` (2D), `hitTest` / `hitSite` (picking), `pruneSelection`, `getLevelMeshes` (roofs, and walls
+they raise), `getSiteMeshes`, the export, and the status bar counts; "Mark demolish" (panel, `setPhase`)
+and the toolbar's "Draw as" cover them.
+
+**Export**: after the level groups a `Site` group (elevation 0, absolute heights) holds `Terrain` (material
+`terrain`, only when the site has grade points: flat ground would only be a plane at the slab) and the
+visible columns as `Chimney` / `Post` (materials `column_<kind>_<phase>`).
+
+**Fit 3D** (`bounds.ts planBox`) includes the columns and the terrain's height over the house area (a
+6 x 6 sampling of the plan box), never the 40' margin.
+
 ## 2D editor
 
 One `<svg>` with a single `<g transform="translate(tx ty) scale(k)">`. Transient state (cursor, snap,
@@ -397,8 +489,9 @@ the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat 
 existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior a
 little darker; floors tan, stairs grey; roofs by finish (metal `#6e6259`, metalness 0.4, roughness
 0.5; shingle `#4a4a4a`), demolished translucent like walls, new pulled toward green. Fit 3D and the
-walk start count roof overhangs and roof tops in the scene bounds. Hemisphere + one directional light, no shadows. drei `<Grid>`
-(12" cells, 10' sections) at the lowest slab's bottom. Orbit (drei OrbitControls, makeDefault)
+walk start count roof overhangs and roof tops in the scene bounds. Hemisphere + one directional light (turned with the north angle, see "Site and terrain"), no shadows.
+The terrain is the ground (opaque green surface over the plan plus 40'); drei `<Grid>` (12" cells, 10'
+sections) is an overlay 1" above the flat fallback ground, toggled by the "Grid" checkbox in the 3D bar. Orbit (drei OrbitControls, makeDefault)
 framing the plan's bounding box on first mount; Fit re-frames the visible levels. Overlay toolbar:
 level checkboxes and "Only active level and below". Layout (uiStore): 2D, split (draggable divider,
 ratio in uiStore) or 3D, toolbar buttons and backtick to cycle; the 2D canvas stays mounted (hidden
@@ -430,15 +523,16 @@ then read into a Plan built from known fields only (`pick`: unknown keys dropped
 file's order so a current file round-trips byte for byte), with defaults for missing optional
 values and broken openings, rooms, stairs and underlays dropped (a broken roof is dropped with a
 console warning naming it). New and Open replace the plan and
-clear the undo history (New confirms when the plan has walls, rooms, stairs or an image). Autosave
+clear the undo history (New confirms when the plan has walls, rooms, stairs, roofs, site elements or an image). Autosave
 to IndexedDB (idb-keyval) on every plan change (debounced), restored on load; a failed save
 (storage full, IndexedDB unavailable) shows "Autosave failed: ..." in the status bar until a later
 save works, and is never thrown. Underlays downscaled to <= 2048px JPEG data URLs.
 3D export (`io/export3d.ts`, toolbar "Export" menu, loaded on first use): `buildExportScene` builds
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
-skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof` with
-cloned geometry and cloned live materials (one per phase/kind, roofs `roof_<finish>_<phase>`, named
+skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, then a `Site`
+group (`Terrain`, `Chimney`, `Post`) with cloned geometry and cloned live materials (one per phase/kind,
+roofs `roof_<finish>_<phase>`, columns `column_<kind>_<phase>`, `terrain`, named
 without spaces), disposed after
 export. glTF: `GLTFExporter`, `binary: true`, `trs: true`. OBJ: `OBJExporter` on the same group with
 the scale reset to 1 (inches; SketchUp asks for units) and each mesh name prefixed with its level,

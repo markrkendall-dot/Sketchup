@@ -5,6 +5,7 @@ import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces 
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { faceAt, getFaces, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
+import { siteGhostLevelId } from '../derive/site';
 import { floorToFloor, stairsSymbol, stairSteps, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
@@ -31,6 +32,7 @@ const OPEN_END_PX = 4.5;
 /** Room tints cycle through this many classes. */
 const ROOM_TINTS = 4;
 export const HATCH_DEMO_ID = 'hp-hatch-demo';
+export const HATCH_CHIMNEY_ID = 'hp-hatch-chimney';
 
 const pt = (p: Vec2) => `${p.x},${p.y}`;
 const segPath = (segs: readonly (readonly [Vec2, Vec2])[]) => segs.map(([p, q]) => `M${pt(p)}L${pt(q)}`).join('');
@@ -69,6 +71,10 @@ const PatternDefs = memo(function PatternDefs() {
       >
         <rect className="hatch-bg" width={size} height={size} />
         <line className="hatch-line" x1={0} y1={0} x2={0} y2={size} strokeWidth={1.5 / k} />
+      </pattern>
+      <pattern id={HATCH_CHIMNEY_ID} patternUnits="userSpaceOnUse" width={size} height={size} patternTransform="rotate(-45)">
+        <rect className="hatch-chimney-bg" width={size} height={size} />
+        <line className="hatch-chimney-line" x1={0} y1={0} x2={0} y2={size} strokeWidth={1.5 / k} />
       </pattern>
     </defs>
   );
@@ -861,6 +867,92 @@ export const GhostLevel = memo(function GhostLevel({ levelId }: { levelId: Id })
     <g className="layer-ghost" pointerEvents="none" data-ghost-level={levelId}>
       <path className="ghost-wall" d={d} vectorEffect="non-scaling-stroke" />
     </g>
+  );
+});
+
+// ---------------------------------------------------------------------------------------------
+// Site layer (site mode): grade points and columns over the first floor's ghost.
+
+/** A grade point: a small triangle with its elevation beside it, constant on screen. */
+const GradePointShape = memo(function GradePointShape({ pointId }: { pointId: Id }) {
+  const g = usePlanStore((s) => s.plan.site.gradePoints[pointId]);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const selected = useUiStore((s) => s.selection.gradePoints.includes(pointId));
+  const k = useViewportScale();
+  if (!g) return null;
+  return (
+    <g className={`grade-point${selected ? ' is-selected' : ''}`} data-grade-id={pointId} transform={`translate(${g.at.x} ${g.at.y}) scale(${1 / k})`}>
+      <path className="grade-tri" d="M0 -7L6.5 5L-6.5 5Z" />
+      <text className="grade-label" x={10} y={4}>
+        {formatLengthCompact(g.elevation, denom)}
+      </text>
+    </g>
+  );
+});
+
+/** A column's plan rectangle: chimneys hatched like brick, posts solid; demo hatched red, new green. */
+const ColumnShape = memo(function ColumnShape({ columnId }: { columnId: Id }) {
+  const c = usePlanStore((s) => s.plan.site.columns[columnId]);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const selected = useUiStore((s) => s.selection.columns.includes(columnId));
+  if (!c || !isVisible(c.phase, viewMode)) return null;
+  return (
+    <g
+      className={`column column-${c.kind} phase-${c.phase}${selected ? ' is-selected' : ''}`}
+      data-column-id={columnId}
+      transform={`translate(${c.at.x} ${c.at.y}) rotate(${c.rotation})`}
+    >
+      <rect className="column-body" x={-c.width / 2} y={-c.depth / 2} width={c.width} height={c.depth} vectorEffect="non-scaling-stroke" />
+    </g>
+  );
+});
+
+/** The site's grade points and columns (picking is done by the select tool, hitSite). */
+const SiteLayer = memo(function SiteLayer() {
+  const pointIds = usePlanStore(useShallow((s) => Object.keys(s.plan.site.gradePoints)));
+  const columnIds = usePlanStore(useShallow((s) => Object.keys(s.plan.site.columns)));
+  return (
+    <g className="layer-site" pointerEvents="none">
+      <g className="layer-columns">
+        {columnIds.map((id) => (
+          <ColumnShape key={id} columnId={id} />
+        ))}
+      </g>
+      <g className="layer-grade-points">
+        {pointIds.map((id) => (
+          <GradePointShape key={id} pointId={id} />
+        ))}
+      </g>
+    </g>
+  );
+});
+
+/** Every level's roofs as faint ghosts, so a post is placed knowing where the roofs are. */
+const SiteRoofGhosts = memo(function SiteRoofGhosts() {
+  const keys = usePlanStore(
+    useShallow((s) => s.plan.levelOrder.flatMap((lid) => Object.keys(s.plan.levels[lid]?.roofs ?? NO_RECORD).map((rid) => `${lid}|${rid}`))),
+  );
+  if (keys.length === 0) return null;
+  return (
+    <g className="layer-roof-ghost" pointerEvents="none">
+      {keys.map((k) => {
+        const [lid, rid] = k.split('|');
+        return <RoofShape key={k} levelId={lid} roofId={rid} ghost />;
+      })}
+    </g>
+  );
+});
+
+/** What the 2D view shows in site mode: the first floor as a ghost, the roofs faintly, the site layer on top. */
+export const SiteView = memo(function SiteView() {
+  const ghostId = usePlanStore((s) => siteGhostLevelId(s.plan));
+  return (
+    <>
+      <PatternDefs />
+      <g className="site-ghost">{ghostId && <GhostLevel levelId={ghostId} />}</g>
+      <SiteRoofGhosts />
+      <SiteLayer />
+    </>
   );
 });
 

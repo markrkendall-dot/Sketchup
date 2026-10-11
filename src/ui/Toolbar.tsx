@@ -4,7 +4,7 @@ import { activateUnderlayTool, setViewMode, switchTool } from '../editor2d/tools
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import type { MeasureTo } from '../model/types';
 import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planStore';
-import { useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
+import { isSiteModeTool, SITE_MODE_TOOL_HINT, useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
 import { visible3dLevels } from '../view3d/visibility';
 import { choosePlanFile, newPlan, savePlan, zoomToFit } from './fileActions';
 import { focusCanvas, releaseFocus } from './focus';
@@ -20,6 +20,12 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
   { name: 'stairs', label: 'Stairs', key: 'T' },
   { name: 'roof', label: 'Roof', key: 'K' },
   { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
+];
+
+/** Only in site mode. */
+const SITE_TOOL_BUTTONS: { name: ToolName; label: string; key: string; title: string }[] = [
+  { name: 'gradePoint', label: 'Grade point', key: 'E', title: 'Grade point (E): click a spot on the ground, type its elevation, Enter' },
+  { name: 'column', label: 'Column', key: 'C', title: 'Column (C): click to place a chimney; Tab switches to a post' },
 ];
 
 const TOOL_TITLE: Partial<Record<ToolName, string>> = {
@@ -150,6 +156,7 @@ const blurAfter = (e: ChangeEvent<HTMLSelectElement>) => e.currentTarget.blur();
 
 export function Toolbar() {
   const activeTool = useUiStore((s) => s.activeTool);
+  const siteMode = useUiStore((s) => s.siteMode);
   const showGrid = useUiStore((s) => s.showGrid);
   const toggleGrid = useUiStore((s) => s.toggleGrid);
   const orthoLock = useUiStore((s) => s.orthoLock);
@@ -255,29 +262,34 @@ export function Toolbar() {
       </div>
       <div className="toolbar-row">
         <div className="group" role="group" aria-label="Tools">
-          {TOOLS.map((t) => (
-            <button
-              key={t.name}
-              className={activeTool === t.name ? 'active' : ''}
-              aria-pressed={activeTool === t.name}
-              title={TOOL_TITLE[t.name] ?? `${t.label} (${t.key})`}
-              onClick={() => {
-                if (t.name === 'underlay') activateUnderlayTool();
-                else switchTool(t.name);
-                focusCanvas();
-              }}
-            >
-              {t.short ? (
-                <>
-                  <span className="lbl-long">{t.label}</span>
-                  <span className="lbl-short">{t.short}</span>
-                </>
-              ) : (
-                t.label
-              )}{' '}
-              <kbd>{t.key}</kbd>
-            </button>
-          ))}
+          {[...TOOLS, ...(siteMode ? SITE_TOOL_BUTTONS : [])].map((t) => {
+            const off = siteMode && !isSiteModeTool(t.name);
+            return (
+              <button
+                key={t.name}
+                className={`${activeTool === t.name ? 'active' : ''}${off ? ' tool-off' : ''}`}
+                aria-pressed={activeTool === t.name}
+                aria-disabled={off || undefined}
+                data-tool={t.name}
+                title={off ? SITE_MODE_TOOL_HINT : ('title' in t ? t.title : TOOL_TITLE[t.name]) ?? `${t.label} (${t.key})`}
+                onClick={() => {
+                  if (t.name === 'underlay') activateUnderlayTool();
+                  else switchTool(t.name);
+                  focusCanvas();
+                }}
+              >
+                {'short' in t && t.short ? (
+                  <>
+                    <span className="lbl-long">{t.label}</span>
+                    <span className="lbl-short">{t.short}</span>
+                  </>
+                ) : (
+                  t.label
+                )}{' '}
+                <kbd>{t.key}</kbd>
+              </button>
+            );
+          })}
         </div>
         <label className="measure">
           Draw as
@@ -294,21 +306,23 @@ export function Toolbar() {
             <option value="new">new</option>
           </select>
         </label>
-        <label className="measure" title={MEASURE_RULE}>
-          Lengths to
-          <select
-            aria-label="Typed wall lengths measure to"
-            value={measureTo}
-            onChange={(e) => {
-              setMeasureTo(e.target.value as MeasureTo);
-              blurAfter(e);
-            }}
-          >
-            <option value="center">center</option>
-            <option value="inside">inside face</option>
-            <option value="outside">outside face</option>
-          </select>
-        </label>
+        {!siteMode && (
+          <label className="measure" title={MEASURE_RULE}>
+            Lengths to
+            <select
+              aria-label="Typed wall lengths measure to"
+              value={measureTo}
+              onChange={(e) => {
+                setMeasureTo(e.target.value as MeasureTo);
+                blurAfter(e);
+              }}
+            >
+              <option value="center">center</option>
+              <option value="inside">inside face</option>
+              <option value="outside">outside face</option>
+            </select>
+          </label>
+        )}
         <div className="spacer" />
         <div className="group" role="group" aria-label="Plan view">
           <button
