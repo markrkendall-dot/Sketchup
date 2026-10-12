@@ -1,6 +1,8 @@
 import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
+import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
+import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
 import { CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, Phase, RoofFinish, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture } from './groundTexture';
@@ -307,6 +309,41 @@ export const farGroundMaterial = terrainMaterial.clone();
 farGroundMaterial.polygonOffset = true;
 farGroundMaterial.polygonOffsetFactor = -1;
 farGroundMaterial.polygonOffsetUnits = -4;
+
+/**
+ * Casework (DESIGN.md "Casework"): painted cabinet carcasses and fronts in the fixture's front
+ * colour, a dark toe kick, brushed steel appliances and sink basins, and the counter in the level's
+ * counter colour with a slight stone sheen. Demolished parts are translucent red, new ones pulled
+ * toward green, like everything else.
+ */
+export function caseworkMaterial(part: CasePart, phase: Phase, color: string = DEFAULT_CABINET_COLOR): MeshStandardMaterial {
+  if (part === 'kick') return trimLike('kick', KICK_COLOR, phase);
+  if (part === 'carcass' || part === 'front') return trimLike('cabinet', color, phase);
+  const key = `${part}|${phase}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      const base = part === 'basin' ? BASIN_COLOR : APPLIANCE_COLOR;
+      m = make(phase === 'new' ? pullGreen(base) : base);
+      m.metalness = 0.6;
+      m.roughness = 0.35;
+    }
+    partMaterials.set(key, m);
+  }
+  return m;
+}
+
+export function counterMaterial(phase: Phase, color: string = DEFAULT_COUNTER_COLOR): MeshStandardMaterial {
+  const key = `counter|${phase}|${color}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    m = phase === 'demo' ? make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 }) : make(phase === 'new' ? pullGreen(color) : color);
+    if (phase !== 'demo') m.roughness = 0.45;
+    partMaterials.set(key, m);
+  }
+  return m;
+}
 
 const columnMaterials = new Map<string, MeshStandardMaterial>();
 

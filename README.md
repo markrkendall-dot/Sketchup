@@ -4,9 +4,10 @@ HomePlan is a browser floor-plan editor for one job: getting the house you live 
 screen from tape measurements, then drawing the changes you want (moved walls, an addition, a new
 porch) and seeing them in 3D. You type wall lengths the way a tape gives them (`12'6`, `150`,
 `6 1/2"`), walls join and split themselves, rooms are found and measured automatically, and the
-house stands up in 3D with its roofs, the ground it sits on, siding, windows and doors. The model
-exports to SketchUp. It is a focused tool, not a Home Designer Pro clone: no cabinets, furniture
-or construction drawings. Everything runs in your browser; nothing is uploaded.
+house stands up in 3D with its roofs, the ground it sits on, siding, windows and doors. A kitchen
+is laid out with cabinets, counters and appliances. The model exports to SketchUp. It is a focused
+tool, not a Home Designer Pro clone: no furniture or construction drawings. Everything runs in your
+browser; nothing is uploaded.
 
 What it draws:
 
@@ -21,6 +22,9 @@ What it draws:
   colour; windows of one or more sashes with divided lites, picture windows, screens, trim and
   shutters; doors with panels or glass, double doors and screen doors; corrugated metal roofs that
   rust; a brick chimney in any colour.
+- **Kitchens**: base, wall and tall cabinets, islands, sinks, ranges, fridges, dishwashers, wall
+  ovens, hoods and microwaves placed along the walls, with one counter top running over each run
+  of cabinets; slab or panel fronts in any colour.
 - **Before and after**: everything you draw is existing, new or to be demolished, and the Existing,
   Proposed and All views show each state, in 2D, in 3D and in the export.
 
@@ -133,6 +137,36 @@ Once the walls are in, these make the 3D model look like the house.
 - **Elevations.** The 3D bar's **N**, **S**, **E** and **W** buttons show each side straight on,
   and the Export menu saves all four as images (see "3D and walk mode" and "Export to SketchUp").
 
+## Kitchens: cabinets, counters and appliances
+
+Press `C`. The properties panel shows the kind the next click places (base cabinet, wall cabinet,
+tall cabinet, island, sink, range, fridge, dishwasher, wall oven, hood, microwave, or a labelled
+box); pick one there. Then:
+
+- **Point along a wall.** The cabinet follows the cursor with its back on the nearest wall face and
+  its front facing into the room. Click to place it at its stock size (a base cabinet is 36" wide,
+  24" deep, 34 1/2" high; a wall cabinet 30 x 12 x 30 with its bottom at 54"). The next one slides
+  up to the end of the last when you aim near it, so a run is placed by clicking along the wall.
+- **Type a width first** (`30`, `2'6`) to place a narrower or wider one; Enter also places it. Esc
+  clears what you typed.
+- **Hold Shift** to place away from the walls (an island; the cursor is then its middle) and press
+  Tab to turn it.
+- **Counters** are drawn by themselves: one top over each run of touching base cabinets, the sink
+  and the dishwasher, 1" past their fronts, mitred where a run turns a corner, cut out at the sink.
+  An island has a counter 1" all round. The counter is 1 1/2" thick on top of the cabinets.
+- **Select a cabinet** (`S`, click it) to change its kind, width, depth, height, bottom, facing,
+  phase, label, fronts (slab or framed panel), front colour and counter overhangs; drag it to move
+  it, Shift+click to select several and move them together. Delete removes it. The Level panel sets
+  the cabinet colour, counter colour and front style every cabinet on the level uses unless it has
+  its own.
+- On the plan, cabinets are outlined with a heavier front edge and a tick where two doors meet;
+  wall cabinets, hoods and microwaves are dashed; appliances carry a word (REF, RANGE, DW, OVEN); a
+  range shows its burners and a sink its basin. In 3D they are painted boxes with doors, drawer
+  fronts and toe kicks, steel appliances, and the counter in its colour.
+
+Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the old cabinets
+*demolish*, and the Existing, Proposed and All views show each state.
+
 ## Planning the renovation
 
 1. Switch the view to **All** (the toolbar, or `V` to cycle). All shows existing walls in grey,
@@ -141,8 +175,10 @@ Once the walls are in, these make the 3D model look like the house.
    the addition (start its walls on the existing exterior wall so they join as T junctions),
    new doors.
 3. To remove something, select it and click **Mark demolish**. That works for walls, doors,
-   windows, stairs, roofs, chimneys and posts; a window that becomes a door is a demolished window
-   plus a new door.
+   windows, stairs, roofs, cabinets, chimneys and posts; a window that becomes a door is a
+   demolished window plus a new door. To take out part of a wall (open a kitchen to the living
+   room), right-click the wall with the select tool and choose **Split wall here**, then mark the
+   piece you want gone.
 4. Flip between **Existing** (what is there, with the demolition shown) and **Proposed** (what
    it will be). Rooms are found per view, so in Proposed two rooms whose dividing wall is
    demolished become one, with its new net area. Roofs and posts follow the view too, and walls
@@ -169,6 +205,9 @@ Once the walls are in, these make the 3D model look like the house.
 - **Selecting a wall where a window is.** A click inside a window's or door's own opening selects
   it; anywhere else on the wall selects the wall. Click a selected opening again to select its
   wall.
+- **Split a wall.** Right-click a wall with the select tool and choose **Split wall here**: a corner
+  goes in at that point and the wall becomes two pieces, each selectable on its own (to demolish
+  one, or move it). A split inside a door or window is refused; move the opening first.
 
 ## 3D and walk mode
 
@@ -195,8 +234,9 @@ also comes back to perspective.
 visible levels): to export the proposed design, switch to Proposed first.
 
 - **glTF (.glb)**, in metres: in SketchUp, File > Import and choose the glTF file. Each level is
-  a group holding its walls, floor, roofs (with their fascia), windows and doors; a `Site` group
-  holds the `Terrain`, `Chimney` and `Post` meshes. Walls are named by kind and phase.
+  a group holding its walls, floor, roofs (with their fascia), windows and doors, cabinets
+  (`Cabinet (base)`, `Appliance (range)`, `Sink`, ...) and `Counter` slabs; a `Site` group holds the
+  `Terrain`, `Chimney` and `Post` meshes. Walls are named by kind and phase.
 - **OBJ (.obj)**, in inches: when importing, set the units to inches.
 - Siding textures are not exported, colours are.
 - **Elevations (.png)**: **Export elevations** saves the north, south, east and west elevations as
@@ -224,6 +264,7 @@ keyboard back to the plan.
 | Keys | Action |
 | --- | --- |
 | `S` `W` `R` `D` `N` `P` `T` `K` `U` | Select, Wall, Room, Door, Window, Passage, Stairs, Roof, Underlay |
+| `C` | Cabinet: the chosen kind follows the cursor along the nearest wall; click to place, type a width first to change it (Site tab: Column) |
 | `B` | Box: four walls; click a corner, type `12' x 10'` (or `12'` Tab `10'`), Enter |
 | `M` | Measure between two points; Esc clears |
 | `E` `C` (Site tab only) | Grade point, Column (chimney; Tab before the click for a post) |
@@ -232,8 +273,8 @@ keyboard back to the plan.
 | `Backspace` | Edit the typed length; roof: remove the last corner |
 | `Esc` | Clear the typed length, then end the wall chain / cancel the roof / clear the selection |
 | `X` | Next wall exterior or interior |
-| `Shift` (hold) | Invert ortho lock; with ortho off, 15° steps |
-| `Tab` / `Shift+Tab` | Door swing side / hinge; stairs turn 90°; column chimney or post |
+| `Shift` (hold) | Invert ortho lock; with ortho off, 15° steps; cabinet: place away from the walls |
+| `Tab` / `Shift+Tab` | Door swing side / hinge; stairs and free cabinets turn 90°; column chimney or post |
 | `Delete` | Delete the selection |
 | `Enter` / `F2` | Rename the selected room |
 | `Arrows` (`Shift`) | Nudge the selected underlay 1" (1') |
@@ -288,7 +329,8 @@ order below, then draw the renovation on top.
 ### How the starter was built
 
 `scripts/example-plan.ts` builds it through the editor's own store actions (`addWall`,
-`addOpening`, `addRoof`, `addColumn`, `addGradePoint`, so every wall passes through the same
+`addOpening`, `addRoof`, `addColumn`, `addGradePoint`; the kitchen's cabinets are not in it, the
+existing ones have not been measured, so every level's `fixtures` is empty), so every wall passes through the same
 joining, clamping and validation as a wall you draw), and `npm run build:example` writes the JSON.
 The script is the readable record of every number: read it before changing the file, edit the
 script rather than the JSON for bulk changes, and run `npm test` (a test checks the file against
@@ -474,8 +516,13 @@ parts green. Export from Existing and from Proposed to give the contractor or Sk
   edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
 - **Not drawn yet**: decks and railings, exterior stairs, retaining walls, the lot outline, porch
-  floors and steps, foundations under additions and porches, gutters, cabinets, fixtures,
+  floors and steps, foundations under additions and porches, gutters, bathroom fixtures,
   furniture, and text or dimension notes you place yourself.
+- **Cabinets** are boxes with simple fronts: no door swings on the plan, no backsplash, open
+  shelves or corner cabinets (an inside corner is two cabinets whose counter is mitred), and a
+  counter is only joined across cabinets turned by a quarter turn (a cabinet at 45° carries its
+  own). Inside faces of walls still show the siding and floors are one colour (interior finishes
+  are next).
 - **Walk mode has no collision**: you can walk through walls and the ground.
 - The terrain is the average of your grade points, weighted by distance. Under the lowest level's
   footprint (out to its walls' outside faces) it drops to 2" below that level's slab, so the

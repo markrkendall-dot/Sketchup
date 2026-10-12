@@ -1,5 +1,7 @@
 import { memo } from 'react';
+import { fixtureSymbol } from '../derive/casework';
 import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
+import { FIXTURE_LABEL } from '../model/casework';
 import { defaultGradeElevation } from '../derive/site';
 import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
 import { add, dist, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
@@ -10,6 +12,7 @@ import { usePlanStore } from '../store/planStore';
 import {
   useUiStore,
   type Draft,
+  type FixturePreview,
   type OpeningPreview,
   type RectPreview,
   type UnderlayMode,
@@ -17,7 +20,7 @@ import {
   type Viewport,
   type WallPreview,
 } from '../store/uiStore';
-import { StairsGlyph } from './PlanLayers';
+import { FixtureGlyph, StairsGlyph } from './PlanLayers';
 import { wallPreviewText } from './previewLabel';
 import { worldToScreen } from './viewport';
 
@@ -371,6 +374,27 @@ function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number
   );
 }
 
+/**
+ * Fixture tool: the ghost of the cabinet or appliance about to be placed, drawn in world space like
+ * the real symbol, with its kind and width on a pill (green while the width is typed).
+ */
+function FixtureGhost({ preview, v, denom }: { preview: FixturePreview; v: Viewport; denom: number }) {
+  const sym = fixtureSymbol({ id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: 1, elevation: 0, phase: 'existing' });
+  const front = worldToScreen(v, midpoint(sym.front[0], sym.front[1]));
+  const back = worldToScreen(v, preview.origin);
+  const out = normalize(sub(front, back));
+  const at = add(front, scale(out.x === 0 && out.y === 0 ? { x: 0, y: 1 } : out, 16));
+  const text = `${FIXTURE_LABEL[preview.kind]} ${formatLengthCompact(preview.width, denom)}${preview.wallId ? '' : ' (free)'}`;
+  return (
+    <g className={`fixture-ghost${preview.typed ? ' typed' : ''}${preview.abuts ? ' abuts' : ''}`}>
+      <g transform={`translate(${v.tx} ${v.ty}) scale(${v.k})`}>
+        <FixtureGlyph sym={sym} k={v.k} className="fixture fixture-ghost-glyph" />
+      </g>
+      <Pill at={at} text={text} className="measure-readout" />
+    </g>
+  );
+}
+
 /** Roof tool: the corners clicked so far, the edge to the cursor and the closing edge (dashed). */
 function RoofDraft({ points, cursor, v }: { points: Vec2[]; cursor: Vec2 | null; v: Viewport }) {
   const sp = points.map((p) => worldToScreen(v, p));
@@ -439,6 +463,7 @@ export const Overlay = memo(function Overlay() {
       {draft.stairsPreview && <StairsGhost origin={draft.stairsPreview.origin} direction={draft.stairsPreview.direction} v={v} />}
       {tool === 'roof' && draft.roofPoints.length > 0 && <RoofDraft points={draft.roofPoints} cursor={draft.snap?.point ?? draft.cursor} v={v} />}
       {tool === 'column' && draft.columnPreview && <ColumnGhost {...draft.columnPreview} v={v} />}
+      {tool === 'fixture' && draft.fixturePreview && <FixtureGhost preview={draft.fixturePreview} v={v} denom={denom} />}
       {tool === 'gradePoint' && draft.gradePending && (
         <GradeDraft at={draft.gradePending} text={draft.lengthBuffer} error={draft.error} v={v} placeholder={gradeDefault} />
       )}

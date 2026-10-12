@@ -1300,6 +1300,33 @@ button.primary:hover:not(:disabled) {
   font-size: 12px;
 }
 
+/* Fixture tool: the symbol of the cabinet about to be placed, in the accent colour. */
+.fixture-ghost .fixture-ghost-glyph .fixture-body {
+  fill: rgba(37, 99, 235, 0.14);
+  stroke: rgba(37, 99, 235, 0.8);
+  stroke-dasharray: 4 3;
+}
+
+.fixture-ghost .fixture-ghost-glyph .fixture-front,
+.fixture-ghost .fixture-ghost-glyph .fixture-tick,
+.fixture-ghost .fixture-ghost-glyph .fixture-basin,
+.fixture-ghost .fixture-ghost-glyph .fixture-burner {
+  stroke: rgba(37, 99, 235, 0.8);
+}
+
+.fixture-ghost .fixture-ghost-glyph .fixture-label {
+  fill: #1e3a8a;
+}
+
+.fixture-ghost.typed .fixture-ghost-glyph .fixture-body {
+  fill: rgba(22, 163, 74, 0.16);
+  stroke: rgba(22, 163, 74, 0.8);
+}
+
+.fixture-ghost.abuts .fixture-ghost-glyph .fixture-body {
+  stroke-dasharray: none;
+}
+
 .column-ghost rect {
   fill: rgba(122, 59, 44, 0.18);
   stroke: #7a3b2c;

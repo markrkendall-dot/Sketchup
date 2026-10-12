@@ -5,6 +5,7 @@
 // (editor2d/planStyles.ts) is inlined, so the file needs nothing else.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { fixtureExtent } from '../derive/casework';
 import { getFootprints } from '../derive/footprint';
 import { isVisible, VIEW_MODE_LABEL } from '../derive/phase';
 import { roofOutlineWithOverhang } from '../derive/roofs';
@@ -52,6 +53,7 @@ export function levelDrawingBounds(level: Level, viewMode: ViewMode): Bounds | n
   for (const fp of getFootprints(level, viewMode).values()) pts.push(...fp.poly);
   for (const r of Object.values(level.roofs ?? {})) if (isVisible(r.phase, viewMode)) pts.push(...roofOutlineWithOverhang(r));
   for (const st of Object.values(level.stairs)) if (isVisible(st.phase, viewMode)) pts.push(...stairsSymbol(st, 1).outline);
+  for (const f of Object.values(level.fixtures ?? {})) if (isVisible(f.phase, viewMode)) pts.push(...fixtureExtent(f));
   return boundsOf(pts);
 }
 

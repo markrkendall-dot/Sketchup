@@ -8,6 +8,7 @@ import {
   clampOpenings,
   columnProblem,
   createEmptyPlan,
+  fixtureProblem,
   roofOptionProblem,
   roofProblem,
   findNodeNear,
@@ -20,7 +21,7 @@ import {
   wallOverlapping,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
-import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Column, Fixture, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { normalizeDegrees, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
@@ -66,8 +67,14 @@ export type GradePointPatch = Partial<Omit<GradePoint, 'id'>>;
 export type NewGradePoint = Omit<GradePoint, 'id'> & { id?: Id };
 export type ColumnPatch = Partial<Omit<Column, 'id'>>;
 export type NewColumn = Omit<Column, 'id'> & { id?: Id };
+export type FixturePatch = Partial<Omit<Fixture, 'id'>>;
+export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
+/** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
+const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang']);
 export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
+/** A level's casework defaults; undefined clears a field. */
+export type FinishesPatch = Partial<Record<keyof LevelFinishes, LevelFinishes[keyof LevelFinishes] | undefined>>;
 /** Which end of a wall stays put when its length is edited. */
 export type LengthAnchor = 'start' | 'end';
 
@@ -78,6 +85,7 @@ export interface EntitySelection {
   rooms?: Id[];
   stairs?: Id[];
   roofs?: Id[];
+  fixtures?: Id[];
   /** Site elements (plan.site); the level id the action is given only scopes the other kinds. */
   gradePoints?: Id[];
   columns?: Id[];
@@ -155,6 +163,26 @@ export interface PlanState {
    */
   updateRoof: (levelId: Id, id: Id, patch: RoofPatch) => void;
   deleteRoofs: (levelId: Id, ids: Id[]) => void;
+  /** Add a cabinet, appliance or sink (DESIGN.md "Casework"); returns the id, or null when it is not usable (fixtureProblem). */
+  addFixture: (levelId: Id, fixture: NewFixture) => Id | null;
+  /**
+   * Patch a fixture; an unusable size, kind or optional field is rejected, the direction is
+   * normalized to [0, 360). The optional fields (label, front style and colour, counter overhang)
+   * take undefined to clear them.
+   */
+  updateFixture: (levelId: Id, id: Id, patch: FixturePatch) => void;
+  deleteFixtures: (levelId: Id, ids: Id[]) => void;
+  /** Move fixtures to new back-edge positions in one set (a drag of the selection). */
+  moveFixtures: (levelId: Id, positions: Record<Id, Vec2>) => void;
+  /** Copies of the fixtures, each moved by `offset`, in one undo step; returns the new ids. */
+  duplicateFixtures: (levelId: Id, ids: Id[], offset: Vec2) => Id[];
+  /** Set the level's casework defaults (cabinet colour, counter colour, front style); undefined clears a field. */
+  updateFinishes: (levelId: Id, patch: FinishesPatch) => void;
+  /**
+   * Split a wall at `at` inches from its a end (a node is inserted there and the level normalized,
+   * so the wall becomes two). Null when done, else why not: too near an end, or inside an opening.
+   */
+  splitWall: (levelId: Id, wallId: Id, at: number) => string | null;
   /** Add a grade point (a spot elevation of the ground); returns the id, or null for a non-finite value. */
   addGradePoint: (point: NewGradePoint) => Id | null;
   /** Move a grade point or change its elevation. */
@@ -175,8 +203,8 @@ export interface PlanState {
   setNorthAngle: (degrees: number) => void;
   /** Delete every grade point (the terrain goes flat again) in one undo step. */
   clearGradePoints: () => void;
-  /** Set the phase of walls, openings, stairs, roofs and columns together (e.g. "Mark demolish"). */
-  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; columns?: Id[] }, phase: Phase) => void;
+  /** Set the phase of walls, openings, stairs, roofs, fixtures and columns together (e.g. "Mark demolish"). */
+  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; columns?: Id[] }, phase: Phase) => void;
   /**
    * Copy the nodes and walls (not openings) of one level into another, merged with whatever is
    * there, in one undo step. Walls that would lie on top of a wall already on the target level
@@ -234,8 +262,10 @@ function deleteInPlace(
   roomIds: Id[] = [],
   stairsIds: Id[] = [],
   roofIds: Id[] = [],
+  fixtureIds: Id[] = [],
 ): void {
   for (const id of roofIds) delete level.roofs[id];
+  for (const id of fixtureIds) delete level.fixtures[id];
   for (const id of openingIds) delete level.openings[id];
   for (const id of roomIds) delete level.rooms[id];
   for (const id of stairsIds) delete level.stairs[id];
@@ -291,6 +321,19 @@ function cleanRoof(r: Roof): Roof {
 }
 
 const isPoint = (p: Vec2 | undefined): p is Vec2 => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+/** A fixture's stored form: position and overhang copied, direction in [0, 360), colour lower-cased, empty label dropped. */
+function cleanFixture(f: Fixture): Fixture {
+  const out: Fixture = { ...f, origin: { x: f.origin.x, y: f.origin.y }, direction: Number.isFinite(f.direction) ? normalizeDegrees(f.direction) : f.direction };
+  if (typeof f.frontColor === 'string') out.frontColor = f.frontColor.toLowerCase();
+  if (f.counterOverhang) out.counterOverhang = { ...f.counterOverhang };
+  if (f.label !== undefined && (typeof f.label !== 'string' || !f.label.trim())) delete out.label;
+  for (const k of ['label', 'frontStyle', 'frontColor', 'counterOverhang'] as const) if (out[k] === undefined) delete out[k];
+  return out;
+}
+
+const sameOverhang = (p: Fixture['counterOverhang'], q: Fixture['counterOverhang']): boolean =>
+  p === q || (!!p && !!q && p.front === q.front && p.back === q.back && p.left === q.left && p.right === q.right);
 
 /** A column's stored form: position copied, rotation in [0, 360), colour lower-cased, unset options left out. */
 function cleanColumn(c: Column): Column {
@@ -488,7 +531,7 @@ export const usePlanStore = create<PlanState>()(
 
         deleteEntities: (levelId, sel) =>
           editLevel(levelId, (level, plan) => {
-            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs, sel.roofs);
+            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs, sel.roofs, sel.fixtures);
             for (const id of sel.gradePoints ?? []) delete plan.site.gradePoints[id];
             for (const id of sel.columns ?? []) delete plan.site.columns[id];
             // Removing walls changes the corner joins of their neighbours.
@@ -737,6 +780,114 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete level.roofs[id];
           }),
 
+        addFixture: (levelId, input) => {
+          let id: Id | null = null;
+          editLevel(levelId, (level) => {
+            const f = cleanFixture({ ...input, id: input.id ?? newId() });
+            if (fixtureProblem(f)) return false;
+            level.fixtures[f.id] = f;
+            id = f.id;
+          });
+          return id;
+        },
+
+        updateFixture: (levelId, id, patch) =>
+          editLevel(levelId, (level) => {
+            const f = level.fixtures[id];
+            if (!f) return false;
+            const next = cleanFixture({ ...f, ...patch, id });
+            if (fixtureProblem(next)) return false;
+            const keys = Object.keys(patch) as (keyof FixturePatch)[];
+            const same = (k: keyof FixturePatch) =>
+              k === 'origin' ? next.origin.x === f.origin.x && next.origin.y === f.origin.y : k === 'counterOverhang' ? sameOverhang(next.counterOverhang, f.counterOverhang) : next[k] === f[k];
+            if (keys.every(same)) return false;
+            for (const k of keys) {
+              if (same(k)) continue;
+              if (next[k] === undefined) {
+                if (OPTIONAL_FIXTURE_KEYS.has(k)) delete f[k];
+              } else (f as unknown as Record<string, unknown>)[k] = next[k];
+            }
+          }),
+
+        deleteFixtures: (levelId, ids) =>
+          editLevel(levelId, (level) => {
+            if (!ids.some((id) => level.fixtures[id])) return false;
+            for (const id of ids) delete level.fixtures[id];
+          }),
+
+        moveFixtures: (levelId, positions) =>
+          editLevel(levelId, (level) => {
+            let changed = false;
+            for (const [id, p] of Object.entries(positions)) {
+              const f = level.fixtures[id];
+              if (!f || !isPoint(p) || (f.origin.x === p.x && f.origin.y === p.y)) continue;
+              f.origin = { x: p.x, y: p.y };
+              changed = true;
+            }
+            if (!changed) return false;
+          }),
+
+        duplicateFixtures: (levelId, ids, offset) => {
+          const made: Id[] = [];
+          editLevel(levelId, (level) => {
+            if (!isPoint(offset)) return false;
+            for (const id of ids) {
+              const f = level.fixtures[id];
+              if (!f) continue;
+              const copy = cleanFixture({ ...f, id: newId(), origin: { x: f.origin.x + offset.x, y: f.origin.y + offset.y } });
+              level.fixtures[copy.id] = copy;
+              made.push(copy.id);
+            }
+            if (made.length === 0) return false;
+          });
+          return made;
+        },
+
+        updateFinishes: (levelId, patch) =>
+          editLevel(levelId, (level) => {
+            const cur: LevelFinishes = { ...(level.finishes ?? {}) };
+            let changed = false;
+            for (const [k, v] of Object.entries(patch) as [keyof LevelFinishes, LevelFinishes[keyof LevelFinishes] | undefined][]) {
+              const value = typeof v === 'string' && k !== 'frontStyle' ? v.toLowerCase() : v;
+              if (cur[k] === value) continue;
+              if (value === undefined) delete cur[k];
+              else (cur as Record<string, unknown>)[k] = value;
+              changed = true;
+            }
+            if (!changed) return false;
+            if (Object.keys(cur).length) level.finishes = cur;
+            else delete level.finishes;
+          }),
+
+        splitWall: (levelId, wallId, at) => {
+          let problem: string | null = null;
+          editLevel(levelId, (level) => {
+            const w = level.walls[wallId];
+            if (!w) {
+              problem = 'No such wall.';
+              return false;
+            }
+            const a = level.nodes[w.a];
+            const b = level.nodes[w.b];
+            const len = dist(a, b);
+            if (!Number.isFinite(at) || at <= MERGE_EPS * 2 || at >= len - MERGE_EPS * 2) {
+              problem = 'Split the wall somewhere along it, not at an end.';
+              return false;
+            }
+            for (const o of Object.values(level.openings)) {
+              if (o.wallId === wallId && Math.abs(o.offset - at) < o.width / 2 + MERGE_EPS) {
+                problem = 'That point is inside an opening: move the opening or split beside it.';
+                return false;
+              }
+            }
+            const t = at / len;
+            const id = newId();
+            level.nodes[id] = { id, x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+            normalizeLevel(level);
+          });
+          return problem;
+        },
+
         addGradePoint: (input) => {
           let id: Id | null = null;
           editSite((site) => {
@@ -846,6 +997,10 @@ export const usePlanStore = create<PlanState>()(
             for (const id of sel.stairs ?? []) {
               const st = level.stairs[id];
               if (st && st.phase !== phase) st.phase = phase;
+            }
+            for (const id of sel.fixtures ?? []) {
+              const f = level.fixtures[id];
+              if (f && f.phase !== phase) f.phase = phase;
             }
             for (const id of sel.walls) {
               const w = level.walls[id];

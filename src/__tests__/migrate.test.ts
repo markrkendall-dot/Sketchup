@@ -82,9 +82,11 @@ beforeEach(() => {
 describe('migrate from schemaVersion 1', () => {
   it('adds empty roofs to every level and the default site, keeping everything else', () => {
     const plan = migrate(structuredClone(V1_FILE));
-    expect(plan.schemaVersion).toBe(2);
+    expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
     expect(plan.levels.b.roofs).toEqual({});
     expect(plan.levels.f.roofs).toEqual({});
+    // Schema 3 (casework) adds an empty fixtures record on the way through.
+    expect(plan.levels.f.fixtures).toEqual({});
     expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {} });
     expect(plan.levels.f.walls.w1).toEqual(V1_FILE.levels.f.walls.w1);
     expect(plan.settings).toEqual(V1_FILE.settings);
@@ -254,9 +256,9 @@ describe('migrate a current file', () => {
     expect('color' in plain || 'cap' in plain).toBe(false);
   });
 
-  it('is byte-identical after JSON.stringify (a v2 file with roofs and site data)', () => {
+  it('is byte-identical after JSON.stringify (a current file with roofs and site data)', () => {
     const plan = richPlan();
-    expect(plan.schemaVersion).toBe(2);
+    expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
     expect(Object.values(plan.levels).reduce((n, l) => n + Object.keys(l.roofs).length, 0)).toBe(2);
     // The optional opening fields (sashes, glazing, door leaves) are part of the round trip.
     const openings = Object.values(plan.levels[plan.levelOrder[1]].openings);

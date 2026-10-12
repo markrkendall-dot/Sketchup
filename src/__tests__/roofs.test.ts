@@ -715,7 +715,7 @@ describe('wall top profiles', () => {
 });
 
 describe('loading roofs', () => {
-  it('migrates a v1 file to v2 with empty roofs and a default site', () => {
+  it('migrates a v1 file to the current schema with empty roofs and a default site', () => {
     const v1 = {
       schemaVersion: 1,
       id: 'p',
@@ -727,8 +727,8 @@ describe('loading roofs', () => {
       modifiedAt: '2025-01-01T00:00:00.000Z',
     };
     const plan = migrate(v1);
-    expect(plan.schemaVersion).toBe(2);
-    expect(SCHEMA_VERSION).toBe(2);
+    expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(SCHEMA_VERSION).toBe(3);
     expect(plan.levels.l1.roofs).toEqual({});
     expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {} });
   });

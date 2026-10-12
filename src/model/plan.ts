@@ -3,10 +3,11 @@ import { coreInterval, draftFootprints, type FootprintSource } from '../derive/o
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
 import { GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
-import type { Column, Glazing, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofEave, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
+import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
+import type { Column, Fixture, FixtureKind, FrontStyle, Glazing, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, Roof, RoofEave, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
-export const SCHEMA_VERSION = 2 as const;
+export const SCHEMA_VERSION = 3 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
 export const MERGE_EPS = 0.5;
 
@@ -32,6 +33,7 @@ export function createLevel(name: string, wallHeight: number, floorThickness: nu
     rooms: {},
     stairs: {},
     roofs: {},
+    fixtures: {},
   };
 }
 
@@ -495,6 +497,17 @@ export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
     next.schemaVersion = 2;
     return next;
   },
+  /** Version 2: levels have no casework; add an empty `fixtures` record to each. */
+  2: (doc) => {
+    const next: Json = { ...doc };
+    if (isObject(doc.levels)) {
+      const upgraded: Json = {};
+      for (const [id, raw] of Object.entries(doc.levels)) upgraded[id] = isObject(raw) ? { ...raw, fixtures: {} } : raw;
+      next.levels = upgraded;
+    }
+    next.schemaVersion = 3;
+    return next;
+  },
 };
 
 const PHASES = new Set(['existing', 'demo', 'new']);
@@ -512,7 +525,9 @@ const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
 const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
-const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'underlay'] as const;
+const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang'] as const;
+const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle'] as const;
+const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'finishes', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
 
@@ -713,6 +728,72 @@ function migrateRoofs(raw: Json, where: string): Level['roofs'] {
   return out;
 }
 
+/** A counter overhang: four finite, non-negative distances. */
+const isOverhang = (v: unknown): v is NonNullable<Fixture['counterOverhang']> =>
+  isObject(v) && (['front', 'back', 'left', 'right'] as const).every((k) => isNum(v[k]) && (v[k] as number) >= 0);
+
+/**
+ * Why a fixture cannot be used (an unknown kind, a non-positive size, a negative elevation, a
+ * malformed optional field), or null when it can (also used by the store).
+ */
+export function fixtureProblem(f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang'>): string | null {
+  if (typeof f.kind !== 'string' || !FIXTURE_KINDS.includes(f.kind)) return `unknown kind ${String(f.kind)}`;
+  if (!isPoint(f.origin)) return 'needs a position';
+  if (!isNum(f.direction)) return 'needs a direction';
+  if (!isNum(f.width) || f.width <= 0 || !isNum(f.depth) || f.depth <= 0 || !isNum(f.height) || f.height <= 0) return 'width, depth and height must be positive';
+  if (!isNum(f.elevation) || f.elevation < 0) return 'the bottom must not be below the floor';
+  if (f.label !== undefined && typeof f.label !== 'string') return 'the label must be text';
+  if (f.frontStyle !== undefined && !FRONT_STYLES.includes(f.frontStyle)) return 'fronts must be slab or panel';
+  if (f.frontColor !== undefined && !isHexColor(f.frontColor)) return 'the front colour must be a hex colour';
+  if (f.counterOverhang !== undefined && !isOverhang(f.counterOverhang)) return 'the counter overhang needs four distances';
+  return null;
+}
+
+/** Fixtures read field by field: one with an unusable kind, size or position is dropped (with a warning); bad optional fields are dropped one by one. */
+function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
+  const out: Level['fixtures'] = {};
+  for (const [fid, f] of Object.entries(raw)) {
+    if (!isObject(f)) continue;
+    const base = {
+      kind: f.kind as FixtureKind,
+      origin: f.origin as Vec2,
+      direction: isNum(f.direction) ? f.direction : 0,
+      width: f.width as number,
+      depth: f.depth as number,
+      height: f.height as number,
+      elevation: isNum(f.elevation) ? f.elevation : 0,
+    };
+    const problem = fixtureProblem(base);
+    if (problem) {
+      console.warn(`HomePlan: ${where}: dropped fixture ${fid}: ${problem}`);
+      continue;
+    }
+    const fixture = pick(f, FIXTURE_KEYS);
+    fixture.id = fid;
+    fixture.origin = { x: base.origin.x, y: base.origin.y };
+    fixture.direction = base.direction;
+    fixture.elevation = base.elevation;
+    fixture.phase = phaseOf(f.phase);
+    put(fixture, 'label', typeof f.label === 'string' && f.label.trim() ? f.label : undefined);
+    put(fixture, 'frontStyle', typeof f.frontStyle === 'string' && FRONT_STYLES.includes(f.frontStyle as FrontStyle) ? f.frontStyle : undefined);
+    put(fixture, 'frontColor', isHexColor(f.frontColor) ? f.frontColor.toLowerCase() : undefined);
+    const o = f.counterOverhang;
+    put(fixture, 'counterOverhang', isOverhang(o) ? { front: o.front, back: o.back, left: o.left, right: o.right } : undefined);
+    out[fid] = fixture as unknown as Fixture;
+  }
+  return out;
+}
+
+/** A level's casework defaults: each field kept when valid, the record dropped when empty. */
+function migrateFinishes(raw: unknown): LevelFinishes | undefined {
+  if (!isObject(raw)) return undefined;
+  const out = pick(raw, FINISHES_KEYS);
+  put(out, 'cabinetColor', isHexColor(raw.cabinetColor) ? raw.cabinetColor.toLowerCase() : undefined);
+  put(out, 'counterColor', isHexColor(raw.counterColor) ? raw.counterColor.toLowerCase() : undefined);
+  put(out, 'frontStyle', typeof raw.frontStyle === 'string' && FRONT_STYLES.includes(raw.frontStyle as FrontStyle) ? raw.frontStyle : undefined);
+  return Object.keys(out).length ? (out as unknown as LevelFinishes) : undefined;
+}
+
 /** The plan's site: north angle, grade points and columns (broken entries are dropped). */
 function migrateSite(raw: unknown): Site {
   const src = isObject(raw) ? raw : {};
@@ -776,6 +857,8 @@ function migrateLevel(raw: unknown, id: string): Level {
   level.rooms = migrateRooms(record(raw.rooms, `${where} rooms`));
   level.stairs = migrateStairs(record(raw.stairs, `${where} stairs`));
   level.roofs = migrateRoofs(record(raw.roofs, `${where} roofs`), where);
+  level.fixtures = migrateFixtures(record(raw.fixtures, `${where} fixtures`), where);
+  put(level, 'finishes', migrateFinishes(raw.finishes));
   put(level, 'underlay', migrateUnderlay(raw.underlay));
   return level as unknown as Level;
 }

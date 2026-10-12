@@ -69,6 +69,10 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
   },
   // Replaced by underlayHint(); kept for the Record type.
   underlay: { idle: '', busy: '' },
+  fixture: {
+    idle: 'Point along a wall, click to place. Type a width to change it.',
+    busy: 'Type the width, then click or Enter to place. Esc clears.',
+  },
   gradePoint: {
     idle: 'Click a spot on the ground, then type its elevation.',
     busy: "Type the elevation (-4, -6'4), Enter places it. Esc cancels.",
@@ -128,6 +132,10 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
   },
   underlay: { idle: '', busy: '' },
+  fixture: {
+    idle: 'The cabinet or appliance follows the cursor with its back on the nearest wall face and slides to abut the last one; click to place it. Type a width (36, 2\'6) to change it; pick the kind in the properties panel; hold Shift for free placement, Tab turns it.',
+    busy: 'Type the width in feet and inches, then click or press Enter to place it. Esc clears the width.',
+  },
   gradePoint: {
     idle: 'Click a spot on the ground. Then type its elevation in feet and inches (minus allowed, e.g. -4 or -6\'4) and press Enter; with nothing typed Enter uses the first floor level.',
     busy: "Type the elevation in feet and inches (-4, -6'4, 8'), then Enter places the grade point. Esc clears it, then cancels.",
@@ -268,6 +276,11 @@ export function StatusBar() {
     for (const r of Object.values(s.plan.levels[levelId]?.roofs ?? {})) if (isVisible(r.phase, viewMode)) n++;
     return n;
   });
+  const fixtureCount = usePlanStore((s) => {
+    let n = 0;
+    for (const f of Object.values(s.plan.levels[levelId]?.fixtures ?? {})) if (isVisible(f.phase, viewMode)) n++;
+    return n;
+  });
   const gradeCount = usePlanStore((s) => Object.keys(s.plan.site.gradePoints).length);
   const columnCount = usePlanStore((s) => {
     let n = 0;
@@ -353,6 +366,11 @@ export function StatusBar() {
             {roofCount > 0 && (
               <>
                 , {roofCount} {roofCount === 1 ? 'roof' : 'roofs'}
+              </>
+            )}
+            {fixtureCount > 0 && (
+              <>
+                , {fixtureCount} {fixtureCount === 1 ? 'fixture' : 'fixtures'}
               </>
             )}
           </>

@@ -20,6 +20,7 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
   { name: 'passage', label: 'Passage', short: 'Opening', key: 'P' },
   { name: 'stairs', label: 'Stairs', key: 'T' },
   { name: 'roof', label: 'Roof', key: 'K' },
+  { name: 'fixture', label: 'Cabinet', key: 'C' },
   { name: 'measure', label: 'Measure', short: 'Tape', key: 'M' },
   { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
 ];
@@ -34,6 +35,7 @@ const TOOL_TITLE: Partial<Record<ToolName, string>> = {
   rect: "Box (B): click a corner, type 12' x 10' and Enter (or click the opposite corner) for four walls",
   measure: 'Measure (M): click two points; the distance stays in the status bar until Esc',
   roof: 'Roof (K): click the outline corners on the outside wall faces, close on the first corner or Enter',
+  fixture: 'Cabinet (C): a cabinet, appliance or sink follows the cursor along the nearest wall; click to place it, type a width first to change it; pick the kind in the properties panel',
   underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
 };
 

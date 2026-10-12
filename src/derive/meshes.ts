@@ -1,7 +1,9 @@
 import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Uint32BufferAttribute, Vector2 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Column, Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, Fixture, FixtureKind, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
+import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
+import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { getFootprints, type Footprint } from './footprint';
 import { columnColorOf, DEFAULT_TRIM, leafColorOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
@@ -767,7 +769,51 @@ export function outwardSide(fp: Pick<Footprint, 'a' | 'b' | 'normal' | 'wallId'>
 }
 
 // ---------------------------------------------------------------------------------------------
+// Casework (derive/casework.ts): cabinets, appliances and sinks as boxes, counters as slabs.
+
+/**
+ * A fixture's boxes (fixtureBoxes) turned into the plan and extruded, merged per material part.
+ * Level-local like the walls. Every box is a closed prism, so each part is a closed surface.
+ */
+export function buildFixtureParts(f: Fixture, finishes?: LevelFinishes): FixtureMesh['parts'] {
+  const fr = fixtureFrame(f);
+  const byPart = new Map<CasePart, BufferGeometry[]>();
+  for (const b of fixtureBoxes(f, finishes)) {
+    const poly = [fixturePoint(fr, b.s0, b.d0), fixturePoint(fr, b.s1, b.d0), fixturePoint(fr, b.s1, b.d1), fixturePoint(fr, b.s0, b.d1)];
+    const g = prism(poly, b.y0, b.y1);
+    const list = byPart.get(b.part);
+    if (list) list.push(g);
+    else byPart.set(b.part, [g]);
+  }
+  return [...byPart].map(([part, gs]) => ({ part, geometry: mergeAll(gs) })).filter((p) => triangleCount(p.geometry) > 0);
+}
+
+/** A counter run (counterRuns) as one slab with its basin holes. */
+export function buildCounterGeometry(run: CounterRun): BufferGeometry {
+  return prism(run.outline, run.y0, run.y1, run.holes);
+}
+
+// ---------------------------------------------------------------------------------------------
 // Memoized level meshes
+
+export interface FixtureMesh {
+  id: Id;
+  kind: FixtureKind;
+  phase: Phase;
+  /** The cabinet fronts' colour after the defaults (model/casework.ts frontColorOf). */
+  frontColor: string;
+  /** One merged geometry per material part, level-local like the walls. */
+  parts: { part: CasePart; geometry: BufferGeometry }[];
+}
+
+export interface CounterMesh {
+  /** The run's fixture ids, joined. */
+  id: Id;
+  geometry: BufferGeometry;
+  /** Demolished when every cabinet under it is, new when any is, else existing. */
+  phase: Phase;
+  fixtureIds: Id[];
+}
 
 export interface WallMesh {
   id: Id;
@@ -823,6 +869,23 @@ export interface LevelMeshes {
   roofs: RoofMesh[];
   /** Window and door fills of the visible openings (passages have none). */
   openings: OpeningMesh[];
+  /** The visible cabinets, appliances and sinks (DESIGN.md "Casework"). */
+  fixtures: FixtureMesh[];
+  /** The counter slabs over them, one per run of touching counter fixtures. */
+  counters: CounterMesh[];
+}
+
+interface FixtureEntry {
+  fixture: Fixture;
+  /** The resolved front style (the level default can change it). */
+  style: string;
+  parts: FixtureMesh['parts'];
+}
+
+interface CounterEntry {
+  /** The visible counter fixtures the runs were built from, in order. */
+  fixtures: Fixture[];
+  counters: CounterMesh[];
 }
 
 interface WallEntry {
@@ -891,6 +954,8 @@ const floorCache = new Map<string, FloorEntry>();
 const stairsCache = new Map<string, Map<Id, StairsEntry>>();
 const roofCache = new Map<string, Map<Id, RoofEntry>>();
 const openingCache = new Map<string, Map<Id, OpeningEntry>>();
+const fixtureCache = new Map<string, Map<Id, FixtureEntry>>();
+const counterCache = new Map<string, CounterEntry>();
 const levelCache = new Map<string, LevelEntry>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
@@ -956,7 +1021,23 @@ function pruneCaches(plan: Plan): void {
     for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
     openingCache.delete(key);
   }
+  for (const [key, m] of fixtureCache) {
+    if (alive(key)) continue;
+    for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
+    fixtureCache.delete(key);
+  }
+  for (const [key, e] of counterCache) {
+    if (alive(key)) continue;
+    for (const c of e.counters) c.geometry.dispose();
+    counterCache.delete(key);
+  }
   for (const key of levelCache.keys()) if (!alive(key)) levelCache.delete(key);
+}
+
+/** The phase a counter slab takes from the cabinets under it. */
+function counterPhase(members: readonly Fixture[]): Phase {
+  if (members.length && members.every((f) => f.phase === 'demo')) return 'demo';
+  return members.some((f) => f.phase === 'new') ? 'new' : 'existing';
 }
 
 /**
@@ -968,7 +1049,7 @@ function pruneCaches(plan: Plan): void {
  */
 export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): LevelMeshes {
   const level = plan.levels[levelId];
-  if (!level) return { walls: [], stairs: [], roofs: [], openings: [] };
+  if (!level) return { walls: [], stairs: [], roofs: [], openings: [], fixtures: [], counters: [] };
   const key = `${levelId}|${viewMode}`;
   const idx = plan.levelOrder.indexOf(levelId);
   const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
@@ -1179,7 +1260,41 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   if (prevFills) for (const [id, e] of prevFills) if (nextFills.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
   openingCache.set(key, nextFills);
 
-  const result: LevelMeshes = { walls, stairs, roofs, openings: openingMeshes, ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  // Casework: each fixture's parts are rebuilt only when its object or the resolved front style
+  // changes; the counter slabs when the list of visible counter fixtures does.
+  const finishes = level.finishes;
+  const prevFixtures = fixtureCache.get(key);
+  const nextFixtures = new Map<Id, FixtureEntry>();
+  const fixtureMeshes: FixtureMesh[] = [];
+  const counterFixtures: Fixture[] = [];
+  for (const f of Object.values(level.fixtures ?? {})) {
+    if (!isVisible(f.phase, viewMode)) continue;
+    if (hasCounter(f.kind)) counterFixtures.push(f);
+    const style = frontStyleOf(f, finishes);
+    const old = prevFixtures?.get(f.id);
+    const entry: FixtureEntry = old && old.fixture === f && old.style === style ? old : { fixture: f, style, parts: buildFixtureParts(f, finishes) };
+    nextFixtures.set(f.id, entry);
+    if (entry.parts.length) fixtureMeshes.push({ id: f.id, kind: f.kind, phase: f.phase, frontColor: frontColorOf(f, finishes), parts: entry.parts });
+  }
+  if (prevFixtures) for (const [id, e] of prevFixtures) if (nextFixtures.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
+  fixtureCache.set(key, nextFixtures);
+  const prevCounters = counterCache.get(key);
+  let counters: CounterMesh[];
+  if (prevCounters && prevCounters.fixtures.length === counterFixtures.length && prevCounters.fixtures.every((f, i) => f === counterFixtures[i])) {
+    counters = prevCounters.counters;
+  } else {
+    if (prevCounters) for (const c of prevCounters.counters) c.geometry.dispose();
+    const byId = new Map(counterFixtures.map((f) => [f.id, f]));
+    counters = counterRuns(counterFixtures).map((run) => ({
+      id: run.fixtureIds.join('+'),
+      geometry: buildCounterGeometry(run),
+      phase: counterPhase(run.fixtureIds.map((id) => byId.get(id)!)),
+      fixtureIds: run.fixtureIds,
+    }));
+    counterCache.set(key, { fixtures: counterFixtures, counters });
+  }
+
+  const result: LevelMeshes = { walls, stairs, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
   levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, result });
   return result;
 }
@@ -1191,8 +1306,12 @@ export function clearMeshCache(): void {
   for (const m of stairsCache.values()) for (const e of m.values()) e.geometry.dispose();
   for (const m of roofCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of openingCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
+  for (const m of fixtureCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
+  for (const e of counterCache.values()) for (const c of e.counters) c.geometry.dispose();
   roofCache.clear();
   openingCache.clear();
+  fixtureCache.clear();
+  counterCache.clear();
   clearSiteCache();
   wallCache.clear();
   floorCache.clear();

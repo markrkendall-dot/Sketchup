@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
 import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible } from '../derive/phase';
@@ -419,9 +420,83 @@ const NO_RECORD: Readonly<Record<Id, unknown>> = {};
  * layer of per-entity components does not re-render (and re-create every child) when an entity
  * only changes, e.g. on every step of a corner drag. The children select their own entity.
  */
-function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs'): Id[] {
+function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures'): Id[] {
   return useLayerPlan(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
 }
+
+/**
+ * Casework symbol (DESIGN.md "Casework"): the outline with a heavier front edge and door ticks,
+ * dashed for what hangs above the counter, an appliance's word, a range's burners, a sink's basin.
+ */
+export function FixtureGlyph({ sym, k, className, id }: { sym: FixtureSymbol; k: number; className: string; id?: Id }) {
+  return (
+    <g className={`${className}${sym.dashed ? ' fixture-overhead' : ''}`} data-fixture-id={id}>
+      <path className="fixture-body" d={polyPath(sym.outline)} vectorEffect="non-scaling-stroke" />
+      <path className="fixture-front" d={segPath([sym.front])} vectorEffect="non-scaling-stroke" />
+      {sym.ticks.length > 0 && <path className="fixture-tick" d={segPath(sym.ticks)} vectorEffect="non-scaling-stroke" />}
+      {sym.basin && <path className="fixture-basin" d={polyPath(sym.basin)} vectorEffect="non-scaling-stroke" />}
+      {sym.burners.map((b, i) => (
+        <circle key={i} className="fixture-burner" cx={b.at.x} cy={b.at.y} r={b.r} vectorEffect="non-scaling-stroke" />
+      ))}
+      {sym.label && (
+        <g transform={`translate(${sym.labelAt.x} ${sym.labelAt.y}) rotate(${sym.labelAngle}) scale(${1 / k})`}>
+          <text className="fixture-label" textAnchor="middle" dominantBaseline="central">
+            {sym.label}
+          </text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelId: Id; fixtureId: Id }) {
+  const f = useLayerPlan((s) => s.plan.levels[levelId]?.fixtures?.[fixtureId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => s.selection.fixtures.includes(fixtureId));
+  const k = useLayerUi(viewportScale);
+  const sym = useMemo(() => (f ? fixtureSymbol(f) : null), [f]);
+  if (!f || !sym || !isVisible(f.phase, viewMode)) return null;
+  return <FixtureGlyph sym={sym} k={k} id={fixtureId} className={`fixture fixture-${f.kind} phase-${f.phase}${selected ? ' is-selected' : ''}`} />;
+});
+
+/** The counter slabs' outlines (one path per run, so an L-shaped counter reads as one top). */
+const CounterLayer = memo(function CounterLayer({ levelId }: { levelId: Id }) {
+  const fixtures = useLayerPlan((s) => s.plan.levels[levelId]?.fixtures);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const runs = useMemo(() => {
+    if (!fixtures) return [];
+    const shown = Object.values(fixtures).filter((f) => isVisible(f.phase, viewMode));
+    return counterRuns(shown).map((r) => ({
+      id: r.fixtureIds.join('+'),
+      d: polyPath(r.outline) + r.holes.map(polyPath).join(''),
+      phase: shown.filter((f) => r.fixtureIds.includes(f.id)).every((f) => f.phase === 'demo') ? 'demo' : shown.some((f) => r.fixtureIds.includes(f.id) && f.phase === 'new') ? 'new' : 'existing',
+    }));
+  }, [fixtures, viewMode]);
+  if (runs.length === 0) return null;
+  return (
+    <g className="layer-counters" pointerEvents="none">
+      {runs.map((r) => (
+        <path key={r.id} className={`counter phase-${r.phase}`} d={r.d} fillRule="evenodd" vectorEffect="non-scaling-stroke" data-counter={r.id} />
+      ))}
+    </g>
+  );
+});
+
+/** Cabinets, appliances and sinks, under the walls (their backs sit against the wall faces). */
+const FixturesLayer = memo(function FixturesLayer({ levelId }: { levelId: Id }) {
+  const ids = useEntityIds(levelId, 'fixtures');
+  if (ids.length === 0) return null;
+  return (
+    <>
+      <CounterLayer levelId={levelId} />
+      <g className="layer-fixtures" pointerEvents="none">
+        {ids.map((id) => (
+          <FixtureShape key={id} levelId={levelId} fixtureId={id} />
+        ))}
+      </g>
+    </>
+  );
+});
 
 /** Stairs symbol: outline, nosing lines, and an UP arrow pointing the way the flight climbs. */
 export function StairsGlyph({ sym, k, className, id }: { sym: StairsSymbol; k: number; className: string; id?: Id }) {
@@ -1052,6 +1127,7 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
       <RoofGhostLayer levelId={levelId} />
       <RoofsLayer levelId={levelId} />
       <StairsLayer levelId={levelId} />
+      <FixturesLayer levelId={levelId} />
       <WallsLayer levelId={levelId} />
       <OpeningsLayer levelId={levelId} />
       <RoomLabelsLayer levelId={levelId} />

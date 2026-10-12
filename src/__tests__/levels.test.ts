@@ -108,6 +108,7 @@ describe('visibility in snapping and hit testing', () => {
       demo: { id: 'demo', a: 'n1', b: 'n2', thickness: 6, kind: 'exterior', phase: 'demo' },
       fresh: { id: 'fresh', a: 'n3', b: 'n4', thickness: 6, kind: 'interior', phase: 'new' },
     },
+    fixtures: {},
     openings: {
       o1: { id: 'o1', wallId: 'demo', type: 'window', offset: 50, width: 30, height: 48, sill: 36, phase: 'demo' },
     },

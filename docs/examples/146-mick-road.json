@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "plan-146-mick-road",
   "name": "146 Mick Road (starter, estimates flagged)",
   "levelOrder": [
@@ -174,7 +174,8 @@
         }
       },
       "stairs": {},
-      "roofs": {}
+      "roofs": {},
+      "fixtures": {}
     },
     "level-f": {
       "id": "level-f",
@@ -933,7 +934,8 @@
           "weathering": 0.7,
           "id": "f-k2"
         }
-      }
+      },
+      "fixtures": {}
     },
     "level-s": {
       "id": "level-s",
@@ -1489,7 +1491,8 @@
           "weathering": 0.6,
           "id": "s-k1"
         }
-      }
+      },
+      "fixtures": {}
     }
   },
   "baseFloorElevation": -100,

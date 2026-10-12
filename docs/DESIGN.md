@@ -90,12 +90,27 @@ export interface Roof {
   rafter?: { depth: Inches; spacing: Inches }; boardColor?: string; weathering?: number; // see "Exterior appearance"
 }
 
+// Casework (schema version 3, see "Casework"): a cabinet, appliance or sink as a plan rectangle.
+export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink' | 'box';
+export interface Fixture {
+  id: Id; kind: FixtureKind;
+  origin: Vec2;              // middle of the BACK edge (against the wall)
+  direction: Degrees;        // the way the front faces: 0 = +x, 90 = +y
+  width: Inches; depth: Inches; height: Inches;
+  elevation: Inches;         // bottom above the floor top (54 wall cabinet, 66 hood)
+  phase: Phase; label?: string;
+  frontStyle?: 'slab' | 'panel'; frontColor?: string;            // else the level's finishes
+  counterOverhang?: { front: Inches; back: Inches; left: Inches; right: Inches }; // else 1" front (island: all round)
+}
+export interface LevelFinishes { cabinetColor?: string; counterColor?: string; frontStyle?: 'slab' | 'panel' }
+
 export interface Level {
   id: Id; name: string;
   wallHeight: Inches;        // floor top to underside of next floor; 96 or 108
   floorThickness: Inches;    // the slab/framing under THIS level (~12 framed, 4 slab)
   nodes: Record<Id, Node>; walls: Record<Id, Wall>; openings: Record<Id, Opening>;
-  rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; roofs: Record<Id, Roof>; underlay?: Underlay;
+  rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; roofs: Record<Id, Roof>;
+  fixtures: Record<Id, Fixture>; finishes?: LevelFinishes; underlay?: Underlay;
 }
 
 // The site (see "Site and terrain"; the file carries it from schema version 2).
@@ -122,7 +137,7 @@ export interface PlanSettings {
 // undo. migrate() ignores them in older files.
 
 export interface Plan {
-  schemaVersion: 2; id: Id; name: string;
+  schemaVersion: 3; id: Id; name: string;
   levelOrder: Id[];          // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
@@ -500,6 +515,100 @@ exported.
 **Fit 3D** (`bounds.ts planBox`) includes the columns (a capped chimney's cap, 2" proud, and its arrestor,
 12" above its top) and the terrain's height over the house area (a 6 x 6 sampling of the plan box), never
 the 100' margin.
+
+## Casework (`model/casework.ts`, `derive/casework.ts`, `editor2d/tools/fixtureTool.ts`)
+
+Kitchen cabinets, counters, appliances and sinks (M12), so a kitchen can be laid out on the plan
+and seen in 3D with the same phases as everything else. A `Fixture` is a plan rectangle in its own
+frame: `origin` is the middle of its back edge, `direction` the way its front faces, `width` along
+the back, `depth` back to front, `height`, and `elevation` of its bottom above the floor top (0 on
+the floor; 54 for a wall cabinet, 66 for a hood). Kinds: `base`, `wall`, `tall`, `island`, `sink`
+(a base cabinet with a basin), `range`, `fridge`, `dishwasher`, `wallOven`, `hood`, `microwave` and a
+labelled `box`. `FIXTURE_DEFAULTS` holds the stock size of each (base 36 x 24 x 34.5, wall 30 x 12
+x 30 at 54, range 30 x 25 x 36, fridge 36 x 30 x 70, ...). The level's `finishes` carry the defaults
+a fixture without its own takes: cabinet colour (off-white `#e9e4d8`), counter colour (dark stone
+`#6b6760`) and front style (`slab` or `panel`). Fixtures live in `level.fixtures` (schema 3).
+
+**Frame** (`fixtureFrame`, like `stairsFrame`): `u` the unit front direction, `v` lateral to its
+right; local coordinates `(s, d, y)` are lateral from the back's middle, from the back toward the
+front, and above the floor. `fixtureOutline` (back-left, front-left, front-right, back-right),
+`hitFixture`, `counterOutline` (the outline grown by the counter overhang: 1" at the front, an
+island 1" all round, `counterOverhang` otherwise) and `basinOutline` (33 x 22, centred in the
+cabinet) come from it.
+
+**Boxes** (`fixtureBoxes`, pure): a fixture as axis-aligned boxes in its frame, one material part
+each (`carcass`, `front`, `kick`, `appliance`, `basin`). Cabinets: a carcass to 3/4" short of the
+front, a toe kick 4" high set back 3" under floor-standing ones, `round(width / 18)` fronts with
+1/8" reveals (base, island and sink cabinets get a 6" drawer front over each door; `panel` style is
+2" stiles and rails round a panel recessed 3/8"). A range is a steel box with a 1" dark cooktop and
+an 8" backguard, a fridge has a door reveal at 70% of its height, a dishwasher a steel front under
+the counter, a wall oven two steel panels between cabinet doors, a hood a 6" canopy with a flue, a
+sink the base cabinet plus an open basin 8" deep whose top is the counter top. `meshes.ts
+buildFixtureParts` turns each box into a `prism` in plan space and merges them per part, so every
+part is a closed surface (a reveal shows the carcass behind it, which is the point).
+
+**Counters** (`counterRuns`): one slab per run of touching counter-bearing fixtures (base, island,
+dishwasher, sink), not one per cabinet, so there is no seam every 24" and the top runs over the
+dishwasher. The rectangles (each fixture's counter outline) are grouped by touching bounding boxes
+(union-find, 1/2" slack); a group whose members are all turned by a multiple of 90 degrees is
+united by coordinate compression (`rectilinearUnion`: the covered cells of the grid of all rectangle
+and basin edges, their uncovered-neighbour sides chained into rings clockwise on screen, collinear
+vertices dropped), the largest ring the outline and the rest the basin holes, mitred at an L; any
+other group gives one slab per fixture. The slab runs from the top of the run's highest cabinet up
+`COUNTER_THICKNESS` (1.5"). Its phase is demolished when every cabinet under it is, new when any is.
+
+**2D** (`fixtureSymbol`, `PlanLayers.tsx FixtureGlyph`, between the stairs and the walls): the
+outline with a heavier front edge and a tick where two doors meet, dashed for what hangs above the
+counter (wall cabinets, the hood, the microwave), an appliance's word (REF, RANGE, DW, OVEN, HOOD,
+MW; a box its label or BOX), a range's four burners, a sink's basin; demolished hatched red and
+dashed, new green, like the rest. `CounterLayer` draws each run's outline (with its holes) once,
+under the cabinets. Hit testing (`selectTool.hitTest`) picks fixtures after room labels and before
+stairs; the select tool drags every selected fixture together (`moveFixtures`, grid-rounded, one
+undo step) and Delete removes them. `levelDrawingBounds` includes them.
+
+**Tool** (C, `fixtureTool.ts`; in site mode C is still the column tool, `keymap.ts`): the kind the
+panel's picker chose (`draft.fixtureKind`) follows the cursor. `nearestFace` finds the visible wall
+face within 12 px: the back's middle lands on it and the front faces away from the wall
+(`FixturePreview.wallId`). `abutOnLine` then slides it along the face so an end that comes within
+12 px of the end of a fixture already on that line (same facing, back on the line) abuts it
+(`abuts`), which is how a run of cabinets is placed by clicking along a wall. Shift held, or no face
+near: free placement at the usual snap, the cursor being the fixture's middle, in `draft.fixtureDirection`
+(Tab turns it by 90). Digits go to the length buffer as the width (`typed`); click or Enter places
+it with the kind's stock depth, height and elevation in the toolbar's "Draw as" phase and selects it;
+Esc clears the buffer. The overlay's `FixtureGhost` draws the symbol with a pill naming the kind and
+width (green when typed). `PlanCanvas` drops the ghost when the pointer leaves.
+
+**Store**: `addFixture` / `updateFixture` (undefined clears `label`, `frontStyle`, `frontColor`,
+`counterOverhang`; the direction is normalized; `fixtureProblem` rejects an unknown kind, a
+non-positive size, a bottom below the floor or a malformed optional field), `deleteFixtures`,
+`moveFixtures`, `duplicateFixtures` (copies offset by a vector, one undo step), `updateFinishes`
+(the level's casework defaults, undefined clears a field, an empty record is dropped), and
+`setPhase` / `deleteEntities` take `fixtures`. **`splitWall(levelId, wallId, at)`** inserts a node
+`at` inches from the wall's a end and normalizes the level, so the wall becomes two pieces that can
+be marked demolished or moved on their own (refused at an end or inside an opening); the select
+tool's right-click menu offers "Split wall here" on a wall.
+
+**3D** (`getLevelMeshes` returns `fixtures: FixtureMesh[]` and `counters: CounterMesh[]`): a
+fixture's parts are rebuilt when its object or the resolved front style changes (keyed per fixture
+object and style), the counter slabs when the list of visible counter fixtures does; dropped
+geometry is disposed. `materials.ts caseworkMaterial(part, phase, color)`: carcass and fronts in
+the fixture's front colour (`frontColorOf`), the kick near-black, appliances and basins brushed
+steel (metalness 0.6, roughness 0.35); `counterMaterial(phase, color)` the level's counter colour
+with a slight sheen; demolished translucent red, new pulled toward green. Everything casts and
+receives shadows except demolished work. The panel has `FixtureProps` (kind, which brings the new
+kind's stock size unless the size was edited; width, depth, height, bottom; facing; phase; label;
+fronts and front colour with a reset to the level defaults; the counter top and the four overhangs
+for counter kinds), `FixtureToolProps` (the kind picker while the tool is active) and, in the Level
+panel, the casework defaults.
+
+**Export**: meshes `Cabinet (base)`, `Cabinet (wall)`, `Cabinet (tall)`, `Cabinet (island)`,
+`Sink`, `Box`, `Appliance (range)` and so on (one per material part), and `Counter`; materials
+`cabinet` (`cabinet_<hex>` in another colour), `kick`, `appliance`, `basin`, `counter`
+(`counter_<hex>`), each plus `_new` / `_demo` for other phases.
+
+Not done: cabinet door swings in plan, backsplashes, open shelves, corner cabinets (an L corner is
+two cabinets whose counter is mitred), appliance details beyond a few boxes, interior wall and floor
+finishes (M13), copy and mirror of a run (M14).
 
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
@@ -962,7 +1071,8 @@ gets that message as an alert. Shadows and textures stay on: these are rendering
 JSON download/upload with `schemaVersion` and `migrate()`. `MIGRATIONS[n]` upgrades a version n
 document to n + 1 and they run in order (0 -> 1: entity arrays become records keyed by id, a
 missing `levelOrder` comes from the levels array, settings are filled; 1 -> 2: every level gets an
-empty `roofs` record and the plan a default `site`). The upgraded document is
+empty `roofs` record and the plan a default `site`; 2 -> 3: every level gets an empty `fixtures`
+record). The upgraded document is
 then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
 file's order so a current file round-trips byte for byte), with defaults for missing optional
 values and broken openings, rooms, stairs and underlays dropped (a broken roof is dropped with a

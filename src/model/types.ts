@@ -135,6 +135,50 @@ export interface Roof {
   weathering?: number;
 }
 
+/**
+ * Kitchen casework and fixtures (DESIGN.md "Casework"): cabinets, the island, appliances, the sink
+ * and a labelled generic box. Each is a plan rectangle standing on the level's floor (or at an
+ * `elevation` above it for wall cabinets, the hood and the microwave).
+ */
+export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink' | 'box';
+/** Cabinet door and drawer fronts: flat slabs, or a frame round a recessed panel. */
+export type FrontStyle = 'slab' | 'panel';
+
+export interface Fixture {
+  id: Id;
+  kind: FixtureKind;
+  /** Middle of the BACK edge (the edge against the wall). */
+  origin: Vec2;
+  /** Plan angle the front faces: 0 = +x, 90 = +y (down the screen). */
+  direction: Degrees;
+  /** Along the back edge. */
+  width: Inches;
+  /** From the back to the front. */
+  depth: Inches;
+  height: Inches;
+  /** Bottom above the level's floor top: 0 on the floor, 54 for a wall cabinet, 66 for a hood. */
+  elevation: Inches;
+  phase: Phase;
+  /** Shown on the plan for a box (and on an appliance when set). */
+  label?: string;
+  /** Absent: the level's casework default, else slab. */
+  frontStyle?: FrontStyle;
+  /** Hex colour `#rrggbb` of the fronts. Absent: the level's cabinet colour, else off-white. */
+  frontColor?: string;
+  /**
+   * Counter overhang past the carcass on each side (kinds with a counter: base, island, dishwasher,
+   * sink). Absent: 1" at the front; an island 1" all round.
+   */
+  counterOverhang?: { front: Inches; back: Inches; left: Inches; right: Inches };
+}
+
+/** Per-level defaults for casework (DESIGN.md "Casework"); every field optional. */
+export interface LevelFinishes {
+  cabinetColor?: string;
+  counterColor?: string;
+  frontStyle?: FrontStyle;
+}
+
 /** A post or chimney on the site (M9 implements their behaviour). */
 export interface Column {
   id: Id;
@@ -191,6 +235,9 @@ export interface Level {
   rooms: Record<Id, Room>;
   stairs: Record<Id, Stairs>;
   roofs: Record<Id, Roof>;
+  /** Casework and fixtures (schema version 3). */
+  fixtures: Record<Id, Fixture>;
+  finishes?: LevelFinishes;
   underlay?: Underlay;
 }
 
@@ -205,7 +252,7 @@ export interface PlanSettings {
 }
 
 export interface Plan {
-  schemaVersion: 2;
+  schemaVersion: 3;
   id: Id;
   name: string;
   levelOrder: Id[]; // bottom to top

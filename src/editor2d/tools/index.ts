@@ -13,6 +13,7 @@ import {
 } from '../../store/uiStore';
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint, type GhostWall } from '../snap';
+import { fixtureTool } from './fixtureTool';
 import { doorTool, passageTool, windowTool } from './openingTool';
 import { measureTool } from './measureTool';
 import { rectTool } from './rectTool';
@@ -76,6 +77,7 @@ const tools: Record<ToolName, Tool> = {
   stairs: stairsTool,
   roof: roofTool,
   underlay: underlayTool,
+  fixture: fixtureTool,
   gradePoint: gradePointTool,
   column: columnTool,
 };
@@ -224,11 +226,12 @@ export function pruneSelection(): void {
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
   const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
   const roofs = sel.roofs.filter((id) => level.roofs[id] && isVisible(level.roofs[id].phase, vm));
+  const fixtures = sel.fixtures.filter((id) => level.fixtures[id] && isVisible(level.fixtures[id].phase, vm));
   const site = getPlan().site;
   const gradePoints = sel.gradePoints.filter((id) => site.gradePoints[id]);
   const columns = sel.columns.filter((id) => site.columns[id] && isVisible(site.columns[id].phase, vm));
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + gradePoints.length + columns.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, gradePoints, columns });
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + gradePoints.length + columns.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, fixtures, gradePoints, columns });
   }
   // An inline rename of a room that undo removed has nothing left to edit.
   const edit = ui.roomEdit;

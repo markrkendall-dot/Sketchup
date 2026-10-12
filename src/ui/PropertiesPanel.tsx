@@ -7,8 +7,27 @@ import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, typ
 import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, groundAt } from '../derive/site';
 import { floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsHoleOutline, stairsHoleStart, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
-import { activateUnderlayTool } from '../editor2d/tools';
+import { activateUnderlayTool, makeToolContext } from '../editor2d/tools';
+import { setFixtureKind } from '../editor2d/tools/fixtureTool';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
+import {
+  counterColorOf,
+  counterOverhangOf,
+  counterTopOf,
+  DEFAULT_CABINET_COLOR,
+  DEFAULT_COUNTER_COLOR,
+  FIXTURE_DEFAULTS,
+  FIXTURE_KINDS,
+  FIXTURE_LABEL,
+  FRONT_STYLE_LABEL,
+  FRONT_STYLES,
+  frontColorOf,
+  frontStyleOf,
+  hasCounter,
+  isCabinet,
+  TALL_CABINET_HEIGHTS,
+  WALL_CABINET_HEIGHTS,
+} from '../model/casework';
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
 import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
@@ -16,7 +35,7 @@ import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, GLAZINGS, glazingOf, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
-import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, Fixture, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -320,6 +339,7 @@ function SelectionActions({
   openings,
   stairs,
   roofs,
+  fixtures,
   columns,
 }: {
   levelId: Id;
@@ -327,12 +347,13 @@ function SelectionActions({
   openings: Opening[];
   stairs: Stairs[];
   roofs: Roof[];
+  fixtures: Fixture[];
   columns: Column[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const items = [...walls, ...openings, ...stairs, ...roofs, ...columns];
+  const items = [...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns];
   if (items.length === 0 && selectionSize(selection) === 0) return null;
   const allDemo = items.length > 0 && items.every((i) => i.phase === 'demo');
   const ids = {
@@ -340,6 +361,7 @@ function SelectionActions({
     openings: openings.map((o) => o.id),
     stairs: stairs.map((st) => st.id),
     roofs: roofs.map((r) => r.id),
+    fixtures: fixtures.map((f) => f.id),
     columns: columns.map((c) => c.id),
   };
   return (
@@ -1036,6 +1058,148 @@ function StairsOpeningFields({ level, stairs, ftf }: { level: Level; stairs: Sta
   );
 }
 
+const fixtureKindOptions = FIXTURE_KINDS.map((k) => ({ value: k, label: FIXTURE_LABEL[k] }));
+const frontStyleOptions = FRONT_STYLES.map((s) => ({ value: s, label: FRONT_STYLE_LABEL[s] }));
+const FACING_OPTIONS: { value: string; label: string }[] = [
+  { value: '0', label: 'Right (+x)' },
+  { value: '90', label: 'Down (+y)' },
+  { value: '180', label: 'Left (-x)' },
+  { value: '270', label: 'Up (-y)' },
+];
+
+/** The fixture tool is active and nothing is selected: the kind the next click places. */
+function FixtureToolProps() {
+  const kind = useUiStore((s) => s.draft.fixtureKind);
+  const def = FIXTURE_DEFAULTS[kind];
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  return (
+    <>
+      <h3>Cabinet tool</h3>
+      <SelectField label="Kind" value={kind} options={fixtureKindOptions} onChange={(k) => setFixtureKind(makeToolContext(), k)} />
+      <ReadOnly label="Stock size">
+        {formatLength(def.width, denom)} wide, {formatLength(def.depth, denom)} deep, {formatLength(def.height, denom)} high
+        {def.elevation > 0 ? `, bottom at ${formatLength(def.elevation, denom)}` : ''}
+      </ReadOnly>
+      <p className="panel-note">
+        The {FIXTURE_LABEL[kind].toLowerCase()} follows the cursor with its back on the nearest wall and slides up to the last one placed.
+        Click to place it; type a width first (36, 2'6) to change it. Hold Shift to place it away from the walls, Tab turns it. Edit the
+        size, fronts and colour after placing by selecting it.
+      </p>
+    </>
+  );
+}
+
+function FixtureProps({ level, fixture }: { level: Level; fixture: Fixture }) {
+  const updateFixture = usePlanStore((s) => s.updateFixture);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
+  const dir = String(fixture.direction);
+  const facing = FACING_OPTIONS.some((o) => o.value === dir) ? FACING_OPTIONS : [...FACING_OPTIONS, { value: dir, label: `${dir}°` }];
+  const over = counterOverhangOf(fixture);
+  const style = frontStyleOf(fixture, level.finishes);
+  const color = frontColorOf(fixture, level.finishes);
+  const heightChoices = fixture.kind === 'wall' ? WALL_CABINET_HEIGHTS : fixture.kind === 'tall' ? TALL_CABINET_HEIGHTS : null;
+  return (
+    <>
+      <h3>{FIXTURE_LABEL[fixture.kind]}</h3>
+      <SelectField
+        label="Kind"
+        value={fixture.kind}
+        options={fixtureKindOptions}
+        onChange={(kind) => {
+          // A new kind brings its stock size unless the size was changed by hand.
+          const old = FIXTURE_DEFAULTS[fixture.kind];
+          const stock = fixture.width === old.width && fixture.depth === old.depth && fixture.height === old.height && fixture.elevation === old.elevation;
+          set(stock ? { kind, ...FIXTURE_DEFAULTS[kind] } : { kind });
+        }}
+      />
+      <LengthField label="Width" value={fixture.width} onCommit={(v) => void (v !== null && set({ width: v }))} hint="Along the wall." />
+      <LengthField label="Depth" value={fixture.depth} onCommit={(v) => void (v !== null && set({ depth: v }))} hint="Back to front." />
+      <LengthField
+        label="Height"
+        value={fixture.height}
+        onCommit={(v) => void (v !== null && set({ height: v }))}
+        hint={heightChoices ? `Usual: ${heightChoices.map((h) => formatLength(h, denom)).join(', ')}.` : hasCounter(fixture.kind) ? `The counter top sits at ${formatLength(counterTopOf(fixture), denom)}.` : undefined}
+      />
+      <LengthField
+        label="Bottom"
+        value={fixture.elevation}
+        bound="nonnegative"
+        onCommit={(v) => void (v !== null && set({ elevation: v }))}
+        hint="Above the floor: 0 on the floor, 54 for a wall cabinet."
+      />
+      <SelectField label="Facing" value={dir} options={facing} onChange={(v) => set({ direction: Number(v) })} />
+      <SelectField label="Phase" value={fixture.phase} options={phaseOptions} onChange={(p) => set({ phase: p })} />
+      <div className="field">
+        <label htmlFor={`fixture-label-${fixture.id}`}>Label</label>
+        <input
+          id={`fixture-label-${fixture.id}`}
+          aria-label="Label"
+          defaultValue={fixture.label ?? ''}
+          placeholder={fixture.kind === 'box' ? 'BOX' : 'none'}
+          onBlur={(e) => set({ label: e.target.value.trim() || undefined })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') releaseFocus(e.currentTarget);
+          }}
+        />
+      </div>
+      {isCabinet(fixture.kind) || fixture.kind === 'wallOven' ? (
+        <>
+          <SelectField label="Fronts" value={style} options={frontStyleOptions} onChange={(s) => set({ frontStyle: s })} />
+          <ColorField
+            label="Front colour"
+            value={color}
+            onCommit={(c) => set({ frontColor: c })}
+            onReset={fixture.frontColor || fixture.frontStyle ? () => set({ frontColor: undefined, frontStyle: undefined }) : undefined}
+            hint="Blank fields follow the level's casework defaults."
+          />
+        </>
+      ) : null}
+      {hasCounter(fixture.kind) && (
+        <>
+          <ReadOnly label="Counter top">{formatLength(counterTopOf(fixture), denom)}</ReadOnly>
+          {(['front', 'back', 'left', 'right'] as const).map((side) => (
+            <LengthField
+              key={side}
+              label={`Overhang ${side}`}
+              value={over[side]}
+              bound="nonnegative"
+              onCommit={(v) => void (v !== null && set({ counterOverhang: { ...over, [side]: v } }))}
+            />
+          ))}
+        </>
+      )}
+      <p className="panel-note">Drag with the select tool to move. Touching counter cabinets share one counter top.</p>
+    </>
+  );
+}
+
+/** A level's casework defaults: the cabinet and counter colours and the front style its fixtures use unless they set their own. */
+function CaseworkDefaults({ level }: { level: Level }) {
+  const updateFinishes = usePlanStore((s) => s.updateFinishes);
+  const f = level.finishes;
+  const count = Object.keys(level.fixtures ?? {}).length;
+  return (
+    <>
+      <ColorField
+        label="Cabinet colour"
+        value={f?.cabinetColor ?? DEFAULT_CABINET_COLOR}
+        onCommit={(c) => updateFinishes(level.id, { cabinetColor: c })}
+        onReset={f?.cabinetColor ? () => updateFinishes(level.id, { cabinetColor: undefined }) : undefined}
+      />
+      <ColorField
+        label="Counter colour"
+        value={counterColorOf(f)}
+        onCommit={(c) => updateFinishes(level.id, { counterColor: c })}
+        onReset={f?.counterColor ? () => updateFinishes(level.id, { counterColor: undefined }) : undefined}
+        hint={f?.counterColor === undefined ? `Default ${DEFAULT_COUNTER_COLOR}.` : undefined}
+      />
+      <SelectField label="Cabinet fronts" value={(f?.frontStyle ?? 'slab') as FrontStyle} options={frontStyleOptions} onChange={(s) => updateFinishes(level.id, { frontStyle: s })} />
+      <ReadOnly label="Fixtures">{count}</ReadOnly>
+    </>
+  );
+}
+
 const roofShapeOptions = (['gable', 'shed', 'hip', 'flat'] as const).map((v) => ({ value: v, label: ROOF_SHAPE_LABEL[v] }));
 const roofFinishOptions: { value: RoofFinish; label: string }[] = [
   { value: 'metal', label: 'Metal' },
@@ -1344,6 +1508,7 @@ function MixedProps({
   openings,
   stairs,
   roofs,
+  fixtures,
   columns,
 }: {
   levelId: Id;
@@ -1352,19 +1517,23 @@ function MixedProps({
   openings: Opening[];
   stairs: Stairs[];
   roofs: Roof[];
+  fixtures: Fixture[];
   columns: Column[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
+  const updateFixture = usePlanStore((s) => s.updateFixture);
   const parts: string[] = [];
   if (walls.length) parts.push(`${walls.length} ${walls.length === 1 ? 'wall' : 'walls'}`);
   if (openings.length) parts.push(`${openings.length} ${openings.length === 1 ? 'opening' : 'openings'}`);
   if (stairs.length) parts.push(`${stairs.length} stairs`);
   if (roofs.length) parts.push(`${roofs.length} ${roofs.length === 1 ? 'roof' : 'roofs'}`);
+  if (fixtures.length) parts.push(`${fixtures.length} ${fixtures.length === 1 ? 'fixture' : 'fixtures'}`);
   if (columns.length) parts.push(`${columns.length} ${columns.length === 1 ? 'column' : 'columns'}`);
   if (sel.gradePoints.length) parts.push(`${sel.gradePoints.length} grade ${sel.gradePoints.length === 1 ? 'point' : 'points'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const items = [...walls, ...openings, ...stairs, ...roofs, ...columns];
+  const items = [...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns];
+  const onlyFixtures = fixtures.length > 0 && items.length === fixtures.length;
   return (
     <>
       <h3>{parts.join(', ')}</h3>
@@ -1381,12 +1550,29 @@ function MixedProps({
                 openings: openings.map((o) => o.id),
                 stairs: stairs.map((st) => st.id),
                 roofs: roofs.map((r) => r.id),
+                fixtures: fixtures.map((f) => f.id),
                 columns: columns.map((c) => c.id),
               },
               p,
             )
           }
         />
+      )}
+      {onlyFixtures && (
+        <>
+          <SelectField
+            label="Fronts"
+            value={common(fixtures, (f) => f.frontStyle ?? null)}
+            options={frontStyleOptions}
+            onChange={(s) => fixtures.forEach((f) => updateFixture(levelId, f.id, { frontStyle: s }))}
+          />
+          <ColorField
+            label="Front colour"
+            value={common(fixtures, (f) => f.frontColor ?? DEFAULT_CABINET_COLOR) ?? DEFAULT_CABINET_COLOR}
+            onCommit={(c) => fixtures.forEach((f) => updateFixture(levelId, f.id, { frontColor: c }))}
+            onReset={fixtures.some((f) => f.frontColor || f.frontStyle) ? () => fixtures.forEach((f) => updateFixture(levelId, f.id, { frontColor: undefined, frontStyle: undefined })) : undefined}
+          />
+        </>
       )}
       {items.length === 0 && <p className="panel-note">{sel.gradePoints.length ? 'Drag grade points with the select tool to move them.' : 'Drag corners with the select tool to move them.'}</p>}
     </>
@@ -1739,6 +1925,7 @@ function LevelProps({ level }: { level: Level }) {
         hint="For interior walls (X). To change drawn walls, select them."
       />
       <ExteriorAppearance level={level} />
+      <CaseworkDefaults level={level} />
       {floorTop !== undefined && ceiling !== undefined && (
         <>
           <ReadOnly label="Floor top">{formatLength(floorTop, denom)}</ReadOnly>
@@ -1754,7 +1941,7 @@ function LevelProps({ level }: { level: Level }) {
           only found where walls close a loop.
         </p>
       )}
-      <p className="panel-note">Select walls, openings, room labels or roofs to edit them. R names a room, K draws a roof.</p>
+      <p className="panel-note">Select walls, openings, room labels, roofs or cabinets to edit them. R names a room, K draws a roof, C places cabinets.</p>
     </>
   );
 }
@@ -1764,6 +1951,7 @@ export function PropertiesPanel() {
   const sel = useUiStore((s) => s.selection);
   const underlaySelected = useUiStore((s) => s.underlaySelected);
   const underlayTool = useUiStore((s) => s.activeTool === 'underlay');
+  const fixtureTool = useUiStore((s) => s.activeTool === 'fixture');
   const level = usePlanStore((s) => s.plan.levels[levelId]);
   const site = usePlanStore((s) => s.plan.site);
   const siteMode = useUiStore((s) => s.siteMode);
@@ -1774,6 +1962,7 @@ export function PropertiesPanel() {
   const rooms = sel.rooms.map((id) => level.rooms[id]).filter(Boolean);
   const stairs = sel.stairs.map((id) => level.stairs[id]).filter(Boolean);
   const roofs = sel.roofs.map((id) => level.roofs[id]).filter(Boolean);
+  const fixtures = sel.fixtures.map((id) => level.fixtures?.[id]).filter(Boolean);
   const gradePoints = sel.gradePoints.map((id) => site.gradePoints[id]).filter(Boolean);
   const columns = sel.columns.map((id) => site.columns[id]).filter(Boolean);
   const live: Selection = {
@@ -1783,6 +1972,7 @@ export function PropertiesPanel() {
     rooms: rooms.map((r) => r.id),
     stairs: stairs.map((st) => st.id),
     roofs: roofs.map((r) => r.id),
+    fixtures: fixtures.map((f) => f.id),
     gradePoints: gradePoints.map((g) => g.id),
     columns: columns.map((c) => c.id),
   };
@@ -1791,6 +1981,7 @@ export function PropertiesPanel() {
   let body: ReactNode;
   if (total === 0 && siteMode) body = <SiteProps key="site" site={site} />;
   else if (total === 0 && (underlayTool || (underlaySelected && level.underlay))) body = <UnderlayProps key={level.id} level={level} />;
+  else if (total === 0 && fixtureTool) body = <FixtureToolProps key="fixture-tool" />;
   else if (total === 0) body = <LevelProps key={level.id} level={level} />;
   else if (total === 1 && walls.length === 1) body = <WallProps key={walls[0].id} level={level} wall={walls[0]} />;
   else if (total === 1 && openings.length === 1)
@@ -1798,17 +1989,18 @@ export function PropertiesPanel() {
   else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
   else if (total === 1 && stairs.length === 1) body = <StairsProps key={stairs[0].id} level={level} stairs={stairs[0]} />;
   else if (total === 1 && roofs.length === 1) body = <RoofProps key={roofs[0].id} level={level} roof={roofs[0]} />;
+  else if (total === 1 && fixtures.length === 1) body = <FixtureProps key={fixtures[0].id} level={level} fixture={fixtures[0]} />;
   else if (total === 1 && gradePoints.length === 1) body = <GradePointProps key={gradePoints[0].id} point={gradePoints[0]} />;
   else if (total === 1 && columns.length === 1) body = <ColumnProps key={columns[0].id} column={columns[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} columns={columns} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} columns={columns} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} />}
       </div>
     </aside>
   );

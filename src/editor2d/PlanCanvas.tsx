@@ -201,6 +201,7 @@ export function PlanCanvas() {
     if (ui.draft.openingPreview) ui.patchDraft({ openingPreview: null });
     if (ui.draft.stairsPreview) ui.patchDraft({ stairsPreview: null });
     if (ui.draft.columnPreview) ui.patchDraft({ columnPreview: null });
+    if (ui.draft.fixturePreview) ui.patchDraft({ fixturePreview: null });
   };
 
   const cursor =

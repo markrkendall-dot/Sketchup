@@ -5,7 +5,7 @@ import { computeFootprints } from '../derive/footprint';
 import { buildWallGeometry, clearMeshCache, getLevelMeshes } from '../derive/meshes';
 import { muntinCounts, openingFill, sashSpans, shutterWidth, type FillBox, type FillInput } from '../derive/openings3d';
 import { DEFAULT_EXTERIOR_COLOR, DEFAULT_INTERIOR_COLOR, DEFAULT_LEAF_COLOR, normalizeHex, roofColorOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
-import { createEmptyPlan, createLevel, migrate } from '../model/plan';
+import { createEmptyPlan, createLevel, migrate, SCHEMA_VERSION } from '../model/plan';
 import type { Level, Opening, Plan, Wall } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import {
@@ -722,7 +722,7 @@ describe('migrate: optional appearance fields', () => {
     expect(Object.keys(wall)).not.toContain('finish');
     expect(Object.keys(opening)).not.toContain('lites');
     expect(Object.keys(roof)).not.toContain('color');
-    expect(migrate(file({})).schemaVersion).toBe(2);
+    expect(migrate(file({})).schemaVersion).toBe(SCHEMA_VERSION);
   });
 
   it('lower-cases a colour; normalizeHex reads #rgb and bare hex', () => {

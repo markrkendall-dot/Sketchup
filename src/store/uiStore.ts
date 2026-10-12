@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import type { WallGeom } from '../derive/openings';
-import type { Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
+import type { FixtureKind, Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'underlay' | 'gradePoint' | 'column' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | OpeningToolName;
 /** Tools that work on the site (E, C); the others edit a level and are off in site mode. */
 export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column'];
 /** Tools allowed in site mode: select, measure, the site tools. */
@@ -96,6 +96,22 @@ export interface OpeningPreview {
   problem: string | null;
 }
 
+/** Fixture tool: the ghost of the fixture about to be placed. */
+export interface FixturePreview {
+  kind: FixtureKind;
+  /** Middle of the back edge. */
+  origin: Vec2;
+  direction: number;
+  width: number;
+  depth: number;
+  /** The wall whose face the back sits on, when snapped to one. */
+  wallId: Id | null;
+  /** The back abuts a fixture already there, on the same line. */
+  abuts: Id | null;
+  /** The width comes from the typed buffer. */
+  typed: boolean;
+}
+
 /** Rectangle tool: the box about to be drawn (centerline corners, clockwise from the first click). */
 export interface RectPreview {
   corners: [Vec2, Vec2, Vec2, Vec2];
@@ -148,6 +164,12 @@ export interface Draft {
   columnKind: 'chimney' | 'post';
   /** Column tool: the column about to be placed, following the snapped cursor. */
   columnPreview: { at: Vec2; kind: 'chimney' | 'post'; width: number; depth: number } | null;
+  /** Fixture tool (C): the kind the next click places (the panel's picker changes it). */
+  fixtureKind: FixtureKind;
+  /** Fixture tool: the direction a fixture placed away from any wall faces (Tab turns it). */
+  fixtureDirection: number;
+  /** Fixture tool: the fixture about to be placed, following the snapped cursor. */
+  fixturePreview: FixturePreview | null;
   /** Rectangle tool: the first corner clicked, null when idle. */
   rectStart: WallStart | null;
   rectPreview: RectPreview | null;
@@ -164,6 +186,7 @@ export interface Selection {
   rooms: Id[];
   stairs: Id[];
   roofs: Id[];
+  fixtures: Id[];
   /** Site elements (plan.site), selectable in site mode. */
   gradePoints: Id[];
   columns: Id[];
@@ -210,6 +233,8 @@ export interface ContextMenu {
   screen: Vec2;
   world: Vec2;
   levelId: Id;
+  /** The wall under the click, when there is one ("Split wall here"). */
+  wallId?: Id;
 }
 
 /** localStorage keys of the editor preferences that are not plan data (so not undoable). */
@@ -390,17 +415,20 @@ export const emptyDraft = (): Draft => ({
   gradePending: null,
   columnKind: 'chimney',
   columnPreview: null,
+  fixtureKind: 'base',
+  fixtureDirection: 90,
+  fixturePreview: null,
   rectStart: null,
   rectPreview: null,
   measure: null,
   dragReadout: null,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], gradePoints: [], columns: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], gradePoints: [], columns: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.gradePoints.length + s.columns.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.gradePoints.length + s.columns.length;
 
 /** Split ratio bounds, so neither view collapses. */
 export const MIN_SPLIT = 0.2;
@@ -457,7 +485,8 @@ export const useUiStore = create<UiState>()((set) => ({
     set((s) => ({
       activeTool,
       underlayMode: 'move',
-      draft: { ...emptyDraft(), cursor: s.draft.cursor },
+      // The fixture kind and the free direction last across tool switches (the picker set them).
+      draft: { ...emptyDraft(), cursor: s.draft.cursor, fixtureKind: s.draft.fixtureKind, fixtureDirection: s.draft.fixtureDirection },
       hover: NO_HOVER,
       roomEdit: null,
       contextMenu: null,

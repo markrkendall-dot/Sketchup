@@ -347,6 +347,118 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-width: 0.7;
 }
 
+/* Casework ------------------------------------------------------------------------------------ */
+
+/* Cabinets and appliances: a thin outline, the front edge heavier, ticks where doors meet. What
+   hangs above the counter (wall cabinets, the hood, the microwave) is dashed. */
+.fixture .fixture-body {
+  fill: #f7f4ee;
+  stroke: #3f3f46;
+  stroke-width: 0.9;
+}
+
+.fixture .fixture-front {
+  fill: none;
+  stroke: #3f3f46;
+  stroke-width: 1.6;
+}
+
+.fixture .fixture-tick {
+  fill: none;
+  stroke: #3f3f46;
+  stroke-width: 0.8;
+}
+
+.fixture .fixture-basin {
+  fill: #e6eaee;
+  stroke: #52525b;
+  stroke-width: 0.9;
+}
+
+.fixture .fixture-burner {
+  fill: none;
+  stroke: #52525b;
+  stroke-width: 0.8;
+}
+
+.fixture .fixture-label {
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  fill: #3f3f46;
+}
+
+.fixture.fixture-overhead .fixture-body {
+  fill: none;
+  stroke-dasharray: 4 2.5;
+}
+
+.fixture.fixture-overhead .fixture-front {
+  stroke-dasharray: 4 2.5;
+  stroke-width: 1;
+}
+
+.fixture.phase-new .fixture-body {
+  fill: #e3f3e9;
+}
+
+.fixture.phase-new .fixture-body,
+.fixture.phase-new .fixture-front,
+.fixture.phase-new .fixture-tick,
+.fixture.phase-new .fixture-label {
+  stroke: var(--new-edge);
+}
+
+.fixture.phase-new .fixture-label {
+  fill: var(--new-edge);
+  stroke: none;
+}
+
+.fixture.phase-demo .fixture-body {
+  fill: var(--demo-fill);
+  stroke: var(--demo);
+  stroke-dasharray: 5 3;
+}
+
+.fixture.phase-demo .fixture-front,
+.fixture.phase-demo .fixture-tick,
+.fixture.phase-demo .fixture-basin,
+.fixture.phase-demo .fixture-burner {
+  stroke: var(--demo);
+}
+
+.fixture.phase-demo .fixture-label {
+  fill: var(--demo);
+}
+
+.fixture.is-selected .fixture-body {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.fixture.is-selected .fixture-front {
+  stroke: var(--accent);
+}
+
+/* The counter top over a run of base cabinets: a light slab under the cabinet symbols. */
+.counter {
+  fill: rgba(107, 103, 96, 0.14);
+  stroke: #6b6760;
+  stroke-width: 0.8;
+}
+
+.counter.phase-new {
+  fill: rgba(63, 143, 95, 0.12);
+  stroke: var(--new-edge);
+}
+
+.counter.phase-demo {
+  fill: var(--demo-fill);
+  stroke: var(--demo);
+  stroke-dasharray: 5 3;
+}
+
 /* Image underlay ----------------------------------------------------------------------------- */
 
 .underlay-image {

@@ -1,4 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { dot, sub } from '../model/geometry';
+import { formatLength } from '../model/units';
+import { getPlan, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { showNotice } from '../ui/fileActions';
 
@@ -53,8 +56,25 @@ export function PlanContextMenu() {
     ui().setContextMenu(null);
     showNotice('Walking starts at the entry door again.');
   };
+  // "Split wall here": a corner goes in at the clicked point along the wall's centerline, so part of
+  // the wall can be marked demolished or moved on its own.
+  const wall = menu.wallId ? getPlan().levels[menu.levelId]?.walls[menu.wallId] : undefined;
+  const splitHere = () => {
+    const level = getPlan().levels[menu.levelId];
+    const w = level?.walls[menu.wallId!];
+    if (!level || !w) return;
+    const a = level.nodes[w.a];
+    const b = level.nodes[w.b];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const at = len > 1e-9 ? dot(sub(menu.world, a), { x: (b.x - a.x) / len, y: (b.y - a.y) / len }) : 0;
+    const problem = usePlanStore.getState().splitWall(menu.levelId, w.id, at);
+    ui().setContextMenu(null);
+    if (problem) showNotice(problem, true);
+    else showNotice(`Split the wall ${formatLength(at, getPlan().settings.precisionDenominator)} from its start. Select either piece on its own now.`);
+  };
+  const rows = 1 + (walkFrom ? 1 : 0) + (wall ? 1 : 0);
   const left = Math.max(4, Math.min(menu.screen.x, width - MENU_WIDTH - 4));
-  const top = Math.max(4, Math.min(menu.screen.y, height - (walkFrom ? 84 : 48)));
+  const top = Math.max(4, Math.min(menu.screen.y, height - (12 + 36 * rows)));
   return (
     <div
       ref={ref}
@@ -70,6 +90,11 @@ export function PlanContextMenu() {
       {walkFrom && (
         <button type="button" role="menuitem" onClick={clear}>
           Clear walk start
+        </button>
+      )}
+      {wall && (
+        <button type="button" role="menuitem" onClick={splitHere} title="Put a corner here so the wall becomes two pieces">
+          Split wall here
         </button>
       )}
     </div>

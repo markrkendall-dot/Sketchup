@@ -1,3 +1,4 @@
+import { hitFixture } from '../../derive/casework';
 import { getFootprints } from '../../derive/footprint';
 import { roofOutlineWithOverhang } from '../../derive/roofs';
 import { hitOpeningRect, hitOpeningSwing } from '../../derive/openings';
@@ -34,10 +35,11 @@ export type Hit =
   | { kind: 'wall'; id: Id }
   | { kind: 'room'; id: Id }
   | { kind: 'stairs'; id: Id }
+  | { kind: 'fixture'; id: Id }
   | { kind: 'roof'; id: Id }
   | null;
 
-const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', roof: 'roofs' } as const;
+const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', fixture: 'fixtures', roof: 'roofs' } as const;
 
 /** Pick radius of a selected roof's outline corner handles, in screen px. */
 const ROOF_HANDLE_PX = 8;
@@ -107,6 +109,11 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   }
   const room = hitRoomLabel(level, viewMode, p, k);
   if (room) return { kind: 'room', id: room };
+  // Topmost (last placed) fixture first.
+  const fixture = Object.values(level.fixtures ?? {})
+    .reverse()
+    .find((f) => isVisible(f.phase, viewMode) && hitFixture(f, p, 2 / k));
+  if (fixture) return { kind: 'fixture', id: fixture.id };
   // Topmost (last drawn) stairs first.
   const stairs = Object.values(level.stairs).reverse();
   const st = stairs.find((s) => isVisible(s.phase, viewMode) && hitStairs(s, p, 2 / k));
@@ -139,6 +146,8 @@ type DragState =
     }
   | ({ kind: 'room' } & RoomDrag)
   | { kind: 'stairs'; id: Id; grab: Vec2; origin: Vec2; startScreen: Vec2; started: boolean }
+  /** The selected fixtures, moved together. */
+  | { kind: 'fixtures'; grab: Vec2; origins: Record<Id, Vec2>; startScreen: Vec2; started: boolean }
   /** An outline corner of a selected roof. */
   | { kind: 'roof-vertex'; id: Id; index: number; startScreen: Vec2; started: boolean }
   | { kind: 'box'; a: Vec2; additive: boolean }
@@ -175,8 +184,9 @@ function pruneSelection(ctx: ToolContext): void {
   const rooms = sel.rooms.filter((id) => level.rooms[id]);
   const stairs = sel.stairs.filter((id) => level.stairs[id]);
   const roofs = sel.roofs.filter((id) => level.roofs[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs });
+  const fixtures = sel.fixtures.filter((id) => level.fixtures[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures });
   }
 }
 
@@ -221,7 +231,7 @@ function finishDrag(ctx: ToolContext): void {
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
     resumeHistory();
     pruneSelection(ctx);
-  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs' || drag?.kind === 'roof-vertex') && drag.started) {
+  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs' || drag?.kind === 'fixtures' || drag?.kind === 'roof-vertex') && drag.started) {
     resumeHistory();
   } else if (drag?.kind === 'room') {
     endRoomDrag(drag);
@@ -245,9 +255,10 @@ function selectHit(sel: Selection, hit: NonNullable<Hit>): Selection {
 
 export const selectTool: Tool = {
   onPointerDown(e, ctx) {
-    // Right-click: the canvas menu ("Walk from here", PlanContextMenu.tsx) at the clicked point.
+    // Right-click: the canvas menu ("Walk from here", "Split wall here", PlanContextMenu.tsx) at the clicked point.
     if (e.button === 2) {
-      ctx.ui().setContextMenu({ screen: e.screen, world: e.world, levelId: ctx.levelId });
+      const under = hitTest(ctx.level(), e.world, ctx.ui().viewport.k, ctx.ui().viewMode);
+      ctx.ui().setContextMenu({ screen: e.screen, world: e.world, levelId: ctx.levelId, ...(under?.kind === 'wall' ? { wallId: under.id } : {}) });
       return;
     }
     if (e.button !== 0) return;
@@ -294,6 +305,13 @@ export const selectTool: Tool = {
     if (hit.kind === 'stairs') {
       const st = level.stairs[hit.id];
       drag = { kind: 'stairs', id: hit.id, grab: e.world, origin: { ...st.origin }, startScreen: e.screen, started: false };
+      return;
+    }
+    if (hit.kind === 'fixture') {
+      // Every selected fixture moves with the one grabbed.
+      const origins: Record<Id, Vec2> = {};
+      for (const id of next.fixtures) if (level.fixtures[id]) origins[id] = { ...level.fixtures[id].origin };
+      drag = { kind: 'fixtures', grab: e.world, origins, startScreen: e.screen, started: false };
       return;
     }
     if (hit.kind === 'opening') {
@@ -358,6 +376,22 @@ export const selectTool: Tool = {
       const d = sub(e.world, drag.grab);
       ui.patchDraft({ cursor: e.world, snap: null });
       ctx.actions.updateStairs(ctx.levelId, drag.id, { origin: add(drag.origin, { x: round(d.x), y: round(d.y) }) });
+      if (!drag.started) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
+
+    if (drag.kind === 'fixtures') {
+      const grid = ctx.plan().settings.snapGrid;
+      const round = (v: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
+      const d = sub(e.world, drag.grab);
+      const step = { x: round(d.x), y: round(d.y) };
+      const positions: Record<Id, Vec2> = {};
+      for (const [id, o] of Object.entries(drag.origins)) positions[id] = add(o, step);
+      ui.patchDraft({ cursor: e.world, snap: null, dragReadout: displacementText(step, ctx.plan().settings.precisionDenominator) });
+      ctx.actions.moveFixtures(ctx.levelId, positions);
       if (!drag.started) {
         drag.started = true;
         pauseHistory();

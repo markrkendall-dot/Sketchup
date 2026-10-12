@@ -2,13 +2,15 @@ import { Group, Mesh, type BufferGeometry, type Material, type MeshStandardMater
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
+import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
 import { getLevelMeshes, getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
+import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
 import { COLUMN_COLOR, DEFAULT_LEAF_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
-import type { Column, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
+import type { Column, FixtureKind, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { chimneyPartMaterial, columnMaterial, fasciaMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, fasciaMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -47,6 +49,17 @@ const openingMaterialName = (part: FillPart, phase: Phase, color: string = DEFAU
 const columnMaterialName = (kind: Column['kind'], phase: Phase, color: string) =>
   phase === 'demo' || color === COLUMN_COLOR[kind] ? `column_${kind}_${phase}` : `column_${kind}_${phase}_${color.slice(1)}`;
 const chimneyPartMaterialName = (part: ChimneyPart, phase: Phase) => `chimney_${part}_${phase}`;
+/** `cabinet`, `kick`, `appliance`, `basin` (plus `_<hex>` for cabinets not in the default colour), then `_<phase>` for other phases. */
+const caseworkMaterialName = (part: CasePart, phase: Phase, color: string) => {
+  const base = part === 'carcass' || part === 'front' ? (phase !== 'demo' && color !== DEFAULT_CABINET_COLOR ? `cabinet_${color.slice(1)}` : 'cabinet') : part;
+  return phase === 'existing' ? base : `${base}_${phase}`;
+};
+const counterMaterialName = (phase: Phase, color: string) => {
+  const base = phase !== 'demo' && color !== DEFAULT_COUNTER_COLOR ? `counter_${color.slice(1)}` : 'counter';
+  return phase === 'existing' ? base : `${base}_${phase}`;
+};
+/** `Cabinet (base)`, `Appliance (range)`, `Sink`, `Box`. */
+const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sink' ? `Cabinet (${FIXTURE_LABEL[kind].replace(' cabinet', '').toLowerCase()})` : kind === 'sink' ? 'Sink' : kind === 'box' ? 'Box' : `Appliance (${FIXTURE_LABEL[kind].toLowerCase()})`);
 
 /**
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
@@ -91,7 +104,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   for (const id of visible3dLevels(plan.levelOrder, levelVisibility)) {
     const level = plan.levels[id];
     const meshes = getLevelMeshes(plan, id, viewMode);
-    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length)) continue;
+    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length)) continue;
     const group = new Group();
     group.name = level.name;
     group.position.set(0, elev[id]?.floorTop ?? 0, 0);
@@ -129,6 +142,20 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         if (o.phase === 'demo' || p.part === 'glass') m.renderOrder = 1;
         group.add(m);
       }
+    }
+    // Casework: one mesh per material part of each fixture, then the counter slabs.
+    for (const f of meshes.fixtures) {
+      for (const p of f.parts) {
+        const m = mesh(fixtureMeshName(f.kind), p.geometry, material(caseworkMaterialName(p.part, f.phase, f.frontColor), caseworkMaterial(p.part, f.phase, f.frontColor)));
+        if (f.phase === 'demo') m.renderOrder = 1;
+        group.add(m);
+      }
+    }
+    const counterColor = counterColorOf(level.finishes);
+    for (const c of meshes.counters) {
+      const m = mesh('Counter', c.geometry, material(counterMaterialName(c.phase, counterColor), counterMaterial(c.phase, counterColor)));
+      if (c.phase === 'demo') m.renderOrder = 1;
+      group.add(m);
     }
     root.add(group);
   }
