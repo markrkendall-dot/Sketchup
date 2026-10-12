@@ -4,7 +4,7 @@ import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { PHASE_LABEL } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
-import { roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
+import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, groundAt } from '../derive/site';
 import { floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsHoleOutline, stairsHoleStart, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool } from '../editor2d/tools';
@@ -15,6 +15,7 @@ import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type 
 import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, GLAZINGS, glazingOf, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
+import { boardColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
@@ -1040,6 +1041,7 @@ const roofFinishOptions: { value: RoofFinish; label: string }[] = [
   { value: 'metal', label: 'Metal' },
   { value: 'shingle', label: 'Shingle' },
 ];
+const roofEaveOptions = ROOF_EAVES.map((e) => ({ value: e, label: ROOF_EAVE_LABEL[e] }));
 
 /** Ridge direction buttons: along x or y for a gable or hip, the four downhill directions for a shed. */
 const RIDGE_BUTTONS: Record<RoofShape, { angle: number; label: string; title: string }[]> = {
@@ -1066,6 +1068,13 @@ function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
   const viewMode = useUiStore((s) => s.viewMode);
   const [fitNote, setFitNote] = useState<{ text: string; error: boolean } | null>(null);
   const set = (patch: Partial<Roof>) => updateRoof(level.id, roof.id, patch);
+  const open = roofEaveOf(roof) === 'open';
+  const rafter = rafterOf(roof);
+  // The default rafter is stored as no field, so a file only carries what was changed.
+  const setRafter = (patch: Partial<{ depth: number; spacing: number }>) => {
+    const next = { ...rafter, ...patch };
+    set({ rafter: next.depth === DEFAULT_RAFTER.depth && next.spacing === DEFAULT_RAFTER.spacing ? undefined : next });
+  };
   const bearing = roofBearing(level.wallHeight, roof);
   const { ridge, eave } = roofExtremes(roof, bearing);
   const b = boundsOf(roof.outline);
@@ -1122,15 +1131,54 @@ function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
         hint="Where the roof sits above this level's ceiling (usually 0)."
       />
       <LengthField label="Thickness" value={roof.thickness} onCommit={(v) => void (v !== null && set({ thickness: v }))} hint="Measured vertically." />
-      <LengthField label="Fascia" value={roof.fascia} bound="nonnegative" onCommit={(v) => void (v !== null && set({ fascia: v }))} hint="Depth of the fascia and rake boards." />
+      <SelectField label="Eaves" value={roofEaveOf(roof)} options={roofEaveOptions} onChange={(eave) => set({ eave: eave === 'fascia' ? undefined : eave })} />
+      {open && (
+        <>
+          <LengthField label="Rafter depth" value={rafter.depth} onCommit={(v) => void (v !== null && setRafter({ depth: v }))} hint="The tails hang this far below the roof's underside." />
+          <LengthField
+            label="Rafter spacing"
+            value={rafter.spacing}
+            onCommit={(v) => {
+              if (v === null) return null;
+              if (v < 2 * RAFTER_WIDTH) return `At least ${formatLength(2 * RAFTER_WIDTH, denom)} (the tails are ${formatLength(RAFTER_WIDTH, denom)} wide).`;
+              setRafter({ spacing: v });
+              return null;
+            }}
+            hint="On centre, along the eave."
+          />
+        </>
+      )}
+      <LengthField
+        label="Fascia"
+        value={roof.fascia}
+        bound="nonnegative"
+        onCommit={(v) => void (v !== null && set({ fascia: v }))}
+        hint={open ? 'Depth of the rake boards (open eaves have no fascia).' : 'Depth of the fascia and rake boards.'}
+      />
+      <ColorField
+        label="Board colour"
+        value={boardColorOf(roof)}
+        onCommit={(boardColor) => set({ boardColor })}
+        onReset={roof.boardColor ? () => set({ boardColor: undefined }) : undefined}
+        hint={`Fascia, rake boards and rafter tails. Default tan ${TRIM_COLOR}.`}
+      />
       <SelectField label="Finish" value={roof.finish} options={roofFinishOptions} onChange={(finish) => set({ finish })} />
       <ColorField
         label="Colour"
         value={roofColorOf(roof)}
         onCommit={(color) => set({ color })}
         onReset={roof.color ? () => set({ color: undefined }) : undefined}
-        hint={`Default for ${roof.finish}: ${ROOF_COLOR[roof.finish]}. The fascia is tan.`}
+        hint={`Default for ${roof.finish}: ${ROOF_COLOR[roof.finish]}.`}
       />
+      {roof.finish === 'metal' && (
+        <NumberField
+          label="Weathering"
+          value={weatheringOf(roof)}
+          check={(v) => (v < 0 || v > 1 ? 'Between 0 and 1.' : null)}
+          onCommit={(weathering) => set({ weathering })}
+          hint={`Rust streaks, 0 (none) to 1. Default ${DEFAULT_WEATHERING}.`}
+        />
+      )}
       <SelectField label="Phase" value={roof.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
       <ReadOnly label={roof.shape === 'shed' ? 'High side' : roof.shape === 'flat' ? 'Underside' : 'Ridge'}>{formatLength(ridge, denom)} above the floor</ReadOnly>
       <ReadOnly label="Eave">{formatLength(eave, denom)} above the floor</ReadOnly>

@@ -8,6 +8,7 @@ import {
   clampOpenings,
   columnProblem,
   createEmptyPlan,
+  roofOptionProblem,
   roofProblem,
   findNodeNear,
   MERGE_EPS,
@@ -145,9 +146,13 @@ export interface PlanState {
    */
   updateStairs: (levelId: Id, id: Id, patch: StairsPatch) => void;
   deleteStairs: (levelId: Id, ids: Id[]) => void;
-  /** Add a roof; returns the id, or null when its outline or sizes are not usable. */
+  /** Add a roof; returns the id, or null when its outline, sizes or optional fields are not usable (roofOptionProblem). */
   addRoof: (levelId: Id, roof: NewRoof) => Id | null;
-  /** Patch a roof; an unusable outline or size is rejected, the ridge angle is normalized to [0, 360). */
+  /**
+   * Patch a roof; an unusable outline, size or optional field is rejected, the ridge angle is
+   * normalized to [0, 360). The optional fields (colour, eaves, rafter, board colour, weathering)
+   * take undefined to clear them.
+   */
   updateRoof: (levelId: Id, id: Id, patch: RoofPatch) => void;
   deleteRoofs: (levelId: Id, ids: Id[]) => void;
   /** Add a grade point (a spot elevation of the ground); returns the id, or null for a non-finite value. */
@@ -272,9 +277,13 @@ const validStairs = (s: Omit<Stairs, 'id'>, limits: { width: boolean; run: boole
   (s.headroom === undefined || (Number.isFinite(s.headroom) && s.headroom > 0)) &&
   (s.holeStart === undefined || (Number.isFinite(s.holeStart) && s.holeStart >= 0));
 
-/** A roof's stored form: outline points copied, ridge angle in [0, 360). */
+/** A roof's stored form: outline points and rafter sizes copied, ridge angle in [0, 360), colours lower-cased. */
 function cleanRoof(r: Roof): Roof {
-  return { ...r, outline: r.outline.map((p) => ({ x: p.x, y: p.y })), ridgeAngle: normalizeDegrees(r.ridgeAngle) };
+  const out: Roof = { ...r, outline: r.outline.map((p) => ({ x: p.x, y: p.y })), ridgeAngle: normalizeDegrees(r.ridgeAngle) };
+  if (r.rafter) out.rafter = { depth: r.rafter.depth, spacing: r.rafter.spacing };
+  if (typeof r.color === 'string') out.color = r.color.toLowerCase();
+  if (typeof r.boardColor === 'string') out.boardColor = r.boardColor.toLowerCase();
+  return out;
 }
 
 const isPoint = (p: Vec2 | undefined): p is Vec2 => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -685,7 +694,7 @@ export const usePlanStore = create<PlanState>()(
           let id: Id | null = null;
           editLevel(levelId, (level) => {
             const roof = cleanRoof({ ...input, id: input.id ?? newId() });
-            if (roofProblem(roof)) return false;
+            if (roofProblem(roof) || roofOptionProblem(roof)) return false;
             level.roofs[roof.id] = roof;
             id = roof.id;
           });
@@ -697,16 +706,19 @@ export const usePlanStore = create<PlanState>()(
             const r = level.roofs[id];
             if (!r) return false;
             const next = cleanRoof({ ...r, ...patch, id });
-            if (roofProblem(next)) return false;
+            if (roofProblem(next) || roofOptionProblem(next)) return false;
             const keys = Object.keys(patch) as (keyof RoofPatch)[];
             const same = (k: keyof RoofPatch) =>
               k === 'outline'
                 ? next.outline.length === r.outline.length && next.outline.every((p, i) => p.x === r.outline[i].x && p.y === r.outline[i].y)
-                : next[k] === r[k];
+                : k === 'rafter'
+                  ? next.rafter?.depth === r.rafter?.depth && next.rafter?.spacing === r.rafter?.spacing
+                  : next[k] === r[k];
             if (keys.every(same)) return false;
             for (const k of keys) {
               if (same(k)) continue;
-              if (next[k] === undefined) delete r[k]; // an optional field (colour) cleared
+              // An optional field (colour, eaves, rafter, board colour, weathering) cleared.
+              if (next[k] === undefined) delete r[k];
               else (r as unknown as Record<string, unknown>)[k] = next[k];
             }
           }),

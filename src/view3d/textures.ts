@@ -1,5 +1,6 @@
 import { CanvasTexture, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, type ColorSpace } from 'three';
-import type { WallFinish } from '../model/types';
+import { DEFAULT_WEATHERING, ROOF_TILE } from '../model/finish';
+import type { RoofFinish, WallFinish } from '../model/types';
 
 // Procedural siding textures (DESIGN.md "Exterior appearance"). One 512 x 512 canvas stands for
 // 48" x 48" of wall, so a texel is 3/32". Wall geometry carries UVs in inches (meshes.ts
@@ -7,7 +8,8 @@ import type { WallFinish } from '../model/types';
 // pieces and openings. Every finish with relief (laps, shingle butts and keyways, V-grooves,
 // mortar joints) also has a height field in inches, turned into a normal map. The layouts, the
 // height fields and the normal-map rule are pure (testable in node); only drawing needs a canvas,
-// and `sidingTextures` returns null where there is no `document` (node, tests).
+// and `sidingTextures` returns null where there is no `document` (node, tests). Roof textures
+// (corrugated metal, asphalt shingle) follow at the end, on a 24" x 48" tile (`roofTexture`).
 
 /** Pixels per side of a texture tile. */
 export const TEXTURE_PX = 512;
@@ -229,9 +231,16 @@ export function sidingHeight(finish: WallFinish): Float32Array | null {
  * Canvas y grows downward while the texture's v grows upward (flipY), so the normal is
  * (-k dh/dx, +k dh/dy, 1) normalized, stored as (n + 1) / 2: R = 0.5 - 0.5 k dh/dx and
  * G = 0.5 + 0.5 k dh/dy for gentle slopes. A step down the canvas (a lap's butt, higher above
- * lower) faces down: G below 128. Flat is (128, 128, 255).
+ * lower) faces down: G below 128. Flat is (128, 128, 255). `strengthY` is the strength down the
+ * canvas when a texel is not square (a roof tile stands for 24" across and 48" down).
  */
-export function normalFromHeight(height: ArrayLike<number>, size: number, strength: number, out: Uint8ClampedArray = new Uint8ClampedArray(size * size * 4)): Uint8ClampedArray {
+export function normalFromHeight(
+  height: ArrayLike<number>,
+  size: number,
+  strength: number,
+  out: Uint8ClampedArray = new Uint8ClampedArray(size * size * 4),
+  strengthY: number = strength,
+): Uint8ClampedArray {
   for (let y = 0; y < size; y++) {
     const up = wrap(y - 1, size) * size;
     const mid = y * size;
@@ -242,7 +251,7 @@ export function normalFromHeight(height: ArrayLike<number>, size: number, streng
       const dx = (height[up + r] + 2 * height[mid + r] + height[down + r] - height[up + l] - 2 * height[mid + l] - height[down + l]) / 8;
       const dy = (height[down + l] + 2 * height[down + x] + height[down + r] - height[up + l] - 2 * height[up + x] - height[up + r]) / 8;
       const nx = -strength * dx;
-      const ny = strength * dy;
+      const ny = strengthY * dy;
       const inv = 1 / Math.sqrt(nx * nx + ny * ny + 1);
       const i = (mid + x) * 4;
       out[i] = Math.round((nx * inv + 1) * 127.5);
@@ -446,14 +455,16 @@ function drawScreen(ctx: Ctx): void {
   }
 }
 
-/** A tile texture over a canvas: repeating, one repeat per 48" of inch UVs, mipmapped. */
-function tileTexture(canvas: HTMLCanvasElement, colorSpace: ColorSpace): CanvasTexture {
+/**
+ * A tile texture over a canvas: repeating, mipmapped. `repeat` 1/48 for siding (UVs in inches, one
+ * repeat per 48" tile); roof UVs are in tiles already (meshes.ts addRoofUVs), so roofs use 1.
+ */
+function tileTexture(canvas: HTMLCanvasElement, colorSpace: ColorSpace, repeat = 1 / TILE_INCHES): CanvasTexture {
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = colorSpace;
   tex.wrapS = RepeatWrapping;
   tex.wrapT = RepeatWrapping;
-  // UVs are in inches: one repeat covers one 48" tile.
-  tex.repeat.set(1 / TILE_INCHES, 1 / TILE_INCHES);
+  tex.repeat.set(repeat, repeat);
   tex.minFilter = LinearMipmapLinearFilter;
   tex.anisotropy = 8;
   tex.needsUpdate = true;
@@ -531,3 +542,305 @@ export function sidingTextures(finish: WallFinish, color: string, variant: Textu
 /** The colour texture alone (sidingTextures' map), or null. */
 export const sidingTexture = (finish: WallFinish, color: string, variant: TextureVariant = 'plain'): CanvasTexture | null =>
   sidingTextures(finish, color, variant)?.map ?? null;
+
+// ---------------------------------------------------------------------------------------------
+// Roof textures. A roof tile is TEXTURE_PX square and stands for ROOF_TILE: 24" across the slope
+// (canvas x) by 48" down it. Roof UVs are in tiles (meshes.ts addRoofUVs) with v growing downhill,
+// and flipY puts v = 1 at the canvas top, so up the canvas is down the slope; the roof textures
+// repeat once per unit of UV (repeat 1, not the siding's 1/48). Layouts below are in tile inches:
+// x across, s down the slope from the tile's uphill edge.
+
+/** Pixels per inch of a roof tile, across the slope and down it (a texel is 3/64" by 3/32"). */
+export const ROOF_PX_ACROSS = TEXTURE_PX / ROOF_TILE.across;
+export const ROOF_PX_DOWN = TEXTURE_PX / ROOF_TILE.down;
+/** Corrugated metal: 9 ribs across a 24" tile (a 2 2/3" pitch), 1/2" from trough to crest. */
+export const METAL_RIBS = 9;
+export const RIB_DEPTH = 0.5;
+/**
+ * Asphalt shingles: 10 courses down a 48" tile (a 4.8" exposure, the nearest to 5" that repeats with
+ * the tile), 12" tabs with 1/4" slots, every other course shifted half a tab. The butt stands 0.15"
+ * proud of the course below.
+ */
+export const ROOF_SHINGLE_COURSES = 10;
+export const SHINGLE_TAB = 12;
+export const SHINGLE_SLOT = 0.25;
+export const ROOF_SHINGLE_BUTT = 0.15;
+/** The shadow just downhill of a shingle's butt: how far down the slope it reaches (inches) and its darkness at the butt. */
+export const ROOF_BUTT_SHADOW = { depth: 0.4, alpha: 0.55 } as const;
+
+/** Weathering to the nearest 0.05 in 0..1, so a slider does not make a texture for every step. */
+export const quantizeWeathering = (w: number): number => Math.round(Math.min(1, Math.max(0, Number.isFinite(w) ? w : 0)) * 20) / 20;
+
+/**
+ * Height of the corrugation at a canvas column, inches above the troughs: a cosine wave, METAL_RIBS
+ * per tile so it repeats seamlessly. Troughs at x = k * 24" / 9, crests half way between.
+ */
+export function ribHeight(col: number): number {
+  return (RIB_DEPTH / 2) * (1 - Math.cos((2 * Math.PI * METAL_RIBS * (col + 0.5)) / TEXTURE_PX));
+}
+
+/** Across-the-tile positions of crest k and trough k, inches. */
+const crestX = (k: number): number => ((k + 0.5) * ROOF_TILE.across) / METAL_RIBS;
+const troughX = (k: number): number => (k * ROOF_TILE.across) / METAL_RIBS;
+
+/** A rust streak on a metal roof tile, in tile inches; it runs downhill from its source and wraps round the tile. */
+export interface RustStreak {
+  /** Across the tile (0 to 24). */
+  x: number;
+  /** Its source, down the slope from the tile's uphill edge (0 to 48). */
+  s: number;
+  length: number;
+  width: number;
+  /** Opacity at the source, fading to nothing at the end: the weathering times a base of 0.15 to 0.9. */
+  alpha: number;
+  /** 0 dark brown to 1 orange. */
+  tone: number;
+  /** A fastener's rust spot at the source. */
+  spot: boolean;
+}
+
+/**
+ * The rust streaks of a metal roof tile: from the fasteners (two rows a tile, 24" apart down the
+ * slope, in every third crest), along every rib where the water runs (in the trough or over the
+ * crest), and a few broad stains over several ribs. The layout is the same at every weathering
+ * (seeded); only the opacity scales with it.
+ */
+export function rustStreaks(weathering: number): RustStreak[] {
+  const w = quantizeWeathering(weathering);
+  const rand = seeded(97);
+  const out: RustStreak[] = [];
+  for (const [row, s] of [12, 36].entries()) {
+    for (let k = row; k < METAL_RIBS; k += 3) {
+      const base = 0.55 + rand() * 0.35;
+      out.push({ x: crestX(k), s: s + (rand() - 0.5) * 0.5, length: 4 + rand() * 16, width: 0.35 + rand() * 0.4, alpha: w * base, tone: rand(), spot: true });
+    }
+  }
+  for (let k = 0; k < METAL_RIBS; k++) {
+    for (let j = 0; j < 3; j++) {
+      const x = (rand() < 0.4 ? crestX(k) : troughX(k)) + (rand() - 0.5) * 0.5;
+      const base = 0.3 + rand() * 0.5;
+      out.push({ x, s: rand() * ROOF_TILE.down, length: 6 + rand() * 36, width: 0.25 + rand() * 0.8, alpha: w * base, tone: rand(), spot: false });
+    }
+  }
+  for (let i = 0; i < 6; i++) {
+    const base = 0.15 + rand() * 0.2;
+    out.push({ x: rand() * ROOF_TILE.across, s: rand() * ROOF_TILE.down, length: 16 + rand() * 32, width: 2 + rand() * 5, alpha: w * base, tone: rand(), spot: false });
+  }
+  return out;
+}
+
+/** One course of asphalt shingles across a roof tile: its span down the slope, its slots and its tabs' brightness. */
+export interface RoofShingleCourse {
+  /** Uphill and downhill edges (the butt is at s1). */
+  s0: number;
+  s1: number;
+  /** Slot centres across the tile, ascending. */
+  slots: number[];
+  /** Brightness factor of the tab right of each slot (brightness()). */
+  shades: number[];
+}
+
+/** The courses of an asphalt shingle roof tile, uphill to downhill. */
+export function roofShingleCourses(): RoofShingleCourse[] {
+  const b = courseBoundaries(ROOF_TILE.down, ROOF_TILE.down / ROOF_SHINGLE_COURSES);
+  const rand = seeded(61);
+  const out: RoofShingleCourse[] = [];
+  for (let k = 0; k + 1 < b.length; k++) {
+    const slots: number[] = [];
+    for (let x = (k % 2) * (SHINGLE_TAB / 2); x < ROOF_TILE.across; x += SHINGLE_TAB) slots.push(x);
+    out.push({ s0: b[k], s1: b[k + 1], slots, shades: slots.map(() => brightness(rand)) });
+  }
+  return out;
+}
+
+/** A distance across the roof tile folded into -12..12. */
+const wrapAcross = (dx: number): number => dx - ROOF_TILE.across * Math.round(dx / ROOF_TILE.across);
+
+/**
+ * The relief of a roof finish over one tile, inches, row-major in canvas order (row 0 is the
+ * tile's downhill edge). Metal: the corrugation (ribHeight), the same down every column. Shingle:
+ * each course rises from nothing at its uphill edge to ROOF_SHINGLE_BUTT at its butt, its slots
+ * sunk to the course underneath.
+ */
+export function roofHeight(finish: RoofFinish): Float32Array {
+  const f = new Float32Array(TEXTURE_PX * TEXTURE_PX);
+  if (finish === 'metal') {
+    for (let col = 0; col < TEXTURE_PX; col++) {
+      const h = ribHeight(col);
+      for (let row = 0; row < TEXTURE_PX; row++) f[row * TEXTURE_PX + col] = h;
+    }
+    return f;
+  }
+  const courses = roofShingleCourses();
+  for (let row = 0; row < TEXTURE_PX; row++) {
+    const s = (TEXTURE_PX - row - 0.5) / ROOF_PX_DOWN;
+    const c = courses.find((k) => s < k.s1) ?? courses[courses.length - 1];
+    const ramp = (ROOF_SHINGLE_BUTT * (s - c.s0)) / (c.s1 - c.s0);
+    for (let col = 0; col < TEXTURE_PX; col++) {
+      const x = (col + 0.5) / ROOF_PX_ACROSS;
+      const inSlot = c.slots.some((sx) => Math.abs(wrapAcross(x - sx)) < SHINGLE_SLOT / 2);
+      f[row * TEXTURE_PX + col] = inSlot ? -ROOF_SHINGLE_BUTT / 2 : ramp;
+    }
+  }
+  return f;
+}
+
+/** Draw in roof tile inches: x across, s down the slope from the tile's uphill edge (the canvas bottom). */
+function roofSpace(ctx: Ctx): void {
+  ctx.setTransform(ROOF_PX_ACROSS, 0, 0, -ROOF_PX_DOWN, 0, TEXTURE_PX);
+}
+
+/** Call `draw` for the tile, and again shifted a tile for each edge the box x0..x1, s0..s1 crosses. */
+function wrapped(x0: number, x1: number, s0: number, s1: number, draw: (dx: number, ds: number) => void): void {
+  const xs = [0, ...(x0 < 0 ? [ROOF_TILE.across] : []), ...(x1 > ROOF_TILE.across ? [-ROOF_TILE.across] : [])];
+  const ss = [0, ...(s0 < 0 ? [ROOF_TILE.down] : []), ...(s1 > ROOF_TILE.down ? [-ROOF_TILE.down] : [])];
+  for (const dx of xs) for (const ds of ss) draw(dx, ds);
+}
+
+/** Rust between dark brown (tone 0) and orange (tone 1), as r, g, b. */
+function rustRgb(tone: number): [number, number, number] {
+  return [Math.round(100 + 80 * tone), Math.round(50 + 45 * tone), Math.round(25 + 18 * tone)];
+}
+
+function drawMetal(ctx: Ctx, color: string, weathering: number): void {
+  const rand = seeded(83);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
+  roofSpace(ctx);
+  // Each rib of the sheet a little lighter or darker, and faint streaks down the slope where the
+  // galvanizing has dulled unevenly (long and narrow, so the tile's repeat does not show as spots).
+  for (let k = 0; k < METAL_RIBS; k++) {
+    const f = brightness(rand);
+    ctx.fillStyle = f > 1 ? `rgba(255, 255, 255, ${((f - 1) * 0.8).toFixed(3)})` : `rgba(0, 0, 0, ${((1 - f) * 0.8).toFixed(3)})`;
+    ctx.fillRect(troughX(k), 0, ROOF_TILE.across / METAL_RIBS, ROOF_TILE.down);
+  }
+  for (let i = 0; i < 240; i++) {
+    const x = rand() * ROOF_TILE.across;
+    const s = rand() * ROOF_TILE.down;
+    const len = 2 + rand() * 14;
+    const wid = 0.05 + rand() * 0.25;
+    const dark = rand() < 0.6;
+    const a = 0.03 + rand() * 0.06;
+    ctx.fillStyle = dark ? `rgba(0, 0, 0, ${a.toFixed(3)})` : `rgba(255, 255, 255, ${a.toFixed(3)})`;
+    wrapped(x, x + wid, s, s + len, (dx, ds) => ctx.fillRect(x + dx, s + ds, wid, len));
+  }
+  // Rust: each streak fades downhill from its source, with a fainter edge either side; a fastener has a spot.
+  for (const st of rustStreaks(weathering)) {
+    if (st.alpha <= 0) continue;
+    const [r, g, b] = rustRgb(st.tone);
+    const half = st.width / 2;
+    wrapped(st.x - half, st.x + half, st.s - 0.5, st.s + st.length, (dx, ds) => {
+      for (const [k, a] of [[1, 0.5], [0.55, 0.5]] as const) {
+        const grad = ctx.createLinearGradient(0, st.s + ds, 0, st.s + ds + st.length);
+        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${(st.alpha * a).toFixed(3)})`);
+        grad.addColorStop(0.35, `rgba(${r}, ${g}, ${b}, ${(st.alpha * a * 0.6).toFixed(3)})`);
+        grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(st.x + dx - half * k, st.s + ds, st.width * k, st.length);
+      }
+      if (st.spot) {
+        const spot = ctx.createRadialGradient(st.x + dx, st.s + ds, 0, st.x + dx, st.s + ds, 0.45);
+        spot.addColorStop(0, `rgba(${r - 30}, ${g - 20}, ${b - 10}, ${Math.min(1, st.alpha * 1.4).toFixed(3)})`);
+        spot.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+        ctx.fillStyle = spot;
+        ctx.fillRect(st.x + dx - 0.45, st.s + ds - 0.45, 0.9, 0.9);
+      }
+    });
+  }
+  // Each rib: the crests catch the light and the troughs hold shade (the normal map adds the slope).
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let col = 0; col < TEXTURE_PX; col++) {
+    const f = (2 * ribHeight(col)) / RIB_DEPTH - 1;
+    ctx.fillStyle = f > 0 ? `rgba(255, 255, 255, ${(0.1 * f).toFixed(3)})` : `rgba(0, 0, 0, ${(-0.16 * f).toFixed(3)})`;
+    ctx.fillRect(col, 0, 1, TEXTURE_PX);
+  }
+}
+
+function drawRoofShingle(ctx: Ctx, color: string): void {
+  const rand = seeded(67);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
+  roofSpace(ctx);
+  const courses = roofShingleCourses();
+  for (const c of courses) {
+    // Tabs a few percent lighter or darker; each slot a dark gap down to the course underneath.
+    c.slots.forEach((sx, j) => {
+      const x1 = j + 1 < c.slots.length ? c.slots[j + 1] : c.slots[0] + ROOF_TILE.across;
+      wrapped(sx, x1, c.s0, c.s1, (dx, ds) => {
+        ctx.fillStyle = shade(color, c.shades[j]);
+        ctx.fillRect(sx + dx, c.s0 + ds, x1 - sx, c.s1 - c.s0);
+      });
+    });
+    ctx.fillStyle = shade(color, 0.45);
+    for (const sx of c.slots) {
+      wrapped(sx - SHINGLE_SLOT / 2, sx + SHINGLE_SLOT / 2, c.s0, c.s1, (dx, ds) => ctx.fillRect(sx + dx - SHINGLE_SLOT / 2, c.s0 + ds, SHINGLE_SLOT, c.s1 - c.s0));
+    }
+  }
+  // The butt of each course shades the top of the course below it (downhill).
+  for (const c of courses) {
+    wrapped(0, ROOF_TILE.across, c.s1, c.s1 + ROOF_BUTT_SHADOW.depth, (dx, ds) => {
+      const g = ctx.createLinearGradient(0, c.s1 + ds, 0, c.s1 + ds + ROOF_BUTT_SHADOW.depth);
+      g.addColorStop(0, `rgba(0, 0, 0, ${ROOF_BUTT_SHADOW.alpha})`);
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(dx, c.s1 + ds, ROOF_TILE.across, ROOF_BUTT_SHADOW.depth);
+    });
+  }
+  // Granules: specks a little lighter or darker than the shingle.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let i = 0; i < 9000; i++) {
+    const dark = rand() < 0.55;
+    const a = 0.08 + rand() * 0.16;
+    ctx.fillStyle = dark ? `rgba(0, 0, 0, ${a.toFixed(3)})` : `rgba(255, 255, 255, ${a.toFixed(3)})`;
+    ctx.fillRect(Math.floor(rand() * TEXTURE_PX), Math.floor(rand() * TEXTURE_PX), 1, 1);
+  }
+}
+
+const roofNormalCache = new Map<RoofFinish, CanvasTexture | null>();
+
+/** The normal map of a roof finish (the relief does not depend on the colour), made once. */
+function roofNormalTexture(finish: RoofFinish): CanvasTexture | null {
+  const hit = roofNormalCache.get(finish);
+  if (hit !== undefined) return hit;
+  const tile = tileCanvas();
+  let tex: CanvasTexture | null = null;
+  if (tile) {
+    const img = tile.ctx.createImageData(TEXTURE_PX, TEXTURE_PX);
+    normalFromHeight(roofHeight(finish), TEXTURE_PX, ROOF_PX_ACROSS, img.data, ROOF_PX_DOWN);
+    tile.ctx.putImageData(img, 0, 0);
+    // Directions, not colours: no colour space conversion.
+    tex = tileTexture(tile.canvas, NoColorSpace, 1);
+  }
+  roofNormalCache.set(finish, tex);
+  return tex;
+}
+
+const roofCache = new Map<string, SidingTextures | null>();
+
+/**
+ * A roof's colour texture and normal map, made once per finish, colour and weathering (to the
+ * nearest 0.05; a shingle roof ignores it) and cached together. Metal: corrugated sheet in the
+ * colour, faintly mottled, with rust streaks whose opacity scales with the weathering, the crests
+ * shaded light and the troughs dark; its normal map is the rib profile. Shingle: courses of tabs
+ * with slots, a shadow under each butt, granules; its normal map has the butts and slots. Null
+ * wherever there is no DOM canvas (node), where the materials use the flat colour.
+ */
+export function roofTexture(finish: RoofFinish, color: string, weathering: number = DEFAULT_WEATHERING): SidingTextures | null {
+  if (typeof document === 'undefined') return null;
+  const w = finish === 'metal' ? quantizeWeathering(weathering) : 0;
+  const key = `${finish}|${color}|${w}`;
+  const hit = roofCache.get(key);
+  if (hit !== undefined) return hit;
+  const tile = tileCanvas();
+  if (!tile) {
+    roofCache.set(key, null);
+    return null;
+  }
+  if (finish === 'metal') drawMetal(tile.ctx, color, w);
+  else drawRoofShingle(tile.ctx, color);
+  const out = { map: tileTexture(tile.canvas, SRGBColorSpace, 1), normalMap: roofNormalTexture(finish) };
+  roofCache.set(key, out);
+  return out;
+}

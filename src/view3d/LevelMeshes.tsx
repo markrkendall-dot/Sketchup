@@ -4,7 +4,7 @@ import { getLevelMeshes } from '../derive/meshes';
 import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
-import { fasciaMaterial, floorMaterial, openingMaterial, roofMaterial, stairsMaterial, wallMaterial } from './materials';
+import { fasciaMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -50,7 +50,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           <mesh
             name={`roof:${r.id}`}
             geometry={r.geometry}
-            material={roofMaterial(r.finish, r.phase, r.color)}
+            material={roofMaterial(r.finish, r.phase, r.color, r.weathering)}
             renderOrder={r.phase === 'demo' ? 1 : 0}
             castShadow={r.phase !== 'demo'}
             receiveShadow
@@ -60,7 +60,18 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
             <mesh
               name={`fascia:${r.id}`}
               geometry={r.fascia}
-              material={fasciaMaterial(r.phase)}
+              material={fasciaMaterial(r.phase, r.boardColor)}
+              renderOrder={r.phase === 'demo' ? 1 : 0}
+              castShadow={r.phase !== 'demo'}
+              receiveShadow
+              dispose={null}
+            />
+          )}
+          {r.rafters && (
+            <mesh
+              name={`rafters:${r.id}`}
+              geometry={r.rafters}
+              material={rafterMaterial(r.phase, r.boardColor)}
               renderOrder={r.phase === 'demo' ? 1 : 0}
               castShadow={r.phase !== 'demo'}
               receiveShadow

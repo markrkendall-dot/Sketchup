@@ -198,6 +198,11 @@ describe('migrate a current file', () => {
       fascia: 6,
       phase: 'existing',
       finish: 'metal',
+      color: '#8a8378',
+      eave: 'open',
+      rafter: { depth: 5.5, spacing: 24 },
+      boardColor: '#5a3a35',
+      weathering: 0.6,
     });
     s.addRoof(lid, {
       shape: 'shed',
@@ -234,6 +239,9 @@ describe('migrate a current file', () => {
     const openings = Object.values(plan.levels[plan.levelOrder[1]].openings);
     expect(openings.find((o) => o.type === 'door')).toMatchObject({ halfLite: true, leafColor: '#2f4a3a', sashes: 2 });
     expect(openings.find((o) => o.type === 'window')).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen' });
+    // So are the roof's eave and appearance fields.
+    const gable = Object.values(plan.levels[plan.levelOrder[2]].roofs)[0];
+    expect(gable).toMatchObject({ eave: 'open', rafter: { depth: 5.5, spacing: 24 }, boardColor: '#5a3a35', weathering: 0.6 });
     const text = JSON.stringify(plan, null, 2);
     expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
   });

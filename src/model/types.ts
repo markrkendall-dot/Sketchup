@@ -93,6 +93,8 @@ export interface Stairs {
 
 export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';
 export type RoofFinish = 'metal' | 'shingle';
+/** How a roof's eaves are finished: a fascia board, or open with the rafter tails showing. */
+export type RoofEave = 'fascia' | 'open';
 
 /**
  * A roof over a plan outline (DESIGN.md "Roofs"). The underside passes through the bearing height
@@ -120,6 +122,17 @@ export interface Roof {
   finish: RoofFinish;
   /** Hex colour `#rrggbb` of the roof surface. Absent: by finish (model/finish.ts). */
   color?: string;
+  /**
+   * Eaves: a fascia board (absent, as before) or open, with rafter tails under the overhang and no
+   * board where the roof descends toward its edge (rake boards stay).
+   */
+  eave?: RoofEave;
+  /** Open eaves: the rafter tails' depth and spacing on centre. Absent: 5.5" x 24". */
+  rafter?: { depth: Inches; spacing: Inches };
+  /** Hex colour `#rrggbb` of the fascia and rake boards and the rafter tails. Absent: tan trim. */
+  boardColor?: string;
+  /** Rust and streaking of a metal roof, 0 (none) to 1. Absent: 0.35. */
+  weathering?: number;
 }
 
 /** A post or chimney on the site (M9 implements their behaviour). */

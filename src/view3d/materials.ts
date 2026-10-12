@@ -1,9 +1,9 @@
 import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
 import type { FillPart } from '../derive/openings3d';
-import { DEFAULT_LEAF_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import { DEFAULT_LEAF_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, Phase, RoofFinish, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture } from './groundTexture';
-import { NORMAL_SCALE, newWorkColor, sidingTexture, sidingTextures } from './textures';
+import { NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures } from './textures';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
@@ -137,20 +137,39 @@ export function stairsMaterial(phase: Phase): MeshStandardMaterial {
 
 const roofMaterials = new Map<string, MeshStandardMaterial>();
 
+/** The colour an existing or new roof shows without textures (export, and the fallback where no canvas exists). */
+const roofFlatColor = (phase: Phase, color: string): string => (phase === 'new' ? pullGreen(color) : color);
+
 /**
- * A roof's material: by finish and colour (default by finish: metal grey-brown with a slight
- * sheen, shingle dark grey); demolished translucent red like walls, new tinted toward green.
+ * A roof's material: by finish, colour and (metal) weathering, quantized to 0.05 so a slider
+ * shares materials and textures between steps. The roof texture (textures.ts roofTexture: metal
+ * corrugated with rust streaks, shingle courses) is drawn in the colour under a white tint, with its
+ * normal map; new work is drawn in the colour pulled toward green and without rust (a new roof is
+ * not weathered). The flat colour is kept in `userData.flatColor` for the export. Metal has a
+ * slight sheen (metalness 0.35, roughness 0.55). Demolished roofs are translucent red like walls.
+ * Without a canvas (node, tests) the flat colour is used.
  */
-export function roofMaterial(finish: RoofFinish, phase: Phase, color: string = ROOF_COLOR[finish]): MeshStandardMaterial {
-  const key = phase === 'demo' ? 'demo' : `${finish}|${phase}|${color}`;
+export function roofMaterial(finish: RoofFinish, phase: Phase, color: string = ROOF_COLOR[finish], weathering: number = DEFAULT_WEATHERING): MeshStandardMaterial {
+  const w = finish === 'metal' && phase !== 'new' ? quantizeWeathering(weathering) : 0;
+  const key = phase === 'demo' ? 'demo' : `${finish}|${phase}|${color}|${w}`;
   let m = roofMaterials.get(key);
   if (!m) {
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
-      m = make(phase === 'new' ? pullGreen(color) : color);
+      const flat = roofFlatColor(phase, color);
+      const tex = roofTexture(finish, flat, w);
+      m = make(tex ? '#ffffff' : flat);
+      if (tex) {
+        m.map = tex.map;
+        if (tex.normalMap) {
+          m.normalMap = tex.normalMap;
+          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
+        }
+        m.userData.flatColor = flat;
+      }
       if (finish === 'metal') {
-        m.metalness = 0.4;
-        m.roughness = 0.5;
+        m.metalness = 0.35;
+        m.roughness = 0.55;
       }
     }
     roofMaterials.set(key, m);
@@ -158,9 +177,14 @@ export function roofMaterial(finish: RoofFinish, phase: Phase, color: string = R
   return m;
 }
 
-/** Fascia and rake boards: tan trim colour (demolished: red, new: pulled toward green). */
-export function fasciaMaterial(phase: Phase): MeshStandardMaterial {
-  return trimLike('fascia', TRIM_COLOR, phase);
+/** Fascia and rake boards: the roof's board colour, tan by default (demolished: red, new: pulled toward green). */
+export function fasciaMaterial(phase: Phase, color: string = TRIM_COLOR): MeshStandardMaterial {
+  return trimLike('fascia', color, phase);
+}
+
+/** Rafter tails under open eaves: the same colour as the roof's boards. */
+export function rafterMaterial(phase: Phase, color: string = TRIM_COLOR): MeshStandardMaterial {
+  return trimLike('rafter', color, phase);
 }
 
 const partMaterials = new Map<string, MeshStandardMaterial>();

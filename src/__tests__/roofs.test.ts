@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildRoofGeometry, clearMeshCache, triangleCount } from '../derive/meshes';
+import { buildRoofGeometry, buildRoofParts, clearMeshCache, triangleCount } from '../derive/meshes';
 import {
   distanceToBoundary,
+  planesHeightAt,
+  RAFTER_SETBACK,
+  RAFTER_WIDTH,
+  RIDGE_CAP_THICKNESS,
+  RIDGE_CAP_WIDTH,
+  ROOF_DEFAULTS,
   roofExtremes,
   roofHeightAt,
   roofOutlineWithOverhang,
@@ -13,13 +19,30 @@ import {
   triangulate,
   wallRoofProfile,
 } from '../derive/roofs';
-import { polygonSignedArea } from '../model/geometry';
+import { pointInPolygon, polygonSignedArea, projectPointToSegment } from '../model/geometry';
+import { boardColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { createEmptyPlan, defaultLevelId, migrate, SCHEMA_VERSION } from '../model/plan';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION } from '../store/uiStore';
 import { hitRoofHandle, hitTest } from '../editor2d/tools/selectTool';
 import type { Roof, Vec2 } from '../model/types';
 import { defaultRidgeAngle } from '../editor2d/tools/roofTool';
+import { fasciaMaterial, rafterMaterial, roofMaterial } from '../view3d/materials';
+import {
+  METAL_RIBS,
+  normalFromHeight,
+  quantizeWeathering,
+  RIB_DEPTH,
+  ribHeight,
+  ROOF_PX_ACROSS,
+  ROOF_PX_DOWN,
+  ROOF_SHINGLE_BUTT,
+  roofHeight,
+  roofShingleCourses,
+  roofTexture,
+  rustStreaks,
+  TEXTURE_PX,
+} from '../view3d/textures';
 
 type V3 = [number, number, number];
 
@@ -268,6 +291,365 @@ describe('roof solid', () => {
   });
 });
 
+/** Plan and height extents of each solid (a rafter tail): x, Y up, plan y as z. */
+function extents(solids: number[][]) {
+  return solids.map((pos) => {
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const zs: number[] = [];
+    for (let i = 0; i < pos.length; i += 3) {
+      xs.push(pos[i]);
+      ys.push(pos[i + 1]);
+      zs.push(pos[i + 2]);
+    }
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys), minZ: Math.min(...zs), maxZ: Math.max(...zs), midX: (Math.min(...xs) + Math.max(...xs)) / 2 };
+  });
+}
+
+describe('open eaves: rafter tails', () => {
+  // 270" along the ridge (x) by 200" across it, 24" overhang: each eave is 318" long.
+  const open = (over: Partial<Roof> = {}) => roof({ outline: rect(0, 0, 270, 200), eave: 'open', ...over });
+
+  it('a 318" eave gets 13 tails 24" apart, the first centred 12" from the corner; no fascia along the eaves', () => {
+    const solid = roofSolid(open(), B);
+    expect(solid.rafters).toHaveLength(26);
+    const tails = extents(solid.rafters);
+    // The north eave runs west to east (the overhang outline is clockwise on screen): measured from its west corner.
+    const north = tails.filter((t) => t.maxZ <= 1e-9).sort((a, b) => a.midX - b.midX);
+    expect(north).toHaveLength(13);
+    north.forEach((t, i) => expect(t.midX).toBeCloseTo(-24 + 12 + 24 * i, 9));
+    // The south eave runs east to west: its first tail is 12" from the south-east corner.
+    const south = tails.filter((t) => t.minZ >= 200 - 1e-9).sort((a, b) => b.midX - a.midX);
+    expect(south).toHaveLength(13);
+    south.forEach((t, i) => expect(t.midX).toBeCloseTo(270 + 24 - 12 - 24 * i, 9));
+    for (const t of [...north, ...south]) {
+      // 1.5" wide, from 1" inside the roof's edge back to the outline (the walls' outside faces).
+      expect(t.maxX - t.minX).toBeCloseTo(RAFTER_WIDTH, 9);
+      expect(t.maxZ - t.minZ).toBeCloseTo(24 - RAFTER_SETBACK, 9);
+    }
+    expect(Math.min(...north.map((t) => t.minZ))).toBeCloseTo(-24 + RAFTER_SETBACK, 9);
+    expect(Math.max(...south.map((t) => t.maxZ))).toBeCloseTo(224 - RAFTER_SETBACK, 9);
+    for (const pos of solid.rafters) {
+      expect(closed(pos)).toBe(true);
+      expect(volume(pos)).toBeGreaterThan(0);
+    }
+    // No board along the eaves: only the four rake boards (two per gable end) remain.
+    expect(solid.boards).toHaveLength(4);
+    for (const b of extents(solid.boards)) expect(b.maxZ - b.minZ).toBeGreaterThan(100);
+  });
+
+  it('a tail has its top on the roof underside and its bottom 5.5" lower', () => {
+    const r = open();
+    const { rafters } = roofSolid(r, B);
+    for (const pos of rafters) {
+      let tops = 0;
+      let bottoms = 0;
+      for (let i = 0; i < pos.length; i += 3) {
+        const under = roofHeightAt(r, B, { x: pos[i], y: pos[i + 2] })!;
+        if (Math.abs(pos[i + 1] - under) < 1e-9) tops++;
+        else if (Math.abs(pos[i + 1] - (under - DEFAULT_RAFTER.depth)) < 1e-9) bottoms++;
+      }
+      expect(tops + bottoms).toBe(pos.length / 3);
+      expect(tops).toBeGreaterThan(0);
+      expect(bottoms).toBeGreaterThan(0);
+    }
+    // A deeper rafter at a closer spacing.
+    const r2 = open({ rafter: { depth: 7.25, spacing: 16 } });
+    const t2 = extents(roofSolid(r2, B).rafters);
+    expect(t2).toHaveLength(2 * (Math.floor((318 - 8) / 16) + 1));
+    const t = t2[0];
+    const top = roofHeightAt(r2, B, { x: t.midX, y: -12 })!;
+    expect(t.maxY - t.minY).toBeGreaterThan(7.25);
+    expect(t.minY).toBeLessThan(top - 7.25 + 1e-9);
+  });
+
+  it('only where the roof descends toward a level edge: none on a flat roof, none on a shed\'s high edge', () => {
+    const flat = roofSolid(open({ shape: 'flat' }), B);
+    expect(flat.rafters).toHaveLength(0);
+    expect(flat.boards).toHaveLength(4);
+    // A shed sloping down to the north (-y): tails along the north eave only; the high south edge
+    // keeps its fascia board and the two sides their rake boards.
+    const shed = roofSolid(open({ shape: 'shed', ridgeAngle: 270, pitch: 3 }), B);
+    expect(shed.rafters).toHaveLength(13);
+    for (const t of extents(shed.rafters)) expect(t.maxZ).toBeLessThanOrEqual(1e-9);
+    expect(shed.boards).toHaveLength(3);
+    const high = extents(shed.boards).filter((b) => b.minZ > 200);
+    expect(high).toHaveLength(1);
+    // The default eaves keep their fascia boards and have no tails.
+    const plain = roofSolid(roof({ outline: rect(0, 0, 270, 200) }), B);
+    expect(plain.rafters).toHaveLength(0);
+    expect(plain.boards).toHaveLength(6);
+    // No tails without an overhang to hang them in.
+    expect(roofSolid(open({ overhang: 1 }), B).rafters).toHaveLength(0);
+  });
+
+  it('on a hip roof every tail stays under its own slope: the ones near a corner are cut at the hip', () => {
+    const r = roof({ shape: 'hip', eave: 'open' });
+    const solid = roofSolid(r, B);
+    // Every edge of a hip roof is an eave: tails all round and no boards.
+    expect(solid.boards).toHaveLength(0);
+    const perEdge = (len: number) => Math.floor((len - 12) / 24) + 1;
+    expect(solid.rafters).toHaveLength(2 * perEdge(W + 48) + 2 * perEdge(D + 48));
+    const planes = roofPlanes(r, B);
+    let cut = 0;
+    for (const pos of solid.rafters) {
+      expect(closed(pos)).toBe(true);
+      for (let i = 0; i < pos.length; i += 3) {
+        // A tail running past a hip would have its top above the neighbouring slope's underside.
+        expect(pos[i + 1]).toBeLessThanOrEqual(planesHeightAt(planes, { x: pos[i], y: pos[i + 2] }) + 1e-9);
+      }
+    }
+    for (const t of extents(solid.rafters)) if (Math.min(t.maxX - t.minX, t.maxZ - t.minZ) < RAFTER_WIDTH + 1e-9 && Math.max(t.maxX - t.minX, t.maxZ - t.minZ) < 23 - 1e-6) cut++;
+    // At least the tail nearest each end of each eave is cut short by its hip.
+    expect(cut).toBeGreaterThanOrEqual(8);
+  });
+
+  it('the slab is the same whatever the eaves; the default roof keeps today\'s look', () => {
+    const plain = roofSolid(roof(), B);
+    const open2 = roofSolid(roof({ eave: 'open', boardColor: '#5a3a35', weathering: 0.8, rafter: { depth: 5.5, spacing: 16 } }), B);
+    expect(open2.slab).toEqual(plain.slab);
+    expect(roofEaveOf({})).toBe('fascia');
+    expect(rafterOf({})).toEqual({ depth: 5.5, spacing: 24 });
+    expect(boardColorOf({})).toBe(TRIM_COLOR);
+    expect(weatheringOf({})).toBe(DEFAULT_WEATHERING);
+    expect(DEFAULT_WEATHERING).toBe(0.35);
+    // The roof tool's defaults add none of the new fields.
+    for (const k of ['eave', 'rafter', 'boardColor', 'weathering']) expect(k in ROOF_DEFAULTS).toBe(false);
+  });
+});
+
+describe('ridge cap', () => {
+  /** Plan area of the faces that point up. */
+  const upArea = (pos: number[]) =>
+    tris(pos).reduce((s, [a, b, c]) => {
+      const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+      return ny > 1e-9 ? s + ny / 2 : s;
+    }, 0);
+
+  it('a metal gable: a 6" strip each side of the ridge for its whole length, 2.5" thick on the roof\'s top surface', () => {
+    const r = roof();
+    const { ridge } = roofSolid(r, B);
+    expect(ridge.length).toBeGreaterThan(0);
+    expect(closed(ridge)).toBe(true);
+    expect(volume(ridge)).toBeGreaterThan(0);
+    // Two strips of RIDGE_CAP_WIDTH along the ridge line, which runs over the overhang (W + 48).
+    const [line] = roofRidgeLines(r);
+    const length = Math.hypot(line[1].x - line[0].x, line[1].y - line[0].y);
+    expect(length).toBeCloseTo(W + 48, 9);
+    expect(upArea(ridge) / (2 * RIDGE_CAP_WIDTH)).toBeCloseTo(length, 6);
+    const e = extents([ridge])[0];
+    expect(e.maxX - e.minX).toBeCloseTo(length, 9);
+    expect(e.minZ).toBeCloseTo(D / 2 - RIDGE_CAP_WIDTH, 9);
+    expect(e.maxZ).toBeCloseTo(D / 2 + RIDGE_CAP_WIDTH, 9);
+    // Bottom on the slab's top (underside + thickness), top 2.5" above it, following both slopes.
+    for (let i = 0; i < ridge.length; i += 3) {
+      const surface = roofHeightAt(r, B, { x: ridge[i], y: ridge[i + 2] })! + r.thickness;
+      const above = ridge[i + 1] - surface;
+      expect(Math.min(Math.abs(above), Math.abs(above - RIDGE_CAP_THICKNESS))).toBeLessThan(1e-9);
+    }
+    expect(e.maxY).toBeCloseTo(B + (D / 2) * (8 / 12) + r.thickness + RIDGE_CAP_THICKNESS, 9);
+  });
+
+  it('a metal hip: along the ridge and the four hips, mitred where they meet, one closed surface inside the outline', () => {
+    const r = roof({ shape: 'hip' });
+    const { ridge } = roofSolid(r, B);
+    expect(closed(ridge)).toBe(true);
+    expect(volume(ridge)).toBeGreaterThan(0);
+    const lines = roofRidgeLines(r);
+    expect(lines).toHaveLength(5);
+    const over = roofOutlineWithOverhang(r);
+    const total = lines.reduce((s, [p, q]) => s + Math.hypot(q.x - p.x, q.y - p.y), 0);
+    for (let i = 0; i < ridge.length; i += 3) {
+      const p = { x: ridge[i], y: ridge[i + 2] };
+      expect(pointInPolygon(p, over) || distanceToBoundary(p, over) < 1e-6).toBe(true);
+      expect(Math.min(...lines.map(([a, b]) => projectPointToSegment(p, a, b).distance))).toBeLessThanOrEqual(RIDGE_CAP_WIDTH + 1e-6);
+    }
+    // Mitred, neither overlapping nor leaving gaps: two strips' width along every line, less W^2 tan(22.5)
+    // at each of the four hip-ridge corners (135 degrees inside), W^2 at each hip end's apex (90
+    // degrees) and W^2 / 2 at each of the eight ends cut along the eave at 45 degrees.
+    const loss = 4 * Math.tan(Math.PI / 8) + 2 * 1 + 8 * 0.5;
+    expect((2 * RIDGE_CAP_WIDTH * total - upArea(ridge)) / RIDGE_CAP_WIDTH ** 2).toBeCloseTo(loss, 6);
+  });
+
+  it('no cap on a shingle roof, a shed or a flat roof; buildRoofGeometry and the slab leave it out', () => {
+    expect(roofSolid(roof({ finish: 'shingle' }), B).ridge).toHaveLength(0);
+    expect(roofSolid(roof({ shape: 'shed', ridgeAngle: 270, pitch: 3 }), B).ridge).toHaveLength(0);
+    expect(roofSolid(roof({ shape: 'flat' }), B).ridge).toHaveLength(0);
+    // The default metal gable: 20 slab triangles and 6 boards in one geometry, as before.
+    expect(triangleCount(buildRoofGeometry(roof(), B))).toBe(20 + 6 * 12);
+  });
+
+  it('buildRoofParts merges the cap into the slab; boards and rafter tails are their own geometries', () => {
+    const r = roof({ eave: 'open', outline: rect(0, 0, 270, 200) });
+    const solid = roofSolid(r, B);
+    const parts = buildRoofParts(r, B);
+    expect(triangleCount(parts.slab)).toBe((solid.slab.length + solid.ridge.length) / 9);
+    expect(triangleCount(parts.fascia!)).toBe(solid.boards.flat().length / 9);
+    expect(triangleCount(parts.rafters!)).toBe(26 * 12);
+    expect(parts.slab.getAttribute('uv').count).toBe(parts.slab.getAttribute('position').count);
+    const shingle = buildRoofParts(roof({ finish: 'shingle' }), B);
+    expect(shingle.rafters).toBeNull();
+    expect(triangleCount(shingle.slab)).toBe(20);
+  });
+});
+
+describe('roof UVs', () => {
+  it('in tiles: a 24" wide gable spans one tile across, and 48" of slope per tile down it', () => {
+    // 24" along the ridge, 96" across it, 12:12, no overhang: each slope is 48" in plan, 48 sqrt 2 along it.
+    const r = roof({ outline: rect(0, 0, 24, 96), pitch: 12, overhang: 0, finish: 'shingle' });
+    const g = buildRoofParts(r, B).slab;
+    const pos = g.getAttribute('position');
+    const nor = g.getAttribute('normal');
+    const uv = g.getAttribute('uv');
+    const range = (pick: (i: number) => boolean, k: 0 | 1) => {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        if (!pick(i)) continue;
+        const v = k === 0 ? uv.getX(i) : uv.getY(i);
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      }
+      return hi - lo;
+    };
+    const northTop = (i: number) => nor.getY(i) > 0.5 && nor.getZ(i) < 0;
+    const southTop = (i: number) => nor.getY(i) > 0.5 && nor.getZ(i) > 0;
+    for (const top of [northTop, southTop]) {
+      expect(range(top, 0)).toBeCloseTo(1, 6);
+      expect(range(top, 1)).toBeCloseTo(Math.SQRT2, 6);
+    }
+    // The eave's edge face: 24" along it, `thickness` tall.
+    const eaveFace = (i: number) => Math.abs(nor.getY(i)) < 0.5 && nor.getZ(i) < -0.99;
+    expect(range(eaveFace, 0)).toBeCloseTo(1, 6);
+    expect(range(eaveFace, 1)).toBeCloseTo(r.thickness / 48, 6);
+    // Every face is mapped without stretch: 24" per unit of u, 48" per unit of v, along the surface.
+    for (let i = 0; i < pos.count; i += 3) {
+      for (const [a, b] of [[i, i + 1], [i + 1, i + 2], [i + 2, i]]) {
+        const d3 = Math.hypot(pos.getX(b) - pos.getX(a), pos.getY(b) - pos.getY(a), pos.getZ(b) - pos.getZ(a));
+        const d2 = Math.hypot((uv.getX(b) - uv.getX(a)) * 24, (uv.getY(b) - uv.getY(a)) * 48);
+        expect(d2).toBeCloseTo(d3, 3);
+      }
+    }
+  });
+
+  it('down the slope on every plane of a hip roof, and along the frame on a flat roof', () => {
+    for (const r of [roof({ shape: 'hip' }), roof({ shape: 'flat' }), roof({ ridgeAngle: 30 })]) {
+      const g = buildRoofParts(r, B).slab;
+      const pos = g.getAttribute('position');
+      const uv = g.getAttribute('uv');
+      for (let i = 0; i < pos.count; i += 3) {
+        for (const [a, b] of [[i, i + 1], [i + 1, i + 2]]) {
+          const d3 = Math.hypot(pos.getX(b) - pos.getX(a), pos.getY(b) - pos.getY(a), pos.getZ(b) - pos.getZ(a));
+          const d2 = Math.hypot((uv.getX(b) - uv.getX(a)) * 24, (uv.getY(b) - uv.getY(a)) * 48);
+          expect(d2, r.shape).toBeCloseTo(d3, 3);
+        }
+      }
+    }
+  });
+});
+
+describe('roof textures and materials', () => {
+  it('corrugated metal: 9 ribs across a 24" tile, 1/2" deep, the same all the way down; the tile repeats seamlessly', () => {
+    const row = Array.from({ length: TEXTURE_PX }, (_, c) => ribHeight(c));
+    const crests = row.filter((h, c) => h > row[(c + TEXTURE_PX - 1) % TEXTURE_PX] && h >= row[(c + 1) % TEXTURE_PX]);
+    expect(crests).toHaveLength(METAL_RIBS);
+    expect(Math.max(...row)).toBeCloseTo(RIB_DEPTH, 3);
+    expect(Math.min(...row)).toBeCloseTo(0, 3);
+    // Across the tile's edge the profile continues: column -1 is column 511.
+    expect(ribHeight(-1)).toBeCloseTo(ribHeight(TEXTURE_PX - 1), 9);
+    expect(TEXTURE_PX / ROOF_PX_ACROSS / METAL_RIBS).toBeCloseTo(24 / 9, 9);
+    const h = roofHeight('metal');
+    for (const r of [0, 100, TEXTURE_PX - 1]) expect(Array.from(h.subarray(r * TEXTURE_PX, (r + 1) * TEXTURE_PX))).toEqual(Array.from(h.subarray(0, TEXTURE_PX)));
+    // Its normal map tilts across the ribs only (G flat, R either side of 128).
+    const n = normalFromHeight(h, TEXTURE_PX, ROOF_PX_ACROSS, undefined, ROOF_PX_DOWN);
+    const rs = new Set<number>();
+    for (let i = 0; i < TEXTURE_PX * 4; i += 4) {
+      expect(n[i + 1]).toBe(128);
+      rs.add(n[i]);
+    }
+    expect(Math.min(...rs)).toBeLessThan(110);
+    expect(Math.max(...rs)).toBeGreaterThan(146);
+  });
+
+  it('rust streaks: the same layout at every weathering, opacity in proportion to it; none at 0', () => {
+    const none = rustStreaks(0);
+    const half = rustStreaks(0.5);
+    const full = rustStreaks(1);
+    expect(none.length).toBeGreaterThan(10);
+    expect(none.every((s) => s.alpha === 0)).toBe(true);
+    full.forEach((s, i) => {
+      expect({ ...half[i], alpha: 0 }).toEqual({ ...s, alpha: 0 });
+      expect(s.alpha).toBeCloseTo(2 * half[i].alpha, 9);
+      expect(s.alpha).toBeGreaterThan(0);
+      expect(s.alpha).toBeLessThanOrEqual(1);
+      expect(s.x).toBeGreaterThanOrEqual(-0.5);
+      expect(s.x).toBeLessThanOrEqual(24.5);
+    });
+    // Fasteners rust in every third crest, two rows a tile.
+    expect(full.filter((s) => s.spot)).toHaveLength(6);
+    expect(quantizeWeathering(0.33)).toBe(0.35);
+    expect(quantizeWeathering(0.62)).toBe(0.6);
+    expect(quantizeWeathering(1.4)).toBe(1);
+    expect(quantizeWeathering(-1)).toBe(0);
+    expect(quantizeWeathering(NaN)).toBe(0);
+  });
+
+  it('asphalt shingles: 10 courses of 4.8" down the tile, 12" tabs, alternate courses offset half a tab; each butt a step', () => {
+    const courses = roofShingleCourses();
+    expect(courses).toHaveLength(10);
+    courses.forEach((c, k) => {
+      expect(c.s1 - c.s0).toBeCloseTo(4.8, 9);
+      expect(c.slots).toEqual(k % 2 ? [6, 18] : [0, 12]);
+    });
+    const h = roofHeight('shingle');
+    // Down the canvas (uphill) across a butt the height jumps up from nothing to the butt's thickness.
+    const col = Math.round(3 * ROOF_PX_ACROSS);
+    const buttRow = TEXTURE_PX - Math.round(courses[4].s1 * ROOF_PX_DOWN);
+    expect(h[(buttRow - 1) * TEXTURE_PX + col]).toBeLessThan(0.02);
+    expect(h[buttRow * TEXTURE_PX + col]).toBeGreaterThan(ROOF_SHINGLE_BUTT - 0.02);
+  });
+
+  it('no canvas in node: roofTexture is null and the material shows the flat colour', () => {
+    expect(roofTexture('metal', '#8a8378', 0.6)).toBeNull();
+    const m = roofMaterial('metal', 'existing', '#8a8378', 0.6);
+    expect(m.map).toBeNull();
+    expect(m.color.getHexString()).toBe('8a8378');
+  });
+
+  it('roof materials are shared per finish, phase, colour and weathering to the nearest 0.05; metal has a slight sheen', () => {
+    const m = roofMaterial('metal', 'existing', '#8a8378', 0.6);
+    expect(roofMaterial('metal', 'existing', '#8a8378', 0.61)).toBe(m);
+    expect(roofMaterial('metal', 'existing', '#8a8378', 0.7)).not.toBe(m);
+    expect(roofMaterial('metal', 'existing', '#6e4b3c', 0.6)).not.toBe(m);
+    expect(roofMaterial('metal', 'new', '#8a8378', 0.6)).not.toBe(m);
+    expect(m.metalness).toBeCloseTo(0.35, 9);
+    expect(m.roughness).toBeCloseTo(0.55, 9);
+    // Weathering means nothing to shingles, nor to a new roof (it is not rusty yet).
+    expect(roofMaterial('shingle', 'existing', '#4a4a4a', 0.1)).toBe(roofMaterial('shingle', 'existing', '#4a4a4a', 0.9));
+    expect(roofMaterial('metal', 'new', '#8a8378', 0.1)).toBe(roofMaterial('metal', 'new', '#8a8378', 0.9));
+    // The default weathering.
+    expect(roofMaterial('metal', 'existing', '#8a8378')).toBe(roofMaterial('metal', 'existing', '#8a8378', DEFAULT_WEATHERING));
+    // Demolished: translucent red; new: pulled toward green.
+    const demo = roofMaterial('metal', 'demo', '#8a8378', 0.6);
+    expect(demo.transparent).toBe(true);
+    expect(demo.color.getHexString()).toBe('e0413a');
+    const fresh = roofMaterial('metal', 'new', '#8a8378', 0.6).color;
+    expect(fresh.g).toBeGreaterThan(fresh.r);
+  });
+
+  it('fascia, rake boards and rafter tails take the board colour, tan by default', () => {
+    expect(fasciaMaterial('existing').color.getHexString()).toBe(TRIM_COLOR.slice(1));
+    const brown = fasciaMaterial('existing', '#5a3a35');
+    expect(brown.color.getHexString()).toBe('5a3a35');
+    expect(fasciaMaterial('existing', '#5a3a35')).toBe(brown);
+    expect(brown).not.toBe(fasciaMaterial('existing'));
+    expect(rafterMaterial('existing', '#5a3a35').color.getHexString()).toBe('5a3a35');
+    expect(rafterMaterial('existing').color.getHexString()).toBe(TRIM_COLOR.slice(1));
+    expect(rafterMaterial('demo', '#5a3a35').color.getHexString()).toBe('e0413a');
+    expect(rafterMaterial('new', '#5a3a35').color.getHexString()).not.toBe('5a3a35');
+  });
+});
+
 describe('sloped prisms and triangulation', () => {
   it('triangulates a non-convex polygon with a collinear point, keeping it as a corner', () => {
     const poly: Vec2[] = [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 40 }, { x: 40, y: 40 }, { x: 40, y: 100 }, { x: 0, y: 100 }];
@@ -395,6 +777,61 @@ describe('loading roofs', () => {
     expect(Object.keys(plan.site.gradePoints)).toEqual(['g']);
     warn.mockRestore();
   });
+
+  /** A v2 file with one roof carrying `extra` fields. */
+  const roofFile = (extra: Record<string, unknown>) => ({
+    schemaVersion: 2,
+    id: 'p',
+    name: 'Eaves',
+    levelOrder: ['l1'],
+    levels: { l1: { id: 'l1', name: 'First', wallHeight: 96, floorThickness: 12, nodes: {}, walls: {}, openings: {}, rooms: {}, stairs: {}, roofs: { r1: { ...roof(), ...extra } } } },
+    baseFloorElevation: 0,
+    settings: {},
+    site: { northAngle: 0, gradePoints: {}, columns: {} },
+    modifiedAt: '2025-01-01T00:00:00.000Z',
+  });
+  const good = { eave: 'open', rafter: { depth: 5.5, spacing: 24 }, boardColor: '#5a3a35', weathering: 0.6 };
+
+  it('keeps the eave, rafter, board colour and weathering fields after the colour, and round-trips them byte for byte', () => {
+    const plan = migrate(roofFile({ color: '#8a8378', ...good }));
+    const r = plan.levels.l1.roofs.r1;
+    expect(r).toMatchObject({ color: '#8a8378', ...good });
+    expect(Object.keys(r).slice(-5)).toEqual(['color', 'eave', 'rafter', 'boardColor', 'weathering']);
+    const text = JSON.stringify(plan, null, 2);
+    expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
+    // The board colour is lower-cased, a rafter is rebuilt from depth and spacing only.
+    const loose = migrate(roofFile({ boardColor: '#5A3A35', rafter: { spacing: 16, depth: 3.5, extra: 1 } })).levels.l1.roofs.r1;
+    expect(loose.boardColor).toBe('#5a3a35');
+    expect(loose.rafter).toEqual({ depth: 3.5, spacing: 16 });
+    expect(Object.keys(loose.rafter!)).toEqual(['depth', 'spacing']);
+    expect(migrate(roofFile({ eave: 'fascia', weathering: 0 })).levels.l1.roofs.r1).toMatchObject({ eave: 'fascia', weathering: 0 });
+  });
+
+  it('drops each malformed eave field alone, keeping the roof and the other fields', () => {
+    const bad: [keyof typeof good, unknown][] = [
+      ['eave', 'closed'],
+      ['eave', 1],
+      ['rafter', { depth: 0, spacing: 24 }],
+      ['rafter', { depth: 5.5 }],
+      ['rafter', { depth: 5.5, spacing: -24 }],
+      ['rafter', { depth: Infinity, spacing: 24 }],
+      ['rafter', '2x6'],
+      ['boardColor', 'brown'],
+      ['boardColor', '#5a3a3'],
+      ['weathering', 1.5],
+      ['weathering', -0.1],
+      ['weathering', '0.5'],
+      ['weathering', NaN],
+    ];
+    for (const [k, v] of bad) {
+      const r = migrate(roofFile({ ...good, [k]: v })).levels.l1.roofs.r1;
+      expect(k in r, `${k}: ${String(v)}`).toBe(false);
+      for (const other of Object.keys(good) as (keyof typeof good)[]) if (other !== k) expect(r[other]).toEqual(good[other]);
+    }
+    // A file without them loads without them.
+    const plain = migrate(roofFile({})).levels.l1.roofs.r1;
+    for (const k of Object.keys(good)) expect(k in plain).toBe(false);
+  });
 });
 
 describe('roof store actions and picking', () => {
@@ -426,6 +863,29 @@ describe('roof store actions and picking', () => {
     expect(store().plan.levels[lid].roofs[id].phase).toBe('demo');
     store().deleteEntities(lid, { ...EMPTY_SELECTION, roofs: [id] });
     expect(store().plan.levels[lid].roofs).toEqual({});
+  });
+
+  it('updateRoof sets the eaves, rafter, board colour and weathering, refuses bad values and clears them with undefined', () => {
+    const lid = defaultLevelId(store().plan);
+    const id = store().addRoof(lid, input)!;
+    const r = () => store().plan.levels[lid].roofs[id];
+    expect(Object.keys(r())).not.toContain('eave');
+    store().updateRoof(lid, id, { eave: 'open', rafter: { depth: 3.5, spacing: 16 }, boardColor: '#5A3A35', weathering: 0.6 });
+    expect(r()).toMatchObject({ eave: 'open', rafter: { depth: 3.5, spacing: 16 }, boardColor: '#5a3a35', weathering: 0.6 });
+    // The same rafter as a new object is no change.
+    const before = store().plan;
+    store().updateRoof(lid, id, { rafter: { depth: 3.5, spacing: 16 } });
+    expect(store().plan).toBe(before);
+    const refused: Partial<Roof>[] = [{ weathering: 1.2 }, { weathering: -1 }, { rafter: { depth: 0, spacing: 24 } }, { rafter: { depth: 5.5, spacing: NaN } }, { eave: 'closed' as Roof['eave'] }, { boardColor: 'brown' }, { color: 'grey' }];
+    for (const patch of refused) {
+      store().updateRoof(lid, id, patch);
+      expect(store().plan, JSON.stringify(patch)).toBe(before);
+    }
+    expect(store().addRoof(lid, { ...input, weathering: 3 })).toBeNull();
+    store().updateRoof(lid, id, { eave: undefined, rafter: undefined, boardColor: undefined, weathering: undefined });
+    for (const k of ['eave', 'rafter', 'boardColor', 'weathering']) expect(k in r()).toBe(false);
+    undo();
+    expect(r()).toMatchObject({ eave: 'open', weathering: 0.6 });
   });
 
   it('the select tool picks a roof inside its overhang when nothing else is hit, and a selected roof\'s corners', () => {

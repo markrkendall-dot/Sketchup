@@ -86,6 +86,8 @@ export interface Roof {
   thickness: Inches;         // slab thickness, measured vertically
   fascia: Inches;            // fascia and rake board depth
   phase: Phase; finish: 'metal' | 'shingle'; color?: string;
+  eave?: 'fascia' | 'open';  // open: rafter tails, no eave board (see "Roofs")
+  rafter?: { depth: Inches; spacing: Inches }; boardColor?: string; weathering?: number; // see "Exterior appearance"
 }
 
 export interface Level {
@@ -279,6 +281,23 @@ is the outside face of the eave walls and the overhang hangs lower by `overhang 
   fascia boards that run on past a convex corner to cover it, sloped stretches are rake boards; at a
   reflex corner the incoming board stops short so boards never overlap. Each board is closed. No CSG;
   roofs that overlap (a wing roof running into the main wall) just overlap.
+- Open eaves (`eave: 'open'`; absent is `fascia`, so older files look the same): a level stretch the
+  roof descends toward (its plane's gradient points away from the edge) gets no board and has rafter
+  tails under it instead; a shed's high edge and every edge of a flat roof keep their boards, and
+  rake boards stay. Tails (`rafterTails`) are 1.5" boxes every `rafter.spacing` (default 24")
+  measured along the overhang outline edge from its start, the first half a spacing in, kept when
+  the centre falls in the stretch (318" of eave gives 13). Each runs square to the edge from 1" inside
+  it back to the outline (none when the overhang is 1" or less), its top on the region's plane (the
+  slab's underside) and its bottom `rafter.depth` (default 5.5") lower, and is clipped by the same
+  half-planes as `roofRegions`, so a tail near a hip stays under its own slope. `RoofSolid.rafters`
+  holds one closed solid per tail.
+- Ridge cap, metal gable and hip roofs only (`ridgeCap`): in each region a 6" band (in plan) along
+  every run of its ridge and hip lines, from the roof's top surface up 2.5", so it follows the slope
+  on each side. Its inner edge is each line moved 6" into the region: mitred where two lines meet,
+  cut along the outline where a line reaches it. The faces along the lines are left out, so the bands
+  of all regions are one closed surface (`RoofSolid.ridge`). `buildRoofGeometry` (slab and boards)
+  leaves the tails and the cap out; `buildRoofParts` merges the cap into the slab geometry and returns
+  `{ slab, fascia, rafters }`.
 - `roofs.ts` has no three.js import (it is in the 2D editor's chunk); it returns position arrays,
   triangulating with its own ear clipping, and `meshes.ts` wraps them (`buildRoofGeometry`).
 
@@ -297,7 +316,8 @@ present (tested). Openings keep their heights and are still clamped to the wall 
 walls are not raised (an attic over a flat ceiling).
 
 Phase and view mode apply like walls: a roof hidden in the view is not drawn, not exported and does
-not raise walls. `getLevelMeshes` caches each roof's geometry per roof object and bearing height.
+not raise walls. `getLevelMeshes` caches each roof's geometries (slab with cap, boards, tails) per
+roof object and bearing height, and disposes all three when they drop out.
 
 2D: the outline dashed, the overhang outline lighter, ridge and hip lines thin and solid; demolished
 roofs hatched red, new ones green; a selected roof shows corner handles that the select tool drags
@@ -306,9 +326,13 @@ Roof tool (K): click corners, snapping to wall outline corners (footprint fill p
 then points on wall faces, then the usual snaps; where two exterior face lines meet just past the
 end of one (the house corner under a porch whose wall continues the end wall) is a corner too.
 Close on the first corner, a double-click or Enter. Defaults: gable, ridge along the longer side of
-the bounding box, 8:12, 24" overhang, 8" thick, 6" fascia, metal, the toolbar's "Draw as" phase.
-"Fit to walls" in the panel sets the outline to the level's outer-face polygon when the walls close
-exactly one ring.
+the bounding box, 8:12, 24" overhang, 8" thick, 6" fascia, metal, the toolbar's "Draw as" phase;
+fascia eaves and tan boards (none of the optional fields). "Fit to walls" in the panel sets the
+outline to the level's outer-face polygon when the walls close exactly one ring. The panel also has
+"Eaves" (fascia board, or open with rafter tails), "Rafter depth" and "Rafter spacing" (open eaves
+only; at least 3", and the default 5.5" x 24" is stored as no field), "Board colour" with a reset to
+tan, and for metal "Weathering" (0 to 1). The store refuses unusable values of these fields
+(`roofOptionProblem`).
 
 ## Platform framing (`derive/platform.ts`)
 
@@ -461,11 +485,15 @@ All of it is optional data on existing elements (no schema bump: `migrate()` rea
 valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | board | block | plain | screen`; an unknown
 value is dropped) and `Wall.color` (`#rrggbb`, lower-cased on load), `Opening.lites {cols, rows}` (whole numbers 1 to
 12), `Opening.shutters`, `Opening.trim` (0 to 24"), `Opening.sashes` (whole number 1 to 6), `Opening.fixedCenter`,
-`Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`.
-Defaults when absent (`wallFinishOf`, `wallColorOf`, `roofColorOf`, `sashesOf`, `glazingOf`, `leafColorOf`):
+`Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`,
+`Roof.eave` (`fascia | open`), `Roof.rafter` (finite `depth` and `spacing` above 0, rebuilt as `{ depth, spacing }`),
+`Roof.boardColor` (`#rrggbb`, lower-cased) and `Roof.weathering` (0 to 1).
+Defaults when absent (`wallFinishOf`, `wallColorOf`, `roofColorOf`, `sashesOf`, `glazingOf`, `leafColorOf`,
+`roofEaveOf`, `rafterOf`, `boardColorOf`, `weatheringOf`):
 exterior walls shingle in the house's stain `#5a3a35`, interior walls plain `#e8e4dc`, a metal roof `#6e6259`, a
-shingle roof `#4a4a4a`, one sash, glass, a dark green door leaf `#2f3a33`; the fascia, rake boards and window trim are
-tan `#d9c9a3`. The Level panel's
+shingle roof `#4a4a4a`, one sash, glass, a dark green door leaf `#2f3a33`, fascia eaves, rafters 5.5" x 24"
+(`DEFAULT_RAFTER`), weathering 0.35 (`DEFAULT_WEATHERING`); the fascia, rake boards and rafter tails take the roof's
+board colour, tan `#d9c9a3` by default, like the window trim. The Level panel's
 "Exterior finish" and "Exterior colour" set every exterior wall of the level with one `updateWalls` (one undo step);
 the Wall, Opening and Roof panels edit one element. The colour picker commits once when it closes (native
 `change`), the hex field on Enter or blur. `updateWalls`, `updateOpening` and `updateRoof` take `undefined` to clear
@@ -544,12 +572,33 @@ demolished opening is translucent red, a new one pulled toward green. Fills foll
 they sit in. The Opening panel has "Sashes" (1 to 6; "Leaves", 1 or 2, for a door), "Fixed centre pane" at 3 sashes,
 "Glazing", the lite grid per sash or leaf, and for a door "Half lite" and "Leaf colour" with a reset.
 
-**Roofs** are two geometries per roof (`buildRoofParts`: the slab, and the fascia and rake boards in tan); the colour
-field changes the slab only. The chimney stays brick red.
+**Roofs** are three geometries per roof (`buildRoofParts`): the slab with the ridge cap (the roof's material), the fascia
+and rake boards (`fasciaMaterial(phase, boardColor)`), and the rafter tails (`rafterMaterial(phase, boardColor)`, the same
+colour); `RoofMesh` carries `boardColor` and `weathering` after their defaults. The slab has UVs in tiles, not inches
+(`addRoofUVs`, per triangle by flat normal like `addWallUVs`): a roof tile is 24" across the slope by 48" down it
+(`ROOF_TILE`). On faces turned up or down, `down` is the plan direction the face slopes toward (the ridge frame's v on a
+level face) and `along` is square to it; u = dot(p, along) / 24 and v = dot(p, down) x sqrt(1 + k^2) / 48 with k the
+slope, so corrugations run down the slope, repeat every 24" / 9 = 2.67" along the eave and courses are measured along the
+slope, not squeezed by it. Vertical faces (the slab's edges, the cap's sides) take u along the face / 24 and v = Y / 48.
+The roof textures therefore use `repeat` (1, 1), not the siding's 1/48.
 
-**Export** is colours only. Wall materials are clones of the live ones with `map` and `normalMap` dropped and the
-flat colour (`wallFlatColor`) set, named `wall_<phase>_<kind>` for the default look and `..._<finish>_<hex>` otherwise;
-roofs `roof_<finish>_<phase>` (plus `_<hex>` when recoloured), `Fascia` meshes `fascia_<phase>`. Each opening part is
+**Roof textures** (`textures.ts roofTexture(finish, color, weathering)`): a 512 px tile for 24" x 48" (up the canvas is
+down the slope), cached with its normal map per finish, colour and weathering to the nearest 0.05 (`quantizeWeathering`),
+so a slider does not make a texture per step. Metal: corrugated, 9 ribs a tile (`ribHeight`, 1/2" deep), crests light and
+troughs dark, rust streaks that fade downhill (`rustStreaks`: from fasteners, along the ribs, a few broad stains; a seeded
+layout whose opacity is the weathering times its base, none at 0); its normal map is the rib profile (`normalFromHeight`,
+`strengthY` for the non-square texels). Shingle: 10 courses of 4.8" (5" does not divide the tile), 12" tabs with 1/4"
+slots staggered half a tab, a shadow under each butt; its normal map has the butts and slots. `roofMaterial(finish, phase,
+color, weathering)` keys by finish, phase, colour and quantized weathering (shingle ignores it): the texture under a white
+tint, the normal map at 0.6, the flat colour in `userData.flatColor`; metal has metalness 0.35, roughness 0.55. New work is
+the colour pulled toward green with no rust, demolished is translucent red, and without a canvas (node) the flat colour
+shows. The chimney stays brick red.
+
+**Export** is colours only. Every exported material is a clone of the live one with `map` and `normalMap` dropped and,
+for a textured one, its flat colour (`userData.flatColor`: `wallFlatColor` for walls, the roof's colour for roofs) set.
+Walls are named `wall_<phase>_<kind>` for the default look and `..._<finish>_<hex>` otherwise;
+roofs `roof_<finish>_<phase>` (plus `_<hex>` when recoloured), `Fascia` meshes `fascia_<phase>` and `Rafters` meshes
+`rafter_<phase>`, both plus `_<hex>` in a board colour other than tan (not when demolished). Each opening part is
 a mesh named `Window` or `Door` with the material `trim`, `sash`, `glass`, `screen`, `door_leaf` (`door_leaf_<hex>`
 for a leaf in another colour, unless demolished) or `shutter` (`_new` / `_demo` for other phases). UV attributes are
 still written; no texture or image is. The Export menu says "Siding textures are not exported; colours are."
@@ -737,8 +786,9 @@ r3f `<Canvas frameloop="demand">` (lazy-loaded chunk), invalidate on plan change
 settings the 3D view uses (not on the 2D draft). One `<group>` per level at its floor top; meshes use
 the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat shading, FrontSide:
 existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior walls
-textured by finish and colour (see "Exterior appearance"); floors tan, stairs grey; roofs by finish (metal `#6e6259`, metalness 0.4, roughness
-0.5; shingle `#4a4a4a`), demolished translucent like walls, new pulled toward green. Fit 3D and the
+textured by finish and colour (see "Exterior appearance"); floors tan, stairs grey; roofs textured by finish (metal `#6e6259`
+corrugated with rust streaks, metalness 0.35, roughness 0.55; shingle `#4a4a4a`), boards and rafter tails in the roof's board
+colour, demolished translucent like walls, new pulled toward green. Fit 3D and the
 walk start count roof overhangs and roof tops in the scene bounds.
 The terrain is the ground (the lawn over the plan plus 100', and the far ground round it out to 1000', see
 "Site and terrain"); drei `<Grid>` (12" cells, 10'
@@ -841,10 +891,11 @@ edit is set after it (Open, Undo's "Undid a change on ...", the duplicate room n
 3D export (`io/export3d.ts`, toolbar "Export" menu, loaded on first use): `buildExportScene` builds
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
-skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, then a `Site`
-group (`Terrain`, `Chimney`, `Post`) with cloned geometry and cloned live materials (one per phase/kind,
-roofs `roof_<finish>_<phase>`, columns `column_<kind>_<phase>`, `terrain`, named
-without spaces), disposed after
+skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, `Fascia`, `Rafters`,
+`Window`, `Door`, then a `Site` group (`Terrain`, `Chimney`, `Post`) with cloned geometry and cloned live materials
+(one per phase/kind, roofs `roof_<finish>_<phase>`, boards `fascia_<phase>` and tails `rafter_<phase>` (plus `_<hex>`
+in a board colour other than tan), columns `column_<kind>_<phase>`, `terrain`, named without spaces; no texture or
+normal map, a textured material's flat colour instead, see "Exterior appearance"), disposed after
 export. glTF: `GLTFExporter`, `binary: true`, `trs: true`. OBJ: `OBJExporter` on the same group with
 the scale reset to 1 (inches; SketchUp asks for units) and each mesh name prefixed with its level,
 since OBJ objects are flat. Only what the current view mode and level visibility show is exported.

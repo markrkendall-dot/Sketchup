@@ -1,9 +1,9 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
-import { GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, WALL_FINISHES } from './finish';
+import { GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
-import type { Column, Glazing, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { Column, Glazing, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofEave, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 2 as const;
@@ -506,7 +506,7 @@ const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart'] as const;
-const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color'] as const;
+const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
@@ -643,6 +643,22 @@ export function roofProblem(r: Pick<Roof, 'outline' | 'pitch' | 'overhang' | 'th
   return null;
 }
 
+/** Rafter tails with a finite positive depth and spacing. */
+const isRafter = (v: unknown): v is { depth: number; spacing: number } => isObject(v) && isNum(v.depth) && v.depth > 0 && isNum(v.spacing) && v.spacing > 0;
+
+/**
+ * Why a roof's optional eave and appearance fields cannot be stored, or null when they can (the
+ * store checks them; a file's bad values are dropped one by one instead, in migrate).
+ */
+export function roofOptionProblem(r: Pick<Roof, 'eave' | 'rafter' | 'boardColor' | 'weathering' | 'color'>): string | null {
+  if (r.eave !== undefined && !ROOF_EAVES.includes(r.eave)) return 'eaves must be fascia or open';
+  if (r.rafter !== undefined && !isRafter(r.rafter)) return 'rafter depth and spacing must be positive';
+  if (r.boardColor !== undefined && !isHexColor(r.boardColor)) return 'the board colour must be a hex colour';
+  if (r.color !== undefined && !isHexColor(r.color)) return 'the colour must be a hex colour';
+  if (r.weathering !== undefined && !(isNum(r.weathering) && r.weathering >= 0 && r.weathering <= 1)) return 'weathering must be 0 to 1';
+  return null;
+}
+
 /** Why a column cannot be used (a non-positive size, top not above base, a non-finite number), or null. */
 export function columnProblem(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top'>): string | null {
   if (!isPoint(c.at)) return 'needs a position';
@@ -681,6 +697,11 @@ function migrateRoofs(raw: Json, where: string): Level['roofs'] {
     roof.phase = phaseOf(r.phase);
     roof.finish = r.finish === 'shingle' ? 'shingle' : 'metal';
     put(roof, 'color', isHexColor(r.color) ? r.color.toLowerCase() : undefined);
+    // Optional eave and appearance fields: kept when valid, dropped otherwise (the defaults apply).
+    put(roof, 'eave', typeof r.eave === 'string' && ROOF_EAVES.includes(r.eave as RoofEave) ? r.eave : undefined);
+    put(roof, 'rafter', isRafter(r.rafter) ? { depth: r.rafter.depth, spacing: r.rafter.spacing } : undefined);
+    put(roof, 'boardColor', isHexColor(r.boardColor) ? r.boardColor.toLowerCase() : undefined);
+    put(roof, 'weathering', isNum(r.weathering) && r.weathering >= 0 && r.weathering <= 1 ? r.weathering : undefined);
     out[rid] = roof as unknown as Roof;
   }
   return out;

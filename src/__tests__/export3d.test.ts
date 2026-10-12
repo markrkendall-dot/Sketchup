@@ -1,4 +1,4 @@
-import { Box3, Group, Mesh, MeshStandardMaterial, type BufferGeometry } from 'three';
+import { Box3, Group, Mesh, MeshStandardMaterial, Texture, type BufferGeometry } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearMeshCache, getLevelMeshes } from '../derive/meshes';
@@ -6,6 +6,7 @@ import { buildExportScene, disposeExportScene, METRES_PER_INCH, toGlb, toObj, ty
 import { createEmptyPlan } from '../model/plan';
 import type { Id, Phase, Plan } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
+import { wallMaterial } from '../view3d/materials';
 
 const store = () => usePlanStore.getState();
 const ext = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;
@@ -163,6 +164,7 @@ describe('buildExportScene', () => {
       const m = o.material as MeshStandardMaterial;
       expect(m.vertexColors).toBe(false);
       expect(m.map).toBeNull();
+      expect(m.normalMap).toBeNull();
       mats.add(m);
     });
     expect(meshes).toBe(7 + 1 + 1 + 7 + 1 + 3); // + the window's trim, sash and glass
@@ -214,6 +216,77 @@ describe('buildExportScene', () => {
     expect(byName(proposed, 'First Floor')!.children.some((c) => c.name === 'Roof')).toBe(false);
     expect(byName(proposed, 'Second Floor')!.children.some((c) => c.name === 'Roof')).toBe(true);
     disposeExportScene(proposed);
+  });
+
+  it('boards and rafter tails: Fascia and Rafters meshes, fascia_<phase> and rafter_<phase>, plus _<hex> in a board colour other than tan', () => {
+    const { first, second } = fixture();
+    const roof = {
+      shape: 'gable' as const,
+      outline: [
+        { x: -3.25, y: -3.25 },
+        { x: 363.25, y: -3.25 },
+        { x: 363.25, y: 483.25 },
+        { x: -3.25, y: 483.25 },
+      ],
+      ridgeAngle: 90,
+      pitch: 8,
+      overhang: 24,
+      bearingOffset: 0,
+      thickness: 2.5,
+      fascia: 7,
+      phase: 'existing' as const,
+      finish: 'metal' as const,
+    };
+    expect(store().addRoof(second, { ...roof, eave: 'open', boardColor: '#5a3a35', color: '#8a8378', weathering: 0.6 })).not.toBeNull();
+    expect(store().addRoof(first, { ...roof, eave: 'open' })).not.toBeNull();
+    expect(store().addRoof(first, { ...roof, eave: 'open', boardColor: '#5a3a35', phase: 'demo' })).not.toBeNull();
+    const root = buildExportScene(store().plan, 'all', allVisible(first));
+    const parts = (level: string, name: string) => byName(root, level)!.children.filter((c) => c.name === name) as Mesh[];
+    const names = (level: string, name: string) => parts(level, name).map((m) => (m.material as MeshStandardMaterial).name).sort();
+    expect(names('Second Floor', 'Roof')).toEqual(['roof_metal_existing_8a8378']);
+    expect(names('Second Floor', 'Fascia')).toEqual(['fascia_existing_5a3a35']);
+    expect(names('Second Floor', 'Rafters')).toEqual(['rafter_existing_5a3a35']);
+    expect(names('First Floor', 'Fascia')).toEqual(['fascia_demo', 'fascia_existing']);
+    expect(names('First Floor', 'Rafters')).toEqual(['rafter_demo', 'rafter_existing']);
+    const brown = parts('Second Floor', 'Rafters')[0].material as MeshStandardMaterial;
+    expect(brown.color.getHexString()).toBe('5a3a35');
+    expect(parts('First Floor', 'Rafters').find((m) => (m.material as MeshStandardMaterial).name === 'rafter_demo')!.renderOrder).toBe(1);
+    // Colours only, everywhere.
+    root.traverse((o) => {
+      if (!(o instanceof Mesh)) return;
+      expect((o.material as MeshStandardMaterial).map).toBeNull();
+      expect((o.material as MeshStandardMaterial).normalMap).toBeNull();
+    });
+    disposeExportScene(root);
+  });
+
+  it('a textured live material exports its flat colour (userData.flatColor) and neither of its maps', () => {
+    const { first } = fixture();
+    // No canvas in node, so give the live wall material a texture and a normal map as the browser would.
+    const live = wallMaterial('existing', 'exterior');
+    const saved = { map: live.map, normalMap: live.normalMap, color: live.color.clone(), flat: live.userData.flatColor };
+    live.map = new Texture();
+    live.normalMap = new Texture();
+    live.color.set('#ffffff');
+    live.userData.flatColor = '#5a3a35';
+    try {
+      const root = buildExportScene(store().plan, 'all', allVisible(first));
+      const wall = byName(root, 'First Floor')!.children.find((c) => c.name.endsWith('(exterior, existing)')) as Mesh;
+      const m = wall.material as MeshStandardMaterial;
+      expect(m.name).toBe('wall_existing_exterior');
+      expect(m.map).toBeNull();
+      expect(m.normalMap).toBeNull();
+      expect(m.color.getHexString()).toBe('5a3a35');
+      disposeExportScene(root);
+    } finally {
+      live.map?.dispose();
+      live.normalMap?.dispose();
+      live.map = saved.map;
+      live.normalMap = saved.normalMap;
+      live.color.copy(saved.color);
+      if (saved.flat === undefined) delete live.userData.flatColor;
+      else live.userData.flatColor = saved.flat;
+    }
   });
 
   it('names opening materials: screen, door_leaf_<hex> for a leaf in another colour, then the phase', () => {

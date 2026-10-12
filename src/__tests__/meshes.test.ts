@@ -780,6 +780,37 @@ describe('walls under a roof', () => {
     });
     expect(getLevelMeshes(moved, first.id, 'all').roofs[0].geometry).toBe(m2.roofs[0].geometry);
   });
+
+  it('open eaves: the roof mesh has rafter tails and reports its board colour and weathering; replaced geometry is disposed', () => {
+    const { plan, first } = roofedBox();
+    const m1 = getLevelMeshes(plan, first.id, 'all');
+    expect(m1.roofs[0]).toMatchObject({ rafters: null, boardColor: '#d9c9a3', weathering: 0.35, color: '#6e6259' });
+    // Two eaves and four rake boards; the metal gable's slab carries its ridge cap and roof UVs.
+    expect(triangleCount(m1.roofs[0].fascia!)).toBe(6 * 12);
+    expect(triangleCount(m1.roofs[0].geometry)).toBeGreaterThan(20);
+    expect(m1.roofs[0].geometry.getAttribute('uv')).toBeDefined();
+    let disposed = 0;
+    for (const g of [m1.roofs[0].geometry, m1.roofs[0].fascia!]) g.addEventListener('dispose', () => disposed++);
+    const open = produce(plan, (d) => {
+      Object.assign(d.levels[first.id].roofs.roof1, { eave: 'open', boardColor: '#5a3a35', weathering: 0.6 });
+    });
+    const m2 = getLevelMeshes(open, first.id, 'all');
+    const r = m2.roofs[0];
+    expect(r).toMatchObject({ boardColor: '#5a3a35', weathering: 0.6 });
+    // 246.5" outline + 48" of overhang: 294.5" eaves, 12 tails each (12" + 11 x 24" = 276").
+    expect(triangleCount(r.rafters!)).toBe(2 * 12 * 12);
+    // Only the four rake boards are left.
+    expect(triangleCount(r.fascia!)).toBe(4 * 12);
+    expect(disposed).toBe(2);
+    // The tails hang under the eaves, below the plate, outside the eave walls.
+    const b = bbox(r.rafters!);
+    expect(b.max[1]).toBeLessThanOrEqual(96 + 1e-6);
+    expect(b.min[2]).toBeCloseTo(-3.25 - 24 + 1, 3);
+    let disposedTails = false;
+    r.rafters!.addEventListener('dispose', () => (disposedTails = true));
+    clearMeshCache();
+    expect(disposedTails).toBe(true);
+  });
 });
 
 describe('platform framing: exterior walls run up through the slab above', () => {

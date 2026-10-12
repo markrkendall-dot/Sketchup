@@ -1,4 +1,4 @@
-import type { Glazing, Opening, Roof, RoofFinish, Wall, WallFinish, WallKind } from './types';
+import type { Glazing, Opening, Roof, RoofEave, RoofFinish, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
@@ -24,12 +24,31 @@ export const defaultWallColor = (kind: WallKind): string => (kind === 'exterior'
 export const wallFinishOf = (w: Pick<Wall, 'kind' | 'finish'>): WallFinish => w.finish ?? defaultWallFinish(w.kind);
 export const wallColorOf = (w: Pick<Wall, 'kind' | 'color'>): string => w.color ?? defaultWallColor(w.kind);
 
-/** Roof surface colours by finish: standing-seam metal grey-brown, asphalt shingle dark grey. */
+/** Roof surface colours by finish: corrugated metal grey-brown, asphalt shingle dark grey. */
 export const ROOF_COLOR: Record<RoofFinish, string> = { metal: '#6e6259', shingle: '#4a4a4a' };
 export const roofColorOf = (r: Pick<Roof, 'finish' | 'color'>): string => r.color ?? ROOF_COLOR[r.finish];
 
 /** Fascia and rake boards, and the trim round openings: tan. */
 export const TRIM_COLOR = '#d9c9a3';
+
+/** Roof eaves (DESIGN.md "Roofs"): a fascia board by default, or open with rafter tails. */
+export const ROOF_EAVES: readonly RoofEave[] = ['fascia', 'open'];
+export const ROOF_EAVE_LABEL: Record<RoofEave, string> = { fascia: 'Fascia board', open: 'Open, rafter tails' };
+/** Rafter tails of open eaves: 5.5" deep (a 2x6) every 24" on centre. */
+export const DEFAULT_RAFTER: { readonly depth: number; readonly spacing: number } = { depth: 5.5, spacing: 24 };
+/** Rust and streaking of a metal roof, 0 (none) to 1. */
+export const DEFAULT_WEATHERING = 0.35;
+/**
+ * A roof texture tile is 24" across the slope by 48" down it; roof UVs are in tiles (meshes.ts
+ * addRoofUVs), so a texture repeats once per tile.
+ */
+export const ROOF_TILE = { across: 24, down: 48 } as const;
+
+export const roofEaveOf = (r: Pick<Roof, 'eave'>): RoofEave => r.eave ?? 'fascia';
+export const rafterOf = (r: Pick<Roof, 'rafter'>): { depth: number; spacing: number } => r.rafter ?? DEFAULT_RAFTER;
+/** The fascia, rake boards and rafter tails: the roof's board colour, else tan. */
+export const boardColorOf = (r: Pick<Roof, 'boardColor'>): string => r.boardColor ?? TRIM_COLOR;
+export const weatheringOf = (r: Pick<Roof, 'weathering'>): number => r.weathering ?? DEFAULT_WEATHERING;
 
 export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 export const isHexColor = (v: unknown): v is string => typeof v === 'string' && HEX_COLOR.test(v);

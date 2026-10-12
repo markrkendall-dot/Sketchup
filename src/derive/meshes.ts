@@ -10,8 +10,8 @@ import { isOpeningVisible, isVisible } from './phase';
 import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, type FaceSet } from './rooms';
 import { columnOutline, planTerrain, type TerrainGrid } from './site';
-import { roofColorOf } from '../model/finish';
-import { profileAt, roofBearing, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
+import { boardColorOf, roofColorOf, ROOF_TILE, weatheringOf } from '../model/finish';
+import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { floorToFloor, stairsFrame, stairsHoleOutline, stairsPoint, stairSteps } from './stairs';
 
 /** Moved to rooms.ts (the 2D editor uses it for "Fit to walls"); re-exported for the 3D code. */
@@ -623,23 +623,80 @@ export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' 
 
 /**
  * A roof as one geometry (level-local, like walls): the slab over the overhang outline with its
- * fascia and rake boards (roofs.ts roofSolid). Each part is a closed solid.
+ * fascia and rake boards (roofs.ts roofSolid). Each part is a closed solid. The rafter tails and
+ * the ridge cap are drawn by buildRoofParts only.
  */
 export function buildRoofGeometry(roof: Roof, bearingHeight: number): BufferGeometry {
   const { slab, boards } = roofSolid(roof, bearingHeight);
   return geometryFrom(boards.reduce((all, b) => all.concat(b), slab));
 }
 
-/** The roof as two geometries so the tan fascia and rake boards get their own material. */
-export function buildRoofParts(roof: Roof, bearingHeight: number): { slab: BufferGeometry; fascia: BufferGeometry | null } {
-  const { slab, boards } = roofSolid(roof, bearingHeight);
-  const fascia = boards.reduce((all, b) => all.concat(b), [] as number[]);
-  return { slab: geometryFrom(slab), fascia: fascia.length ? geometryFrom(fascia) : null };
+/** A roof's three drawn parts: each has its own material. */
+export interface RoofParts {
+  /** The slab and the ridge cap (the roof's surface material), with roof UVs (addRoofUVs). */
+  slab: BufferGeometry;
+  /** Fascia and rake boards, null when the roof has none. */
+  fascia: BufferGeometry | null;
+  /** Rafter tails under open eaves, null when the roof has none. */
+  rafters: BufferGeometry | null;
 }
 
-function roofParts(roof: Roof, bearing: number): { geometry: BufferGeometry; fascia: BufferGeometry | null } {
-  const { slab, fascia } = buildRoofParts(roof, bearing);
-  return { geometry: slab, fascia };
+/**
+ * The roof as separate geometries: the slab with the ridge cap merged into it (both take the
+ * roof's material), the fascia and rake boards, and the rafter tails (both in the board colour).
+ */
+export function buildRoofParts(roof: Roof, bearingHeight: number): RoofParts {
+  const { slab, boards, rafters, ridge } = roofSolid(roof, bearingHeight);
+  const fascia = boards.flat();
+  const tails = rafters.flat();
+  return {
+    slab: addRoofUVs(geometryFrom(ridge.length ? slab.concat(ridge) : slab), roofFrame(roof).v),
+    fascia: fascia.length ? geometryFrom(fascia) : null,
+    rafters: tails.length ? geometryFrom(tails) : null,
+  };
+}
+
+function roofParts(roof: Roof, bearing: number): { geometry: BufferGeometry; fascia: BufferGeometry | null; rafters: BufferGeometry | null } {
+  const { slab, fascia, rafters } = buildRoofParts(roof, bearing);
+  return { geometry: slab, fascia, rafters };
+}
+
+/**
+ * Texture coordinates of a roof slab in tiles (ROOF_TILE: 24" across the slope by 48" down it; the
+ * roof textures repeat once per tile, view3d/textures.ts roofTexture), per triangle by its flat
+ * normal, like addWallUVs. Faces turned up or down (the roof's surfaces): `down` is the plan
+ * direction the face slopes down toward (`level`, the ridge frame's v, on a level face), `along` is
+ * square to it, u = dot(p, along) / 24 and v = dot(p, down) * sqrt(1 + k^2) / 48 with k the slope,
+ * so corrugations run down the slope, repeat every 24" / 9 along the eave, and courses are measured
+ * along the slope, not squeezed by it (sqrt(1 + k^2) is 1 / |ny| for a unit normal). Vertical faces
+ * (the slab's edges): u along the edge / 24, v = Y / 48.
+ */
+export function addRoofUVs(g: BufferGeometry, level: Vec2): BufferGeometry {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  const count = pos?.count ?? 0;
+  const uv = new Float32Array(count * 2);
+  for (let i = 0; i < count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const nx = nor.getX(i);
+    const ny = nor.getY(i);
+    const nz = nor.getZ(i);
+    const h = Math.hypot(nx, nz);
+    if (Math.abs(ny) > 0.5) {
+      const down = h > 1e-9 ? { x: nx / h, y: nz / h } : level;
+      const along = { x: -down.y, y: down.x };
+      uv[2 * i] = (x * along.x + z * along.y) / ROOF_TILE.across;
+      uv[2 * i + 1] = (x * down.x + z * down.y) / Math.abs(ny) / ROOF_TILE.down;
+    } else {
+      // Along the face: its normal turned a quarter in plan.
+      const t = h > 1e-9 ? { x: -nz / h, y: nx / h } : { x: 1, y: 0 };
+      uv[2 * i] = (x * t.x + z * t.y) / ROOF_TILE.across;
+      uv[2 * i + 1] = pos.getY(i) / ROOF_TILE.down;
+    }
+  }
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -730,14 +787,20 @@ export interface StairsMesh {
 
 export interface RoofMesh {
   id: Id;
-  /** The roof slab. */
+  /** The roof slab, with the ridge cap of a metal gable or hip roof. */
   geometry: BufferGeometry;
-  /** Fascia and rake boards (tan), null when the roof has none. */
+  /** Fascia and rake boards, null when the roof has none. */
   fascia: BufferGeometry | null;
+  /** Rafter tails under open eaves, null when the roof has none. */
+  rafters: BufferGeometry | null;
   phase: Phase;
   finish: RoofFinish;
   /** Hex colour of the slab (the roof's own, else by finish). */
   color: string;
+  /** Hex colour of the fascia, the rake boards and the rafter tails (the roof's own, else tan). */
+  boardColor: string;
+  /** Rust and streaking of a metal roof, 0 to 1 (the roof's own, else the default). */
+  weathering: number;
 }
 
 /** What an opening fill is for, in the export: `Window` or `Door`. */
@@ -796,6 +859,7 @@ interface RoofEntry {
   bearing: number;
   geometry: BufferGeometry;
   fascia: BufferGeometry | null;
+  rafters: BufferGeometry | null;
 }
 
 interface OpeningEntry {
@@ -861,9 +925,10 @@ export function stairHoles(below: Level | undefined, viewMode: ViewMode, belowFt
   return out;
 }
 
-function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null }): void {
+function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null; rafters?: BufferGeometry | null }): void {
   e.geometry.dispose();
   e.fascia?.dispose();
+  e.rafters?.dispose();
 }
 
 /** Drop and dispose cache entries of levels that are no longer in the plan. */
@@ -1073,7 +1138,17 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const old = prevRoofs?.get(roof.id);
     const entry: RoofEntry = old && old.roof === roof && old.bearing === bearing ? old : { roof, bearing, ...roofParts(roof, bearing) };
     nextRoofs.set(roof.id, entry);
-    roofs.push({ id: roof.id, geometry: entry.geometry, fascia: entry.fascia, phase: roof.phase, finish: roof.finish, color: roofColorOf(roof) });
+    roofs.push({
+      id: roof.id,
+      geometry: entry.geometry,
+      fascia: entry.fascia,
+      rafters: entry.rafters,
+      phase: roof.phase,
+      finish: roof.finish,
+      color: roofColorOf(roof),
+      boardColor: boardColorOf(roof),
+      weathering: weatheringOf(roof),
+    });
   }
   if (prevRoofs) for (const [id, e] of prevRoofs) if (nextRoofs.get(id) !== e) disposeEntry(e);
   roofCache.set(key, nextRoofs);

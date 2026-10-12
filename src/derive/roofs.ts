@@ -1,4 +1,5 @@
-import { add, clipHalfPlane, cross, dot, pointInPolygon, polygonSignedArea, projectPointToSegment, scale, sub } from '../model/geometry';
+import { add, clipHalfPlane, cross, dist, dot, lineIntersection, normalize, pointInPolygon, polygonSignedArea, projectPointToSegment, scale, sub } from '../model/geometry';
+import { rafterOf, roofEaveOf } from '../model/finish';
 import type { Roof, RoofShape, Vec2 } from '../model/types';
 import { insetPolygon } from './rooms';
 import { directionVector } from './stairs';
@@ -12,7 +13,8 @@ import { directionVector } from './stairs';
 // lies on the outline (the bearing walls' outside faces), so the overhang hangs lower than the
 // plate by overhang * pitch / 12. The solid spans the outline grown by the overhang, from the
 // underside up `thickness` (measured vertically), with fascia boards along the eaves and rake
-// boards along the sloped edges.
+// boards along the sloped edges; open eaves have rafter tails instead of a fascia board, and a
+// metal gable or hip roof has a ridge cap.
 //
 // Heights are level-local (0 = the level's floor top); the bearing height is the level's wall
 // height plus the roof's bearingOffset (roofBearing).
@@ -20,6 +22,13 @@ import { directionVector } from './stairs';
 const EPS = 1e-9;
 /** Thickness of the fascia and rake boards, proud of the slab edge. */
 export const BOARD_THICKNESS = 1.5;
+/** Width of a rafter tail (a 2x rafter). */
+export const RAFTER_WIDTH = 1.5;
+/** How far a rafter tail stops short of the roof's edge. */
+export const RAFTER_SETBACK = 1;
+/** Ridge cap of a metal roof: a strip this wide (in plan) each side of a ridge or hip line, this thick. */
+export const RIDGE_CAP_WIDTH = 6;
+export const RIDGE_CAP_THICKNESS = 2.5;
 
 export const ROOF_DEFAULTS = {
   shape: 'gable' as RoofShape,
@@ -357,11 +366,21 @@ export function slopedPrismPositions(
   return out;
 }
 
-/** A roof solid as position arrays (three coordinates, level-local): the slab and each board. */
+/**
+ * A roof solid as position arrays (three coordinates, level-local): the slab, the boards, the
+ * rafter tails and the ridge cap.
+ */
 export interface RoofSolid {
   slab: number[];
   /** Fascia boards along the eaves, rake boards along the sloped edges; each a closed solid. */
   boards: number[][];
+  /** Rafter tails under open eaves (`eave: 'open'`); each a closed solid. */
+  rafters: number[][];
+  /**
+   * The ridge cap of a metal gable or hip roof: a strip each side of every ridge and hip line on the
+   * roof's top surface, closed together. Kept apart from the slab (meshes.ts merges it for drawing).
+   */
+  ridge: number[];
 }
 
 interface EdgeSeg {
@@ -370,12 +389,22 @@ interface EdgeSeg {
   plane: RoofPlane;
 }
 
+/** An outline edge: its start, unit direction and length. */
+interface OutlineEdge {
+  a: Vec2;
+  e: Vec2;
+  len: number;
+}
+
 /**
  * The roof as closed solids. The slab: each plane's region of the overhang outline from the
  * underside up `thickness`, vertical faces around the outline, none along the ridge and hip lines
  * (the regions share them). Boards: along every outline stretch, 1.5" proud of the slab edge, top
  * flush with the roof's top surface, `fascia` deep; a level stretch (an eave) is a fascia board and
- * runs past a corner onto the next stretch's board line, a sloped stretch is a rake board.
+ * runs past a corner onto the next stretch's board line, a sloped stretch is a rake board. With
+ * open eaves a level stretch the roof descends toward (its plane rises away from the edge) has
+ * rafter tails under it instead of a board (rafterTails); a shed's high edge and every edge of a
+ * flat roof keep their boards. A metal gable or hip roof has a ridge cap (ridgeCap).
  */
 export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
   const over = roofOutlineWithOverhang(roof);
@@ -393,12 +422,14 @@ export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
       if (Math.hypot(q.x - p.x, q.y - p.y) > 1e-6 && onPolygonEdge(p, q, over)) segs.push({ p, q, plane: r.plane });
     }
   }
+  const ridge = roof.finish === 'metal' && (roof.shape === 'gable' || roof.shape === 'hip') ? ridgeCap(regions, over, T) : [];
   const boards: number[][] = [];
-  const F = roof.fascia;
-  if (!(F > 0) || segs.length === 0) return { slab, boards };
+  const rafters: number[][] = [];
+  if (segs.length === 0) return { slab, boards, rafters, ridge };
 
   // Put the boundary stretches in ring order: by outline edge, then along it.
-  const ordered: EdgeSeg[] = [];
+  const ordered: { s: EdgeSeg; edge: OutlineEdge }[] = [];
+  const taken = new Set<EdgeSeg>();
   for (let e = 0; e < over.length; e++) {
     const a = over[e];
     const b = over[(e + 1) % over.length];
@@ -410,18 +441,35 @@ export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
       return projectPointToSegment(m, a, b).distance < 1e-6 && Math.abs(cross(d, sub(s.q, s.p))) / Math.sqrt(len2) < 1e-6 * Math.max(1, Math.hypot(s.q.x - s.p.x, s.q.y - s.p.y));
     });
     on.sort((s, t) => dot(sub(s.p, a), d) - dot(sub(t.p, a), d));
-    for (const s of on) if (!ordered.includes(s)) ordered.push(s);
+    const len = Math.sqrt(len2);
+    for (const s of on) {
+      if (taken.has(s)) continue;
+      taken.add(s);
+      ordered.push({ s, edge: { a, e: scale(d, 1 / len), len } });
+    }
   }
   const t = BOARD_THICKNESS;
-  const info = ordered.map((s) => {
+  const F = roof.fascia;
+  const open = roofEaveOf(roof) === 'open';
+  const planes = regions.map((r) => r.plane);
+  const info = ordered.map(({ s, edge }) => {
     const d0 = sub(s.q, s.p);
     const len = Math.hypot(d0.x, d0.y);
     const d = scale(d0, 1 / len);
     const zp = planeAt(s.plane, s.p) + T;
     const zq = planeAt(s.plane, s.q) + T;
-    return { ...s, d, len, zp, zq, level: Math.abs(zq - zp) < 1e-6 };
+    const level = Math.abs(zq - zp) < 1e-6;
+    // The roof descends toward the edge when its plane's gradient points inward, against the
+    // outward normal (d.y, -d.x): an eave. Not a shed's high edge, nor any edge of a flat roof.
+    const descends = level && s.plane.gx * d.y - s.plane.gy * d.x < -1e-9;
+    return { ...s, d, len, zp, zq, level, edge, tails: open && descends };
   });
   info.forEach((s, i) => {
+    if (s.tails) {
+      rafterTails(roof, s, planes, rafters);
+      return;
+    }
+    if (!(F > 0)) return;
     const prev = info[(i + info.length - 1) % info.length];
     const next = info[(i + 1) % info.length];
     const turnIn = cross(prev.d, s.d);
@@ -444,7 +492,102 @@ export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
     const quad = [p0, q0, add(q0, scale(n, t)), add(p0, scale(n, t))];
     boards.push(slopedPrismPositions(quad, (x) => ztop(x) - F, ztop));
   });
-  return { slab, boards };
+  return { slab, boards, rafters, ridge };
+}
+
+/**
+ * Rafter tails under an open eave stretch: RAFTER_WIDTH boxes every `spacing` measured along the
+ * overhang outline edge the stretch lies on (the first half a spacing from the edge's start), each
+ * kept when its centre falls in the stretch. A tail runs square to the edge from RAFTER_SETBACK
+ * inside it back to the outline (the bearing walls' outside faces), with its top on the stretch's
+ * plane (the slab's underside) and its bottom `depth` lower. Each is clipped to where its plane is
+ * the lowest (the half-planes roofRegions uses), so a tail near a hip stays under its own slope.
+ */
+function rafterTails(roof: Roof, s: EdgeSeg & { edge: OutlineEdge }, planes: readonly RoofPlane[], out: number[][]): void {
+  const { depth, spacing } = rafterOf(roof);
+  if (!(roof.overhang > RAFTER_SETBACK) || !(depth > 0) || !(spacing > 0)) return;
+  const { a, e, len } = s.edge;
+  const inward = { x: -e.y, y: e.x }; // right of travel on a positive ring
+  const t0 = dot(sub(s.p, a), e);
+  const t1 = dot(sub(s.q, a), e);
+  const lo = Math.min(t0, t1);
+  const hi = Math.max(t0, t1);
+  // Never closer than their own width (they would merge into one band).
+  const step = Math.max(spacing, RAFTER_WIDTH);
+  const at = (along: number, inside: number) => add(add(a, scale(e, along)), scale(inward, inside));
+  const z = (p: Vec2) => planeAt(s.plane, p);
+  const half = RAFTER_WIDTH / 2;
+  for (let k = 0; (k + 0.5) * step <= len + 1e-6; k++) {
+    const c = (k + 0.5) * step;
+    // Half open, so a tail on the boundary between two stretches of one edge is made once.
+    if (c < lo - 1e-6 || c >= hi - 1e-6) continue;
+    let poly = [at(c - half, RAFTER_SETBACK), at(c + half, RAFTER_SETBACK), at(c + half, roof.overhang), at(c - half, roof.overhang)];
+    for (const o of planes) {
+      const n = { x: s.plane.gx - o.gx, y: s.plane.gy - o.gy };
+      if (Math.hypot(n.x, n.y) < 1e-12) continue;
+      poly = clipHalfPlane(poly, n, o.c - s.plane.c);
+      if (!poly.length) break;
+    }
+    if (poly.length < 3 || Math.abs(polygonSignedArea(poly)) < 1e-6) continue;
+    out.push(slopedPrismPositions(poly, (p) => z(p) - depth, z));
+  }
+}
+
+/**
+ * The ridge cap: in each region, a band RIDGE_CAP_WIDTH wide (in plan) along every run of its
+ * ridge and hip lines (region edges inside the overhang outline), from the roof's top surface up
+ * RIDGE_CAP_THICKNESS, so it follows the slope on each side. The band's inner edge is each line
+ * moved into the region: mitred where two lines meet (a hip and the ridge), cut along the outline
+ * where a line reaches it. The faces along the lines are left out (the band on the other side
+ * shares them), so the bands together are one closed surface. A region too small to hold its band
+ * gets none.
+ */
+function ridgeCap(regions: readonly RoofRegion[], over: readonly Vec2[], T: number): number[] {
+  const out: number[] = [];
+  const W = RIDGE_CAP_WIDTH;
+  for (const r of regions) {
+    const ring = cleanPositive(r.poly);
+    const n = ring.length;
+    if (n < 3) continue;
+    const next = (i: number) => ring[(i + 1) % n];
+    const inner = ring.map((p, i) => dist(p, next(i)) > 1e-6 && !onPolygonEdge(p, next(i), over));
+    if (!inner.some(Boolean) || inner.every(Boolean)) continue;
+    // Edge i's line moved `off` into the region (right of travel on a positive ring).
+    const line = (i: number, off: number) => {
+      const d = normalize(sub(next(i), ring[i]));
+      const inward = { x: -d.y, y: d.x };
+      return { p: add(ring[i], scale(inward, off)), d, inward };
+    };
+    for (let first = 0; first < n; first++) {
+      if (!inner[first] || inner[(first + n - 1) % n]) continue;
+      // The run of ridge and hip edges first, first + 1, ... up to the next outline edge.
+      let m = 0;
+      while (inner[(first + m) % n]) m++;
+      const vs: Vec2[] = [];
+      for (let j = 0; j <= m; j++) vs.push(ring[(first + j) % n]);
+      // The inner edge's corners: where the lines either side of each vertex meet once moved in.
+      const ws = vs.map((v, j) => {
+        const before = (first + j - 1 + n) % n;
+        const after = (first + j) % n;
+        const lb = line(before, inner[before] ? W : 0);
+        const la = line(after, inner[after] ? W : 0);
+        const w = lineIntersection(lb.p, lb.d, la.p, la.d);
+        // Parallel lines (a straight run), or a mitre that runs far off: square to the line.
+        if (w && dist(w, v) <= 4 * W) return w;
+        return add(v, scale((inner[after] ? la : lb).inward, W));
+      });
+      if (!ws.every((w) => insideOrOn(w, ring))) continue;
+      const onRun = (p: Vec2, q: Vec2) => {
+        for (let j = 0; j < m; j++) {
+          if (projectPointToSegment(p, vs[j], vs[j + 1]).distance < 1e-6 && projectPointToSegment(q, vs[j], vs[j + 1]).distance < 1e-6) return true;
+        }
+        return false;
+      };
+      const zb = (p: Vec2) => planeAt(r.plane, p) + T;
+      slopedPrismPositions([...vs, ...[...ws].reverse()], zb, (p) => zb(p) + RIDGE_CAP_THICKNESS, { side: (p, q) => !onRun(p, q) }, out);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
