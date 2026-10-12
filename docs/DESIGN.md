@@ -541,7 +541,7 @@ right-click.
    the next start; direction persists.
 5. Click without typing commits at the snapped cursor.
 
-### Editing tools (docs/REVIEW-2.md batch B)
+### Editing tools (docs/history/REVIEW-2.md batch B)
 
 - **Move a wall by a distance** (`model/offset.ts planWallOffset`, store `offsetWalls(levelId, ids,
   distance, side)` / `shiftWalls(levelId, shifts)`, one undo step, null or the refusal message).

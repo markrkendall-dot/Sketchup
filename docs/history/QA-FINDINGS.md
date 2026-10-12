@@ -93,10 +93,10 @@ Typed-length drawing and loop closing, T and crossing splits, miters, room detec
 
 After all three batches: run every e2e script once more, commit, push, and give MK a short changelog.
 
-## Review pass 2 (docs/REVIEW-2.md)
+## Review pass 2 (docs/history/REVIEW-2.md)
 
 A second pass on the house itself (the 146 Mick Road starter) and MK's renovation, done through the
-UI. Findings and fixes are in `docs/REVIEW-2.md`; one commit per batch on `claude/cool-mccarthy-rqi8ka`.
+UI. Findings and fixes are in `docs/history/REVIEW-2.md`; one commit per batch on `claude/cool-mccarthy-rqi8ka`.
 
 | Item | Finding | Status |
 | --- | --- | --- |

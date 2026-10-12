@@ -235,7 +235,7 @@ so a plan with photos can be a few megabytes.
 ## Modelling 146 Mick Road
 
 `docs/examples/146-mick-road.json` is a starter plan of the owner's house, made from the site
-sketch and nine photos (`docs/photos/`) so that the 3D model already reads as the same house:
+sketch, the owner's floor sketches and nine photos (`docs/photos/`) so that the 3D model already reads as the same house:
 the gable roof with deep eaves, the east wing with its own gable, the entry porch with its knee
 walls and west-facing gable, the brick chimney, shingle below and clapboard above, the multi-lite
 windows, the green shutters and the walkout basement on the lake side. It is a **starter, not a

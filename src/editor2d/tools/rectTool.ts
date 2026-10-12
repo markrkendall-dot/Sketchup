@@ -8,7 +8,7 @@ import type { Tool, ToolContext, ToolPointerEvent } from './index';
 import { applyBufferKey, SIZE_SEPARATOR, splitSizePair } from './lengthBuffer';
 import { MUST_BE_POSITIVE, thicknessFor } from './wallTool';
 
-// Rectangle tool (B, docs/REVIEW-2.md B2): click a corner, then type the two sizes (`12' x 10'`,
+// Rectangle tool (B, docs/history/REVIEW-2.md B2): click a corner, then type the two sizes (`12' x 10'`,
 // `12'x10'`, `12' by 10'`, or `12'` Tab `10'`) and Enter, or click the opposite corner. Four walls
 // of the next wall kind, its thickness and the "Draw as" phase, added in one undo step.
 

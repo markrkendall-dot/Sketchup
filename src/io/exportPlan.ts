@@ -1,4 +1,4 @@
-// Export the 2D plan of a level (docs/REVIEW-2.md B4) as a stand-alone SVG drawing at 1/4" = 1'-0",
+// Export the 2D plan of a level (docs/history/REVIEW-2.md B4) as a stand-alone SVG drawing at 1/4" = 1'-0",
 // with a title block, or as a PNG of it at 2x. The plan is the screen's own layers (PlanLayers),
 // rendered with renderToStaticMarkup inside a provider of snapshot stores (editor2d/layerStores.ts)
 // with nothing hovered, selected or being drawn, and the image underlay hidden. The layers' CSS

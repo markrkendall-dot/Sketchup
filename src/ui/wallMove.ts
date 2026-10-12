@@ -1,4 +1,4 @@
-// Moving walls by a distance (docs/REVIEW-2.md B1): the panel's Move buttons and the select tool's
+// Moving walls by a distance (docs/history/REVIEW-2.md B1): the panel's Move buttons and the select tool's
 // Shift+arrow nudges run the store action through here, which then says in the status bar what the
 // rooms either side of the wall measure now.
 import { faceOfRoom, facesBesideWall, getFaces, roomDimensions, type Face, type FaceSet } from '../derive/rooms';

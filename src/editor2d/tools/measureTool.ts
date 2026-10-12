@@ -6,7 +6,7 @@ import type { SnapResult } from '../../store/uiStore';
 import { faceSnapSources, snapFaceCorner, snapFaceEdge } from '../snap';
 import type { Tool, ToolContext, ToolPointerEvent } from './index';
 
-// Measure tool (M, docs/REVIEW-2.md B3): click two points; the overlay shows the distance and its
+// Measure tool (M, docs/history/REVIEW-2.md B3): click two points; the overlay shows the distance and its
 // x and y parts, and the status bar keeps "Measured ..." until Esc or the next measurement. Nothing
 // in the plan changes.
 

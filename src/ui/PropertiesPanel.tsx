@@ -366,7 +366,7 @@ function SelectionActions({
 }
 
 /**
- * Move a wall across by a typed distance, toward the room on either side (docs/REVIEW-2.md B1).
+ * Move a wall across by a typed distance, toward the room on either side (docs/history/REVIEW-2.md B1).
  * Its neighbours slide so they stay attached and straight; collinear walls move with it. The status
  * bar then gives the new net sizes of the rooms either side.
  */

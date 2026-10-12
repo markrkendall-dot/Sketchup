@@ -1,4 +1,4 @@
-// Moving walls sideways by a distance (docs/REVIEW-2.md B1). Pure: the store applies the result.
+// Moving walls sideways by a distance (docs/history/REVIEW-2.md B1). Pure: the store applies the result.
 import { add, cross, dist, dot, lineIntersection, normalize, perpLeft, scale, sub } from './geometry';
 import { MERGE_EPS } from './plan';
 import type { Id, Level, Vec2 } from './types';

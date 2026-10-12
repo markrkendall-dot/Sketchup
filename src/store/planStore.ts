@@ -287,7 +287,7 @@ function addWallInPlace(level: Level, aRef: Vec2 | Id, bRef: Vec2 | Id, opts: Ad
   const lb = locate(bRef);
   if (!la || !lb || (la.id !== null && la.id === lb.id) || dist(la.at, lb.at) <= MERGE_EPS) return null;
   // A wall on top of a wall already there (any phase) would replace a piece of it when the level
-  // is normalized: refuse it instead (docs/REVIEW-2.md A1).
+  // is normalized: refuse it instead (docs/history/REVIEW-2.md A1).
   if (wallOverlapping(level, la.at, lb.at)) return 'overlap';
   const place = (l: { id: Id | null; at: Vec2 }): { id: Id; existing: boolean } => {
     if (l.id) return { id: l.id, existing: true };
