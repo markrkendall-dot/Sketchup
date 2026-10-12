@@ -1,13 +1,15 @@
 import { Grid, Sky } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
-import { BackSide, Color, DirectionalLight, Mesh, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry } from 'three';
-import { fallbackElevation, sunPosition } from '../derive/site';
+import { BackSide, Color, DirectionalLight, Mesh, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry, type Object3D } from 'three';
+import { fallbackElevation } from '../derive/site';
 import { usePlanStore } from '../store/planStore';
-import { useUiStore, type UiState } from '../store/uiStore';
+import { useUiStore, type UiState, type View3dPreset } from '../store/uiStore';
 import { focusCanvas } from '../ui/focus';
 import { planBox, sunShadowFit } from './bounds';
+import { registerCapture, SKY_NAME, SUN_LIGHT_NAME } from './capture';
 import { Controls } from './Controls';
+import { viewSun } from './elevation';
 import { LevelMeshes } from './LevelMeshes';
 import { setEnvironmentMap } from './materials';
 import { FarGround, SiteColumns, Terrain } from './SiteMeshes';
@@ -71,7 +73,13 @@ function InvalidateOnChange() {
     });
     // Not the whole ui store: the draft changes on every mouse move over the 2D plan.
     const offUi = useUiStore.subscribe((s, prev) => {
-      if (sceneUiChanged(s, prev) || s.show3dGrid !== prev.show3dGrid || s.layout !== prev.layout || s.splitRatio !== prev.splitRatio)
+      if (
+        sceneUiChanged(s, prev) ||
+        s.show3dGrid !== prev.show3dGrid ||
+        s.layout !== prev.layout ||
+        s.splitRatio !== prev.splitRatio ||
+        s.view3dPreset !== prev.view3dPreset
+      )
         invalidate();
     });
     return () => {
@@ -124,21 +132,31 @@ function GroundGrid() {
   );
 }
 
+/** The sun's direction for the view: the plan's sun in perspective, the elevation's own (elevation.ts viewSun). */
+function useViewSun(): [number, number, number] {
+  const north = usePlanStore((s) => s.plan.site.northAngle);
+  const preset = useUiStore((s) => s.view3dPreset);
+  return useMemo(() => viewSun(preset, north), [preset, north]);
+}
+
 /**
  * The sun: a directional light from the south-west in plan terms (`sunPosition`, turned with the
  * plan's north angle) casting shadows, its shadow camera fitted round the whole plan (`planBox`,
- * `sunShadowFit`) on every plan change. r3f applies props to the light, never to its shadow camera,
- * so the effect updates that camera's projection itself; the light's target is put in the scene so
- * its world matrix follows its position. The shadow map does not depend on the camera, so it is
- * drawn only on the frame after the scene changes (the plan, or a UI setting that changes what the
- * scene holds), not on every orbit frame.
+ * `sunShadowFit`) on every plan change. An elevation lights its face from behind the viewer
+ * instead (elevation.ts `elevationSun`), refitting the shadow camera the same way. r3f applies
+ * props to the light, never to its shadow camera, so the effect updates that camera's projection
+ * itself; the light's target is put in the scene so its world matrix follows its position. The
+ * shadow map does not depend on the camera, so it is drawn only on the frame after the scene or
+ * the sun changes (the plan, a UI setting that changes what the scene holds, the view preset), not
+ * on every orbit frame.
  */
 function SunLight() {
   const plan = usePlanStore((s) => s.plan);
+  const sun = useViewSun();
   const invalidate = useThree((s) => s.invalidate);
   const light = useMemo(() => {
     const l = new DirectionalLight('#ffffff', SUN_INTENSITY);
-    l.name = 'sun';
+    l.name = SUN_LIGHT_NAME;
     l.castShadow = true;
     l.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     l.shadow.bias = SHADOW_BIAS;
@@ -147,7 +165,7 @@ function SunLight() {
     l.shadow.needsUpdate = true;
     return l;
   }, []);
-  const fit = useMemo(() => sunShadowFit(planBox(plan), sunPosition(plan.site.northAngle)), [plan]);
+  const fit = useMemo(() => sunShadowFit(planBox(plan), sun), [plan, sun]);
   const { half, near, far } = fit;
   const [px, py, pz] = fit.position;
   useEffect(() => {
@@ -187,19 +205,30 @@ function SunLight() {
   );
 }
 
+/** Names drei's sky mesh, so an elevation capture can turn its sun (capture.ts). */
+const nameSky = (sky: Object3D | null) => {
+  if (sky) sky.name = SKY_NAME;
+};
+
 /**
  * The sky backdrop: drei's Sky (Preetham) with the sun where the light is. Its shader is costly per
  * pixel and it sits at the far plane, so it is drawn after every opaque mesh (a group's render
  * order orders everything in it) and the depth test can skip the pixels something else covers.
  */
 function SkyDome() {
-  const north = usePlanStore((s) => s.plan.site.northAngle);
-  const sun = useMemo(() => sunPosition(north), [north]);
+  const sun = useViewSun();
   return (
     <group renderOrder={SKY_RENDER_ORDER}>
-      <Sky distance={SKY_DISTANCE} sunPosition={sun} turbidity={6} rayleigh={1.5} />
+      <Sky ref={nameSky} distance={SKY_DISTANCE} sunPosition={sun} turbidity={6} rayleigh={1.5} />
     </group>
   );
+}
+
+/** Lets the Export menu render elevations from this canvas while it is mounted (capture.ts). */
+function CaptureHandle() {
+  const get = useThree((s) => s.get);
+  useEffect(() => registerCapture(get), [get]);
+  return null;
 }
 
 const ENV_VERTEX = /* glsl */ `
@@ -279,7 +308,16 @@ function Levels() {
   );
 }
 
-/** Small overlay toolbar: level visibility, Fit 3D, and the walk mode toggle. */
+/** The view buttons in the 3D bar: the perspective orbit and the four elevations. */
+const PRESET_BUTTONS: { preset: View3dPreset; label: string; title: string }[] = [
+  { preset: 'perspective', label: 'Perspective', title: 'Perspective: orbit round the model (drag to orbit, right-drag to pan, scroll to zoom)' },
+  { preset: 'north', label: 'N', title: 'North elevation: straight-on view of the north face' },
+  { preset: 'south', label: 'S', title: 'South elevation: straight-on view of the south face' },
+  { preset: 'east', label: 'E', title: 'East elevation: straight-on view of the east face' },
+  { preset: 'west', label: 'W', title: 'West elevation: straight-on view of the west face' },
+];
+
+/** Small overlay toolbar: level visibility, the view presets, Fit 3D, and the walk mode toggle. */
 function View3dToolbar() {
   const order = usePlanStore((s) => s.plan.levelOrder);
   const names = usePlanStore((s) => s.plan.levelOrder.map((id) => s.plan.levels[id]?.name ?? '').join('\u0000'));
@@ -287,7 +325,8 @@ function View3dToolbar() {
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const grid = useUiStore((s) => s.show3dGrid);
   const walking = useUiStore((s) => s.cameraMode === 'walk');
-  const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, requestFit3d, setCameraMode } = useUiStore.getState();
+  const preset = useUiStore((s) => s.view3dPreset);
+  const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, requestFit3d, setCameraMode, setView3dPreset } = useUiStore.getState();
   const nameList = names.split('\u0000');
   return (
     <div className="view3d-toolbar" role="toolbar" aria-label="3D view">
@@ -307,6 +346,29 @@ function View3dToolbar() {
         Grid
       </label>
       <span className="sep" />
+      <div className="group" role="group" aria-label="View">
+        {PRESET_BUTTONS.map((b) => {
+          const on = !walking && preset === b.preset;
+          return (
+            <button
+              key={b.preset}
+              className={on ? 'active' : ''}
+              aria-pressed={on}
+              disabled={walking}
+              title={b.title}
+              onClick={() => {
+                // The elevation already showing: frame it again (after a pan or zoom).
+                if (b.preset === preset) {
+                  if (b.preset !== 'perspective') requestFit3d();
+                } else setView3dPreset(b.preset);
+                focusCanvas();
+              }}
+            >
+              {b.label}
+            </button>
+          );
+        })}
+      </div>
       <button
         onClick={() => {
           requestFit3d();
@@ -391,6 +453,7 @@ export default function Scene3D() {
         <SiteColumns />
         <Controls />
         <InvalidateOnChange />
+        <CaptureHandle />
         <DebugHandle />
       </Canvas>
       <View3dToolbar />

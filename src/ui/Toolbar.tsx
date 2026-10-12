@@ -45,7 +45,8 @@ const LAYOUT_BUTTONS: { layout: Layout; label: string }[] = [
 
 /**
  * Export menu: the 3D model as binary glTF (metres) or OBJ (inches), exactly as the 3D view shows
- * it (view mode and visible levels). The exporter and three load on first use.
+ * it (view mode and visible levels); the 2D plan as SVG or PNG; the four elevations as PNG images
+ * rendered by the 3D view. The exporters and three load on first use.
  */
 function ExportMenu() {
   const [open, setOpen] = useState(false);
@@ -56,6 +57,7 @@ function ExportMenu() {
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const active = useUiStore((s) => s.activeLevelId);
   const siteMode = useUiStore((s) => s.siteMode);
+  const layout = useUiStore((s) => s.layout);
   const order = usePlanStore((s) => s.plan.levelOrder);
   const levels = usePlanStore((s) => s.plan.levels);
 
@@ -88,6 +90,19 @@ function ExportMenu() {
       const { downloadExport } = await import('../io/export3d');
       const ui = useUiStore.getState();
       await downloadExport(format, getPlan(), ui.viewMode, ui);
+      setOpen(false);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runElevations = async () => {
+    setBusy(true);
+    try {
+      const { downloadElevations } = await import('../io/exportElevation');
+      downloadElevations(getPlan());
       setOpen(false);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : String(err));
@@ -142,6 +157,11 @@ function ExportMenu() {
           <p className="menu-note">
             Plan: {levels[active]?.name ?? 'the active level'} in the {VIEW_MODE_LABEL[viewMode]} view, with a title block.
           </p>
+          <button role="menuitem" disabled={busy || layout === '2d'} onClick={() => void runElevations()}>
+            Export elevations (.png)
+            <small>{layout === '2d' ? 'Open the 3D view first' : 'North, south, east and west, straight on, at 2x the 3D view'}</small>
+          </button>
+          <p className="menu-note">Elevations: four images of what the 3D view shows, with shadows and siding textures.</p>
         </div>
       )}
     </div>

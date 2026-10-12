@@ -161,6 +161,14 @@ tool) and choose **Walk from here** ("Clear walk start" goes back to the door). 
 look with the mouse, WASD or the arrows to move, Shift to go faster, Q/E to change level, Esc to
 leave. Walls are not solid in walk mode.
 
+**N**, **S**, **E** and **W** in the 3D bar show an elevation: a straight-on view of that side of
+the house, without perspective, framed to fill the view and lit from over your left shoulder, so
+the eaves and window frames throw their shadows down the wall. The sides are the plan's: north is
+the top of the plan. Drag to pan (either button), scroll to zoom, and click the side again or
+**Fit 3D** to frame it again. The ground is cut just in front of you, so what is below grade stays
+hidden. **Perspective** goes back to orbiting where you left off; a walk started from an elevation
+also comes back to perspective.
+
 ## Export to SketchUp
 
 **Export** makes a 3D file of exactly what the 3D view shows (the current view mode and the
@@ -171,6 +179,11 @@ visible levels): to export the proposed design, switch to Proposed first.
   holds the `Terrain`, `Chimney` and `Post` meshes. Walls are named by kind and phase.
 - **OBJ (.obj)**, in inches: when importing, set the units to inches.
 - Siding textures are not exported, colours are.
+- **Elevations (.png)**: **Export elevations** saves the north, south, east and west elevations as
+  four images (`<plan name>-north-elevation.png` and so on), rendered as the elevation buttons show
+  them, with shadows and siding textures, at twice the 3D view's resolution. It needs the 3D view
+  open (Split or 3D layout), and the browser may ask once to allow several downloads. They are
+  pictures, not scaled drawings.
 
 ## Export the plan
 
@@ -447,6 +460,7 @@ parts green. Export from Existing and from Proposed to give the contractor or Sk
 - Openings are rectangular holes with a fixed frame and sash design; arched or bay windows are
   not modeled.
 - The plan export (SVG or PNG) is one level per file at 1/4" = 1'-0"; there is no sheet layout
-  with several levels or elevation drawings.
+  with several levels. The elevations export as rendered images at the 3D view's size, not as
+  dimensioned drawings to scale.
 - A walk start picked with "Walk from here" lasts until you clear it or reload the page; it is not
   saved with the plan.

@@ -17,6 +17,11 @@ export type Layout = '2d' | 'split' | '3d';
 export const LAYOUTS: readonly Layout[] = ['2d', 'split', '3d'];
 /** 3D camera: orbit around the model, or walk through it in first person. */
 export type CameraMode = 'orbit' | 'walk';
+/** A side of the plan, for its elevation: north is the top of the plan (plan -y), east its right (+x). */
+export type ElevationFace = 'north' | 'south' | 'east' | 'west';
+export const ELEVATION_FACES: readonly ElevationFace[] = ['north', 'south', 'east', 'west'];
+/** 3D view: the orbiting perspective camera, or a straight-on orthographic elevation of one side. */
+export type View3dPreset = 'perspective' | ElevationFace;
 /** Phases the drawing tools can create; demo is applied to existing elements instead. */
 export type DrawPhase = Extract<Phase, 'existing' | 'new'>;
 
@@ -299,6 +304,8 @@ export interface UiState {
   underlayMode: UnderlayMode;
   /** 3D view camera: orbit, or first-person walk (only while the 3D view is shown). */
   cameraMode: CameraMode;
+  /** 3D view in orbit mode: perspective, or an elevation (always perspective while walking). */
+  view3dPreset: View3dPreset;
   /** Walk mode: the level the eye is on (its floor top + eye height). */
   walkLevelId: Id | null;
   /** Walk mode: the pointer is locked to the 3D canvas (mouse looks around). */
@@ -347,8 +354,10 @@ export interface UiState {
   selectUnderlay: (on: boolean) => void;
   /** Change the underlay tool mode; drops any half-made calibration. */
   setUnderlayMode: (mode: UnderlayMode) => void;
-  /** Leaving walk mode clears the walk state. */
+  /** Leaving walk mode clears the walk state; walking returns the view to perspective. */
   setCameraMode: (mode: CameraMode) => void;
+  /** An elevation leaves walk mode (the walk needs the perspective camera). */
+  setView3dPreset: (preset: View3dPreset) => void;
   setWalkLevel: (id: Id | null) => void;
   setWalkLocked: (locked: boolean) => void;
   setHelpOpen: (open: boolean) => void;
@@ -427,6 +436,7 @@ export const useUiStore = create<UiState>()((set) => ({
   underlaySelected: false,
   underlayMode: 'move',
   cameraMode: 'orbit',
+  view3dPreset: 'perspective',
   walkLevelId: null,
   walkLocked: false,
   helpOpen: false,
@@ -535,8 +545,16 @@ export const useUiStore = create<UiState>()((set) => ({
       s.cameraMode === cameraMode
         ? s
         : cameraMode === 'walk'
-          ? { cameraMode, layout: s.layout === '2d' ? '3d' : s.layout }
+          ? { cameraMode, view3dPreset: 'perspective', layout: s.layout === '2d' ? '3d' : s.layout }
           : { cameraMode, walkLevelId: null, walkLocked: false },
+    ),
+  setView3dPreset: (view3dPreset) =>
+    set((s) =>
+      s.view3dPreset === view3dPreset
+        ? s
+        : view3dPreset !== 'perspective' && s.cameraMode === 'walk'
+          ? { view3dPreset, cameraMode: 'orbit', walkLevelId: null, walkLocked: false }
+          : { view3dPreset },
     ),
   setWalkLevel: (walkLevelId) => set({ walkLevelId }),
   setWalkLocked: (walkLocked) => set((s) => (s.walkLocked === walkLocked ? s : { walkLocked })),

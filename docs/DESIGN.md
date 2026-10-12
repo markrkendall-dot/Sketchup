@@ -792,9 +792,11 @@ colour, demolished translucent like walls, new pulled toward green. Fit 3D and t
 walk start count roof overhangs and roof tops in the scene bounds.
 The terrain is the ground (the lawn over the plan plus 100', and the far ground round it out to 1000', see
 "Site and terrain"); drei `<Grid>` (12" cells, 10'
-sections) is an overlay 1" above the flat fallback ground, toggled by the "Grid" checkbox in the 3D bar. Orbit (drei OrbitControls, makeDefault)
+sections) is an overlay 1" above the flat fallback ground, toggled by the "Grid" checkbox in the 3D bar. Orbit (drei OrbitControls, makeDefault,
+`maxDistance` 14000" so the camera stays inside the sky box)
 framing the plan's bounding box on first mount; Fit re-frames the visible levels. Overlay toolbar:
-level checkboxes and "Only active level and below". Layout (uiStore): 2D, split (draggable divider,
+level checkboxes, "Only active level and below", Grid, the view buttons (Perspective, N, S, E, W),
+Fit 3D and Walk. Layout (uiStore): 2D, split (draggable divider,
 ratio in uiStore) or 3D, toolbar buttons and backtick to cycle; the 2D canvas stays mounted (hidden
 in 3D), the 3D canvas mounts only when shown. Camera near 1, far 40000 (scene in inches), so the far
 ground's corners are in view from anywhere inside the sky.
@@ -869,6 +871,52 @@ or the pointer-lock `unlock` event return to orbit, restoring the orbit pose. Ke
 handler also ignores keys while a pointer lock is active). `frameloop="always"` while walking,
 `"demand"` otherwise. A point light follows the eye (indoors the sky and sun reach only floors).
 Crosshair and a hint ("Walls are not solid in walk mode": no collision in v1).
+
+**Elevations** (`uiStore.view3dPreset`: `perspective`, `north`, `south`, `east` or `west`; pure maths in
+`view3d/elevation.ts`). The sides are the plan's: north looks toward +plan y from the road side, south
+toward -y, east toward -x from larger x, west toward +x, Y up, whatever the north angle. `Controls` mounts
+`ElevationView` instead of `OrbitView` (one controls component at a time, as with the walk): a drei
+`OrthographicCamera` (makeDefault, near 1, far 40000; drei puts the perspective camera back when it
+unmounts) and its own OrbitControls with no rotation, the polar angle held at pi/2, both mouse buttons and
+one finger panning, and a `minZoom` that keeps the view under 24000" across. `elevationFit(box, face,
+size)` frames `planBox` of the visible levels: drei's orthographic frustum is the canvas in CSS pixels, so
+the zoom is min(width / (face width x 1.1), height / (face height x 1.1)), the face being the box's extents
+across the view axis; the camera stands on the centre line 100" in front of the box, looking at its
+centre. It refits on mount, on a face change and on Fit 3D (clicking the active side asks for one).
+`OrbitView`'s pose effect and fit do nothing until the camera is the perspective one (the commit that
+mounts it again still sees the orthographic camera), and since r3f resizes only the default camera,
+`Controls` gives the perspective camera the canvas's aspect again when it comes back. Walking resets the
+preset to perspective (`FirstPerson` needs the perspective camera), an elevation set while walking leaves
+walk mode, and the view buttons are disabled while walking.
+
+**The ground cut**: the orthographic camera stands inside the terrain's area, so the pixels below the
+ground line would look underground, at the buried basement walls and the sky beneath them.
+`elevationGroundCut` stands a vertical strip 2" in front of the camera (past its near plane), facing it,
+from the drawn ground along that line (the grid's two triangles per cell, sampled at every grid line and
+diagonal it crosses, plus 0.5") down to 24000" below and out to 24000" either side (flat past the grid), in
+the lawn material, with no shadows: a section through the ground at the camera's plane. The ground rising
+toward the house beyond it still shows. `ElevationView` rebuilds it on every fit and terrain change;
+panning keeps the camera in its plane.
+
+**The sun for an elevation**: `SunLight` and `SkyDome` take `viewSun(preset, northAngle)`:
+`sunPosition(northAngle)` in perspective, else `elevationSun(face)`, behind the viewer, 30 degrees to
+their left and 45 degrees up, as far away as `sunPosition`, so the face is lit and its eaves and frames
+throw shadows down the wall to the right. The shadow camera is refitted round the same box for that
+direction, and the effect that sets its frustum marks the map for redrawing; `InvalidateOnChange` redraws
+on a preset change.
+
+**Elevation capture and export** (`view3d/capture.ts`, `io/exportElevation.ts`, "Export elevations
+(.png)" in the Export menu). `CaptureHandle` in the Canvas registers r3f's state getter with
+`registerCapture` while it is mounted. `captureElevation(face, scale = 2)` renders one frame
+synchronously with a plain three `OrthographicCamera` in inches at the canvas's aspect, framed by the same
+`elevationFit`, with its own ground cut (the view's own one hidden), the sun light, its shadow camera and
+the sky's sun turned to that face, and the renderer at `scale` times its pixel ratio (less if the browser
+caps the drawing buffer); `toDataURL('image/png')` reads it in the same task, so the drawing buffer need
+not be preserved. Then everything is put back, the shadow map marked for redrawing and the view
+invalidated. Without a 3D view it returns null. `downloadElevations` renders north, south, east and west,
+then downloads each through `downloadBlob` as `planFileName`'s slug plus `-<side>-elevation.png`. The menu
+item is disabled in the 2D layout ("Open the 3D view first"); a split layout too narrow for the 3D pane
+gets that message as an alert. Shadows and textures stay on: these are renderings, not line drawings.
 
 ## Persistence and export
 
