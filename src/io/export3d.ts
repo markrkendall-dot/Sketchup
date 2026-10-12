@@ -7,7 +7,7 @@ import { getLevelMeshes, getSiteMeshes, getTerrainGeometry } from '../derive/mes
 import { DEFAULT_LEAF_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR } from '../model/finish';
 import type { Column, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { columnMaterial, fasciaMaterial, floorMaterial, openingMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallFlatColor, wallMaterial } from '../view3d/materials';
+import { columnMaterial, fasciaMaterial, floorMaterial, openingMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -57,12 +57,17 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   root.scale.setScalar(METRES_PER_INCH);
   const elev = getLevelElevations(plan);
   const materials = new Map<string, MeshStandardMaterial>();
-  const material = (name: string, live: MeshStandardMaterial, adjust?: (m: MeshStandardMaterial) => void) => {
+  // Colours only: every clone drops its textures and takes the flat colour a textured live
+  // material records (view3d/materials.ts `userData.flatColor`).
+  const material = (name: string, live: MeshStandardMaterial) => {
     let m = materials.get(name);
     if (!m) {
       m = live.clone();
       m.name = name;
-      adjust?.(m);
+      m.map = null;
+      m.normalMap = null;
+      const flat: unknown = live.userData.flatColor;
+      if (typeof flat === 'string') m.color.set(flat);
       materials.set(name, m);
     }
     return m;
@@ -83,11 +88,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     if (meshes.floor) group.add(mesh('Floor', meshes.floor, material('floor', floorMaterial)));
     meshes.walls.forEach((w, i) => {
       // Colours only: the live material's siding texture is dropped and its flat colour used.
-      const mat = material(wallMaterialName(w.phase, w.kind, w.finish, w.color), wallMaterial(w.phase, w.kind, w.finish, w.color), (m) => {
-        m.map = null;
-        m.normalMap = null;
-        m.color.set(wallFlatColor(w.phase, w.finish, w.color));
-      });
+      const mat = material(wallMaterialName(w.phase, w.kind, w.finish, w.color), wallMaterial(w.phase, w.kind, w.finish, w.color));
       const m = mesh(`Wall ${i + 1} (${w.kind}, ${w.phase})`, w.geometry, mat);
       // Translucent demolished walls draw after the opaque ones, as in the live view.
       if (w.phase === 'demo') m.renderOrder = 1;

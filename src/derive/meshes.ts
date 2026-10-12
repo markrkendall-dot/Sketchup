@@ -1134,16 +1134,134 @@ export function buildColumnGeometry(column: Pick<Column, 'at' | 'width' | 'depth
   return prism(columnOutline(column), column.base, column.top);
 }
 
-/** The terrain grid (site.ts) as an indexed geometry with smooth upward normals. */
+interface GridSide {
+  /** The side's boundary vertices, in order of increasing x (`along` 0) or plan y (`along` 2). */
+  ids: number[];
+  along: 0 | 2;
+  /** Outward direction in (x, plan y). */
+  out: [number, number];
+}
+
+/** The terrain grid's four sides (north, south, west, east), corners on two of them. */
+function gridSides(grid: TerrainGrid): GridSide[] {
+  const nx = grid.cellsX + 1;
+  const ny = grid.cellsY + 1;
+  const run = (n: number, at: (k: number) => number) => Array.from({ length: n }, (_, k) => at(k));
+  return [
+    { ids: run(nx, (i) => i), along: 0, out: [0, -1] },
+    { ids: run(nx, (i) => (ny - 1) * nx + i), along: 0, out: [0, 1] },
+    { ids: run(ny, (j) => j * nx), along: 2, out: [-1, 0] },
+    { ids: run(ny, (j) => j * nx + nx - 1), along: 2, out: [1, 0] },
+  ];
+}
+
+/** Push triangle a, b, c (indices into `pos`) wound so its normal points along `dir` (x, y, z). */
+function pushFacing(idx: number[], pos: readonly number[], a: number, b: number, c: number, dir: P3): void {
+  const u = [pos[b * 3] - pos[a * 3], pos[b * 3 + 1] - pos[a * 3 + 1], pos[b * 3 + 2] - pos[a * 3 + 2]];
+  const w = [pos[c * 3] - pos[a * 3], pos[c * 3 + 1] - pos[a * 3 + 1], pos[c * 3 + 2] - pos[a * 3 + 2]];
+  const n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+  if (n[0] * dir[0] + n[1] * dir[1] + n[2] * dir[2] >= 0) idx.push(a, b, c);
+  else idx.push(a, c, b);
+}
+
+/**
+ * The terrain grid (site.ts) as an indexed geometry: the grid with smooth upward normals, then its
+ * skirt, a vertical strip on each of the grid's four sides from the boundary vertices down to
+ * `skirtElevation`, facing out, so the ground (in the export too) has no open edge. The skirt has
+ * vertices of its own (a copy of each boundary vertex and one at the bottom), so the boundary keeps
+ * its upward normals and each side gets flat outward ones. UVs are in inches like the walls':
+ * (plan x, plan y) on the grid, (distance along the side, elevation) on the skirt; the lawn texture
+ * repeats every 96" (view3d/groundTexture.ts).
+ */
 export function buildTerrainGeometry(grid: TerrainGrid): BufferGeometry {
+  const p = grid.positions;
+  const pos = Array.from(p);
+  const uv: number[] = [];
+  for (let v = 0; v < p.length / 3; v++) uv.push(p[v * 3], p[v * 3 + 2]);
+  const idx = Array.from(grid.indices);
+  const bottom = grid.skirtElevation;
+  for (const { ids, along, out } of gridSides(grid)) {
+    const dir: P3 = [out[0], 0, out[1]];
+    const top0 = pos.length / 3;
+    for (const g of ids) {
+      pos.push(p[g * 3], p[g * 3 + 1], p[g * 3 + 2]);
+      uv.push(p[g * 3 + along], p[g * 3 + 1]);
+    }
+    const bottom0 = pos.length / 3;
+    for (const g of ids) {
+      pos.push(p[g * 3], bottom, p[g * 3 + 2]);
+      uv.push(p[g * 3 + along], bottom);
+    }
+    for (let k = 0; k + 1 < ids.length; k++) {
+      pushFacing(idx, pos, top0 + k, bottom0 + k, bottom0 + k + 1, dir);
+      pushFacing(idx, pos, top0 + k, bottom0 + k + 1, top0 + k + 1, dir);
+    }
+  }
   const g = new BufferGeometry();
-  g.setAttribute('position', new Float32BufferAttribute(grid.positions, 3));
-  g.setIndex(new Uint32BufferAttribute(grid.indices, 1));
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  g.setIndex(new Uint32BufferAttribute(idx, 1));
   g.computeVertexNormals();
   return g;
 }
 
+/** Half the side of the far ground's square, from the terrain grid's centre (1000'; the sky box is 30000" wide). */
+export const FAR_GROUND_HALF = 12000;
+
+/**
+ * The far ground round the terrain (DESIGN.md "Site and terrain"), so the horizon shows ground: a collar from
+ * the grid's boundary out to a square FAR_GROUND_HALF from the grid's centre. Each side is a strip
+ * of quads from the boundary vertices (their heights, and their normals from `terrainNormals`, the
+ * terrain geometry's normal array, so the seam does not show) to as many points spread along the
+ * square's side at the grid's `skirtElevation`, normals up; over 1000' the fall is imperceptible.
+ * The collar leaves the grid's area open: a plane under the whole site would cross the basement
+ * where the house is cut out of the ground. UVs in inches like the terrain.
+ */
+export function buildFarGroundGeometry(grid: TerrainGrid, terrainNormals?: ArrayLike<number>, half: number = FAR_GROUND_HALF): BufferGeometry {
+  const { minX, minY, maxX, maxY } = grid.bounds;
+  const cx = (minX + maxX) / 2;
+  const cz = (minY + maxY) / 2;
+  // A site wider than the square still gets a strip round it.
+  const h = Math.max(half, (maxX - minX) / 2 + grid.step, (maxY - minY) / 2 + grid.step);
+  const p = grid.positions;
+  const pos: number[] = [];
+  const normal: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  for (const { ids, along, out } of gridSides(grid)) {
+    const inner0 = pos.length / 3;
+    for (const g of ids) {
+      pos.push(p[g * 3], p[g * 3 + 1], p[g * 3 + 2]);
+      if (terrainNormals) normal.push(terrainNormals[g * 3], terrainNormals[g * 3 + 1], terrainNormals[g * 3 + 2]);
+      else normal.push(0, 1, 0);
+      uv.push(p[g * 3], p[g * 3 + 2]);
+    }
+    // The square's side beyond this one: fixed x (west, east) or plan y (north, south).
+    const fixed = along === 0 ? cz + out[1] * h : cx + out[0] * h;
+    const start = (along === 0 ? cx : cz) - h;
+    const outer0 = pos.length / 3;
+    for (let k = 0; k < ids.length; k++) {
+      const t = start + (2 * h * k) / (ids.length - 1);
+      const [x, z] = along === 0 ? [t, fixed] : [fixed, t];
+      pos.push(x, grid.skirtElevation, z);
+      normal.push(0, 1, 0);
+      uv.push(x, z);
+    }
+    for (let k = 0; k + 1 < ids.length; k++) {
+      pushFacing(idx, pos, inner0 + k, outer0 + k, outer0 + k + 1, [0, 1, 0]);
+      pushFacing(idx, pos, inner0 + k, outer0 + k + 1, inner0 + k + 1, [0, 1, 0]);
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new Float32BufferAttribute(normal, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+
 let terrainEntry: { grid: TerrainGrid; geometry: BufferGeometry } | null = null;
+let farGroundEntry: { terrain: BufferGeometry; geometry: BufferGeometry } | null = null;
 
 /**
  * The terrain's geometry in a view mode: the same object while the grid (site.ts planTerrain,
@@ -1157,6 +1275,19 @@ export function getTerrainGeometry(plan: Plan, viewMode: ViewMode = 'all'): Buff
   terrainEntry?.geometry.dispose();
   terrainEntry = { grid, geometry: buildTerrainGeometry(grid) };
   return terrainEntry.geometry;
+}
+
+/**
+ * The far ground round the plan's terrain: the same object while the terrain geometry is (its
+ * inner edge follows the terrain's boundary). The replaced geometry is disposed.
+ */
+export function getFarGroundGeometry(plan: Plan, viewMode: ViewMode = 'all'): BufferGeometry {
+  const terrain = getTerrainGeometry(plan, viewMode);
+  if (farGroundEntry && farGroundEntry.terrain === terrain) return farGroundEntry.geometry;
+  farGroundEntry?.geometry.dispose();
+  const normals = terrain.getAttribute('normal').array;
+  farGroundEntry = { terrain, geometry: buildFarGroundGeometry(planTerrain(plan, viewMode), normals) };
+  return farGroundEntry.geometry;
 }
 
 export interface ColumnMesh {
@@ -1211,4 +1342,6 @@ function clearSiteCache(): void {
   siteResultCache.clear();
   terrainEntry?.geometry.dispose();
   terrainEntry = null;
+  farGroundEntry?.geometry.dispose();
+  farGroundEntry = null;
 }

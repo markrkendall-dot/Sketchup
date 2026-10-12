@@ -10,6 +10,10 @@ import { fasciaMaterial, floorMaterial, openingMaterial, roofMaterial, stairsMat
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
  * memoized derive/meshes.ts cache, which owns it (and disposes it), so meshes use dispose={null}.
  * The selector returns the same object while nothing on the level changed.
+ *
+ * Shadows (Scene3D's sun): everything receives them; everything opaque casts them. Demolished work
+ * is translucent red, so it casts none (a see-through wall would throw a solid shadow), and neither
+ * do glass and screen walls.
  */
 export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id }) {
   const viewMode = useUiStore((s) => s.viewMode);
@@ -17,7 +21,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
   return (
     <group position={[0, floorTop, 0]} name={`level:${levelId}`}>
-      {meshes.floor && <mesh name="floor" geometry={meshes.floor} material={floorMaterial} dispose={null} />}
+      {meshes.floor && <mesh name="floor" geometry={meshes.floor} material={floorMaterial} castShadow receiveShadow dispose={null} />}
       {meshes.walls.map((w) => (
         <mesh
           key={w.id}
@@ -25,11 +29,21 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           geometry={w.geometry}
           material={wallMaterial(w.phase, w.kind, w.finish, w.color)}
           renderOrder={w.phase === 'demo' ? 1 : 0}
+          castShadow={w.phase !== 'demo' && w.finish !== 'screen'}
+          receiveShadow
           dispose={null}
         />
       ))}
       {meshes.stairs.map((s) => (
-        <mesh key={s.id} name={`stairs:${s.id}`} geometry={s.geometry} material={stairsMaterial(s.phase)} dispose={null} />
+        <mesh
+          key={s.id}
+          name={`stairs:${s.id}`}
+          geometry={s.geometry}
+          material={stairsMaterial(s.phase)}
+          castShadow={s.phase !== 'demo'}
+          receiveShadow
+          dispose={null}
+        />
       ))}
       {meshes.roofs.map((r) => (
         <group key={r.id}>
@@ -38,10 +52,20 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
             geometry={r.geometry}
             material={roofMaterial(r.finish, r.phase, r.color)}
             renderOrder={r.phase === 'demo' ? 1 : 0}
+            castShadow={r.phase !== 'demo'}
+            receiveShadow
             dispose={null}
           />
           {r.fascia && (
-            <mesh name={`fascia:${r.id}`} geometry={r.fascia} material={fasciaMaterial(r.phase)} renderOrder={r.phase === 'demo' ? 1 : 0} dispose={null} />
+            <mesh
+              name={`fascia:${r.id}`}
+              geometry={r.fascia}
+              material={fasciaMaterial(r.phase)}
+              renderOrder={r.phase === 'demo' ? 1 : 0}
+              castShadow={r.phase !== 'demo'}
+              receiveShadow
+              dispose={null}
+            />
           )}
         </group>
       ))}
@@ -54,6 +78,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
               geometry={p.geometry}
               material={openingMaterial(p.part, o.phase, o.leafColor)}
               renderOrder={o.phase === 'demo' || p.part === 'glass' || p.part === 'screen' ? 1 : 0}
+              castShadow={o.phase !== 'demo' && p.part !== 'glass' && p.part !== 'screen'}
+              receiveShadow
               dispose={null}
             />
           ))}

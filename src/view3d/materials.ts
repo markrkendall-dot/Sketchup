@@ -1,11 +1,43 @@
-import { Color, DoubleSide, FrontSide, MeshStandardMaterial } from 'three';
+import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
 import type { FillPart } from '../derive/openings3d';
 import { DEFAULT_LEAF_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, Phase, RoofFinish, WallFinish, WallKind } from '../model/types';
+import { GRASS_COLOR, grassTexture } from './groundTexture';
 import { NORMAL_SCALE, newWorkColor, sidingTexture, sidingTextures } from './textures';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
+//
+// A material that carries a texture records the colour it stands for in `userData.flatColor`
+// (`#rrggbb`): the export is colours only (io/export3d.ts drops every map and uses that colour).
+
+/**
+ * The sky environment map (Scene3D's PMREM gradient) is carried only by materials that reflect it
+ * (glass), at their own intensity; the rest take their sky light from the hemisphere light, which
+ * costs far less per pixel (DESIGN.md "3D").
+ */
+export const GLASS_ENV_INTENSITY = 2;
+
+let environment: Texture | null = null;
+/** Materials that carry the environment map, kept current by setEnvironmentMap. */
+const reflective = new Set<MeshStandardMaterial>();
+
+/** The environment map Scene3D generated (null when the 3D view unmounts), for the materials that reflect it. */
+export function setEnvironmentMap(map: Texture | null): void {
+  environment = map;
+  for (const m of reflective) {
+    m.envMap = map;
+    m.needsUpdate = true;
+  }
+}
+
+/** Let a material reflect the sky environment at `intensity` (now and whenever it is regenerated). */
+function reflectSky<M extends MeshStandardMaterial>(m: M, intensity: number): M {
+  m.envMap = environment;
+  m.envMapIntensity = intensity;
+  reflective.add(m);
+  return m;
+}
 
 const PHASE_COLOR: Record<Phase, string> = {
   existing: '#e4dfd6', // warm light grey
@@ -76,7 +108,6 @@ export function wallMaterial(
           m.normalMap = tex.normalMap;
           m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
         }
-        m.userData.flatColor = wallFlatColor(phase, finish, color);
       }
       if (finish === 'screen') {
         m.transparent = true;
@@ -85,6 +116,7 @@ export function wallMaterial(
         m.side = DoubleSide;
       }
     }
+    m.userData.flatColor = wallFlatColor(phase, finish, color);
     wallMaterials.set(key, m);
   }
   return m;
@@ -192,20 +224,64 @@ export function openingMaterial(part: FillPart, phase: Phase, color?: string): M
   const key = `glass|${phase}`;
   let m = partMaterials.get(key);
   if (!m) {
-    m = make(phase === 'demo' ? PHASE_COLOR.demo : phase === 'new' ? '#a8d8c4' : '#bcd4e6', { transparent: true, opacity: 0.35 });
-    m.roughness = 0.1;
+    m = glassMaterial(phase);
     partMaterials.set(key, m);
   }
   return m;
 }
 
-/** The ground: grass green, matte, smooth shaded (the terrain geometry has smooth normals). */
+/** Window glass: dark blue-grey, so a pane reads dark with the sky in it, as in the photos. */
+export const GLASS_COLOR = '#243139';
+/**
+ * How opaque glass is: the rooms behind it are lit by the same sky fill as the outside (nothing
+ * occludes a hemisphere light), so at 0.65 they washed the panes out to a pale slate.
+ */
+export const GLASS_OPACITY = 0.75;
+
+/**
+ * Glass is physical (MeshPhysicalMaterial at its defaults: ior 1.5, no transmission pass): smooth,
+ * see-through at GLASS_OPACITY, the sky reflected at GLASS_ENV_INTENSITY (strongest at a glancing
+ * view, by Fresnel), no depth write (drawn after the opaque meshes, renderOrder 1). New glass is
+ * pulled toward green; demolished glass is translucent red at 0.35 like every demolished part.
+ */
+function glassMaterial(phase: Phase): MeshPhysicalMaterial {
+  const m = new MeshPhysicalMaterial({
+    color: new Color(phase === 'demo' ? PHASE_COLOR.demo : phase === 'new' ? pullGreen(GLASS_COLOR) : GLASS_COLOR),
+    roughness: 0.05,
+    metalness: 0,
+    flatShading: true,
+    side: FrontSide,
+    transparent: true,
+    opacity: phase === 'demo' ? 0.35 : GLASS_OPACITY,
+    depthWrite: false,
+  });
+  return reflectSky(m, GLASS_ENV_INTENSITY);
+}
+
+/**
+ * The ground: the lawn texture (groundTexture.ts; the terrain's UVs are in inches) under a white
+ * tint, matte, smooth shaded (the terrain geometry has smooth normals); the flat lawn colour where
+ * there is no canvas.
+ */
+const lawn = grassTexture();
 export const terrainMaterial = new MeshStandardMaterial({
-  color: new Color('#7f9a63'),
+  color: new Color(lawn ? '#ffffff' : GRASS_COLOR),
+  map: lawn,
   roughness: 1,
   metalness: 0,
   side: FrontSide,
 });
+terrainMaterial.userData.flatColor = GRASS_COLOR;
+
+/**
+ * The far ground round the terrain: the same lawn, drawn a little toward the camera so that along
+ * the seam it wins the depth tie with the top of the terrain's skirt (seen from outside the
+ * terrain, the skirt's edge showed as a dark line there).
+ */
+export const farGroundMaterial = terrainMaterial.clone();
+farGroundMaterial.polygonOffset = true;
+farGroundMaterial.polygonOffsetFactor = -1;
+farGroundMaterial.polygonOffsetUnits = -4;
 
 /** Column colours: brick red for chimneys, trim tan for posts. */
 const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c' };

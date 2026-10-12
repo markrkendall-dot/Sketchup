@@ -14,8 +14,10 @@ import { getFaces, slabOutlines } from './rooms';
 
 /** Grid cell size of the terrain. */
 export const TERRAIN_STEP = 24;
-/** The terrain extends this far beyond the plan's bounds on every side (40'). */
-export const TERRAIN_MARGIN = 480;
+/** The terrain extends this far beyond the plan's bounds on every side (100'). */
+export const TERRAIN_MARGIN = 1200;
+/** How far the terrain's skirt reaches below its lowest edge vertex. */
+export const TERRAIN_SKIRT_DROP = 12;
 /** The grid never has more cells than this along either axis; larger sites get a coarser step. */
 export const TERRAIN_MAX_CELLS = 200;
 /** A sample closer than this to a grade point takes that point's elevation exactly. */
@@ -76,6 +78,11 @@ export interface TerrainGrid {
   /** Cells along x and along plan y. */
   cellsX: number;
   cellsY: number;
+  /**
+   * The lowest vertex on the grid's boundary minus TERRAIN_SKIRT_DROP: where the skirt hung from
+   * the boundary ends (meshes.ts buildTerrainGeometry), and the far ground round the grid reaches.
+   */
+  skirtElevation: number;
 }
 
 /**
@@ -116,6 +123,10 @@ export const TERRAIN_UNDER_SLAB = 2;
  * are split along them (extra vertices after the grid's), so the ground meets the wall's outside
  * face at grade and drops to `floorUnder` straight down there, inside the wall, rather than
  * sloping across a whole cell.
+ *
+ * `skirtElevation` is the lowest boundary vertex minus TERRAIN_SKIRT_DROP: the grid's edge hangs a
+ * skirt down to it (meshes.ts buildTerrainGeometry), so the ground has no open edge, and the far
+ * ground round the grid falls to it at its outer edge.
  */
 export function terrainGrid(
   site: Pick<Site, 'gradePoints'>,
@@ -144,8 +155,13 @@ export function terrainGrid(
     }
   }
   const pos: number[] = [];
+  let edgeLow = Infinity;
   for (let v = 0; v < nx * ny; v++) {
-    pos.push(tb.minX + (v % nx) * step, inside[v] ? floorUnder : grade[v], tb.minY + Math.floor(v / nx) * step);
+    const i = v % nx;
+    const j = Math.floor(v / nx);
+    const h = inside[v] ? floorUnder : grade[v];
+    pos.push(tb.minX + i * step, h, tb.minY + j * step);
+    if (i === 0 || j === 0 || i === nx - 1 || j === ny - 1) edgeLow = Math.min(edgeLow, h);
   }
   const idx: number[] = [];
   // Extra vertices of the split cells, shared by position and side (ground / under the house);
@@ -204,7 +220,15 @@ export function terrainGrid(
       }
     }
   }
-  return { positions: new Float32Array(pos), indices: new Uint32Array(idx), bounds: tb, step, cellsX, cellsY };
+  return {
+    positions: new Float32Array(pos),
+    indices: new Uint32Array(idx),
+    bounds: tb,
+    step,
+    cellsX,
+    cellsY,
+    skirtElevation: edgeLow - TERRAIN_SKIRT_DROP,
+  };
 }
 
 /** The height function of the plane through three plan points with the given heights. */

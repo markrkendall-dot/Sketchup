@@ -1,22 +1,43 @@
 import { memo } from 'react';
-import { getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
+import { getFarGroundGeometry, getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
-import { columnMaterial, terrainMaterial } from './materials';
+import { columnMaterial, farGroundMaterial, terrainMaterial } from './materials';
 
 /**
- * The ground: one mesh over the plan plus a 40' margin, from the memoized terrain geometry
+ * The ground draws after the house's opaque meshes (which keep render order 0), so the depth test
+ * rejects the lawn hidden behind the house before its texture and shadows are computed.
+ */
+const GROUND_RENDER_ORDER = 1;
+
+/**
+ * The ground: one mesh over the plan plus a 100' margin, from the memoized terrain geometry
  * (derive/meshes.ts getTerrainGeometry, which owns and disposes it), with the lowest level's
- * footprint cut out of it down to under its slab. The selector returns the same geometry while
- * the grade points, the plan bounds, the fallback elevation and that footprint are unchanged.
+ * footprint cut out of it down to under its slab and a skirt round its edge. The selector returns
+ * the same geometry while the grade points, the plan bounds, the fallback elevation and that
+ * footprint are unchanged. It receives shadows and casts none.
  */
 export const Terrain = memo(function Terrain() {
   const viewMode = useUiStore((s) => s.viewMode);
   const geometry = usePlanStore((s) => getTerrainGeometry(s.plan, viewMode));
-  return <mesh name="terrain" geometry={geometry} material={terrainMaterial} dispose={null} />;
+  return <mesh name="terrain" geometry={geometry} material={terrainMaterial} renderOrder={GROUND_RENDER_ORDER} receiveShadow dispose={null} />;
 });
 
-/** The site's columns (chimney, posts) in absolute elevation, hidden by the view mode like walls. */
+/**
+ * The far ground: the lawn from the terrain's edge out to 1000' from its centre, falling to the
+ * bottom of the terrain's skirt there (derive/meshes.ts getFarGroundGeometry), so the horizon
+ * shows ground under the sky.
+ */
+export const FarGround = memo(function FarGround() {
+  const viewMode = useUiStore((s) => s.viewMode);
+  const geometry = usePlanStore((s) => getFarGroundGeometry(s.plan, viewMode));
+  return <mesh name="far-ground" geometry={geometry} material={farGroundMaterial} renderOrder={GROUND_RENDER_ORDER} receiveShadow dispose={null} />;
+});
+
+/**
+ * The site's columns (chimney, posts) in absolute elevation, hidden by the view mode like walls.
+ * They cast and receive shadows; a demolished one (translucent) casts none.
+ */
 export const SiteColumns = memo(function SiteColumns() {
   const viewMode = useUiStore((s) => s.viewMode);
   const meshes = usePlanStore((s) => getSiteMeshes(s.plan, viewMode));
@@ -29,6 +50,8 @@ export const SiteColumns = memo(function SiteColumns() {
           geometry={c.geometry}
           material={columnMaterial(c.kind, c.phase)}
           renderOrder={c.phase === 'demo' ? 1 : 0}
+          castShadow={c.phase !== 'demo'}
+          receiveShadow
           dispose={null}
         />
       ))}

@@ -1,6 +1,16 @@
 import { Mesh, type BufferGeometry, type MeshStandardMaterial } from 'three';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearMeshCache, buildColumnGeometry, buildTerrainGeometry, getLevelMeshes, getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
+import {
+  buildColumnGeometry,
+  buildFarGroundGeometry,
+  buildTerrainGeometry,
+  clearMeshCache,
+  FAR_GROUND_HALF,
+  getFarGroundGeometry,
+  getLevelMeshes,
+  getSiteMeshes,
+  getTerrainGeometry,
+} from '../derive/meshes';
 import {
   columnDefaults,
   columnOutline,
@@ -126,15 +136,15 @@ describe('terrainHeightAt', () => {
 describe('terrainGrid', () => {
   const bounds = { minX: 0, minY: 0, maxX: 318, maxY: 306 };
 
-  it('is a 24" grid over the bounds plus 40 feet, rounded out to whole cells', () => {
+  it('is a 24" grid over the bounds plus 100 feet, rounded out to whole cells', () => {
     const g = terrainGrid(defaultSite(), bounds, -104);
     expect(g.step).toBe(TERRAIN_STEP);
     expect(g.bounds).toEqual(terrainBounds(bounds));
-    expect(g.bounds).toEqual({ minX: -480, minY: -480, maxX: 816, maxY: 792 });
-    expect(g.cellsX).toBe(54);
-    expect(g.cellsY).toBe(53);
-    expect(g.positions.length).toBe(55 * 54 * 3);
-    expect(g.indices.length).toBe(54 * 53 * 6);
+    expect(g.bounds).toEqual({ minX: -1200, minY: -1200, maxX: 1536, maxY: 1512 });
+    expect(g.cellsX).toBe(114);
+    expect(g.cellsY).toBe(113);
+    expect(g.positions.length).toBe(115 * 114 * 3);
+    expect(g.indices.length).toBe(114 * 113 * 6);
     // Covers the plan with the full margin.
     expect(g.bounds.minX).toBeLessThanOrEqual(bounds.minX - TERRAIN_MARGIN);
     expect(g.bounds.maxY).toBeGreaterThanOrEqual(bounds.maxY + TERRAIN_MARGIN);
@@ -169,9 +179,72 @@ describe('terrainGrid', () => {
     }
     // The plan-view area is the whole grid.
     expect(area).toBeCloseTo((g.bounds.maxX - g.bounds.minX) * (g.bounds.maxY - g.bounds.minY), 3);
+    // The grid's own vertices (the skirt's follow them) have upward normals.
     const geometry = buildTerrainGeometry(g);
     const n = geometry.getAttribute('normal');
-    for (let i = 0; i < n.count; i++) expect(n.getY(i)).toBeGreaterThan(0.9);
+    for (let i = 0; i < g.positions.length / 3; i++) expect(n.getY(i)).toBeGreaterThan(0.9);
+    geometry.dispose();
+  });
+
+  it('hangs a skirt from the boundary to the lowest edge vertex minus 12", facing out, with its own vertices', () => {
+    const site = siteWith(gp(0, 0, -4), gp(300, 0, -4), gp(0, 300, -76), gp(300, 300, -76));
+    const g = terrainGrid(site, bounds, -104);
+    const nx = g.cellsX + 1;
+    const ny = g.cellsY + 1;
+    let low = Infinity;
+    for (let v = 0; v < nx * ny; v++) {
+      if (v % nx === 0 || v % nx === nx - 1 || v < nx || v >= nx * (ny - 1)) low = Math.min(low, g.positions[v * 3 + 1]);
+    }
+    expect(g.skirtElevation).toBeCloseTo(low - 12, 4);
+
+    const geometry = buildTerrainGeometry(g);
+    const pos = geometry.getAttribute('position');
+    const uv = geometry.getAttribute('uv');
+    const normal = geometry.getAttribute('normal');
+    const index = geometry.getIndex()!;
+    const gridCount = g.positions.length / 3;
+    // Each side: a copy of its boundary vertices and a bottom row (the corners twice, one per side).
+    const ring = 2 * nx + 2 * ny;
+    expect(pos.count).toBe(gridCount + 2 * ring);
+    expect(index.count).toBe(g.indices.length + 4 * (g.cellsX + g.cellsY) * 3);
+    // The grid is unchanged and its UVs are plan inches.
+    for (let v = 0; v < gridCount; v += 97) {
+      expect(pos.getY(v)).toBe(g.positions[v * 3 + 1]);
+      expect(uv.getX(v)).toBe(g.positions[v * 3]);
+      expect(uv.getY(v)).toBe(g.positions[v * 3 + 2]);
+    }
+    // Skirt vertices: on the boundary, either a copy of a boundary vertex or at the skirt elevation.
+    const { minX, minY, maxX, maxY } = g.bounds;
+    let bottoms = 0;
+    for (let v = gridCount; v < pos.count; v++) {
+      const x = pos.getX(v);
+      const z = pos.getZ(v);
+      expect([minX, maxX].includes(x) || [minY, maxY].includes(z)).toBe(true);
+      const y = pos.getY(v);
+      if (Math.abs(y - g.skirtElevation) < 1e-3) bottoms++;
+      else expect(y).toBeCloseTo(terrainHeightAt(site, { x, y: z }, -104), 3);
+      // Flat normals, out of the side the vertex is on (a corner is on two; each copy has one).
+      expect(normal.getY(v)).toBeCloseTo(0, 6);
+      const outs = [
+        [x === minX, -1, 0],
+        [x === maxX, 1, 0],
+        [z === minY, 0, -1],
+        [z === maxY, 0, 1],
+      ] as const;
+      const facing = Math.max(...outs.filter(([on]) => on).map(([, ox, oz]) => normal.getX(v) * ox + normal.getZ(v) * oz));
+      expect(facing).toBeGreaterThan(0.99);
+    }
+    expect(bottoms).toBe(ring);
+    // Every skirt triangle faces away from the grid's centre.
+    const cx = (minX + maxX) / 2;
+    const cz = (minY + maxY) / 2;
+    for (let t = g.indices.length; t < index.count; t += 3) {
+      const [a, b, c] = [index.getX(t), index.getX(t + 1), index.getX(t + 2)].map((k) => [pos.getX(k), pos.getY(k), pos.getZ(k)]);
+      const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+      expect(n[0] * (a[0] - cx) + n[2] * (a[2] - cz)).toBeGreaterThan(0);
+    }
     geometry.dispose();
   });
 
@@ -187,6 +260,80 @@ describe('terrainGrid', () => {
     // Just under the cap keeps the standard step.
     const edge = { minX: 0, minY: 0, maxX: 24 * (TERRAIN_MAX_CELLS - 2) - 2 * TERRAIN_MARGIN, maxY: 100 };
     expect(terrainGrid(defaultSite(), edge, 0).step).toBe(TERRAIN_STEP);
+  });
+});
+
+describe('far ground', () => {
+  it('is a collar from the terrain edge, at its heights and normals, to a 24000" square at the skirt elevation, facing up', () => {
+    const site = siteWith(gp(0, 0, -4), gp(300, 300, -76));
+    const g = terrainGrid(site, { minX: 0, minY: 0, maxX: 318, maxY: 306 }, -104);
+    const terrain = buildTerrainGeometry(g);
+    const terrainNormals = terrain.getAttribute('normal');
+    const geometry = buildFarGroundGeometry(g, terrainNormals.array);
+    const pos = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    const uv = geometry.getAttribute('uv');
+    const index = geometry.getIndex()!;
+    const { minX, minY, maxX, maxY } = g.bounds;
+    const cx = (minX + maxX) / 2;
+    const cz = (minY + maxY) / 2;
+    expect(FAR_GROUND_HALF).toBe(12000);
+    let area = 0;
+    for (let t = 0; t < index.count; t += 3) {
+      const [a, b, c] = [index.getX(t), index.getX(t + 1), index.getX(t + 2)].map((k) => [pos.getX(k), pos.getY(k), pos.getZ(k)]);
+      // Facing up: the Y component of (b - a) x (c - a).
+      const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+      expect(ny).toBeGreaterThan(0);
+      area += ny / 2;
+      // No triangle reaches into the terrain's area (the house is cut out of the ground there).
+      const mx = (a[0] + b[0] + c[0]) / 3;
+      const mz = (a[2] + b[2] + c[2]) / 3;
+      expect(mx > minX && mx < maxX && mz > minY && mz < maxY).toBe(false);
+    }
+    // The square minus the terrain's rectangle, covered once.
+    expect(area).toBeCloseTo(24000 * 24000 - (maxX - minX) * (maxY - minY), -1);
+    let inner = 0;
+    let outer = 0;
+    for (let v = 0; v < pos.count; v++) {
+      const x = pos.getX(v);
+      const z = pos.getZ(v);
+      expect(uv.getX(v)).toBe(x);
+      expect(uv.getY(v)).toBe(z);
+      if (Math.abs(Math.abs(x - cx) - 12000) < 1e-6 || Math.abs(Math.abs(z - cz) - 12000) < 1e-6) {
+        // On the square: at the skirt elevation, normal up.
+        outer++;
+        expect(pos.getY(v)).toBeCloseTo(g.skirtElevation, 4);
+        expect(normal.getY(v)).toBe(1);
+      } else {
+        // On the terrain's boundary: the terrain vertex there, with its normal.
+        inner++;
+        expect([minX, maxX].includes(x) || [minY, maxY].includes(z)).toBe(true);
+        const i = Math.round((x - minX) / g.step);
+        const j = Math.round((z - minY) / g.step);
+        const k = j * (g.cellsX + 1) + i;
+        expect(pos.getY(v)).toBe(g.positions[k * 3 + 1]);
+        expect(normal.getY(v)).toBe(terrainNormals.getY(k));
+        expect(normal.getX(v)).toBe(terrainNormals.getX(k));
+      }
+    }
+    expect(inner).toBe(2 * (g.cellsX + 1) + 2 * (g.cellsY + 1));
+    expect(outer).toBe(inner);
+    terrain.dispose();
+    geometry.dispose();
+  });
+
+  it('keeps its geometry while the terrain geometry stays', () => {
+    house();
+    store().addGradePoint({ at: { x: 0, y: 0 }, elevation: -4 });
+    const f1 = getFarGroundGeometry(plan());
+    let disposed = 0;
+    f1.addEventListener('dispose', () => disposed++);
+    store().addColumn({ at: { x: 100, y: 100 }, kind: 'post', width: 6, depth: 6, rotation: 0, base: 0, top: 96, phase: 'existing' });
+    expect(getFarGroundGeometry(plan())).toBe(f1);
+    // A second grade point lowers the far edge: a new frame, the old one disposed.
+    store().addGradePoint({ at: { x: 300, y: 300 }, elevation: -76 });
+    expect(getFarGroundGeometry(plan())).not.toBe(f1);
+    expect(disposed).toBe(1);
   });
 });
 

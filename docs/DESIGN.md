@@ -348,11 +348,12 @@ the north angle. None of it belongs to a level.
 is the inverse-distance-weighted (power 2) average of the grade points: exactly a point's elevation
 within 1" of it, flat for a single point, `fallback` (the bottom of the lowest level's slab,
 `fallbackElevation`) without points. `terrainGrid(site, bounds, fallback)` samples it on a 24" grid over
-the plan bounds (`siteBounds`: nodes of every level, roof outlines, columns, grade points) plus 480",
-rounded outward to whole cells, so a wall moving about does not change the grid; the step grows when
-that would exceed 200 cells along an axis. The result is an indexed
+the plan bounds (`siteBounds`: nodes of every level, roof outlines, columns, grade points) plus 1200"
+(`TERRAIN_MARGIN`, 100'), rounded outward to whole cells, so a wall moving about does not change the grid;
+the step grows when that would exceed 200 cells along an axis. The result is an indexed
 surface (vertex = plan x, elevation, plan y; two triangles per cell, all facing +Y) plus its `bounds`
-(`terrainBounds`). The house is cut out of it: `terrainGrid(site, bounds, fallback, footprints,
+(`terrainBounds`) and `skirtElevation`, the lowest vertex on the grid's boundary minus 12"
+(`TERRAIN_SKIRT_DROP`). The house is cut out of it: `terrainGrid(site, bounds, fallback, footprints,
 floorUnder)` sets the grid vertices inside the footprints (the lowest level's `slabOutlines(getFaces(lowest,
 viewMode), true)`, out to its walls' outside faces) to `floorUnder` (that level's slab bottom minus 2"),
 and splits the cells the outlines cross along them (convex pieces of each cell triangle inside and
@@ -362,10 +363,30 @@ grade and drops straight down there, inside the wall. The memo `terrainFor` is k
 angle or a wall inside the bounds never rebuilds anything), then by the rounded bounds, the fallback, the
 `floorUnder` and the lowest level's `outerFaces` array (`terrainCut`; getFaces keeps it while that level's
 nodes and walls are untouched, so an edit on another level does not rebuild the ground and a basement wall
-edit does). `getTerrainGeometry(plan, viewMode)` keeps one `BufferGeometry` per grid (smooth normals) and
-disposes the one it replaces. The terrain is
-opaque and FrontSide (`#7f9a63`, roughness 1) and replaces the infinite grid as the ground, so the
-basement walls below grade are buried and the walkout side shows. The drei grid stays as an overlay
+edit does). `getTerrainGeometry(plan, viewMode)` keeps one `BufferGeometry` per grid and disposes the one
+it replaces. `buildTerrainGeometry` gives the grid smooth normals and UVs in inches (u = plan x, v = plan
+y), then hangs a skirt from the grid's boundary: on each side a strip of vertical quads from the boundary
+vertices down to `skirtElevation`, facing out, with vertices of its own (so the boundary keeps its upward
+normals) and UVs (along the side, elevation). The skirt closes the ground's edge (in the export too); in the
+3D view the far ground covers it. The terrain is opaque and FrontSide, roughness 1, with the lawn texture
+(`view3d/groundTexture.ts`: a 512 px seeded canvas for 96" of ground, two greens mixed by noise at three
+scales, blade strokes, soil and straw specks, every mark wrapped round the tile's edges; `RepeatWrapping`,
+`repeat` 1/96, anisotropy 2) under a white tint; without a canvas (node, tests) and in the export it is
+the lawn's mean colour `GRASS_COLOR` (`#495427`, `userData.flatColor`). It replaces the infinite grid as
+the ground, so the basement walls below grade are buried and the walkout side shows. It receives the
+sun's shadows and casts none.
+
+**Far ground** (`meshes.ts buildFarGroundGeometry`, `getFarGroundGeometry`, `SiteMeshes.tsx FarGround`): a
+collar from the grid's boundary out to a square 12000" (`FAR_GROUND_HALF`, 1000') from the grid's centre, so
+the horizon shows ground under the sky. Each side is a strip of quads from the boundary vertices (their
+heights, and the terrain geometry's normals there, so the seam does not show) to as many points spread
+along the square's side at `skirtElevation` (normal up); over 1000' the fall is imperceptible. It leaves
+the grid's area open: a plane under the whole site would cross the basement, where the house is cut out of
+the ground. Same lawn, UVs in inches; its material (`farGroundMaterial`, a clone of the terrain's) has a
+small negative polygon offset so along the seam it wins the depth tie with the top of the skirt (seen from
+outside the terrain that edge showed as a dark line). It is rebuilt whenever the terrain geometry is.
+
+The drei grid stays as an overlay
 ("Grid" checkbox in the 3D bar, `uiStore.show3dGrid`, default on) 1" above the fallback elevation: with
 grade points the terrain is above it and hides it, which is the point (no z-fighting). Under the lowest
 level the ground sits 2" below its slab, so the basement interior is empty. A weighted average never
@@ -381,7 +402,8 @@ the ground, top at the lowest roof underside over it among roofs it can be seen 
 ignores a roof being demolished; `phasesCoexist`), else the first floor's ceiling. `getSiteMeshes(plan,
 viewMode)` returns the visible columns' geometry, memoized per view mode by the `columns` record and per
 column object, disposing what drops out. The `Terrain` and the columns render in `view3d/SiteMeshes.tsx`
-(columns: brick `#7a4a3e`, post tan `#c9b58c`, demolished translucent red, new pulled toward green).
+(columns: brick `#7a4a3e`, post tan `#c9b58c`, demolished translucent red, new pulled toward green). A column
+casts and receives the sun's shadows; a demolished one casts none.
 
 **Site mode** (`uiStore.siteMode`, the "Site" tab below the lowest level in the level bar): entering it
 makes the lowest level active (so the panel and store actions have a level), clears the selection and
@@ -415,8 +437,9 @@ point (elevation, position, against the first floor), Column (kind, size, rotati
 "Reset heights") and, with nothing selected in site mode, Site (north angle, "Road is north", counts,
 "Clear grade points" with a confirm).
 
-**North and light**: `sunPosition(northAngle)` is the directional light's position, the south-west offset
-(-700, 1100) in plan turned clockwise by the angle, so the sun comes from the south-west once north is
+**North and light**: `sunPosition(northAngle)` is the sun's direction (the light, the sky's sun and the
+shadow camera follow it, see "3D"), the south-west offset (-700, 1100) in plan turned clockwise by the angle
+and 1600" up (about 51 degrees above the horizon), so the sun comes from the south-west once north is
 applied.
 
 **Phases** apply to roofs and columns exactly like walls: `isVisible(phase, viewMode)` in `RoofShape` and
@@ -425,11 +448,12 @@ they raise), `getSiteMeshes`, the export, and the status bar counts; "Mark demol
 and the toolbar's "Draw as" cover them.
 
 **Export**: after the level groups a `Site` group (elevation 0, absolute heights) holds `Terrain` (material
-`terrain`, only when the site has grade points: flat ground would only be a plane at the slab) and the
-visible columns as `Chimney` / `Post` (materials `column_<kind>_<phase>`).
+`terrain`, the flat lawn colour, no texture; with its skirt; only when the site has grade points: flat ground
+would only be a plane at the slab) and the visible columns as `Chimney` / `Post` (materials
+`column_<kind>_<phase>`). The far ground is not exported.
 
 **Fit 3D** (`bounds.ts planBox`) includes the columns and the terrain's height over the house area (a
-6 x 6 sampling of the plan box), never the 40' margin.
+6 x 6 sampling of the plan box), never the 100' margin.
 
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
@@ -512,8 +536,8 @@ The outside is found by `outwardSide`: the side of the wall with no closed room 
 `openings: OpeningMesh[]` (id, type, phase, `leafColor` after its default, and one geometry per part: `trim`, `sash`,
 `glass`, `screen`, `leaf`, `shutter`), cached per opening object, wall object, footprint, wall height and outside
 side, and disposed like the rest. Materials (`openingMaterial(part, phase, leafColor)`): trim tan, sash and window
-muntins white `#f4f1ea`, glass `#bcd4e6` at opacity 0.35 (transparent, no depth write, drawn after the opaque
-meshes), the screen with the screen texture (transparent, opacity 0.85 over the texture's alpha, no depth write,
+muntins white `#f4f1ea`, glass a `MeshPhysicalMaterial` in dark blue-grey `#243139` at opacity 0.75 reflecting the
+sky environment map (see "3D"; transparent, no depth write, drawn after the opaque meshes), the screen with the screen texture (transparent, opacity 0.85 over the texture's alpha, no depth write,
 drawn after the opaque meshes; `FrontSide`, since the pane is a closed box and both faces at once would double its
 darkness), leaf `#2f3a33` or its `leafColor` (materials shared per part, phase and colour), shutters `#3f6f5f`; a
 demolished opening is translucent red, a new one pulled toward green. Fills follow `isOpeningVisible` like the hole
@@ -715,13 +739,62 @@ the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat 
 existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior walls
 textured by finish and colour (see "Exterior appearance"); floors tan, stairs grey; roofs by finish (metal `#6e6259`, metalness 0.4, roughness
 0.5; shingle `#4a4a4a`), demolished translucent like walls, new pulled toward green. Fit 3D and the
-walk start count roof overhangs and roof tops in the scene bounds. Hemisphere + one directional light (turned with the north angle, see "Site and terrain"), no shadows.
-The terrain is the ground (opaque green surface over the plan plus 40'); drei `<Grid>` (12" cells, 10'
+walk start count roof overhangs and roof tops in the scene bounds.
+The terrain is the ground (the lawn over the plan plus 100', and the far ground round it out to 1000', see
+"Site and terrain"); drei `<Grid>` (12" cells, 10'
 sections) is an overlay 1" above the flat fallback ground, toggled by the "Grid" checkbox in the 3D bar. Orbit (drei OrbitControls, makeDefault)
 framing the plan's bounding box on first mount; Fit re-frames the visible levels. Overlay toolbar:
 level checkboxes and "Only active level and below". Layout (uiStore): 2D, split (draggable divider,
 ratio in uiStore) or 3D, toolbar buttons and backtick to cycle; the 2D canvas stays mounted (hidden
-in 3D), the 3D canvas mounts only when shown. Camera near 1, far 20000 (scene in inches).
+in 3D), the 3D canvas mounts only when shown. Camera near 1, far 40000 (scene in inches), so the far
+ground's corners are in view from anywhere inside the sky.
+
+**Light** (`Scene3D.tsx`; ACES tone mapping, r3f's default, at exposure 1.1, set on the renderer by
+`SkyEnvironment`). The sun (`SunLight`) is a directional light at intensity 5.2 from `sunPosition(northAngle)`
+(see "Site and terrain") that casts shadows:
+`<Canvas shadows="percentage">` (PCF; three 0.186 has dropped PCF soft, r3f's default, and falls back to PCF
+with a warning), map 2048 x 2048, bias -0.0002, normal bias 1.5". Its orthographic shadow camera is fitted
+to `planBox(plan)` (every level) on each plan change by `bounds.ts sunShadowFit`: target the box centre,
+the light twice the box's radius r toward the sun, a square frustum 1.1r either side of the axis, depth from
+r/2 to past the far side of the box plus twice r over the sine of the sun's elevation, so the house's
+shadow on lower ground is kept; a texel is under half an inch on the starter house. r3f applies props to
+the light, never to its shadow camera, so an effect sets the frustum and calls
+`shadow.camera.updateProjectionMatrix()`; the light's `target` is rendered as a `<primitive>` so its world
+matrix follows its position. The shadow map does not depend on the camera, so `shadow.autoUpdate` is off
+and `needsUpdate` is set when the plan or a UI setting that changes the scene's contents (`sceneUiChanged`:
+view mode, level visibility, active level, site mode) changes, and when the fit changes: orbiting and
+walking reuse the map. Shadows: every mesh receives them; walls, floors, stairs, roofs, fascia, columns
+and opening parts cast them, except demolished work (translucent red would throw a solid shadow), glass
+and screen walls; the terrain and far ground only receive. The sky's fill is a hemisphere light at 2.4,
+blue-white `#e1ebf6` from above and the lawn's bounce `#a39f7c` from below, so faces turned from the sun
+(the north face) keep their siding visible while a sunlit face is about 2.6 times as bright as the eave
+shadow on it (the south face reads about (115, 72, 66) in the sun and (44, 22, 18) under the eave). drei `<Sky>` is the backdrop: the same sun position, turbidity
+6, rayleigh 1.5, `distance` 30000 (it scales a unit box round the origin that the camera must stay inside;
+the far ground is inside it too), in a group with render order 2 and the ground at render order 1, so they
+draw after the house's opaque meshes and the depth test can skip what the house covers.
+
+**Glass and the environment map**: once per renderer `SkyEnvironment` renders a sphere (radius 50,
+BackSide) with a gradient shader (blue zenith `#4d80bf`, pale horizon `#dde5ec`, green-brown ground
+`#5e6044`) with `PMREMGenerator.fromScene` (size 128; no network asset) and hands the texture to
+`materials.ts setEnvironmentMap`, which sets it on the materials that reflect the sky (glass); the generator
+is disposed at once, the texture on unmount. It is deliberately not `scene.environment`: on every material
+the extra image-based lookups cost about 270 ms a frame in headless SwiftShader, and on these matte
+surfaces they add little over the hemisphere light. Glass (`openingMaterial('glass')`) is a
+`MeshPhysicalMaterial` at its physical defaults (ior 1.5, no transmission pass): `#243139`, roughness 0.05,
+metalness 0, opacity 0.75, `envMapIntensity` 2, no depth write, render order 1 after the opaque meshes, so
+a pane reads dark with the sky in it, brightest at a glancing view; new glass is pulled toward green,
+demolished glass is translucent red at 0.35. (At 0.65 the rooms behind, lit by the same unoccluded sky fill
+as the outside, washed the panes out.) GLTFExporter writes it as a plain material named `glass`.
+
+**Export is colours only**: `buildExportScene`'s `material()` clones the live material, sets `map` and
+`normalMap` to null and, when the live material records `userData.flatColor` (wall materials, the
+terrain), uses that colour; a textured live material keeps a white tint, so recording the flat colour is
+part of attaching a texture.
+
+**Frame cost** (headless SwiftShader, the starter at the screenshot poses, 1052 x 851): the 3D view before
+these changes drew a demand frame in about 125 to 145 ms, now about 310 to 330 ms (a frame that redraws the
+shadow map about 30 to 60 ms more). The additions: PCF shadow lookups about 80 ms, the lawn texture about
+45 ms, the sky about 25 ms.
 
 First-person walk (`uiStore.cameraMode`, overlay "Walk" button or `F` while the 3D view shows;
 `view3d/FirstPerson.tsx`, pure helpers in `view3d/walk.ts`): the orbit controls unmount (saving

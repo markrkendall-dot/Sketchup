@@ -1,14 +1,66 @@
-import { Grid } from '@react-three/drei';
+import { Grid, Sky } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
+import { BackSide, Color, DirectionalLight, Mesh, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry } from 'three';
 import { fallbackElevation, sunPosition } from '../derive/site';
 import { usePlanStore } from '../store/planStore';
-import { useUiStore } from '../store/uiStore';
+import { useUiStore, type UiState } from '../store/uiStore';
 import { focusCanvas } from '../ui/focus';
+import { planBox, sunShadowFit } from './bounds';
 import { Controls } from './Controls';
 import { LevelMeshes } from './LevelMeshes';
-import { SiteColumns, Terrain } from './SiteMeshes';
+import { setEnvironmentMap } from './materials';
+import { FarGround, SiteColumns, Terrain } from './SiteMeshes';
 import { visible3dLevels } from './visibility';
+
+// Light (DESIGN.md "3D"): the sun casts shadows, a hemisphere light is the sky's fill, drei's Sky
+// is the backdrop, and a gradient sky rendered once into a PMREM environment map is what glass
+// reflects. Only glass carries that map: on every material it cost about 270 ms a frame in
+// headless SwiftShader, and on matte surfaces it adds little over the hemisphere light.
+
+/**
+ * The sun's intensity. With ACES tone mapping at exposure 1 the sun and the fill below put the
+ * sunlit south stain at about its own colour and the shaded north face at about half of it.
+ */
+const SUN_INTENSITY = 5.2;
+/** The sky's fill: blue-white from above, the lawn's bounce from below. */
+const HEMISPHERE_SKY = '#e1ebf6';
+const HEMISPHERE_GROUND = '#a39f7c';
+const HEMISPHERE_INTENSITY = 2.4;
+/** Tone mapping exposure (ACES): a little above 1 lifts the shaded faces without clipping the sunlit ones. */
+const EXPOSURE = 1.1;
+/** Shadow map size (2048: a texel is under half an inch on the starter house). */
+const SHADOW_MAP_SIZE = 2048;
+/** Depth bias (normalized depth) and normal offset (inches) against shadow acne. */
+const SHADOW_BIAS = -0.0002;
+const SHADOW_NORMAL_BIAS = 1.5;
+/**
+ * drei's Sky is a box this wide round the origin, drawn at the far plane; the camera has to stay
+ * inside it, and the far ground (1000' from the terrain's centre) does too.
+ */
+const SKY_DISTANCE = 30000;
+/** Camera far plane: the far ground's corners from anywhere inside the sky box. */
+const CAMERA_FAR = 40000;
+/**
+ * Opaque meshes draw in render order: the house (0), then the ground (SiteMeshes GROUND_RENDER_ORDER,
+ * 1), then the sky, so the depth test rejects hidden ground and sky pixels before they are shaded.
+ */
+const SKY_RENDER_ORDER = 2;
+/** The environment gradient (sRGB): blue zenith, pale horizon, grass green-brown below. */
+const ENV_ZENITH = '#4d80bf';
+const ENV_HORIZON = '#dde5ec';
+const ENV_GROUND = '#5e6044';
+
+/** The UI settings that change what the 3D scene holds (and so its shadows). */
+function sceneUiChanged(s: UiState, prev: UiState): boolean {
+  return (
+    s.viewMode !== prev.viewMode ||
+    s.activeLevelId !== prev.activeLevelId ||
+    s.hidden3dLevels !== prev.hidden3dLevels ||
+    s.only3dActiveAndBelow !== prev.only3dActiveAndBelow ||
+    s.siteMode !== prev.siteMode
+  );
+}
 
 /** Re-render the demand-driven canvas when the plan or a 3D-relevant UI setting changes. */
 function InvalidateOnChange() {
@@ -19,16 +71,7 @@ function InvalidateOnChange() {
     });
     // Not the whole ui store: the draft changes on every mouse move over the 2D plan.
     const offUi = useUiStore.subscribe((s, prev) => {
-      if (
-        s.viewMode !== prev.viewMode ||
-        s.activeLevelId !== prev.activeLevelId ||
-        s.hidden3dLevels !== prev.hidden3dLevels ||
-        s.only3dActiveAndBelow !== prev.only3dActiveAndBelow ||
-        s.show3dGrid !== prev.show3dGrid ||
-        s.siteMode !== prev.siteMode ||
-        s.layout !== prev.layout ||
-        s.splitRatio !== prev.splitRatio
-      )
+      if (sceneUiChanged(s, prev) || s.show3dGrid !== prev.show3dGrid || s.layout !== prev.layout || s.splitRatio !== prev.splitRatio)
         invalidate();
     });
     return () => {
@@ -81,10 +124,140 @@ function GroundGrid() {
   );
 }
 
-/** The directional light: the sun from the south-west in plan terms, turned with the plan's north angle. */
-function Sun() {
+/**
+ * The sun: a directional light from the south-west in plan terms (`sunPosition`, turned with the
+ * plan's north angle) casting shadows, its shadow camera fitted round the whole plan (`planBox`,
+ * `sunShadowFit`) on every plan change. r3f applies props to the light, never to its shadow camera,
+ * so the effect updates that camera's projection itself; the light's target is put in the scene so
+ * its world matrix follows its position. The shadow map does not depend on the camera, so it is
+ * drawn only on the frame after the scene changes (the plan, or a UI setting that changes what the
+ * scene holds), not on every orbit frame.
+ */
+function SunLight() {
+  const plan = usePlanStore((s) => s.plan);
+  const invalidate = useThree((s) => s.invalidate);
+  const light = useMemo(() => {
+    const l = new DirectionalLight('#ffffff', SUN_INTENSITY);
+    l.name = 'sun';
+    l.castShadow = true;
+    l.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    l.shadow.bias = SHADOW_BIAS;
+    l.shadow.normalBias = SHADOW_NORMAL_BIAS;
+    l.shadow.autoUpdate = false;
+    l.shadow.needsUpdate = true;
+    return l;
+  }, []);
+  const fit = useMemo(() => sunShadowFit(planBox(plan), sunPosition(plan.site.northAngle)), [plan]);
+  const { half, near, far } = fit;
+  const [px, py, pz] = fit.position;
+  useEffect(() => {
+    const cam = light.shadow.camera;
+    cam.left = -half;
+    cam.right = half;
+    cam.top = half;
+    cam.bottom = -half;
+    cam.near = near;
+    cam.far = far;
+    cam.updateProjectionMatrix();
+    light.shadow.needsUpdate = true;
+    invalidate();
+  }, [light, half, near, far, px, py, pz, invalidate]);
+  useEffect(() => {
+    const redraw = () => {
+      light.shadow.needsUpdate = true;
+    };
+    const offPlan = usePlanStore.subscribe((s, prev) => {
+      if (s.plan !== prev.plan) redraw();
+    });
+    const offUi = useUiStore.subscribe((s, prev) => {
+      if (sceneUiChanged(s, prev)) redraw();
+    });
+    return () => {
+      offPlan();
+      offUi();
+    };
+  }, [light]);
+  // The shadow map's render target.
+  useEffect(() => () => light.dispose(), [light]);
+  return (
+    <>
+      <primitive object={light} position={fit.position} />
+      <primitive object={light.target} position={fit.target} />
+    </>
+  );
+}
+
+/**
+ * The sky backdrop: drei's Sky (Preetham) with the sun where the light is. Its shader is costly per
+ * pixel and it sits at the far plane, so it is drawn after every opaque mesh (a group's render
+ * order orders everything in it) and the depth test can skip the pixels something else covers.
+ */
+function SkyDome() {
   const north = usePlanStore((s) => s.plan.site.northAngle);
-  return <directionalLight position={sunPosition(north)} intensity={1.9} />;
+  const sun = useMemo(() => sunPosition(north), [north]);
+  return (
+    <group renderOrder={SKY_RENDER_ORDER}>
+      <Sky distance={SKY_DISTANCE} sunPosition={sun} turbidity={6} rayleigh={1.5} />
+    </group>
+  );
+}
+
+const ENV_VERTEX = /* glsl */ `
+varying vec3 vDir;
+void main() {
+  vDir = position;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const ENV_FRAGMENT = /* glsl */ `
+uniform vec3 zenith;
+uniform vec3 horizon;
+uniform vec3 ground;
+varying vec3 vDir;
+void main() {
+  float y = normalize(vDir).y;
+  vec3 sky = mix(horizon, zenith, sqrt(max(y, 0.0)));
+  vec3 below = mix(mix(horizon, ground, 0.6), ground, min(1.0, -y * 8.0));
+  gl_FragColor = vec4(y >= 0.0 ? sky : below, 1.0);
+}`;
+
+/**
+ * The sky glass reflects, made once per renderer without any network asset: a sphere with a
+ * gradient (blue zenith, pale horizon, green-brown ground) rendered into a PMREM environment map,
+ * handed to the materials that carry it (materials.ts setEnvironmentMap). Disposed with the canvas.
+ */
+function SkyEnvironment() {
+  const gl = useThree((s) => s.gl);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    gl.toneMappingExposure = EXPOSURE;
+    const geometry = new SphereGeometry(50, 32, 16);
+    const material = new ShaderMaterial({
+      vertexShader: ENV_VERTEX,
+      fragmentShader: ENV_FRAGMENT,
+      uniforms: {
+        zenith: { value: new Color(ENV_ZENITH) },
+        horizon: { value: new Color(ENV_HORIZON) },
+        ground: { value: new Color(ENV_GROUND) },
+      },
+      side: BackSide,
+      depthWrite: false,
+    });
+    const envScene = new Scene();
+    envScene.add(new Mesh(geometry, material));
+    const pmrem = new PMREMGenerator(gl);
+    const target = pmrem.fromScene(envScene, 0, 0.1, 100, { size: 128 });
+    pmrem.dispose();
+    geometry.dispose();
+    material.dispose();
+    setEnvironmentMap(target.texture);
+    invalidate();
+    return () => {
+      setEnvironmentMap(null);
+      target.dispose();
+    };
+  }, [gl, invalidate]);
+  return null;
 }
 
 function Levels() {
@@ -187,8 +360,9 @@ function WalkOverlay() {
 }
 
 /**
- * The 3D model: the terrain, one group per level at its elevation, the site's columns, orbit or walk
- * controls, an optional ground grid.
+ * The 3D model: the sky, the terrain and the far ground round it, one group per level at its
+ * elevation, the site's columns, orbit or walk controls, an optional ground grid, the sun with its
+ * shadows, the sky's fill and the environment map glass reflects.
  * Renders on demand only (frameloop="demand") while orbiting, so an idle model costs nothing.
  */
 export default function Scene3D() {
@@ -200,13 +374,18 @@ export default function Scene3D() {
         className="view3d-canvas"
         frameloop={walking ? 'always' : 'demand'}
         dpr={[1, 2]}
-        camera={{ fov: 50, near: 1, far: 20000, position: [900, 700, 1200] }}
+        // PCF filtering: what r3f's default "soft" falls back to in three 0.186, without the warning.
+        shadows="percentage"
+        camera={{ fov: 50, near: 1, far: CAMERA_FAR, position: [900, 700, 1200] }}
         gl={{ antialias: true, preserveDrawingBuffer: import.meta.env.DEV }}
       >
         <color attach="background" args={['#e9edf1']} />
-        <hemisphereLight args={['#ffffff', '#b8b0a2', 1.7]} />
-        <Sun />
+        <SkyDome />
+        <SkyEnvironment />
+        <hemisphereLight args={[HEMISPHERE_SKY, HEMISPHERE_GROUND, HEMISPHERE_INTENSITY]} />
+        <SunLight />
         <Terrain />
+        <FarGround />
         <GroundGrid />
         <Levels />
         <SiteColumns />
