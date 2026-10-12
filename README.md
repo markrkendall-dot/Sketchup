@@ -255,6 +255,10 @@ any static host and send the link, or send the file; on an iPad, open the link i
 and Files' previews of an HTML attachment do not run its script). To bake another plan in, save
 it from the editor and run `node scripts/build-viewer.mjs that-plan.json` after the build.
 
+A built copy of the starter's viewer is kept at `docs/viewer/146-mick-road-viewer.html` so it can
+be downloaded from GitHub (the download button on the file's page) and passed on by AirDrop or
+mail; rebuild and copy it over after changing the starter.
+
 ## Export the plan
 
 **Export > Export plan (.svg)** saves the active level's 2D plan as a drawing for a contractor or a
