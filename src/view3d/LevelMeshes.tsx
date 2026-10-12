@@ -18,6 +18,8 @@ import { caseworkMaterial, counterMaterial, fasciaMaterial, floorMaterial, openi
  */
 export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id }) {
   const viewMode = useUiStore((s) => s.viewMode);
+  // The 3D bar's Roofs checkbox: off lifts every roof (with its fascia and rafter tails) off.
+  const showRoofs = useUiStore((s) => s.show3dRoofs);
   const meshes = usePlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
   const counterColor = usePlanStore((s) => counterColorOf(s.plan.levels[levelId]?.finishes));
@@ -47,7 +49,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           dispose={null}
         />
       ))}
-      {meshes.roofs.map((r) => (
+      {showRoofs && meshes.roofs.map((r) => (
         <group key={r.id}>
           <mesh
             name={`roof:${r.id}`}

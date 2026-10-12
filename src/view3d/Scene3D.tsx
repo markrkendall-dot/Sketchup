@@ -60,6 +60,7 @@ function sceneUiChanged(s: UiState, prev: UiState): boolean {
     s.activeLevelId !== prev.activeLevelId ||
     s.hidden3dLevels !== prev.hidden3dLevels ||
     s.only3dActiveAndBelow !== prev.only3dActiveAndBelow ||
+    s.show3dRoofs !== prev.show3dRoofs ||
     s.siteMode !== prev.siteMode
   );
 }
@@ -317,18 +318,19 @@ const PRESET_BUTTONS: { preset: View3dPreset; label: string; title: string }[] =
   { preset: 'west', label: 'W', title: 'West elevation: straight-on view of the west face' },
 ];
 
-/** Small overlay toolbar: level visibility, the view presets, Fit 3D, and the walk mode toggle. */
+/** Small overlay toolbar: level and roof visibility, the view presets, Fit 3D, and the walk mode toggle. */
 function View3dToolbar() {
   const order = usePlanStore((s) => s.plan.levelOrder);
   const names = usePlanStore((s) => s.plan.levelOrder.map((id) => s.plan.levels[id]?.name ?? '').join('\u0000'));
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const grid = useUiStore((s) => s.show3dGrid);
+  const roofs = useUiStore((s) => s.show3dRoofs);
   const walking = useUiStore((s) => s.cameraMode === 'walk');
   const preset = useUiStore((s) => s.view3dPreset);
   // The standalone viewer has no walk mode (keyboard driven) and no grid.
   const viewer = useUiStore((s) => s.viewerMode);
-  const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, requestFit3d, setCameraMode, setView3dPreset } = useUiStore.getState();
+  const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, setShow3dRoofs, requestFit3d, setCameraMode, setView3dPreset } = useUiStore.getState();
   const nameList = names.split('\u0000');
   return (
     <div className="view3d-toolbar" role="toolbar" aria-label="3D view">
@@ -342,6 +344,10 @@ function View3dToolbar() {
       <label title="Hide the levels above the one being edited">
         <input type="checkbox" checked={only} onChange={(e) => setOnly3dActiveAndBelow(e.target.checked)} />
         Only active level and below
+      </label>
+      <label title="Untick to lift the roofs off and look down into the top floor">
+        <input type="checkbox" checked={roofs} onChange={(e) => setShow3dRoofs(e.target.checked)} />
+        Roofs
       </label>
       {!viewer && (
         <label title="Grid lines on the ground (12 inch cells, 10 foot sections)">

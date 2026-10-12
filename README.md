@@ -213,7 +213,9 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
 
 The **Split** and **3D** layouts (or the backtick key) show the model, built from the plan and
 updated as you edit. Drag to orbit, right-drag to pan, scroll to zoom, **Fit 3D** to frame it.
-The checkboxes hide levels. **Walk** (or `F`) drops you in at eye height just inside the level's
+The checkboxes hide levels, and **Roofs** lifts every roof off: untick it to look down into
+the top floor and see its rooms from above (untick the Second Floor too to look into the First
+Floor). **Walk** (or `F`) drops you in at eye height just inside the level's
 entry door (the first door in an outside wall), looking into the house; on a level without one, in
 the middle of the house. To start somewhere else, right-click that spot in the 2D plan (select
 tool) and choose **Walk from here** ("Clear walk start" goes back to the door). Click the view to
@@ -249,7 +251,8 @@ visible levels): to export the proposed design, switch to Proposed first.
 
 `npm run build:viewer` makes `dist-viewer/146-mick-road-viewer.html`: one self-contained HTML
 file (about 1.6 MB, no network access needed) that shows the house in 3D (drag or one finger to
-orbit, two fingers to pinch and pan, level checkboxes, the four elevations, Fit) and the plan of
+orbit, two fingers to pinch and pan, level checkboxes, a Roofs checkbox to look down into the
+Second Floor, the four elevations, Fit) and the plan of
 each level (pinch or scroll to zoom, drag to pan, double-tap to reset), with no editing. Put it on
 any static host and send the link, or send the file; on an iPad, open the link in Safari (Mail's
 and Files' previews of an HTML attachment do not run its script). To bake another plan in, save

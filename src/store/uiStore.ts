@@ -322,6 +322,8 @@ export interface UiState {
   only3dActiveAndBelow: boolean;
   /** 3D view: the drei grid overlay on the ground. */
   show3dGrid: boolean;
+  /** 3D view: draw the roofs (off lifts every roof off, to look down into the top floor). */
+  show3dRoofs: boolean;
   /** Bumped to ask the 3D view to re-fit the camera to the plan. */
   fit3dRequest: number;
   /** Draw the active level's image underlay (a temporary hide; the plan keeps it). */
@@ -376,6 +378,7 @@ export interface UiState {
   setOnly3dActiveAndBelow: (on: boolean) => void;
   requestFit3d: () => void;
   setShow3dGrid: (on: boolean) => void;
+  setShow3dRoofs: (on: boolean) => void;
   toggleShowUnderlay: () => void;
   /** Select the underlay (clears the entity selection) or deselect it. */
   selectUnderlay: (on: boolean) => void;
@@ -462,6 +465,7 @@ export const useUiStore = create<UiState>()((set) => ({
   hidden3dLevels: [],
   only3dActiveAndBelow: false,
   show3dGrid: true,
+  show3dRoofs: true,
   fit3dRequest: 0,
   showUnderlay: true,
   underlaySelected: false,
@@ -562,6 +566,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setOnly3dActiveAndBelow: (only3dActiveAndBelow) => set({ only3dActiveAndBelow }),
   requestFit3d: () => set((s) => ({ fit3dRequest: s.fit3dRequest + 1 })),
   setShow3dGrid: (show3dGrid) => set({ show3dGrid }),
+  setShow3dRoofs: (show3dRoofs) => set({ show3dRoofs }),
   toggleShowUnderlay: () => set((s) => ({ showUnderlay: !s.showUnderlay })),
   selectUnderlay: (on) =>
     set((s) =>
