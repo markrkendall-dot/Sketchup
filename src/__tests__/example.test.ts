@@ -91,16 +91,16 @@ describe('docs/examples/146-mick-road.json', () => {
     // addition, and the stair strip's south wall (there is none today, photo 16). The retaining
     // wall's two pieces on the Basement are existing.
     expect(count(all('walls'))).toEqual({ existing: 55, demo: 7, new: 17 });
-    expect(count(all('openings'))).toEqual({ existing: 21, demo: 12, new: 19 });
+    expect(count(all('openings'))).toEqual({ existing: 21, demo: 11, new: 19 });
     // The demolished stair; the wing's outside stair on the Basement stays.
     expect(count(all('stairs'))).toEqual({ existing: 1, demo: 1, new: 3 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
     expect(count(all('rooms'))).toEqual({ existing: 11, demo: 3, new: 7 });
-    // Every fixture of today (Kitchen, Bath, stove) gives way to the proposed kitchen, all new.
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 24, new: 16 });
+    // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen, all new.
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 16 });
     expect(count(Object.values(plan.site.columns))).toEqual({ existing: 1, demo: 0, new: 3 });
     // Demolished: the stair, the house door, the entry porch with its five screen openings, its roof
-    // and label, the wing's north wall with its window and the wing's roof, the east window into the
+    // and label, the wing's north wall (it has no window) and the wing's roof, the east window into the
     // new bedroom, the hall passage, the Living's west window (replaced without shutters), the old
     // bath's door (inside the powder room; a closet door replaces it) and its north window (raised
     // over the counter).
@@ -214,6 +214,29 @@ describe('docs/examples/146-mick-road.json', () => {
     }
   });
 
+  it('has the First Floor as the interior photos and MK show it', () => {
+    const f = plan.levels[plan.levelOrder[1]];
+    const existing = Object.values(f.fixtures).filter((x) => x.phase === 'demo');
+    // The Bath door: its south jamb about 1' from the Bath's south wall face (y 97), photos 20 and 22.
+    const bathDoor = Object.values(f.openings).find((o) => o.type === 'door' && o.width === 30 && o.phase === 'demo')!;
+    const w = f.walls[bathDoor.wallId];
+    const [a, b] = [f.nodes[w.a], f.nodes[w.b]];
+    const y = a.y + ((b.y - a.y) / Math.abs(b.y - a.y)) * bathDoor.offset;
+    expect([a.x, y - 15, y + 15]).toEqual([194.5, 54, 84]);
+    // The front room's angled corner: a 4" full-height box whose face runs from the north wall's
+    // face (y 7) to the Bath's west wall face (x 192), turned to face south-west.
+    const angled = existing.find((x) => x.kind === 'box' && x.height === 96 && x.direction === 120)!;
+    const [, east, north] = fixtureOutline(angled);
+    expect(east.x).toBeCloseTo(192, 0);
+    expect(north.y).toBeCloseTo(7, 0);
+    // The Utility (inside x 318..456, y 195..308): wall cabinets on its north and west walls, open
+    // shelves under its south and east windows, a blue mini fridge; nothing reaches past its faces.
+    const inUtility = existing.filter((x) => fixtureOutline(x).every((p) => p.x >= 318 - 1e-6 && p.x <= 456 + 1e-6 && p.y >= 195 - 1e-6 && p.y <= 308 + 1e-6));
+    expect(inUtility.map((x) => (x.kind === 'box' ? x.label : x.kind)).sort()).toEqual(['Mini fridge', 'Open shelves', 'Open shelves', 'wall', 'wall', 'wall', 'wall', 'wall']);
+    // The shelves stay under the windows' 30" sills.
+    expect(inUtility.filter((x) => x.label === 'Open shelves').every((x) => x.height < 30)).toBe(true);
+  });
+
   it('has the roofs, columns, windows, doors and terrain of the house', () => {
     const allRoofs = plan.levelOrder.flatMap((id) => Object.values(plan.levels[id].roofs));
     const roofs = allRoofs.filter((r) => isVisible(r.phase, 'existing'));
@@ -234,7 +257,8 @@ describe('docs/examples/146-mick-road.json', () => {
       const level = plan.levels[id];
       return Object.values(level.openings).filter((o) => isOpeningVisible(o, level.walls[o.wallId], 'existing'));
     });
-    expect(openings.filter((o) => o.type === 'window')).toHaveLength(20);
+    // The wing's north face has no window (MK).
+    expect(openings.filter((o) => o.type === 'window')).toHaveLength(19);
     // The house door, the porch's screen door, the basement walkout double door, the first-floor
     // Bath and Kitchen to Utility doors, and the Second Floor's Bunk, Master, Bath and Guest doors.
     expect(openings.filter((o) => o.type === 'door')).toHaveLength(9);
@@ -533,11 +557,12 @@ describe('docs/examples/146-mick-road.json', () => {
       ['new', 42, 36, 44],
     ]);
 
-    // The existing view has none of it: it shows today's 24 fixtures (photos 13 to 22) and their five
-    // counters (the north wall's base and drawer bank either side of the range, which carries none, the
-    // 45 degree corner cabinet, the east run, and the Bath vanity).
+    // The existing view has none of it: it shows today's 34 fixtures (photos 13 to 22 and MK's
+    // description of the Utility) and their five counters (the north wall's base and drawer bank either
+    // side of the range, which carries none, the 45 degree corner cabinet, the east run, and the Bath
+    // vanity; the Utility has wall cabinets only).
     const existing = getLevelMeshes(plan, f.id, 'existing');
-    expect([existing.fixtures.length, existing.counters.length]).toEqual([24, 5]);
+    expect([existing.fixtures.length, existing.counters.length]).toEqual([34, 5]);
     const proposedMeshes = getLevelMeshes(plan, f.id, 'proposed');
     expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([16, 3]);
   });

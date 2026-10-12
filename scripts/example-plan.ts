@@ -65,6 +65,9 @@ const PINE = '#c4884e';
 const LAMINATE = '#e2dccb';
 const WHITE = '#f1efe8';
 const STOVE_BLACK = '#26241f';
+/** The front room's cream paint (photos 19 and 20) and the Utility's blue mini fridge (MK). */
+const CREAM = '#ddd6b4';
+const FRIDGE_BLUE = '#3a5fa0';
 /**
  * Centre of the Kitchen's east window and the sink under it: the sink base comes right after the
  * corner cabinet (photos 13 and 15), and the window's 40" stays clear of the wing's north wall (its
@@ -462,14 +465,15 @@ export function buildExamplePlan(): Plan {
   // wide, its south jamb 8" from the lake wall's inside face (y 252..300; photos 14 and 17). Front room
   // to the stair strip (y 99.5 line): a tall cased opening, 36" at x 132..168, up to the partition's
   // west face, its head near the crown (photos 16 and 20). Bath: 30" x 80" flush stained door at the
-  // south end of its west wall (y 63..93, photos 20 and 22), swinging into the Bath (hinged on its
-  // north jamb). Kitchen to Utility: a grey 32" half-lite door of 3 x 3 lites at the Kitchen's south
-  // end, its south jamb 28" from the lake wall's inside face (y 248..280, photos 13 and 14), swinging
-  // into the Utility (no hinges show on the Kitchen side).
+  // south end of its west wall, its south jamb about 1' from the Bath's south wall (y 54..84; photos
+  // 20 and 22 both put the casing about 9" to 13" from that corner), swinging into the Bath (hinged
+  // on its north jamb). Kitchen to Utility: a grey 32" half-lite door of 3 x 3 lites at the Kitchen's
+  // south end, its south jamb 28" from the lake wall's inside face (y 248..280, photos 13 and 14),
+  // swinging into the Utility (no hinges show on the Kitchen side).
   addOpeningAt(fId, { x: PART.kl, y: 212 }, { type: 'passage', width: 48, height: 80, sill: 0 });
   addOpeningAt(fId, { x: PART.kl, y: 276 }, { type: 'passage', width: 48, height: 42, sill: 42 });
   const hallPassage = addOpeningAt(fId, { x: 150, y: PART.line }, { type: 'passage', width: 36, height: 88, sill: 0 });
-  const bathDoor = addOpeningAt(fId, { x: PART.bathWest, y: 78 }, { type: 'door', width: 30, height: 80, leafColor: STAINED_DOOR, into: EAST });
+  const bathDoor = addOpeningAt(fId, { x: PART.bathWest, y: 69 }, { type: 'door', width: 30, height: 80, leafColor: STAINED_DOOR, into: EAST });
   addOpeningAt(fId, { x: east, y: 264 }, { type: 'door', width: 32, height: 80, lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: UTILITY_DOOR_GREY, into: EAST });
   // Second Floor doors and openings (the sketch): Bunk and Master doors 28" off the landing, closet
   // opening 24", Bath door 24" swinging out into the hall, Guest door 30" into the Guest.
@@ -494,10 +498,9 @@ export function buildExamplePlan(): Plan {
   win(sId, { x: east, y: 98 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
   win(sId, { x: east, y: 222 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
   const eastWindow = win(fId, { x: east, y: KITCHEN_WINDOW_Y }, 40, 40, 2, 3, { sashes: 2, sill: 42 });
-  // The wing: casement pairs in its east gable end (photo 03) and its north face, 2 x 3 lites, and in
-  // its south face, 2 x 2 lites (photo 23).
+  // The wing: casement pairs in its east gable end (photo 03), 2 x 3 lites, and in its south face,
+  // 2 x 2 lites (photo 23). Its north face has no window (MK).
   win(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 }, 48, 44, 2, 3, { sashes: 2 });
-  const wingNorthWindow = win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y0 }, 48, 40, 2, 3, { sashes: 2 });
   win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, 48, 44, 2, 2, { sashes: 2, sill: 30 });
   // The walkout double door below the wing's south window (photo 02): two plain leaves in the stain,
   // set in the boards with no trim round them.
@@ -573,10 +576,32 @@ export function buildExamplePlan(): Plan {
   existingFixture({ kind: 'sink', origin: { x: 263, y: b.south }, direction: 270, width: 36, depth: 24, height: 31.5, elevation: 0 });
   existingFixture({ kind: 'box', label: 'Dryer', origin: { x: 210.5, y: b.north }, direction: SOUTHWARD, width: 27, depth: 28, height: 40, elevation: 0, frontColor: WHITE });
   existingFixture({ kind: 'box', label: 'Washer', origin: { x: 237.5, y: b.north }, direction: SOUTHWARD, width: 27, depth: 28, height: 40, elevation: 0, frontColor: WHITE });
-  // The front room (photo 20): the black wood stove on a stone hearth, out from the north wall near
-  // the north-east corner, its pipe into the chimney's thimble high on the north wall.
-  existingFixture({ kind: 'box', origin: { x: 160, y: 12 }, direction: SOUTHWARD, width: 40, depth: 44, height: 1, elevation: 0, frontColor: '#7d7a73' });
-  existingFixture({ kind: 'box', label: 'Wood stove', origin: { x: 160, y: 20 }, direction: SOUTHWARD, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
+  // The Bath's tub sits in an alcove: a pine-clad stub wall, floor to ceiling, at its south end
+  // between it and the toilet (photo 21).
+  existingFixture({ kind: 'box', origin: { x: b.east, y: 69 }, direction: WESTWARD, width: 4, depth: 30, height: 96, elevation: 0, frontColor: PINE });
+  // The front room's north-east corner is cut off by an angled wall (photo 20, MK): its face runs
+  // from the north wall's face at x 161 (by the chimney, where the stovepipe's thimble is) to the
+  // Bath's west wall face at y 25, facing south-west (120 degrees), 36" long; both ends are
+  // estimates from photo 20. It is a full-height box, not a wall, because a wall would split the
+  // Bath's west wall at y 23.5, where the proposed closet door (y 19..43) goes.
+  const angle = { mid: { x: 176.5, y: 16 }, out: { x: -0.5, y: Math.sqrt(3) / 2 } };
+  const offAngle = (d: number) => ({ x: round2(angle.mid.x + angle.out.x * d), y: round2(angle.mid.y + angle.out.y * d) });
+  existingFixture({ kind: 'box', origin: offAngle(-4), direction: 120, width: 36, depth: 4, height: 96, elevation: 0, frontColor: CREAM });
+  // The black wood stove on its stone hearth in front of the angled wall, turned to face south-west
+  // with it (photos 16 and 20), its pipe up and back into the thimble at the wall's north end.
+  existingFixture({ kind: 'box', origin: offAngle(0), direction: 120, width: 34, depth: 40, height: 1, elevation: 0, frontColor: '#7d7a73' });
+  existingFixture({ kind: 'box', label: 'Wood stove', origin: offAngle(8), direction: 120, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
+  // The Utility, inside x 318..456, y 195..308 (MK; no photos, so every size and place is an
+  // estimate): wood panelled, old wood kitchen wall cabinets on the north wall and on the west wall
+  // north of the Kitchen door (its casing at y 244.5), open shelves under the south and east
+  // windows (up to their 30" sills), and a blue mini fridge on the south wall, east of the shelves.
+  const u = { west: 318, east: 456, north: 195, south: 308 };
+  for (const x of [351, 393, 435]) existingFixture({ kind: 'wall', origin: { x, y: u.north }, direction: SOUTHWARD, width: 42, depth: 12, height: 30, elevation: 54 });
+  for (const y of [207, 231]) existingFixture({ kind: 'wall', origin: { x: u.west, y }, direction: 0, width: 24, depth: 12, height: 30, elevation: 54 });
+  const shelves = { kind: 'box' as const, label: 'Open shelves', width: 48, depth: 12, height: 29, elevation: 0, frontColor: PINE };
+  existingFixture({ ...shelves, origin: { x: (WING.x0 + WING.x1) / 2, y: u.south }, direction: 270 });
+  existingFixture({ ...shelves, origin: { x: u.east, y: (WING.y0 + WING.y1) / 2 }, direction: WESTWARD });
+  existingFixture({ kind: 'box', label: 'Mini fridge', origin: { x: 434, y: u.south }, direction: 270, width: 20, depth: 20, height: 34, elevation: 0, frontColor: FRIDGE_BLUE });
 
   // ---- Room labels, one per area (names say where a number is an estimate). A label is drawn at its
   // anchor (else at the middle of the room's widest part), so the anchors are where each reads best.
@@ -601,7 +626,7 @@ export function buildExamplePlan(): Plan {
   label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 });
   label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 });
 
-  proposed({ bId, fId, stair, houseDoor, livingWest, hallPassage, eastWindow, wingNorthWindow, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
+  proposed({ bId, fId, stair, houseDoor, livingWest, hallPassage, eastWindow, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
   return getPlan();
 }
 
@@ -614,13 +639,12 @@ interface ExistingIds {
   livingWest: Id;
   hallPassage: Id;
   eastWindow: Id;
-  wingNorthWindow: Id;
   wingRoof: Id;
   porchRoof: Id;
-  /** The old bath's door (x 194.5, at the south end of the wall, y 63..93) and its north window (x 234). */
+  /** The old bath's door (x 194.5, at the south end of the wall, y 54..84) and its north window (x 234). */
   bathDoor: Id;
   bathWindow: Id;
-  /** The existing Kitchen, Bath and front room fixtures (the old layout gives way to the new one). */
+  /** The existing Kitchen, Bath, front room and Utility fixtures (the old layout gives way to the new one). */
   fixtures: Id[];
 }
 
@@ -671,7 +695,7 @@ function proposed(ids: ExistingIds): void {
   const FLOOR_TOP = 2;
 
   // ---- Demolition (First Floor). The entry porch: its three walls (their screens go with them),
-  // its roof and its label. The wing's north wall with its window, the main block's east window (it
+  // its roof and its label. The wing's north wall, the main block's east window (it
   // would face into the new bedroom), the wing's roof. The y 99.5 piece between the Kitchen and the
   // Bath, and the one between the hall and the stair strip west of the powder room, with the hall's
   // passage (the powder room takes its place). The stair and the house door. The Living's west
@@ -679,7 +703,8 @@ function proposed(ids: ExistingIds): void {
   // without shutters replaces it. The old bath's door (at the south end of its west wall it would
   // open from the powder room into the kitchen) and its north window (the kitchen counter runs under
   // where it was, so a shorter one is set higher). The old fixtures: the Kitchen's casework, the
-  // Bath's, and the wood stove (the new flight runs along the north wall where it stands).
+  // Bath's, the Utility's, and the wood stove with the angled wall behind it (the new flight runs
+  // along the north wall where they stand).
   demolish(fId, {
     walls: [
       { x: (pc.x0 + CL.x0) / 2, y: pc.y0 },
@@ -689,7 +714,7 @@ function proposed(ids: ExistingIds): void {
       { x: 250, y: 99.5 },
       { x: 60, y: 99.5 },
     ],
-    openings: [ids.eastWindow, ids.wingNorthWindow, ids.hallPassage, ids.houseDoor, ids.livingWest, ids.bathDoor, ids.bathWindow],
+    openings: [ids.eastWindow, ids.hallPassage, ids.houseDoor, ids.livingWest, ids.bathDoor, ids.bathWindow],
     stairs: [ids.stair],
     roofs: [ids.wingRoof, ids.porchRoof],
     fixtures: ids.fixtures,

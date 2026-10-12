@@ -398,7 +398,8 @@ and the plan's north angle is 0.
   partition (x 170.5) with a 48" passage (y 188 to 236, south jamb 6' from the lake wall) and,
   south of it past a short wall, a 48" **pass-through** with a shelf ledge, sill 42", head 84"
   (y 252 to 300); the Bath's west wall (x 194.5) with a flush stained 30" door at its south end
-  (y 63 to 93) swinging into the Bath; and in the main block's east wall a grey 32" half-lite door
+  (y 54 to 84, its south jamb about 1' from the Bath's south wall, photos 20 and 22) swinging into
+  the Bath; and in the main block's east wall a grey 32" half-lite door
   of 3 x 3 lites from the Kitchen into the Utility (y 248 to 280), swinging into the Utility. There
   is **no wall on the stair's south side**: the flight is open to the Living, with a newel, a
   spindle rail and shelves under it (photo 16), so the strip is part of the Living. The stair
@@ -414,10 +415,17 @@ and the plan's north angle is 0.
   30" top-freezer refrigerator, a 24" base, the 30" range under its hood, a 15" drawer bank; a 30"
   base set at 45 degrees in the north-east corner; on the east wall the sink base under the window,
   the dishwasher and a 24" drawer base; wall cabinets up to the crown, one of them across the
-  corner. Bath: a 60" tub along the east wall, the toilet south of it, a 36" vanity on the south
-  wall, the dryer and the washer along the north wall (labelled boxes). Front room: the wood stove
-  on its hearth near the north-east corner, by the chimney. All of them are demolished in the
-  Proposed view.
+  corner. Bath: a 60" tub along the east wall in an alcove, with a pine-clad stub wall at its south
+  end (photo 21), the toilet south of it, a 36" vanity on the south wall, the dryer and the washer
+  along the north wall (labelled boxes). Front room: the north-east corner is cut off by an
+  **angled wall** (photo 20, confirmed by MK), its face from the north wall at x 161 (by the
+  chimney, where the stovepipe goes in) to the Bath's west wall at y 25, drawn as a full-height
+  cream box 4" thick (a wall there would split the Bath's west wall where the proposed closet door
+  goes); the wood stove on its hearth stands in front of it, turned to face south-west with it.
+  Utility (MK's description, no photos, so all estimates): old wood wall cabinets on the north wall
+  (three 42") and on the west wall north of the Kitchen door (two 24"), open shelves under the south
+  and east windows (48" wide, 12" deep, up to the 30" sills), and a blue mini fridge on the south
+  wall east of the shelves. All of them are demolished in the Proposed view.
 - **Second Floor interior** (the owner's sketch, face to face; partitions 5", existing): the Bunk's
   south wall (y 99.5) and east wall (x 171.5), the Master's north wall (y 137.5) and the
   Master/Guest partition (x 171.5), the closet's east wall (x 39.5), the Bath's east (x 220.5) and
@@ -451,7 +459,7 @@ wallpaper, a knotty pine tongue-and-groove ceiling with boards running east-west
 baseboard, and beige vinyl tile; the Living and the front room have cream-painted walls (vertical
 boards in the Living, smooth in the front room), white-painted board or flat ceilings, and a dark
 red-brown painted board floor; the Bath has knotty pine wainscot about 40" high, green paint above,
-a pine ceiling and parquet tile. The appliances are white (the app draws them as steel).
+a pine ceiling and parquet tile; the Utility is wood panelled (MK). The appliances are white (the app draws them as steel).
 
 ### Check the sides first
 
@@ -478,7 +486,9 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Kitchen | 11'6" x 17'2", **adjusted: re-measure.** MK measured 16'3"; the upstairs wins, and the first-floor mistake is suspected near the bottom of the stairs | Kitchen north-south, between the lake wall and the y 99.5 wall |
 | Interior partition thickness | 5" (measured) | At a jamb |
 | Stair | 33" wide, 101" run climbing east from x 31 (about 2' in from the west wall, photos 16 and 18) to x 132 (under the upstairs landing), cuts the Second Floor floor from 26" up the run (80" headroom); open to the Living on its south side | **Distance from the west wall to the bottom riser**, run, riser count |
-| Bath door (First Floor) | 30" x 80" flush, at the south end of the Bath's west wall (y 63 to 93), swinging into the Bath (photos 20 and 22); **position is an estimate** | Jamb to the Bath's south wall |
+| Bath door (First Floor) | 30" x 80" flush, at the south end of the Bath's west wall (y 54 to 84: photos 20 and 22 both put its casing 9" to 13" from the Bath's south wall), swinging into the Bath; **position is an estimate** | Jamb to the Bath's south wall |
+| Front room's angled corner | a wall across the north-east corner, its face from the north wall 154" east of the west wall's inside face (x 161) to the Bath's west wall 18" south of the north wall's inside face (y 25), behind the wood stove (photo 20) | **Both ends, from the corners** |
+| Utility fittings | wall cabinets 12" deep, 30" high, bottom at 54": three 42" on the north wall and two 24" on the west wall north of the Kitchen door; open shelves 48" x 12" x 29" under the south and east windows; mini fridge 20" x 20" x 34" on the south wall at x 424 to 444 (MK's description) | Lengths, heights, and where the fridge stands |
 | Kitchen/Living passage | 48" wide, south jamb 6' from the lake wall (y 188 to 236), sill 0, 80" high | Jamb to jamb |
 | Kitchen/Living pass-through | 48" wide, sill 42", head 84", south jamb 8" from the lake wall's inside face (y 252 to 300; photos 14 and 17) | **Width, sill, head, distance from the south-west corner** |
 | Kitchen to Utility door | 32" x 80" grey half-lite, 3 x 3 lites, south jamb 28" from the lake wall's inside face (y 248 to 280), swinging into the Utility (photos 13 and 14) | **Width and distance from the lake wall** |
@@ -501,7 +511,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | West windows | first floor 90 x 44 at y 203", sill 44 (head above the door head): a casement (2 x 2 lites, photo 18), a fixed pane and a casement; second floor two casements of 2 x 2 lites, 48 x 32 at y 200", sill 48; both with shutters one casement wide (photo 8) | Jamb to the north corner |
 | North windows | first floor three casements (2 x 3 lites) 80 x 56 at x 96", sill 30, west of the chimney, and two single panes 48 x 44 at x 234", sill 42 (the Bath's, over the washer and dryer, its sill just above the wainscot, photo 22); second floor two casements (2 x 3 lites) 46 x 44, sill 36, at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office; its west jamb is 2" from that wall's face) (photos 6 and 7) | Jamb to the west corner |
 | East windows | second floor two pairs of casements (2 x 3 lites) 46 x 44, sill 34, at y 98" and y 222"; first floor a casement pair (2 x 3 lites) 40 x 40, sill 42, at y 160" over the Kitchen sink (photos 3, 13 and 15) | **Jamb to the north corner, and where the wing's north wall meets this wall: the sink sits further south than the model's wing allows** |
-| Wing windows | pairs of casements: east end 48 x 44 (photo 3) and north face 48 x 40, 2 x 3 lites; south face 48 x 44, 2 x 2 lites (photo 23); sill 30 | Rough openings |
+| Wing windows | pairs of casements: east end 48 x 44, 2 x 3 lites (photo 3); south face 48 x 44, 2 x 2 lites (photo 23); sill 30. The north face has no window (MK) | Rough openings |
 | Retaining wall | poured concrete, 10" thick, top 96" above the basement floor, about 10' south of the main block, from 10' past its west face to the wing's corner (photos 2 and 23) | **Distance from the house, height, where it ends west** |
 | Basement double door | 72 x 80 on the wing's south wall, two plain leaves in the stain (photo 2) | Jamb to jamb |
 | Roof pitches | main 6:12, wing 7:12, entry porch 5:12 (photos 3 and 8) | A level and a tape against the rafter or the gable |
@@ -557,7 +567,7 @@ Five changes, all on the First Floor:
    its ridge north-south. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2" inside)
    from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom door (32") is
    in the main block's east wall, from the kitchen, south of the pantry run (jambs 15'8" and 18'4"
-   from the north wall's inside face). The wing's north wall, its window and its roof, and the
+   from the north wall's inside face). The wing's north wall and its roof, and the
    main block's first-floor east window, are demolished. New 8" block walls carry the new part
    (a crawl space).
 2. **Kitchen.** The wall between the kitchen and the old bath is demolished, so the kitchen is an
