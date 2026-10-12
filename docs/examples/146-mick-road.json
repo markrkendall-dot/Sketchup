@@ -2074,6 +2074,7 @@
         },
         "f-c23": {
           "kind": "box",
+          "label": "Wall",
           "origin": {
             "x": 311,
             "y": 69
@@ -2089,12 +2090,13 @@
         },
         "f-c24": {
           "kind": "box",
+          "label": "Chase",
           "origin": {
-            "x": 178.5,
-            "y": 12.54
+            "x": 182.83,
+            "y": 16.17
           },
-          "direction": 120,
-          "width": 36,
+          "direction": 135,
+          "width": 33.94,
           "depth": 4,
           "height": 96,
           "elevation": 0,
@@ -2105,11 +2107,11 @@
         "f-c25": {
           "kind": "box",
           "origin": {
-            "x": 176.5,
-            "y": 16
+            "x": 180,
+            "y": 19
           },
-          "direction": 120,
-          "width": 34,
+          "direction": 135,
+          "width": 32,
           "depth": 40,
           "height": 1,
           "elevation": 0,
@@ -2121,10 +2123,10 @@
           "kind": "box",
           "label": "Wood stove",
           "origin": {
-            "x": 172.5,
-            "y": 22.93
+            "x": 174.34,
+            "y": 24.66
           },
-          "direction": 120,
+          "direction": 135,
           "width": 24,
           "depth": 26,
           "height": 30,

@@ -578,19 +578,20 @@ export function buildExamplePlan(): Plan {
   existingFixture({ kind: 'box', label: 'Washer', origin: { x: 237.5, y: b.north }, direction: SOUTHWARD, width: 27, depth: 28, height: 40, elevation: 0, frontColor: WHITE });
   // The Bath's tub sits in an alcove: a pine-clad stub wall, floor to ceiling, at its south end
   // between it and the toilet (photo 21).
-  existingFixture({ kind: 'box', origin: { x: b.east, y: 69 }, direction: WESTWARD, width: 4, depth: 30, height: 96, elevation: 0, frontColor: PINE });
-  // The front room's north-east corner is cut off by an angled wall (photo 20, MK): its face runs
-  // from the north wall's face at x 161 (by the chimney, where the stovepipe's thimble is) to the
-  // Bath's west wall face at y 25, facing south-west (120 degrees), 36" long; both ends are
-  // estimates from photo 20. It is a full-height box, not a wall, because a wall would split the
-  // Bath's west wall at y 23.5, where the proposed closet door (y 19..43) goes.
-  const angle = { mid: { x: 176.5, y: 16 }, out: { x: -0.5, y: Math.sqrt(3) / 2 } };
+  existingFixture({ kind: 'box', label: 'Wall', origin: { x: b.east, y: 69 }, direction: WESTWARD, width: 4, depth: 30, height: 96, elevation: 0, frontColor: PINE });
+  // The front room's north-east corner is cut off at 45 degrees (photo 20, MK): a chase that hides
+  // the pipes of the Bath upstairs (x 174..218, y 7..81), its face from the north wall's face at
+  // x 168 (by the chimney, where the stovepipe's thimble is) to the Bath's west wall face at y 31,
+  // 2' each way (photo 20 reads 1'6" to 2'7": an estimate). It is a full-height box, not a wall,
+  // because a wall would split the Bath's west wall where the proposed closet door (y 19..43) goes.
+  const CHASE = 24;
+  const angle = { mid: { x: 192 - CHASE / 2, y: 7 + CHASE / 2 }, out: { x: -Math.SQRT1_2, y: Math.SQRT1_2 } };
   const offAngle = (d: number) => ({ x: round2(angle.mid.x + angle.out.x * d), y: round2(angle.mid.y + angle.out.y * d) });
-  existingFixture({ kind: 'box', origin: offAngle(-4), direction: 120, width: 36, depth: 4, height: 96, elevation: 0, frontColor: CREAM });
+  existingFixture({ kind: 'box', label: 'Chase', origin: offAngle(-4), direction: 135, width: round2(CHASE * Math.SQRT2), depth: 4, height: 96, elevation: 0, frontColor: CREAM });
   // The black wood stove on its stone hearth in front of the angled wall, turned to face south-west
   // with it (photos 16 and 20), its pipe up and back into the thimble at the wall's north end.
-  existingFixture({ kind: 'box', origin: offAngle(0), direction: 120, width: 34, depth: 40, height: 1, elevation: 0, frontColor: '#7d7a73' });
-  existingFixture({ kind: 'box', label: 'Wood stove', origin: offAngle(8), direction: 120, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
+  existingFixture({ kind: 'box', origin: offAngle(0), direction: 135, width: 32, depth: 40, height: 1, elevation: 0, frontColor: '#7d7a73' });
+  existingFixture({ kind: 'box', label: 'Wood stove', origin: offAngle(8), direction: 135, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
   // The Utility, inside x 318..456, y 195..308 (MK; no photos, so every size and place is an
   // estimate): wood panelled, old wood kitchen wall cabinets on the north wall and on the west wall
   // north of the Kitchen door (its casing at y 244.5), open shelves under the south and east
@@ -703,7 +704,7 @@ function proposed(ids: ExistingIds): void {
   // without shutters replaces it. The old bath's door (at the south end of its west wall it would
   // open from the powder room into the kitchen) and its north window (the kitchen counter runs under
   // where it was, so a shorter one is set higher). The old fixtures: the Kitchen's casework, the
-  // Bath's, the Utility's, and the wood stove with the angled wall behind it (the new flight runs
+  // Bath's, the Utility's, and the wood stove with the pipe chase behind it (the new flight runs
   // along the north wall where they stand).
   demolish(fId, {
     walls: [

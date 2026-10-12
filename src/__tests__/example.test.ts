@@ -223,9 +223,9 @@ describe('docs/examples/146-mick-road.json', () => {
     const [a, b] = [f.nodes[w.a], f.nodes[w.b]];
     const y = a.y + ((b.y - a.y) / Math.abs(b.y - a.y)) * bathDoor.offset;
     expect([a.x, y - 15, y + 15]).toEqual([194.5, 54, 84]);
-    // The front room's angled corner: a 4" full-height box whose face runs from the north wall's
-    // face (y 7) to the Bath's west wall face (x 192), turned to face south-west.
-    const angled = existing.find((x) => x.kind === 'box' && x.height === 96 && x.direction === 120)!;
+    // The front room's pipe chase: a 4" full-height box across the corner at 45 degrees, its face
+    // from the north wall's face (y 7) to the Bath's west wall face (x 192).
+    const angled = existing.find((x) => x.kind === 'box' && x.height === 96 && x.direction === 135)!;
     const [, east, north] = fixtureOutline(angled);
     expect(east.x).toBeCloseTo(192, 0);
     expect(north.y).toBeCloseTo(7, 0);

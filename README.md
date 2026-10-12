@@ -417,11 +417,11 @@ and the plan's north angle is 0.
   the dishwasher and a 24" drawer base; wall cabinets up to the crown, one of them across the
   corner. Bath: a 60" tub along the east wall in an alcove, with a pine-clad stub wall at its south
   end (photo 21), the toilet south of it, a 36" vanity on the south wall, the dryer and the washer
-  along the north wall (labelled boxes). Front room: the north-east corner is cut off by an
-  **angled wall** (photo 20, confirmed by MK), its face from the north wall at x 161 (by the
-  chimney, where the stovepipe goes in) to the Bath's west wall at y 25, drawn as a full-height
-  cream box 4" thick (a wall there would split the Bath's west wall where the proposed closet door
-  goes); the wood stove on its hearth stands in front of it, turned to face south-west with it.
+  along the north wall (labelled boxes). Front room: the north-east corner is cut off at 45
+  degrees by a **pipe chase** for the Bath upstairs (photo 20; MK), its face from the north wall at
+  x 168 (by the chimney, where the stovepipe goes in) to the Bath's west wall at y 31, drawn as a
+  full-height cream box 4" thick (a wall there would split the Bath's west wall where the proposed
+  closet door goes); the wood stove on its hearth stands in front of it, turned to face south-west.
   Utility (MK's description, no photos, so all estimates): old wood wall cabinets on the north wall
   (three 42") and on the west wall north of the Kitchen door (two 24"), open shelves under the south
   and east windows (48" wide, 12" deep, up to the 30" sills), and a blue mini fridge on the south
@@ -487,7 +487,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Interior partition thickness | 5" (measured) | At a jamb |
 | Stair | 33" wide, 101" run climbing east from x 31 (about 2' in from the west wall, photos 16 and 18) to x 132 (under the upstairs landing), cuts the Second Floor floor from 26" up the run (80" headroom); open to the Living on its south side | **Distance from the west wall to the bottom riser**, run, riser count |
 | Bath door (First Floor) | 30" x 80" flush, at the south end of the Bath's west wall (y 54 to 84: photos 20 and 22 both put its casing 9" to 13" from the Bath's south wall), swinging into the Bath; **position is an estimate** | Jamb to the Bath's south wall |
-| Front room's angled corner | a wall across the north-east corner, its face from the north wall 154" east of the west wall's inside face (x 161) to the Bath's west wall 18" south of the north wall's inside face (y 25), behind the wood stove (photo 20) | **Both ends, from the corners** |
+| Front room's pipe chase | 45 degrees across the north-east corner, behind the wood stove, hiding the upstairs Bath's pipes (photo 20, MK): 2' each way, its face from the north wall 161" east of the west wall's inside face (x 168) to the Bath's west wall 24" south of the north wall's inside face (y 31); photo 20 reads 1'6" to 2'7" | **How far it comes out along each wall** |
 | Utility fittings | wall cabinets 12" deep, 30" high, bottom at 54": three 42" on the north wall and two 24" on the west wall north of the Kitchen door; open shelves 48" x 12" x 29" under the south and east windows; mini fridge 20" x 20" x 34" on the south wall at x 424 to 444 (MK's description) | Lengths, heights, and where the fridge stands |
 | Kitchen/Living passage | 48" wide, south jamb 6' from the lake wall (y 188 to 236), sill 0, 80" high | Jamb to jamb |
 | Kitchen/Living pass-through | 48" wide, sill 42", head 84", south jamb 8" from the lake wall's inside face (y 252 to 300; photos 14 and 17) | **Width, sill, head, distance from the south-west corner** |
@@ -623,6 +623,11 @@ Which view to use:
 
 Still open:
 
+- **The pipe chase** in the front room's north-east corner carries the pipes of the Bath upstairs
+  (MK), but the design demolishes it with the wood stove: the new flight's top and the kitchen's
+  closet (x 174 to 192, y 7 to 43) take that corner, and the closet's door (y 19 to 43) opens where
+  the chase stands. The pipes need a new route (in the closet, behind a smaller closet, or moved
+  with a new upstairs bath), or the closet gives way to the chase.
 - The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the
   foyer's gable and the porch's shed overlap with no valley).
 - **Two doors from the kitchen into the bedroom**: today's grey Kitchen to Utility door (photos 13
