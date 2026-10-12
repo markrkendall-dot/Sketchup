@@ -226,10 +226,33 @@ describe('migrate a current file', () => {
     plan.site = {
       northAngle: 12.5,
       gradePoints: { g1: { id: 'g1', at: { x: 0, y: 0 }, elevation: -12 } },
-      columns: { c1: { id: 'c1', at: { x: 120, y: -6 }, width: 24, depth: 40, rotation: 0, base: -100, top: 400, kind: 'chimney', phase: 'existing' } },
+      columns: {
+        c1: { id: 'c1', at: { x: 120, y: -6 }, width: 24, depth: 20, rotation: 0, base: -100, top: 400, kind: 'chimney', phase: 'existing', color: '#5a3a35', cap: true },
+        c2: { id: 'c2', at: { x: 300, y: -6 }, width: 6, depth: 6, rotation: 0, base: -4, top: 96, kind: 'post', phase: 'new' },
+      },
     };
     return plan;
   }
+
+  /** A current file whose one column carries `extra` (the fields the column loop of migrateSite reads). */
+  const withColumn = (extra: Record<string, unknown>): unknown => {
+    const plan = JSON.parse(JSON.stringify(createEmptyPlan('Columns')));
+    plan.site.columns.c = { id: 'c', at: { x: 0, y: 0 }, width: 24, depth: 20, rotation: 0, base: -12, top: 300, kind: 'chimney', phase: 'existing', ...extra };
+    return plan;
+  };
+
+  it('keeps a column colour (lower-cased) and cap, drops malformed ones on their own', () => {
+    expect(migrate(withColumn({ color: '#5A3A35', cap: true })).site.columns.c).toMatchObject({ color: '#5a3a35', cap: true });
+    expect(migrate(withColumn({ cap: false })).site.columns.c.cap).toBe(false);
+    for (const bad of [{ color: 'brown' }, { color: '#5a3a3' }, { color: 7 }, { cap: 'yes' }, { cap: 1 }, { cap: null }]) {
+      const c = migrate(withColumn(bad)).site.columns.c;
+      expect(c, JSON.stringify(bad)).toBeDefined();
+      for (const k of Object.keys(bad)) expect(k in c, JSON.stringify(bad)).toBe(false);
+    }
+    // A file without them loads without them.
+    const plain = migrate(withColumn({})).site.columns.c;
+    expect('color' in plain || 'cap' in plain).toBe(false);
+  });
 
   it('is byte-identical after JSON.stringify (a v2 file with roofs and site data)', () => {
     const plan = richPlan();
@@ -242,6 +265,8 @@ describe('migrate a current file', () => {
     // So are the roof's eave and appearance fields.
     const gable = Object.values(plan.levels[plan.levelOrder[2]].roofs)[0];
     expect(gable).toMatchObject({ eave: 'open', rafter: { depth: 5.5, spacing: 24 }, boardColor: '#5a3a35', weathering: 0.6 });
+    // And the chimney's colour and cap, last in the column like the file has them.
+    expect(Object.keys(plan.site.columns.c1).slice(-2)).toEqual(['color', 'cap']);
     const text = JSON.stringify(plan, null, 2);
     expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
   });

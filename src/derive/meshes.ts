@@ -3,13 +3,13 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
 import type { Column, Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { getFootprints, type Footprint } from './footprint';
-import { DEFAULT_TRIM, leafColorOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, DEFAULT_TRIM, leafColorOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible } from './phase';
 import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, type FaceSet } from './rooms';
-import { columnOutline, planTerrain, type TerrainGrid } from './site';
+import { CHIMNEY_CAP, chimneyPartBoxes, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
 import { boardColorOf, roofColorOf, ROOF_TILE, weatheringOf } from '../model/finish';
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { floorToFloor, stairsFrame, stairsHoleOutline, stairsPoint, stairSteps } from './stairs';
@@ -1204,9 +1204,53 @@ export function clearMeshCache(): void {
 // Site: terrain and columns (DESIGN.md "Site and terrain"). Unlike the level meshes these are in
 // absolute elevation (Y = the plan's elevation), so the view puts them in a group at the origin.
 
-/** A column as a box from its base to its top, turned by its rotation about its centre. */
-export function buildColumnGeometry(column: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top'>): BufferGeometry {
-  return prism(columnOutline(column), column.base, column.top);
+/**
+ * Texture coordinates in inches for a box-like solid (a column's shaft and parts), per triangle by
+ * its flat normal like addWallUVs: faces turned up or down take (x, z), the plan position; a
+ * vertical face with normal (nx, 0, nz) takes u = x t.x + z t.z along its tangent t = (-nz, 0, nx)
+ * (the normal turned a quarter in plan) and v = Y, so courses run level round every face. The
+ * textures on them repeat every 48" (repeat 1/48, view3d/textures.ts).
+ */
+export function addBoxUVs(g: BufferGeometry): BufferGeometry {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  const count = pos?.count ?? 0;
+  const uv = new Float32Array(count * 2);
+  for (let i = 0; i < count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const nx = nor.getX(i);
+    const nz = nor.getZ(i);
+    if (Math.abs(nor.getY(i)) > 0.5) {
+      uv[2 * i] = x;
+      uv[2 * i + 1] = z;
+    } else {
+      const h = Math.hypot(nx, nz) || 1;
+      uv[2 * i] = (x * -nz + z * nx) / h;
+      uv[2 * i + 1] = pos.getY(i);
+    }
+  }
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
+}
+
+/**
+ * A column's shaft: a box from its base to its top, turned by its rotation about its centre, with
+ * UVs in inches (addBoxUVs). On a capped chimney the shaft stops under the cap (CHIMNEY_CAP), so no
+ * two faces of the shaft and its cap lie on top of each other.
+ */
+export function buildColumnGeometry(column: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top'> & Partial<Pick<Column, 'kind' | 'cap'>>): BufferGeometry {
+  const top = hasChimneyCap(column) ? Math.max(column.base, column.top - CHIMNEY_CAP.thickness) : column.top;
+  return addBoxUVs(prism(columnOutline(column), column.base, top));
+}
+
+/**
+ * The cap and spark arrestor of a capped chimney (site.ts chimneyPartBoxes), one geometry each with
+ * UVs in inches; none for a column without them. The cap is a closed box; the arrestor is a wire box
+ * open at the bottom, where it stands on the cap over the flue.
+ */
+export function buildColumnParts(column: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top' | 'kind' | 'cap'>): ColumnPartMesh[] {
+  return chimneyPartBoxes(column).map((b) => ({ part: b.part, geometry: addBoxUVs(prism(b.outline, b.bottom, b.top, [], { bottom: b.part !== 'arrestor' })) }));
 }
 
 interface GridSide {
@@ -1365,11 +1409,22 @@ export function getFarGroundGeometry(plan: Plan, viewMode: ViewMode = 'all'): Bu
   return farGroundEntry.geometry;
 }
 
+/** A part of a column drawn in its own material: a chimney's cap or spark arrestor. */
+export interface ColumnPartMesh {
+  part: ChimneyPart;
+  geometry: BufferGeometry;
+}
+
 export interface ColumnMesh {
   id: Id;
+  /** The shaft (buildColumnGeometry). */
   geometry: BufferGeometry;
   phase: Phase;
   kind: Column['kind'];
+  /** The column's colour after the default (model/finish.ts columnColorOf). */
+  color: string;
+  /** A capped chimney's cap and spark arrestor (buildColumnParts); absent on any other column. */
+  parts?: ColumnPartMesh[];
 }
 
 export interface SiteMeshes {
@@ -1380,6 +1435,12 @@ export interface SiteMeshes {
 interface ColumnEntry {
   column: Column;
   geometry: BufferGeometry;
+  parts: ColumnPartMesh[];
+}
+
+function disposeColumnEntry(e: ColumnEntry): void {
+  e.geometry.dispose();
+  for (const p of e.parts) p.geometry.dispose();
 }
 
 const columnCache = new Map<ViewMode, Map<Id, ColumnEntry>>();
@@ -1387,8 +1448,8 @@ const siteResultCache = new Map<ViewMode, { columns: Site['columns']; result: Si
 
 /**
  * The columns visible in a view mode as meshes, memoized: the same result object while the
- * columns record is unchanged, and a column's geometry is reused while its object is unchanged
- * (geometry that drops out is disposed).
+ * columns record is unchanged, and a column's geometries (the shaft, and a capped chimney's parts)
+ * are reused while its object is unchanged (geometry that drops out is disposed).
  */
 export function getSiteMeshes(plan: Plan, viewMode: ViewMode): SiteMeshes {
   const columns = plan.site.columns;
@@ -1400,11 +1461,11 @@ export function getSiteMeshes(plan: Plan, viewMode: ViewMode): SiteMeshes {
   for (const c of Object.values(columns)) {
     if (!isVisible(c.phase, viewMode)) continue;
     const old = prev?.get(c.id);
-    const entry = old && old.column === c ? old : { column: c, geometry: buildColumnGeometry(c) };
+    const entry = old && old.column === c ? old : { column: c, geometry: buildColumnGeometry(c), parts: buildColumnParts(c) };
     next.set(c.id, entry);
-    out.push({ id: c.id, geometry: entry.geometry, phase: c.phase, kind: c.kind });
+    out.push({ id: c.id, geometry: entry.geometry, phase: c.phase, kind: c.kind, color: columnColorOf(c), ...(entry.parts.length ? { parts: entry.parts } : {}) });
   }
-  if (prev) for (const [id, e] of prev) if (next.get(id) !== e) e.geometry.dispose();
+  if (prev) for (const [id, e] of prev) if (next.get(id) !== e) disposeColumnEntry(e);
   columnCache.set(viewMode, next);
   const result: SiteMeshes = { columns: out };
   siteResultCache.set(viewMode, { columns, result });
@@ -1412,7 +1473,7 @@ export function getSiteMeshes(plan: Plan, viewMode: ViewMode): SiteMeshes {
 }
 
 function clearSiteCache(): void {
-  for (const m of columnCache.values()) for (const e of m.values()) e.geometry.dispose();
+  for (const m of columnCache.values()) for (const e of m.values()) disposeColumnEntry(e);
   columnCache.clear();
   siteResultCache.clear();
   terrainEntry?.geometry.dispose();

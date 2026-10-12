@@ -162,7 +162,11 @@ export interface PlanState {
   deleteGradePoints: (ids: Id[]) => void;
   /** Add a post or chimney; returns the id, or null when its size or heights are not usable. */
   addColumn: (column: NewColumn) => Id | null;
-  /** Patch a column; an unusable size or height (top not above base) is rejected, the rotation is normalized to [0, 360). */
+  /**
+   * Patch a column; an unusable size, height (top not above base), colour or cap is rejected
+   * (columnProblem), the rotation is normalized to [0, 360). `color` and `cap` take undefined to
+   * clear them.
+   */
   updateColumn: (id: Id, patch: ColumnPatch) => void;
   deleteColumns: (ids: Id[]) => void;
   /** Move grade points and columns to new positions in one set (a drag of the site selection). */
@@ -288,9 +292,13 @@ function cleanRoof(r: Roof): Roof {
 
 const isPoint = (p: Vec2 | undefined): p is Vec2 => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 
-/** A column's stored form: position copied, rotation in [0, 360). */
+/** A column's stored form: position copied, rotation in [0, 360), colour lower-cased, unset options left out. */
 function cleanColumn(c: Column): Column {
-  return { ...c, at: { x: c.at.x, y: c.at.y }, rotation: Number.isFinite(c.rotation) ? normalizeDegrees(c.rotation) : c.rotation };
+  const out: Column = { ...c, at: { x: c.at.x, y: c.at.y }, rotation: Number.isFinite(c.rotation) ? normalizeDegrees(c.rotation) : c.rotation };
+  if (typeof c.color === 'string') out.color = c.color.toLowerCase();
+  if (c.color === undefined) delete out.color;
+  if (c.cap === undefined) delete out.cap;
+  return out;
 }
 
 /**
@@ -785,7 +793,12 @@ export const usePlanStore = create<PlanState>()(
             const keys = Object.keys(patch) as (keyof ColumnPatch)[];
             const same = (k: keyof ColumnPatch) => (k === 'at' ? next.at.x === c.at.x && next.at.y === c.at.y : next[k] === c[k]);
             if (keys.every(same)) return false;
-            for (const k of keys) if (!same(k)) (c as unknown as Record<string, unknown>)[k] = next[k];
+            for (const k of keys) {
+              if (same(k)) continue;
+              // An optional field (colour, cap) cleared; the required ones never are (columnProblem).
+              if (next[k] === undefined) delete c[k];
+              else (c as unknown as Record<string, unknown>)[k] = next[k];
+            }
           }),
 
         deleteColumns: (ids) =>

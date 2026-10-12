@@ -31,22 +31,28 @@ const MAIN = { x0: 0, x1: ft(26.5), y0: 0, y1: ft(26) + 3 };
 const CL = { x0: MAIN.x0 + HALF, x1: MAIN.x1 - HALF, y0: MAIN.y0 + HALF, y1: MAIN.y1 - HALF };
 
 // East wing (the Utility), one storey with its own gable, on the east wall at the south end, its south
-// face flush with the main block's (photos 1, 3, 9; the owner's sketch puts it there too). Interior
+// face flush with the main block's (photos 01, 03, 09; the owner's sketch puts it there too). Interior
 // measured 11'6" x 9'5", so outside x 318..463, y 188..315 (its west side is the main block's east wall).
 const UTILITY = { w: ft(11.5), d: ft(9) + 5 };
 const WING = { x0: MAIN.x1, x1: MAIN.x1 + UTILITY.w + T, y0: MAIN.y1 - UTILITY.d - 2 * T, y1: MAIN.y1 };
-// Entry porch: one structure on the west face at its north end, flush with the north face (photo 8,
-// taken facing east; photos 6 and 7 show the same porch from the road). Estimated 8' along the wall
-// by 5'6" out. Shingled knee walls with a glazed panel on its north side and the front's north bay,
-// open bays above the knee walls elsewhere, the entry opening in line with the house door, and its own
-// gable facing west.
+// Entry porch: one structure on the west face at its north end, flush with the north face (photo 08,
+// taken facing east; photos 06 and 07 show the same porch from the road). Estimated 8' along the wall
+// by 5'6" out (photos 06 and 07 read 7' to 9' out; the starter keeps 5'6" until it is measured).
+// Shingled knee walls with screens above them in all four bays, a screen door in line with the house
+// door, and its own gable facing west.
 const PORCH = { x0: -66, x1: MAIN.x0, y0: MAIN.y0, y1: ft(8) };
-/** The house door and the porch entry share this line (photo 8). */
+/** The house door and the porch entry share this line (photo 08). */
 const ENTRY_Y = ft(4);
 
+/** The house's dark red-brown stain: siding, rake boards, rafter tails, the chimney (photos 01, 06, 07, 08). */
 const FINISH_COLOR = '#5a3a35';
-const BLOCK_COLOR = '#8a8580';
-const ROOF_COLOR = '#6e6259';
+/** The grey concrete block of the foundation (photos 01 and 02). */
+const BLOCK_COLOR = '#8f8a84';
+/** Weathered galvanized corrugated steel (the main and porch roofs, photos 06 and 07) and the wing's darker, browner sheet (photo 03). */
+const ROOF_GALVANIZED = '#8a8378';
+const ROOF_WING = '#6e4b3c';
+/** The house door's dark green (photo 08). */
+const DOOR_GREEN = '#2f4a3a';
 const PHASE: Phase = 'existing';
 
 type Rect = { x0: number; x1: number; y0: number; y1: number };
@@ -101,13 +107,23 @@ interface OpeningSpec {
   width: number;
   height: number;
   sill?: number;
+  /** Per sash of a window, per leaf of a door. */
   lites?: { cols: number; rows: number };
   shutters?: boolean;
+  /** Trim width on the outside face (default 4"). */
+  trim?: number;
+  /** Windows: sashes side by side; doors: leaves (2 is a double door). */
+  sashes?: number;
+  fixedCenter?: boolean;
+  glazing?: Opening['glazing'];
+  halfLite?: boolean;
+  leafColor?: string;
   swing?: NonNullable<Opening['swing']>;
   /** Doors: the direction the leaf swings toward (picks the swing side from the wall's direction). */
   into?: Vec2;
 }
 
+/** Add an opening centred at p (on a wall's centerline); throws when it does not fit the wall where it is. */
 function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
   const { wallId, offset } = wallAt(levelId, p);
   let swing = o.swing;
@@ -119,10 +135,11 @@ function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
     const left = perpLeft(dir);
     swing = { hinge: 'a', side: left.x * o.into.x + left.y * o.into.y > 0 ? 'left' : 'right' };
   }
+  const at = Math.round(offset * 1000) / 1000;
   const id = store().addOpening(levelId, {
     wallId,
     type: o.type,
-    offset: Math.round(offset * 1000) / 1000,
+    offset: at,
     width: o.width,
     height: o.height,
     sill: o.sill ?? (o.type === 'door' ? 0 : 30),
@@ -130,16 +147,43 @@ function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
     ...(o.type === 'door' ? { swing: swing ?? { hinge: 'a' as const, side: 'left' as const } } : {}),
     ...(o.lites ? { lites: o.lites } : {}),
     ...(o.shutters ? { shutters: true } : {}),
+    ...(o.trim !== undefined ? { trim: o.trim } : {}),
+    ...(o.sashes !== undefined ? { sashes: o.sashes } : {}),
+    ...(o.fixedCenter ? { fixedCenter: true } : {}),
+    ...(o.glazing ? { glazing: o.glazing } : {}),
+    ...(o.halfLite ? { halfLite: true } : {}),
+    ...(o.leafColor ? { leafColor: o.leafColor } : {}),
   });
   if (!id) throw new Error(`opening at ${JSON.stringify(p)} on ${level(levelId).name} was rejected`);
+  // addOpening slides an opening that reaches past a corner or a partition's face back onto the
+  // wall; here that would be a wrong number, so it is an error.
+  const placed = level(levelId).openings[id].offset;
+  if (Math.abs(placed - at) > 1e-6) throw new Error(`opening at ${JSON.stringify(p)} on ${level(levelId).name} does not fit: moved from ${at} to ${placed}`);
   return id;
 }
 
 const win = (levelId: Id, p: Vec2, width: number, height: number, cols: number, rows: number, extra: Partial<OpeningSpec> = {}) =>
   addOpeningAt(levelId, p, { type: 'window', width, height, lites: { cols, rows }, ...extra });
 
-function roof(levelId: Id, r: Omit<Roof, 'id' | 'bearingOffset' | 'thickness' | 'fascia' | 'phase' | 'finish' | 'color'>): Id {
-  const id = store().addRoof(levelId, { ...r, bearingOffset: 0, thickness: 8, fascia: 6, phase: PHASE, finish: 'metal', color: ROOF_COLOR });
+/**
+ * A roof of the house: corrugated metal, a 2.5" slab (sheet on purlins), open eaves with the rafter
+ * tails showing (5.5" deep every 24", photos 01, 02 and 07) and 7" rake boards, all in the stain
+ * (photos 03 and 08). `color` and `weathering` (rust) per roof.
+ */
+function roof(levelId: Id, r: Pick<Roof, 'shape' | 'outline' | 'ridgeAngle' | 'pitch' | 'overhang'>, color: string, weathering: number): Id {
+  const id = store().addRoof(levelId, {
+    ...r,
+    bearingOffset: 0,
+    thickness: 2.5,
+    fascia: 7,
+    phase: PHASE,
+    finish: 'metal',
+    color,
+    eave: 'open',
+    rafter: { depth: 5.5, spacing: 24 },
+    boardColor: FINISH_COLOR,
+    weathering,
+  });
   if (!id) throw new Error('roof rejected');
   return id;
 }
@@ -192,10 +236,20 @@ export function buildExamplePlan(): Plan {
   ];
   const wing = centerline(WING, HALF);
 
-  // ---- Basement: the block, with the walkout bump under the wing (8" block walls, plain grey).
+  // ---- Basement: the block, with the walkout bump under the wing (8" walls of grey concrete block,
+  // photos 01 and 02). The bump's south wall, round the walkout double door, is vertical boards in the
+  // stain (photo 02).
   drawWalls(bId, ring(CL), TB, true);
   drawWalls(bId, [{ x: CL.x1, y: wing.y0 }, { x: wing.x1, y: wing.y0 }, { x: wing.x1, y: wing.y1 }, { x: CL.x1, y: wing.y1 }], TB);
-  store().updateWalls(bId, Object.keys(level(bId).walls), { finish: 'plain', color: BLOCK_COLOR });
+  store().updateWalls(bId, Object.keys(level(bId).walls), { finish: 'block', color: BLOCK_COLOR });
+  const bl = level(bId);
+  const bumpSouth = Object.keys(bl.walls).filter((id) => {
+    const a = bl.nodes[bl.walls[id].a];
+    const b = bl.nodes[bl.walls[id].b];
+    return a.y === wing.y1 && b.y === wing.y1 && Math.min(a.x, b.x) >= CL.x1;
+  });
+  if (bumpSouth.length !== 1) throw new Error('the basement bump has no south wall');
+  store().updateWalls(bId, bumpSouth, { finish: 'board', color: FINISH_COLOR });
 
   // ---- First Floor: the block, the east wing and the entry porch on the west face. The porch's north
   // wall continues the house's north wall in a straight line.
@@ -204,7 +258,7 @@ export function buildExamplePlan(): Plan {
   const pc = centerline(PORCH, HALF);
   drawWalls(fId, [{ x: CL.x0, y: CL.y0 }, { x: pc.x0, y: pc.y0 }, { x: pc.x0, y: pc.y1 }, { x: CL.x0, y: pc.y1 }], T);
   store().updateWalls(fId, Object.keys(level(fId).walls), { finish: 'shingle', color: FINISH_COLOR });
-  // The wing's east gable end is clapboard (photo 3).
+  // The wing's east gable end is clapboard (photo 03).
   const fl = level(fId);
   store().updateWalls(fId, wingWalls.filter((id) => fl.nodes[fl.walls[id].a].x === wing.x1 && fl.nodes[fl.walls[id].b].x === wing.x1), { finish: 'clapboard' });
 
@@ -227,7 +281,7 @@ export function buildExamplePlan(): Plan {
   if (!store().addStairs(fId, { origin: { x: CL.x0 + HALF, y: STRIP_MID }, direction: 0, width: 33, run: 125, phase: PHASE, cutsFloorAbove: true })) throw new Error('stairs rejected');
 
   // ---- Second Floor: the block. Clapboard on the south and east faces, shingle on the north and
-  // west ones (photos 1, 3, 6, 8).
+  // west ones (photos 01, 03, 06, 08).
   const secondWalls = drawWalls(sId, ring(CL), T, true);
   store().updateWalls(sId, secondWalls, { finish: 'clapboard', color: FINISH_COLOR });
   const second = level(sId);
@@ -257,56 +311,75 @@ export function buildExamplePlan(): Plan {
   const gp = (x: number, y: number, elevation: number) => {
     if (!store().addGradePoint({ at: { x, y }, elevation })) throw new Error('grade point rejected');
   };
-  gp(MAIN.x0, MAIN.y0, -4);
+  // The porch's floor is about at grade (photos 07 and 08): the ground is at +1, an inch under its
+  // floor top (+2), at its two outer corners, the middle of its front and its two corners against the
+  // house (the north one is also the main block's north-west corner), so its slab edge hardly shows.
+  gp(MAIN.x0, MAIN.y0, 1);
   gp(MAIN.x1, MAIN.y0, -4);
-  gp(PORCH.x0, PORCH.y0, -4);
-  gp(PORCH.x0, PORCH.y1, -8);
+  gp(PORCH.x0, PORCH.y0, 1);
+  gp(PORCH.x0, PORCH.y1, 1);
+  gp(PORCH.x0, (PORCH.y0 + PORCH.y1) / 2, 1);
+  gp(PORCH.x1, PORCH.y1, 1);
   gp(MAIN.x1 / 2, MAIN.y0, -4);
   gp(MAIN.x0, MAIN.y1 / 2, -8);
   gp(MAIN.x0, MAIN.y1, -14);
   gp(MAIN.x1, MAIN.y1, -88);
   gp(WING.x1, WING.y1, -100);
   // The lawn reaches nearly to the first floor at the wing's north-east corner and drops under the
-  // deck toward the lake (photo 3).
+  // deck toward the lake (photo 03).
   gp(WING.x1, WING.y0, -20);
   gp(MAIN.x1 + ft(6), ft(8), -6);
   gp(MAIN.x1 / 2, MAIN.y1 + ft(10), -100);
   gp((WING.x0 + WING.x1) / 2, WING.y1 + ft(10), -100);
+  // The walkout's threshold: the ground at the basement floor in front of the double door's two
+  // jambs (6" out from the wall), so the doors open onto the terrace instead of into a bank.
+  gp((WING.x0 + WING.x1) / 2 - 36, WING.y1 + 6, -100);
+  gp((WING.x0 + WING.x1) / 2 + 36, WING.y1 + 6, -100);
   gp(MAIN.x1 / 4, MAIN.y0 - ft(30), 6);
   gp((MAIN.x1 * 3) / 4, MAIN.y0 - ft(30), 6);
 
-  // ---- Openings.
+  // ---- Openings. Every window and door of the outside is an estimate from the photos (README, "What to
+  // replace with measurements"); lites are per sash of a window and per leaf of a door. addOpeningAt
+  // throws when one does not fit where it is put, so the jambs clear every corner and partition face.
   const south = CL.y1;
   const north = CL.y0;
   const east = CL.x1;
   const west = CL.x0;
-  // South face (the lake side).
-  win(fId, { x: 100, y: south }, 130, 60, 6, 2);
-  win(fId, { x: 260, y: south }, 96, 60, 6, 2);
-  win(sId, { x: 115, y: south }, 88, 48, 6, 3);
-  win(sId, { x: 256, y: south }, 64, 48, 6, 3);
-  // West face (the entry, photo 8): the door inside the porch, a three-sash window set high (its head
-  // above the door head) and a 4 x 2 lite window upstairs, both with shutters.
-  addOpeningAt(fId, { x: west, y: ENTRY_Y }, { type: 'door', width: 36, height: 80, lites: { cols: 1, rows: 1 } });
-  win(fId, { x: west, y: 203 }, 96, 40, 3, 1, { shutters: true, sill: 47 });
-  win(sId, { x: west, y: 200 }, 48, 28, 4, 2, { shutters: true, sill: 50 });
-  // The porch: knee walls 36" high. Its front has a glazed north bay, the entry in line with the
-  // house door and an open south bay; its north side is glazed and its south side open above the
-  // knee wall (the south side is not in the photos: estimate).
+  const WEST = { x: -1, y: 0 };
+  const NORTH = { x: 0, y: -1 };
+  const SOUTH = { x: 0, y: 1 };
+  // South face (the lake side, photo 01; photo 02 from below its east end). First floor: two picture
+  // windows, each a casement of 2 x 3 lites, a wide fixed pane and another casement (side sashes 24"),
+  // about 12' (the Living) and 10' (the Kitchen) wide; their jambs clear the Kitchen/Living
+  // partition's faces at x 168 and 173 (Living x 15.5..159.5, Kitchen x 183..301).
+  win(fId, { x: 87.5, y: south }, 144, 60, 2, 3, { sashes: 3, fixedCenter: true });
+  win(fId, { x: 242, y: south }, 118, 60, 2, 3, { sashes: 3, fixedCenter: true });
+  // Second floor: four casements over the Master and three over the Guest, 2 x 3 lites each.
+  win(sId, { x: 115, y: south }, 88, 46, 2, 3, { sashes: 4, sill: 34 });
+  win(sId, { x: 256, y: south }, 66, 46, 2, 3, { sashes: 3, sill: 34 });
+  // West face (the entry, photo 08): the house door inside the porch, dark green with nine lites over
+  // two panels; a window set high (its head above the door head) of a casement (2 x 3 lites), a fixed
+  // pane and a casement, and upstairs two casements of 2 x 2 lites; both windows have shutters.
+  addOpeningAt(fId, { x: west, y: ENTRY_Y }, { type: 'door', width: 36, height: 80, lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN });
+  win(fId, { x: west, y: 203 }, 90, 44, 2, 3, { sashes: 3, fixedCenter: true, shutters: true, sill: 44 });
+  win(sId, { x: west, y: 200 }, 48, 32, 2, 2, { sashes: 2, shutters: true, sill: 48 });
+  // The porch (photos 07 and 08): screens above 36" knee walls in all four bays (the two narrow front
+  // ones either side of the entry; the south side shows only as light through the porch in photo 07:
+  // estimate), and a screen door in line with the house door, swinging out. No trim: the posts
+  // between the front openings are only 3.5" wide, and the photos show the porch's framing stained
+  // like its walls.
   const knee = 36;
-  win(fId, { x: (PORCH.x0 + T) / 2, y: pc.y0 }, 44, 40, 3, 1, { sill: knee });
-  win(fId, { x: pc.x0, y: 17.5 }, 18, 40, 1, 2, { sill: knee });
-  addOpeningAt(fId, { x: pc.x0, y: ENTRY_Y }, { type: 'passage', width: 36, height: 80, sill: 0 });
-  addOpeningAt(fId, { x: pc.x0, y: 78.5 }, { type: 'passage', width: 18, height: 44, sill: knee });
-  addOpeningAt(fId, { x: (PORCH.x0 + T) / 2, y: pc.y1 }, { type: 'passage', width: 44, height: 44, sill: knee });
+  const screened = { glazing: 'screen' as const, trim: 0 };
+  addOpeningAt(fId, { x: (PORCH.x0 + T) / 2, y: pc.y0 }, { type: 'window', width: 44, height: 44, sill: knee, ...screened });
+  addOpeningAt(fId, { x: pc.x0, y: 17.5 }, { type: 'window', width: 18, height: 44, sill: knee, ...screened });
+  addOpeningAt(fId, { x: pc.x0, y: ENTRY_Y }, { type: 'door', width: 36, height: 80, into: WEST, leafColor: FINISH_COLOR, ...screened });
+  addOpeningAt(fId, { x: pc.x0, y: 78.5 }, { type: 'window', width: 18, height: 44, sill: knee, ...screened });
+  addOpeningAt(fId, { x: (PORCH.x0 + T) / 2, y: pc.y1 }, { type: 'window', width: 44, height: 44, sill: knee, ...screened });
   // First Floor passages and the Bath door (centres from the jambs). Kitchen/Living: 48", south jamb 6' from
   // the lake wall's inside face (y 188..236). Hall to Stair strip (y 99.5 line) and Stair strip to Living
   // (y 137.5 wall): 36" each at x 132..168, up to the partition's west face. The stair's bottom opens to
   // Living by a 30" opening at x 7..37. Bath: 30" x 80" door, north jamb 6" from the north wall's inside
   // face (y 13..43, an estimate), swinging into the hall.
-  const WEST = { x: -1, y: 0 };
-  const NORTH = { x: 0, y: -1 };
-  const SOUTH = { x: 0, y: 1 };
   addOpeningAt(fId, { x: PART.kl, y: 212 }, { type: 'passage', width: 48, height: 80, sill: 0 });
   addOpeningAt(fId, { x: 150, y: PART.line }, { type: 'passage', width: 36, height: 80, sill: 0 });
   addOpeningAt(fId, { x: 150, y: PART.stairSouth }, { type: 'passage', width: 36, height: 80, sill: 0 });
@@ -319,43 +392,51 @@ export function buildExamplePlan(): Plan {
   addOpeningAt(sId, { x: 22, y: UP.strip }, { type: 'passage', width: 24, height: 80, sill: 0 });
   addOpeningAt(sId, { x: 196, y: UP.bathSouth }, { type: 'door', width: 24, height: 80, into: SOUTH });
   addOpeningAt(sId, { x: 196, y: UP.guestNorth }, { type: 'door', width: 30, height: 80, into: SOUTH });
-  // North face (the road): first floor either side of the chimney, second floor two windows.
-  win(fId, { x: ft(8), y: north }, 72, 48, 6, 3);
-  win(fId, { x: ft(19.5), y: north }, 48, 36, 2, 1);
-  win(sId, { x: ft(6.5), y: north }, 48, 40, 4, 3);
+  // North face (the road, photos 06 and 07): on the first floor three casements of 2 x 3 lites west of
+  // the chimney (jambs x 56..136) and two single panes east of it; upstairs two casement pairs.
+  win(fId, { x: ft(8), y: north }, 80, 56, 2, 3, { sashes: 3 });
+  win(fId, { x: ft(19.5), y: north }, 42, 44, 1, 1, { sashes: 2, sill: 34 });
+  win(sId, { x: ft(6.5), y: north }, 46, 44, 2, 3, { sashes: 2, sill: 36 });
   // The east one was centred x 240, which put its west jamb across the Bath's east wall (x 220.5, face
-  // 223); it sits in the Office, so it moves east to x 248 (jambs 224..272).
-  win(sId, { x: 248, y: north }, 48, 40, 4, 3);
-  // East face (photo 3, taken facing west): two double-sash windows upstairs, the south one just
-  // north of where the wing's ridge meets the wall, and one set high on the first floor north of the
-  // wing.
-  win(sId, { x: east, y: 98 }, 46, 44, 4, 3, { sill: 34 });
-  win(sId, { x: east, y: 222 }, 46, 44, 4, 3, { sill: 34 });
-  win(fId, { x: east, y: 152 }, 40, 40, 4, 3, { sill: 42 });
-  // The wing: its east gable end, north and south faces.
-  win(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 }, 56, 44, 6, 3);
-  win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y0 }, 48, 40, 4, 3);
-  win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, 36, 36, 2, 2);
-  // The walkout double door below the wing's south window.
-  addOpeningAt(bId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, { type: 'door', width: 60, height: 80, lites: { cols: 1, rows: 1 } });
+  // 223); it sits in the Office, so it moves east to x 248 (jambs 225..271, 2" clear of that face).
+  win(sId, { x: 248, y: north }, 46, 44, 2, 3, { sashes: 2, sill: 36 });
+  // East face (photo 03, taken facing west): two casement pairs upstairs, the south one just north of
+  // where the wing's ridge meets the wall, and one casement set high on the first floor north of the
+  // wing; 2 x 3 lites each.
+  win(sId, { x: east, y: 98 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
+  win(sId, { x: east, y: 222 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
+  win(fId, { x: east, y: 152 }, 36, 40, 2, 3, { sill: 42 });
+  // The wing: casement pairs of 2 x 3 lites in its east gable end (photo 03), its north face and its
+  // south face (photos 01 and 02).
+  win(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 }, 48, 44, 2, 3, { sashes: 2 });
+  win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y0 }, 48, 40, 2, 3, { sashes: 2 });
+  win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, 48, 44, 2, 3, { sashes: 2, sill: 30 });
+  // The walkout double door below the wing's south window (photo 02): two plain leaves in the stain,
+  // set in the boards with no trim round them.
+  addOpeningAt(bId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, { type: 'door', width: 72, height: 80, lites: { cols: 1, rows: 1 }, sashes: 2, leafColor: FINISH_COLOR, trim: 0 });
 
-  // ---- Roofs.
-  // Main roof about 6:12 (photos 3 and 8 both read 5.5 to 7); the wing's ridge meets the main east
-  // wall just under the upstairs south window (photo 3), about 7:12.
-  roof(sId, { shape: 'gable', outline: outline(MAIN), ridgeAngle: 0, pitch: 6, overhang: 24 });
-  roof(fId, { shape: 'gable', outline: outline(WING), ridgeAngle: 0, pitch: 7, overhang: 18 });
-  // Entry porch: a gable with its ridge east-west, so the gable faces west over the entry (photo 8;
+  // ---- Roofs: rusting corrugated metal (roof()). The main and porch roofs are weathered galvanized
+  // steel with rust streaks (photos 06 and 07), the porch's the rustiest; the wing's sheet is darker
+  // and browner, less streaked (photo 03).
+  // Main roof about 6:12 (photos 03 and 08 both read 5.5 to 7); the wing's ridge meets the main east
+  // wall just under the upstairs south window (photo 03), about 7:12.
+  roof(sId, { shape: 'gable', outline: outline(MAIN), ridgeAngle: 0, pitch: 6, overhang: 24 }, ROOF_GALVANIZED, 0.6);
+  roof(fId, { shape: 'gable', outline: outline(WING), ridgeAngle: 0, pitch: 7, overhang: 18 }, ROOF_WING, 0.3);
+  // Entry porch: a gable with its ridge east-west, so the gable faces west over the entry (photo 08;
   // about 5:12, eaves well past the knee walls). The porch's west wall rises into the gable.
-  roof(fId, { shape: 'gable', outline: outline(PORCH), ridgeAngle: 0, pitch: 5, overhang: 18 });
+  roof(fId, { shape: 'gable', outline: outline(PORCH), ridgeAngle: 0, pitch: 5, overhang: 18 }, ROOF_GALVANIZED, 0.7);
 
-  // ---- Chimney against the middle of the north wall (photo 6; photo 8 shows it at the same spot in
-  // perspective). The porch posts are the wall pieces between its openings, so no separate posts.
-  const chimneyAt = { x: MAIN.x1 / 2, y: MAIN.y0 - 20 };
+  // ---- Chimney against the middle of the north wall (photo 06; photo 08 shows it at the same spot in
+  // perspective): about 24" along the wall and 20" out from it (photos 06 and 07), stained like the
+  // house, with a concrete cap and a wire spark arrestor on top (photo 07). The porch posts are the
+  // wall pieces between its openings, so no separate posts.
+  const chimneyAt = { x: MAIN.x1 / 2, y: MAIN.y0 - 10 };
   const chimneyHeights = () => {
     const d = columnDefaults(getPlan(), 'chimney', chimneyAt);
     return { ...d, base: round2(d.base), top: round2(d.top) };
   };
-  if (!store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights() })) throw new Error('chimney rejected');
+  // The depth after the defaults (a new chimney is 40" deep).
+  if (!store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights(), depth: 20, color: FINISH_COLOR, cap: true })) throw new Error('chimney rejected');
 
   // ---- Room labels, one per area (names say where a number is an estimate). A label is drawn at its
   // anchor (else at the middle of the room's widest part), so the anchors are where each reads best.

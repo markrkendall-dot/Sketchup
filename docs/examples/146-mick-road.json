@@ -58,8 +58,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "block",
+          "color": "#8f8a84"
         },
         "b-w2": {
           "id": "b-w2",
@@ -68,8 +68,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "block",
+          "color": "#8f8a84"
         },
         "b-w3": {
           "id": "b-w3",
@@ -78,8 +78,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "block",
+          "color": "#8f8a84"
         },
         "b-w4": {
           "id": "b-w4",
@@ -88,8 +88,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "block",
+          "color": "#8f8a84"
         },
         "b-w5": {
           "id": "b-w5",
@@ -98,8 +98,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "block",
+          "color": "#8f8a84"
         },
         "b-w6": {
           "id": "b-w6",
@@ -108,8 +108,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "block",
+          "color": "#8f8a84"
         },
         "b-w7": {
           "id": "b-w7",
@@ -118,8 +118,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "block",
+          "color": "#8f8a84"
         },
         "b-w8": {
           "id": "b-w8",
@@ -128,8 +128,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "existing",
-          "finish": "plain",
-          "color": "#8a8580"
+          "finish": "board",
+          "color": "#5a3a35"
         }
       },
       "openings": {
@@ -137,7 +137,7 @@
           "wallId": "b-w8",
           "type": "door",
           "offset": 69,
-          "width": 60,
+          "width": 72,
           "height": 80,
           "sill": 0,
           "phase": "existing",
@@ -149,6 +149,9 @@
             "cols": 1,
             "rows": 1
           },
+          "trim": 0,
+          "sashes": 2,
+          "leafColor": "#5a3a35",
           "id": "b-o1"
         }
       },
@@ -502,29 +505,33 @@
         "f-o1": {
           "wallId": "f-w17",
           "type": "window",
-          "offset": 70.5,
-          "width": 130,
+          "offset": 83,
+          "width": 144,
           "height": 60,
           "sill": 30,
           "phase": "existing",
           "lites": {
-            "cols": 6,
-            "rows": 2
+            "cols": 2,
+            "rows": 3
           },
+          "sashes": 3,
+          "fixedCenter": true,
           "id": "f-o1"
         },
         "f-o2": {
           "wallId": "f-w3",
           "type": "window",
-          "offset": 54.5,
-          "width": 96,
+          "offset": 72.5,
+          "width": 118,
           "height": 60,
           "sill": 30,
           "phase": "existing",
           "lites": {
-            "cols": 6,
-            "rows": 2
+            "cols": 2,
+            "rows": 3
           },
+          "sashes": 3,
+          "fixedCenter": true,
           "id": "f-o2"
         },
         "f-o3": {
@@ -540,24 +547,28 @@
             "side": "left"
           },
           "lites": {
-            "cols": 1,
-            "rows": 1
+            "cols": 3,
+            "rows": 3
           },
+          "halfLite": true,
+          "leafColor": "#2f4a3a",
           "id": "f-o3"
         },
         "f-o4": {
           "wallId": "f-w4",
           "type": "window",
           "offset": 108.5,
-          "width": 96,
-          "height": 40,
-          "sill": 47,
+          "width": 90,
+          "height": 44,
+          "sill": 44,
           "phase": "existing",
           "lites": {
-            "cols": 3,
-            "rows": 1
+            "cols": 2,
+            "rows": 3
           },
           "shutters": true,
+          "sashes": 3,
+          "fixedCenter": true,
           "id": "f-o4"
         },
         "f-o5": {
@@ -565,13 +576,11 @@
           "type": "window",
           "offset": 33,
           "width": 44,
-          "height": 40,
+          "height": 44,
           "sill": 36,
           "phase": "existing",
-          "lites": {
-            "cols": 3,
-            "rows": 1
-          },
+          "trim": 0,
+          "glazing": "screen",
           "id": "f-o5"
         },
         "f-o6": {
@@ -579,43 +588,52 @@
           "type": "window",
           "offset": 14,
           "width": 18,
-          "height": 40,
+          "height": 44,
           "sill": 36,
           "phase": "existing",
-          "lites": {
-            "cols": 1,
-            "rows": 2
-          },
+          "trim": 0,
+          "glazing": "screen",
           "id": "f-o6"
         },
         "f-o7": {
           "wallId": "f-w10",
-          "type": "passage",
+          "type": "door",
           "offset": 44.5,
           "width": 36,
           "height": 80,
           "sill": 0,
           "phase": "existing",
+          "swing": {
+            "hinge": "a",
+            "side": "right"
+          },
+          "trim": 0,
+          "glazing": "screen",
+          "leafColor": "#5a3a35",
           "id": "f-o7"
         },
         "f-o8": {
           "wallId": "f-w10",
-          "type": "passage",
+          "type": "window",
           "offset": 75,
           "width": 18,
           "height": 44,
           "sill": 36,
           "phase": "existing",
+          "trim": 0,
+          "glazing": "screen",
           "id": "f-o8"
         },
         "f-o9": {
           "wallId": "f-w11",
-          "type": "passage",
+          "type": "window",
           "offset": 33,
           "width": 44,
           "height": 44,
           "sill": 36,
           "phase": "existing",
+          "trim": 0,
+          "glazing": "screen",
           "id": "f-o9"
         },
         "f-o10": {
@@ -680,40 +698,42 @@
           "wallId": "f-w1",
           "type": "window",
           "offset": 92.5,
-          "width": 72,
-          "height": 48,
+          "width": 80,
+          "height": 56,
           "sill": 30,
           "phase": "existing",
           "lites": {
-            "cols": 6,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 3,
           "id": "f-o15"
         },
         "f-o16": {
           "wallId": "f-w21",
           "type": "window",
           "offset": 39.5,
-          "width": 48,
-          "height": 36,
-          "sill": 30,
+          "width": 42,
+          "height": 44,
+          "sill": 34,
           "phase": "existing",
           "lites": {
-            "cols": 2,
+            "cols": 1,
             "rows": 1
           },
+          "sashes": 2,
           "id": "f-o16"
         },
         "f-o17": {
           "wallId": "f-w14",
           "type": "window",
           "offset": 52.5,
-          "width": 40,
+          "width": 36,
           "height": 40,
           "sill": 42,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 2,
             "rows": 3
           },
           "id": "f-o17"
@@ -722,14 +742,15 @@
           "wallId": "f-w7",
           "type": "window",
           "offset": 60,
-          "width": 56,
+          "width": 48,
           "height": 44,
           "sill": 30,
           "phase": "existing",
           "lites": {
-            "cols": 6,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 2,
           "id": "f-o18"
         },
         "f-o19": {
@@ -741,23 +762,25 @@
           "sill": 30,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 2,
           "id": "f-o19"
         },
         "f-o20": {
           "wallId": "f-w8",
           "type": "window",
           "offset": 69,
-          "width": 36,
-          "height": 36,
+          "width": 48,
+          "height": 44,
           "sill": 30,
           "phase": "existing",
           "lites": {
             "cols": 2,
-            "rows": 2
+            "rows": 3
           },
+          "sashes": 2,
           "id": "f-o20"
         }
       },
@@ -858,11 +881,18 @@
           "pitch": 7,
           "overhang": 18,
           "bearingOffset": 0,
-          "thickness": 8,
-          "fascia": 6,
+          "thickness": 2.5,
+          "fascia": 7,
           "phase": "existing",
           "finish": "metal",
-          "color": "#6e6259",
+          "color": "#6e4b3c",
+          "eave": "open",
+          "rafter": {
+            "depth": 5.5,
+            "spacing": 24
+          },
+          "boardColor": "#5a3a35",
+          "weathering": 0.3,
           "id": "f-k1"
         },
         "f-k2": {
@@ -889,11 +919,18 @@
           "pitch": 5,
           "overhang": 18,
           "bearingOffset": 0,
-          "thickness": 8,
-          "fascia": 6,
+          "thickness": 2.5,
+          "fascia": 7,
           "phase": "existing",
           "finish": "metal",
-          "color": "#6e6259",
+          "color": "#8a8378",
+          "eave": "open",
+          "rafter": {
+            "depth": 5.5,
+            "spacing": 24
+          },
+          "boardColor": "#5a3a35",
+          "weathering": 0.7,
           "id": "f-k2"
         }
       }
@@ -1194,27 +1231,29 @@
           "type": "window",
           "offset": 56.5,
           "width": 88,
-          "height": 48,
-          "sill": 30,
+          "height": 46,
+          "sill": 34,
           "phase": "existing",
           "lites": {
-            "cols": 6,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 4,
           "id": "s-o1"
         },
         "s-o2": {
           "wallId": "s-w3",
           "type": "window",
           "offset": 58.5,
-          "width": 64,
-          "height": 48,
-          "sill": 30,
+          "width": 66,
+          "height": 46,
+          "sill": 34,
           "phase": "existing",
           "lites": {
-            "cols": 6,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 3,
           "id": "s-o2"
         },
         "s-o3": {
@@ -1222,14 +1261,15 @@
           "type": "window",
           "offset": 111.5,
           "width": 48,
-          "height": 28,
-          "sill": 50,
+          "height": 32,
+          "sill": 48,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 2,
             "rows": 2
           },
           "shutters": true,
+          "sashes": 2,
           "id": "s-o3"
         },
         "s-o4": {
@@ -1302,28 +1342,30 @@
           "wallId": "s-w1",
           "type": "window",
           "offset": 74.5,
-          "width": 48,
-          "height": 40,
-          "sill": 30,
+          "width": 46,
+          "height": 44,
+          "sill": 36,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 2,
           "id": "s-o9"
         },
         "s-o10": {
           "wallId": "s-w17",
           "type": "window",
           "offset": 27.5,
-          "width": 48,
-          "height": 40,
-          "sill": 30,
+          "width": 46,
+          "height": 44,
+          "sill": 36,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 2,
           "id": "s-o10"
         },
         "s-o11": {
@@ -1335,9 +1377,10 @@
           "sill": 34,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 2,
           "id": "s-o11"
         },
         "s-o12": {
@@ -1349,9 +1392,10 @@
           "sill": 34,
           "phase": "existing",
           "lites": {
-            "cols": 4,
+            "cols": 2,
             "rows": 3
           },
+          "sashes": 2,
           "id": "s-o12"
         }
       },
@@ -1431,11 +1475,18 @@
           "pitch": 6,
           "overhang": 24,
           "bearingOffset": 0,
-          "thickness": 8,
-          "fascia": 6,
+          "thickness": 2.5,
+          "fascia": 7,
           "phase": "existing",
           "finish": "metal",
-          "color": "#6e6259",
+          "color": "#8a8378",
+          "eave": "open",
+          "rafter": {
+            "depth": 5.5,
+            "spacing": 24
+          },
+          "boardColor": "#5a3a35",
+          "weathering": 0.6,
           "id": "s-k1"
         }
       }
@@ -1458,7 +1509,7 @@
           "x": 0,
           "y": 0
         },
-        "elevation": -4
+        "elevation": 1
       },
       "grade-2": {
         "id": "grade-2",
@@ -1474,7 +1525,7 @@
           "x": -66,
           "y": 0
         },
-        "elevation": -4
+        "elevation": 1
       },
       "grade-4": {
         "id": "grade-4",
@@ -1482,90 +1533,122 @@
           "x": -66,
           "y": 96
         },
-        "elevation": -8
+        "elevation": 1
       },
       "grade-5": {
         "id": "grade-5",
+        "at": {
+          "x": -66,
+          "y": 48
+        },
+        "elevation": 1
+      },
+      "grade-6": {
+        "id": "grade-6",
+        "at": {
+          "x": 0,
+          "y": 96
+        },
+        "elevation": 1
+      },
+      "grade-7": {
+        "id": "grade-7",
         "at": {
           "x": 159,
           "y": 0
         },
         "elevation": -4
       },
-      "grade-6": {
-        "id": "grade-6",
+      "grade-8": {
+        "id": "grade-8",
         "at": {
           "x": 0,
           "y": 157.5
         },
         "elevation": -8
       },
-      "grade-7": {
-        "id": "grade-7",
+      "grade-9": {
+        "id": "grade-9",
         "at": {
           "x": 0,
           "y": 315
         },
         "elevation": -14
       },
-      "grade-8": {
-        "id": "grade-8",
+      "grade-10": {
+        "id": "grade-10",
         "at": {
           "x": 318,
           "y": 315
         },
         "elevation": -88
       },
-      "grade-9": {
-        "id": "grade-9",
+      "grade-11": {
+        "id": "grade-11",
         "at": {
           "x": 463,
           "y": 315
         },
         "elevation": -100
       },
-      "grade-10": {
-        "id": "grade-10",
+      "grade-12": {
+        "id": "grade-12",
         "at": {
           "x": 463,
           "y": 188
         },
         "elevation": -20
       },
-      "grade-11": {
-        "id": "grade-11",
+      "grade-13": {
+        "id": "grade-13",
         "at": {
           "x": 390,
           "y": 96
         },
         "elevation": -6
       },
-      "grade-12": {
-        "id": "grade-12",
+      "grade-14": {
+        "id": "grade-14",
         "at": {
           "x": 159,
           "y": 435
         },
         "elevation": -100
       },
-      "grade-13": {
-        "id": "grade-13",
+      "grade-15": {
+        "id": "grade-15",
         "at": {
           "x": 390.5,
           "y": 435
         },
         "elevation": -100
       },
-      "grade-14": {
-        "id": "grade-14",
+      "grade-16": {
+        "id": "grade-16",
+        "at": {
+          "x": 354.5,
+          "y": 321
+        },
+        "elevation": -100
+      },
+      "grade-17": {
+        "id": "grade-17",
+        "at": {
+          "x": 426.5,
+          "y": 321
+        },
+        "elevation": -100
+      },
+      "grade-18": {
+        "id": "grade-18",
         "at": {
           "x": 79.5,
           "y": -360
         },
         "elevation": 6
       },
-      "grade-15": {
-        "id": "grade-15",
+      "grade-19": {
+        "id": "grade-19",
         "at": {
           "x": 238.5,
           "y": -360
@@ -1577,15 +1660,17 @@
       "column-1": {
         "at": {
           "x": 159,
-          "y": -20
+          "y": -10
         },
         "kind": "chimney",
         "phase": "existing",
         "width": 24,
-        "depth": 40,
+        "depth": 20,
         "rotation": 0,
-        "base": -16.78,
-        "top": 340.75,
+        "base": -16.26,
+        "top": 335.25,
+        "color": "#5a3a35",
+        "cap": true,
         "id": "column-1"
       }
     }

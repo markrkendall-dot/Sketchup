@@ -2,6 +2,7 @@ import { Mesh, type BufferGeometry, type MeshStandardMaterial } from 'three';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   buildColumnGeometry,
+  buildColumnParts,
   buildFarGroundGeometry,
   buildTerrainGeometry,
   clearMeshCache,
@@ -10,10 +11,15 @@ import {
   getLevelMeshes,
   getSiteMeshes,
   getTerrainGeometry,
+  triangleCount,
 } from '../derive/meshes';
 import {
+  CHIMNEY_CAP,
+  chimneyPartBoxes,
   columnDefaults,
   columnOutline,
+  columnPeak,
+  hasChimneyCap,
   defaultGradeElevation,
   fallbackElevation,
   highestRidge,
@@ -38,12 +44,15 @@ import example from '../../docs/examples/146-mick-road.json';
 import { dispatchKey, dispatchPointer, enterSiteMode, setViewMode, switchLevel, switchTool, type ToolPointerEvent } from '../editor2d/tools';
 import { hitSite } from '../editor2d/tools/siteTools';
 import { buildExportScene, disposeExportScene, type ExportLevelVisibility } from '../io/export3d';
+import { CHIMNEY_CAP_COLOR, COLUMN_COLOR } from '../model/finish';
 import { createEmptyPlan, defaultLevelId, defaultSite, migrate } from '../model/plan';
 import type { Column, Plan, Roof, Site, Vec2 } from '../model/types';
 import { clearHistory, redo, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore } from '../store/uiStore';
 import { bindingFor } from '../ui/keymap';
 import { planBox } from '../view3d/bounds';
+import { chimneyPartMaterial, columnMaterial, openingMaterial } from '../view3d/materials';
+import { BRICK_COURSE, BRICK_LENGTH, brickFaces, brickHeight, brickTextures, MORTAR_JOINT, PX_PER_INCH, RELIEF, TEXTURE_PX } from '../view3d/textures';
 import { active3dLevel, visible3dLevels } from '../view3d/visibility';
 
 const store = () => usePlanStore.getState();
@@ -760,6 +769,279 @@ describe('export', () => {
     const withColumn = buildExportScene(plan(), 'all', vis(first));
     expect(names(withColumn.children.find((c) => c.name === 'Site')!)).toEqual(['Post']); // flat ground is not exported
     disposeExportScene(withColumn);
+  });
+});
+
+describe('chimney colour, cap and spark arrestor (realism batch D)', () => {
+  const chimney = (over: Partial<Column> = {}): Column => ({
+    id: 'c1',
+    at: { x: 159, y: -10 },
+    width: 24,
+    depth: 20,
+    rotation: 0,
+    base: -16,
+    top: 335,
+    kind: 'chimney',
+    phase: 'existing',
+    ...over,
+  });
+  function box(g: BufferGeometry) {
+    g.computeBoundingBox();
+    const b = g.boundingBox!;
+    return { min: b.min.toArray(), max: b.max.toArray() };
+  }
+  const expectBox = (g: BufferGeometry, min: number[], max: number[]) => {
+    const b = box(g);
+    b.min.forEach((v, i) => expect(v, `min ${i}`).toBeCloseTo(min[i], 9));
+    b.max.forEach((v, i) => expect(v, `max ${i}`).toBeCloseTo(max[i], 9));
+  };
+  /** The triangles of a non-indexed geometry with their flat normals and UVs. */
+  function triangles(g: BufferGeometry) {
+    const p = g.getAttribute('position');
+    const n = g.getAttribute('normal');
+    const uv = g.getAttribute('uv');
+    const out: { p: number[][]; n: number[]; uv: number[][] }[] = [];
+    for (let i = 0; i < p.count; i += 3) {
+      const idx = [i, i + 1, i + 2];
+      out.push({ p: idx.map((k) => [p.getX(k), p.getY(k), p.getZ(k)]), n: [n.getX(i), n.getY(i), n.getZ(i)], uv: idx.map((k) => [uv.getX(k), uv.getY(k)]) });
+    }
+    return out;
+  }
+  /** Signed volume: positive when every face points out of the solid. */
+  const volume = (g: BufferGeometry) =>
+    triangles(g).reduce((v, { p: [a, b, c] }) => v + (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6, 0);
+
+  it('without a cap: no parts and the full shaft; a post ignores the cap', () => {
+    for (const c of [chimney(), chimney({ cap: false }), chimney({ kind: 'post', cap: true })]) {
+      expect(buildColumnParts(c)).toEqual([]);
+      expect(chimneyPartBoxes(c)).toEqual([]);
+      expectBox(buildColumnGeometry(c), [147, -16, -20], [171, 335, 0]);
+      expect(columnPeak(c)).toBe(335);
+    }
+    expect(hasChimneyCap(chimney({ cap: true }))).toBe(true);
+    expect(hasChimneyCap({ kind: 'post', cap: true })).toBe(false);
+  });
+
+  it('with a cap: the shaft stops under a 4" concrete cap 2" proud all round; a 12" wire box 1" in stands on it', () => {
+    const c = chimney({ cap: true });
+    expect(CHIMNEY_CAP).toEqual({ thickness: 4, proud: 2, arrestor: 12, inset: 1 });
+    expect(columnPeak(c)).toBe(347);
+    const shaft = buildColumnGeometry(c);
+    expectBox(shaft, [147, -16, -20], [171, 331, 0]);
+    expect(volume(shaft)).toBeCloseTo(24 * 20 * 347, 3);
+    const parts = buildColumnParts(c);
+    expect(parts.map((p) => p.part)).toEqual(['cap', 'arrestor']);
+    const [cap, arrestor] = parts.map((p) => p.geometry);
+    // The cap: a closed box, every face pointing out.
+    expectBox(cap, [145, 331, -22], [173, 335, 2]);
+    expect(triangleCount(cap)).toBe(12);
+    expect(volume(cap)).toBeCloseTo(28 * 24 * 4, 6);
+    // The arrestor: open at the bottom (it stands over the flue), its faces pointing out.
+    expectBox(arrestor, [148, 335, -19], [170, 347, -1]);
+    expect(triangleCount(arrestor)).toBe(10);
+    for (const t of triangles(arrestor)) {
+      const centre = [0, 1, 2].map((k) => (t.p[0][k] + t.p[1][k] + t.p[2][k]) / 3);
+      const out = [centre[0] - 159, centre[1] - 341, centre[2] + 10];
+      expect(t.n[0] * out[0] + t.n[1] * out[1] + t.n[2] * out[2]).toBeGreaterThan(0);
+      expect(t.n[1]).toBeGreaterThan(-0.5); // no bottom face
+    }
+    // No two faces lie on each other facing the same way (z-fighting): the shaft's top meets the
+    // cap's bottom and the cap's top the arrestor's open bottom.
+    const ups = (g: BufferGeometry, y: number) => triangles(g).filter((t) => t.n[1] > 0.5 && t.p.every((q) => Math.abs(q[1] - y) < 1e-6)).length;
+    expect(ups(shaft, 331)).toBe(2);
+    expect(ups(cap, 331)).toBe(0);
+    expect(ups(cap, 335)).toBe(2);
+    expect(ups(arrestor, 335)).toBe(0);
+    // A chimney shorter than its cap is all cap.
+    expectBox(buildColumnParts(chimney({ cap: true, base: 333 }))[0].geometry, [145, 333, -22], [173, 335, 2]);
+    expect(triangleCount(buildColumnGeometry(chimney({ cap: true, base: 333 })))).toBe(0);
+  });
+
+  it('the parts turn with the column', () => {
+    const [cap, arrestor] = buildColumnParts(chimney({ cap: true, rotation: 90 })).map((p) => p.geometry);
+    const b = box(cap);
+    expect(b.max[0] - b.min[0]).toBeCloseTo(24, 9);
+    expect(b.max[2] - b.min[2]).toBeCloseTo(28, 9);
+    const a = box(arrestor);
+    expect(a.max[0] - a.min[0]).toBeCloseTo(18, 9);
+    expect(a.max[2] - a.min[2]).toBeCloseTo(22, 9);
+  });
+
+  it('addBoxUVs: (x, plan y) on the top and bottom; along the face and the height on each side, in inches', () => {
+    const g = buildColumnGeometry(chimney());
+    const ranges = new Map<string, { u: number[]; v: number[] }>();
+    for (const t of triangles(g)) {
+      if (Math.abs(t.n[1]) > 0.5) {
+        t.p.forEach((q, k) => {
+          expect(t.uv[k][0]).toBeCloseTo(q[0], 4);
+          expect(t.uv[k][1]).toBeCloseTo(q[2], 4);
+        });
+        continue;
+      }
+      // u runs along the face's tangent (-nz, nx), v is the height.
+      t.p.forEach((q, k) => {
+        expect(t.uv[k][0]).toBeCloseTo(q[0] * -t.n[2] + q[2] * t.n[0], 4);
+        expect(t.uv[k][1]).toBeCloseTo(q[1], 4);
+      });
+      const key = t.n.map((c) => Math.round(c)).join(',');
+      const r = ranges.get(key) ?? { u: [], v: [] };
+      r.u.push(...t.uv.map((w) => w[0]));
+      r.v.push(...t.uv.map((w) => w[1]));
+      ranges.set(key, r);
+    }
+    const span = (xs: number[]) => Math.max(...xs) - Math.min(...xs);
+    // North and south faces are 24" across, east and west 20"; each runs from the base to the top.
+    expect([...ranges.keys()].sort()).toEqual(['-1,0,0', '0,0,-1', '0,0,1', '1,0,0']);
+    expect(span(ranges.get('0,0,-1')!.u)).toBeCloseTo(24, 4);
+    expect(span(ranges.get('0,0,1')!.u)).toBeCloseTo(24, 4);
+    expect(span(ranges.get('1,0,0')!.u)).toBeCloseTo(20, 4);
+    expect(span(ranges.get('-1,0,0')!.u)).toBeCloseTo(20, 4);
+    for (const r of ranges.values()) {
+      expect(Math.min(...r.v)).toBeCloseTo(-16, 4);
+      expect(Math.max(...r.v)).toBeCloseTo(335, 4);
+    }
+    // The north face's u is plan x, so the brick bond does not stretch across it.
+    expect(Math.min(...ranges.get('0,0,-1')!.u)).toBeCloseTo(147, 4);
+    for (const p of buildColumnParts(chimney({ cap: true }))) expect(p.geometry.getAttribute('uv').count).toBe(p.geometry.getAttribute('position').count);
+  });
+
+  it('getSiteMeshes: parts only on a capped chimney, the colour after its default; replaced parts are disposed', () => {
+    const capped = store().addColumn({ ...chimney({ cap: true, color: '#5A3A35' }), id: undefined })!;
+    const plain = store().addColumn({ ...chimney({ at: { x: 400, y: -10 } }), id: undefined })!;
+    const post = store().addColumn({ ...chimney({ kind: 'post', at: { x: 500, y: -10 }, width: 6, depth: 6, top: 96, cap: true }), id: undefined })!;
+    const meshes = getSiteMeshes(plan(), 'all').columns;
+    const of = (id: string) => meshes.find((m) => m.id === id)!;
+    expect(of(capped).color).toBe('#5a3a35');
+    expect(of(capped).parts!.map((p) => p.part)).toEqual(['cap', 'arrestor']);
+    expect(of(plain).color).toBe(COLUMN_COLOR.chimney);
+    expect('parts' in of(plain)).toBe(false);
+    expect(of(post).color).toBe(COLUMN_COLOR.post);
+    expect('parts' in of(post)).toBe(false);
+    let disposed = 0;
+    for (const p of of(capped).parts!) p.geometry.addEventListener('dispose', () => disposed++);
+    of(capped).geometry.addEventListener('dispose', () => disposed++);
+    store().updateColumn(capped, { cap: undefined });
+    const after = getSiteMeshes(plan(), 'all').columns.find((m) => m.id === capped)!;
+    expect(disposed).toBe(3);
+    expect('parts' in after).toBe(false);
+    expectBox(after.geometry, [147, -16, -20], [171, 335, 0]);
+  });
+
+  it('materials: by kind, phase and colour; a chimney records its flat colour; the cap is concrete, the arrestor the window screen', () => {
+    const brown = columnMaterial('chimney', 'existing', '#5a3a35');
+    expect(columnMaterial('chimney', 'existing', '#5a3a35')).toBe(brown);
+    expect(columnMaterial('chimney', 'existing')).not.toBe(brown);
+    expect(columnMaterial('chimney', 'existing')).toBe(columnMaterial('chimney', 'existing', COLUMN_COLOR.chimney));
+    expect(columnMaterial('post', 'existing', '#5a3a35')).not.toBe(brown);
+    // No canvas in node: no brick texture, the flat colour shows and is recorded for the export.
+    expect(brown.map).toBeNull();
+    expect(brown.color.getHexString()).toBe('5a3a35');
+    expect(brown.userData.flatColor).toBe('#5a3a35');
+    expect(brickTextures('#5a3a35')).toBeNull();
+    const fresh = columnMaterial('chimney', 'new', '#5a3a35');
+    expect(fresh).not.toBe(brown);
+    expect(fresh.color.g).toBeGreaterThan(brown.color.g);
+    expect(fresh.userData.flatColor).toBe(`#${fresh.color.getHexString()}`);
+    const demo = columnMaterial('chimney', 'demo', '#5a3a35');
+    expect(demo.transparent).toBe(true);
+    expect(demo.color.getHexString()).toBe('e0413a');
+    const cap = chimneyPartMaterial('cap', 'existing');
+    expect(`#${cap.color.getHexString()}`).toBe(CHIMNEY_CAP_COLOR);
+    expect(CHIMNEY_CAP_COLOR).toBe('#b8b4ac');
+    expect(chimneyPartMaterial('cap', 'demo').transparent).toBe(true);
+    const arrestor = chimneyPartMaterial('arrestor', 'existing');
+    expect(arrestor).toBe(openingMaterial('screen', 'existing'));
+    expect(arrestor.transparent).toBe(true);
+    expect(arrestor.depthWrite).toBe(false);
+  });
+
+  it('export: the shaft column_<kind>_<phase> (plus _<hex> when coloured), the cap and arrestor as more Chimney meshes', () => {
+    const { first } = house();
+    store().addGradePoint({ at: { x: 0, y: 0 }, elevation: -4 });
+    store().addColumn({ ...chimney({ cap: true, color: '#5a3a35' }), id: undefined });
+    store().addColumn({ ...chimney({ at: { x: 60, y: -10 }, phase: 'demo', cap: true, color: '#5a3a35' }), id: undefined });
+    store().addColumn({ ...chimney({ at: { x: 260, y: -10 } }), id: undefined });
+    const root = buildExportScene(plan(), 'all', { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: first });
+    const site = root.children.find((c) => c.name === 'Site')!;
+    const meshes = site.children as Mesh[];
+    expect(meshes.map((m) => m.name).sort()).toEqual(['Chimney', 'Chimney', 'Chimney', 'Chimney', 'Chimney', 'Chimney', 'Chimney', 'Terrain']);
+    const mats = meshes.map((m) => (m.material as MeshStandardMaterial).name);
+    expect(mats).toEqual([
+      'terrain',
+      'column_chimney_existing_5a3a35',
+      'chimney_cap_existing',
+      'chimney_arrestor_existing',
+      'column_chimney_demo',
+      'chimney_cap_demo',
+      'chimney_arrestor_demo',
+      'column_chimney_existing',
+    ]);
+    const byMat = (n: string) => meshes.find((m) => (m.material as MeshStandardMaterial).name === n)!;
+    expect((byMat('column_chimney_existing_5a3a35').material as MeshStandardMaterial).color.getHexString()).toBe('5a3a35');
+    expect((byMat('chimney_cap_existing').material as MeshStandardMaterial).color.getHexString()).toBe('b8b4ac');
+    expect((byMat('chimney_arrestor_existing').material as MeshStandardMaterial).transparent).toBe(true);
+    expect(byMat('chimney_arrestor_existing').renderOrder).toBe(1);
+    expect(byMat('column_chimney_demo').renderOrder).toBe(1);
+    for (const m of meshes) {
+      expect((m.material as MeshStandardMaterial).map).toBeNull();
+      expect((m.material as MeshStandardMaterial).normalMap).toBeNull();
+    }
+    disposeExportScene(root);
+  });
+
+  it('Fit 3D (planBox) reaches the spark arrestor 12" above a capped chimney and the cap 2" past its faces', () => {
+    house();
+    const id = store().addColumn({ ...chimney({ at: { x: 400, y: -60 }, base: -300, top: 500 }), id: undefined })!;
+    const plainBox = planBox(plan());
+    expect(plainBox.max[1]).toBe(500);
+    expect(plainBox.max[0]).toBeCloseTo(412, 6);
+    store().updateColumn(id, { cap: true });
+    const capped = planBox(plan());
+    expect(capped.max[1]).toBe(512);
+    expect(capped.max[0]).toBeCloseTo(414, 6);
+    expect(capped.min[2]).toBeCloseTo(-72, 6);
+    expect(capped.min[1]).toBe(-300);
+  });
+
+  it('store: the colour is lower-cased, refused unless #rrggbb; colour and cap clear with undefined, one undo step each', () => {
+    const id = store().addColumn({ ...chimney(), id: undefined })!;
+    expect(store().addColumn({ ...chimney({ color: 'brown' }), id: undefined })).toBeNull();
+    clearHistory();
+    store().updateColumn(id, { color: '#5A3A35', cap: true });
+    expect(plan().site.columns[id]).toMatchObject({ color: '#5a3a35', cap: true });
+    const before = plan();
+    store().updateColumn(id, { color: 'red' });
+    store().updateColumn(id, { color: '#5a3a35' }); // unchanged
+    expect(plan()).toBe(before);
+    store().updateColumn(id, { color: undefined });
+    store().updateColumn(id, { cap: undefined });
+    expect('color' in plan().site.columns[id]).toBe(false);
+    expect('cap' in plan().site.columns[id]).toBe(false);
+    undo();
+    expect(plan().site.columns[id].cap).toBe(true);
+    undo();
+    expect(plan().site.columns[id].color).toBe('#5a3a35');
+  });
+
+  it('brick: 18 courses of 6 bricks a tile in running bond, 2 2/3" x 8" with 3/8" joints, the mortar raked', () => {
+    const faces = brickFaces();
+    expect(BRICK_COURSE).toBeCloseTo(8 / 3, 12);
+    expect(BRICK_LENGTH).toBe(8);
+    expect(faces).toHaveLength(18 * 6);
+    for (const f of faces) {
+      expect(f.x1 - f.x0).toBeCloseTo(8 - MORTAR_JOINT, 9);
+      expect(f.y1 - f.y0).toBeCloseTo(8 / 3 - MORTAR_JOINT, 9);
+    }
+    // Every other course is shifted half a brick; the 18 courses fill the 48" tile exactly.
+    expect(faces[0].x0).toBeCloseTo(MORTAR_JOINT / 2, 9);
+    expect(faces[6].x0).toBeCloseTo(4 + MORTAR_JOINT / 2, 9);
+    expect(faces[faces.length - 1].y1).toBeCloseTo(48 - MORTAR_JOINT / 2, 9);
+    const h = brickHeight();
+    expect(h).toHaveLength(TEXTURE_PX * TEXTURE_PX);
+    // Mid-brick is the face; a bed joint between two courses is raked back.
+    const at = (x: number, y: number) => h[(TEXTURE_PX - 1 - Math.floor(y * PX_PER_INCH)) * TEXTURE_PX + Math.floor(x * PX_PER_INCH)];
+    expect(at(2, 4 / 3)).toBe(0);
+    expect(at(2, 8 / 3)).toBeCloseTo(-RELIEF.mortar, 9);
   });
 });
 

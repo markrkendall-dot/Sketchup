@@ -510,7 +510,7 @@ const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
-const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase'] as const;
+const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt'] as const;
@@ -659,13 +659,19 @@ export function roofOptionProblem(r: Pick<Roof, 'eave' | 'rafter' | 'boardColor'
   return null;
 }
 
-/** Why a column cannot be used (a non-positive size, top not above base, a non-finite number), or null. */
-export function columnProblem(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top'>): string | null {
+/**
+ * Why a column cannot be used (a non-positive size, top not above base, a non-finite number, a
+ * colour that is not `#rrggbb`, a cap that is not true or false), or null. A file's bad colour or cap
+ * is dropped on its own instead, in migrate.
+ */
+export function columnProblem(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top' | 'color' | 'cap'>): string | null {
   if (!isPoint(c.at)) return 'needs a position';
   if (!isNum(c.width) || c.width <= 0 || !isNum(c.depth) || c.depth <= 0) return 'width and depth must be positive';
   if (!isNum(c.rotation)) return 'needs a rotation';
   if (!isNum(c.base) || !isNum(c.top)) return 'needs a base and a top';
   if (!(c.top > c.base)) return 'the top must be above the base';
+  if (c.color !== undefined && !isHexColor(c.color)) return 'the colour must be a hex colour';
+  if (c.cap !== undefined && typeof c.cap !== 'boolean') return 'the cap must be on or off';
   return null;
 }
 
@@ -731,6 +737,9 @@ function migrateSite(raw: unknown): Site {
     col.rotation = isNum(c.rotation) ? c.rotation : 0;
     col.kind = c.kind === 'chimney' ? 'chimney' : 'post';
     col.phase = phaseOf(c.phase);
+    // Optional appearance fields: kept when valid, dropped otherwise (the defaults apply).
+    put(col, 'color', isHexColor(c.color) ? c.color.toLowerCase() : undefined);
+    put(col, 'cap', typeof c.cap === 'boolean' ? c.cap : undefined);
     columns[id] = col as unknown as Column;
   }
   site.columns = columns;

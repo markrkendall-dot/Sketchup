@@ -372,6 +372,31 @@ describe('file formats', () => {
     expect(box.max.z - box.min.z).toBeCloseTo(12.192 + 6.5 * METRES_PER_INCH, 5);
   });
 
+  it('writes a capped, coloured chimney as three Chimney nodes: the shaft, the cap and the spark arrestor', async () => {
+    const { first } = fixture();
+    expect(
+      store().addColumn({ at: { x: 180, y: -13 }, width: 24, depth: 20, rotation: 0, base: -12, top: 300, kind: 'chimney', phase: 'existing', color: '#5a3a35', cap: true }),
+    ).not.toBeNull();
+    const root = buildExportScene(store().plan, 'all', allVisible(first));
+    const glb = await toGlb(root);
+    disposeExportScene(root);
+    const view = new DataView(glb);
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(glb, 20, view.getUint32(12, true)))) as {
+      nodes: { name: string; mesh?: number; children?: number[] }[];
+      meshes: { primitives: { material: number }[] }[];
+      materials: { name: string; alphaMode?: string; pbrMetallicRoughness?: { baseColorTexture?: unknown } }[];
+      images?: unknown[];
+    };
+    const site = json.nodes.find((n) => n.name === 'Site')!;
+    const chimneys = site.children!.map((i) => json.nodes[i]).filter((n) => n.name === 'Chimney');
+    const mats = chimneys.map((n) => json.materials[json.meshes[n.mesh!].primitives[0].material]);
+    expect(mats.map((m) => m.name)).toEqual(['column_chimney_existing_5a3a35', 'chimney_cap_existing', 'chimney_arrestor_existing']);
+    expect(mats[2].alphaMode).toBe('BLEND');
+    // Colours only: no texture or image in the file.
+    expect(json.images ?? []).toEqual([]);
+    for (const m of json.materials) expect(m.pbrMetallicRoughness?.baseColorTexture).toBeUndefined();
+  });
+
   it('writes an OBJ in inches with one named object per mesh, prefixed by its level', () => {
     const { plan, first } = fixture();
     const root = buildExportScene(plan, 'all', allVisible(first));

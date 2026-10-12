@@ -104,6 +104,7 @@ export interface Column {
   id: Id; at: Vec2; width: Inches; depth: Inches; rotation: Degrees; // plan rectangle, turned clockwise
   base: Inches; top: Inches;                                         // absolute elevations
   kind: 'post' | 'chimney'; phase: Phase;
+  color?: string; cap?: boolean;                                     // see "Site and terrain"
 }
 export interface Site {
   northAngle: Degrees;      // degrees clockwise from the top of the plan to true north
@@ -419,15 +420,31 @@ slab's underside (the "north pair at first floor top minus 12 inches" of the ren
 ground never reaches that slab; a grade point above it would, and nothing clamps it.
 
 **Columns** are boxes from `base` to `top` (absolute elevations) over a plan rectangle turned by
-`rotation` (`columnOutline`, `buildColumnGeometry` = `prism`). Defaults (`columnDefaults`): chimney
+`rotation` (`columnOutline`, `buildColumnGeometry` = `prism` with `addBoxUVs`, see "Exterior
+appearance"). Defaults (`columnDefaults`): chimney
 24" x 40", base 12" below the ground at its point (`groundAt`), top 48" above the highest roof ridge
 on the plan (the top surface at the ridge; above the top ceiling without roofs); post 6" x 6", base on
 the ground, top at the lowest roof underside over it among roofs it can be seen with (a new post
-ignores a roof being demolished; `phasesCoexist`), else the first floor's ceiling. `getSiteMeshes(plan,
-viewMode)` returns the visible columns' geometry, memoized per view mode by the `columns` record and per
-column object, disposing what drops out. The `Terrain` and the columns render in `view3d/SiteMeshes.tsx`
-(columns: brick `#7a4a3e`, post tan `#c9b58c`, demolished translucent red, new pulled toward green). A column
-casts and receives the sun's shadows; a demolished one casts none.
+ignores a roof being demolished; `phasesCoexist`), else the first floor's ceiling. Optional fields:
+`color` (`#rrggbb`, lower-cased; `columnColorOf` defaults to brick `#7a4a3e` for a chimney and tan
+`#c9b58c` for a post, `COLUMN_COLOR` in `model/finish.ts`) and `cap` (a chimney's cap and spark
+arrestor; a post ignores it). `migrate()` keeps each when valid and drops it alone otherwise;
+`columnProblem` refuses a bad one in `addColumn` and `updateColumn`, which deletes either on
+`undefined`. A capped chimney (`hasChimneyCap`) has two more parts (`CHIMNEY_CAP`,
+`chimneyPartBoxes` in `site.ts`, built by `meshes.ts buildColumnParts`): the **cap**, a closed box
+from `top` less 4" to `top`, 2" proud of the shaft's faces all round, and the **arrestor**, a wire box
+from `top` up 12", 1" in from the shaft's faces (at most a quarter of the shaft), open at the bottom
+where it stands on the cap. The shaft then stops under the cap, at `top` less 4", so no two faces of
+the three lie on each other facing the same way. `columnPeak` is `top` plus the arrestor's 12".
+`getSiteMeshes(plan, viewMode)` returns the visible columns, memoized per view mode by the `columns`
+record and per column object, disposing what drops out: `ColumnMesh` has the shaft's `geometry`, the
+`color` after its default and, only on a capped chimney, `parts` (`cap`, `arrestor`). The `Terrain`
+and the columns render in `view3d/SiteMeshes.tsx`: the shaft in `columnMaterial(kind, phase, color)`
+(a chimney is brick in its colour, a post the flat colour, see "Exterior appearance"; demolished
+translucent red, new pulled toward green), the cap in concrete `#b8b4ac` (`CHIMNEY_CAP_COLOR`) and the
+arrestor in the window screens' wire mesh (`chimneyPartMaterial`). A column and its cap cast and
+receive the sun's shadows; a demolished one casts none, and neither does the arrestor (see-through,
+drawn after the opaque meshes like a screen).
 
 **Site mode** (`uiStore.siteMode`, the "Site" tab below the lowest level in the level bar): entering it
 makes the lowest level active (so the panel and store actions have a level), clears the selection and
@@ -457,8 +474,9 @@ through `deleteEntities`. Store actions: `addGradePoint`, `updateGradePoint`, `d
 size or a top at or below the base), `moveSiteItems`, `setNorthAngle` (normalized to [0, 360)); each is
 one undo step and a no-op leaves the plan object alone. `setPhase` and `deleteEntities` take `columns`
 (and `deleteEntities` `gradePoints`). `Selection` gains `gradePoints` and `columns`. The panel has Grade
-point (elevation, position, against the first floor), Column (kind, size, rotation, base, top, phase,
-"Reset heights") and, with nothing selected in site mode, Site (north angle, "Road is north", counts,
+point (elevation, position, against the first floor), Column (kind, size, rotation, base, top, "Colour"
+with a reset to the default, "Cap and spark arrestor" for a chimney, phase, "Reset heights") and, with
+nothing selected in site mode, Site (north angle, "Road is north", counts,
 "Clear grade points" with a confirm).
 
 **North and light**: `sunPosition(northAngle)` is the sun's direction (the light, the sky's sun and the
@@ -474,10 +492,14 @@ and the toolbar's "Draw as" cover them.
 **Export**: after the level groups a `Site` group (elevation 0, absolute heights) holds `Terrain` (material
 `terrain`, the flat lawn colour, no texture; with its skirt; only when the site has grade points: flat ground
 would only be a plane at the slab) and the visible columns as `Chimney` / `Post` (materials
-`column_<kind>_<phase>`). The far ground is not exported.
+`column_<kind>_<phase>`, plus `_<hex>` in a colour other than the kind's default unless demolished; a
+chimney's brick is its flat colour). A capped chimney's cap and arrestor follow its shaft as two more
+`Chimney` meshes, materials `chimney_cap_<phase>` and `chimney_arrestor_<phase>`. The far ground is not
+exported.
 
-**Fit 3D** (`bounds.ts planBox`) includes the columns and the terrain's height over the house area (a
-6 x 6 sampling of the plan box), never the 100' margin.
+**Fit 3D** (`bounds.ts planBox`) includes the columns (a capped chimney's cap, 2" proud, and its arrestor,
+12" above its top) and the terrain's height over the house area (a 6 x 6 sampling of the plan box), never
+the 100' margin.
 
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
@@ -487,13 +509,15 @@ value is dropped) and `Wall.color` (`#rrggbb`, lower-cased on load), `Opening.li
 12), `Opening.shutters`, `Opening.trim` (0 to 24"), `Opening.sashes` (whole number 1 to 6), `Opening.fixedCenter`,
 `Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`,
 `Roof.eave` (`fascia | open`), `Roof.rafter` (finite `depth` and `spacing` above 0, rebuilt as `{ depth, spacing }`),
-`Roof.boardColor` (`#rrggbb`, lower-cased) and `Roof.weathering` (0 to 1).
+`Roof.boardColor` (`#rrggbb`, lower-cased), `Roof.weathering` (0 to 1), `Column.color` (`#rrggbb`, lower-cased) and
+`Column.cap` (true or false; see "Site and terrain").
 Defaults when absent (`wallFinishOf`, `wallColorOf`, `roofColorOf`, `sashesOf`, `glazingOf`, `leafColorOf`,
-`roofEaveOf`, `rafterOf`, `boardColorOf`, `weatheringOf`):
+`roofEaveOf`, `rafterOf`, `boardColorOf`, `weatheringOf`, `columnColorOf`):
 exterior walls shingle in the house's stain `#5a3a35`, interior walls plain `#e8e4dc`, a metal roof `#6e6259`, a
 shingle roof `#4a4a4a`, one sash, glass, a dark green door leaf `#2f3a33`, fascia eaves, rafters 5.5" x 24"
-(`DEFAULT_RAFTER`), weathering 0.35 (`DEFAULT_WEATHERING`); the fascia, rake boards and rafter tails take the roof's
-board colour, tan `#d9c9a3` by default, like the window trim. The Level panel's
+(`DEFAULT_RAFTER`), weathering 0.35 (`DEFAULT_WEATHERING`), a chimney brick red `#7a4a3e` and a post tan `#c9b58c`
+(`COLUMN_COLOR`), no cap; the fascia, rake boards and rafter tails take the roof's board colour, tan `#d9c9a3` by
+default, like the window trim. The Level panel's
 "Exterior finish" and "Exterior colour" set every exterior wall of the level with one `updateWalls` (one undo step);
 the Wall, Opening and Roof panels edit one element. The colour picker commits once when it closes (native
 `change`), the hex field on Enter or blur. `updateWalls`, `updateOpening` and `updateRoof` take `undefined` to clear
@@ -534,12 +558,24 @@ translucent red with no texture, plain walls are the colour itself (pulled towar
 geometry with one material, so it cannot tell the faces of a wall apart: **both faces of an exterior wall show the
 siding** (the inside of a window reveal shows shingle too); interior walls are plain unless given a finish.
 
+**Brick** (a chimney, `textures.ts brickTextures(color)`): the siding's tile (512 px for 48", `repeat` 1/48) of
+modular brick, 2 2/3" courses (three to 8") of 8" bricks in running bond (`brickFaces`: 18 courses of 6 a tile, the
+same `runningBond` layout as the block's), each brick a few percent lighter or darker and a little warmer or cooler,
+with a few pores; the mortar is the colour lifted 18% toward a pale grey (a stained chimney is near one colour; the
+block's is 45%), each bed joint shaded under the brick above. Its relief (`brickHeight`) is flat faces and 0.25" raked
+joints, one normal map for every colour. `columnMaterial(kind, phase, color)` puts it on a chimney's shaft under a white
+tint with `normalScale` 0.6, keyed by kind, phase and colour (new work is drawn in the colour pulled toward green), and
+records the flat colour in `userData.flatColor`; a post is the flat colour; without a canvas (node) a chimney is too.
+
 **UVs**: `buildWallGeometry` ends with `addWallUVs`, which gives every triangle UVs in inches by its flat normal:
 faces along the wall (long faces, jambs of a gable triangle, the part above the plate) take u = distance along the
 centerline from the wall's start, v = height above the level's floor top; faces across the wall (jambs, free ends)
 take u = distance across the wall; top and bottom faces (also the sloped tops under a roof) u along, v across. A
 wall's courses therefore run level and continuous across its pieces, openings and the gable triangle, restart at each
 level's floor top, and need not line up across a corner (the horizontal courses do; the vertical joints do not).
+Columns and their parts get `addBoxUVs`, also in inches per triangle: faces turned up or down take (x, plan y); a
+vertical face with normal (nx, 0, nz) takes u = x t.x + z t.z along its tangent t = (-nz, 0, nx) and v = Y, so a
+chimney's courses run level round all four faces and its bond is not stretched across any of them.
 
 **Opening fills** (`openings3d.ts openingFill`, pure): a window or door becomes boxes in the wall's own frame (s along
 the centerline, d from the mid plane toward the outside, y above the floor top); `meshes.ts buildOpeningFill` turns
@@ -592,15 +628,18 @@ slots staggered half a tab, a shadow under each butt; its normal map has the but
 color, weathering)` keys by finish, phase, colour and quantized weathering (shingle ignores it): the texture under a white
 tint, the normal map at 0.6, the flat colour in `userData.flatColor`; metal has metalness 0.35, roughness 0.55. New work is
 the colour pulled toward green with no rust, demolished is translucent red, and without a canvas (node) the flat colour
-shows. The chimney stays brick red.
+shows. A chimney is brick in its own colour (above).
 
 **Export** is colours only. Every exported material is a clone of the live one with `map` and `normalMap` dropped and,
-for a textured one, its flat colour (`userData.flatColor`: `wallFlatColor` for walls, the roof's colour for roofs) set.
+for a textured one, its flat colour (`userData.flatColor`: `wallFlatColor` for walls, the roof's colour for roofs, the
+column's colour for a chimney) set.
 Walls are named `wall_<phase>_<kind>` for the default look and `..._<finish>_<hex>` otherwise;
 roofs `roof_<finish>_<phase>` (plus `_<hex>` when recoloured), `Fascia` meshes `fascia_<phase>` and `Rafters` meshes
 `rafter_<phase>`, both plus `_<hex>` in a board colour other than tan (not when demolished). Each opening part is
 a mesh named `Window` or `Door` with the material `trim`, `sash`, `glass`, `screen`, `door_leaf` (`door_leaf_<hex>`
-for a leaf in another colour, unless demolished) or `shutter` (`_new` / `_demo` for other phases). UV attributes are
+for a leaf in another colour, unless demolished) or `shutter` (`_new` / `_demo` for other phases). Columns are
+`column_<kind>_<phase>` (plus `_<hex>` in a colour other than the default, not when demolished), a chimney's cap and
+spark arrestor `chimney_cap_<phase>` and `chimney_arrestor_<phase>` (see "Site and terrain"). UV attributes are
 still written; no texture or image is. The Export menu says "Siding textures are not exported; colours are."
 
 ## 2D editor
@@ -817,7 +856,7 @@ and `needsUpdate` is set when the plan or a UI setting that changes the scene's 
 view mode, level visibility, active level, site mode) changes, and when the fit changes: orbiting and
 walking reuse the map. Shadows: every mesh receives them; walls, floors, stairs, roofs, fascia, columns
 and opening parts cast them, except demolished work (translucent red would throw a solid shadow), glass
-and screen walls; the terrain and far ground only receive. The sky's fill is a hemisphere light at 2.4,
+and screen walls, and the chimney's wire arrestor; the terrain and far ground only receive. The sky's fill is a hemisphere light at 2.4,
 blue-white `#e1ebf6` from above and the lawn's bounce `#a39f7c` from below, so faces turned from the sun
 (the north face) keep their siding visible while a sunlit face is about 2.6 times as bright as the eave
 shadow on it (the south face reads about (115, 72, 66) in the sun and (44, 22, 18) under the eave). drei `<Sky>` is the backdrop: the same sun position, turbidity
@@ -940,9 +979,11 @@ edit is set after it (Open, Undo's "Undid a change on ...", the duplicate room n
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
 skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, `Fascia`, `Rafters`,
-`Window`, `Door`, then a `Site` group (`Terrain`, `Chimney`, `Post`) with cloned geometry and cloned live materials
+`Window`, `Door`, then a `Site` group (`Terrain`, `Chimney`, `Post`; a capped chimney's cap and arrestor are more
+`Chimney` meshes) with cloned geometry and cloned live materials
 (one per phase/kind, roofs `roof_<finish>_<phase>`, boards `fascia_<phase>` and tails `rafter_<phase>` (plus `_<hex>`
-in a board colour other than tan), columns `column_<kind>_<phase>`, `terrain`, named without spaces; no texture or
+in a board colour other than tan), columns `column_<kind>_<phase>` (plus `_<hex>` in a colour other than the
+default), `chimney_cap_<phase>`, `chimney_arrestor_<phase>`, `terrain`, named without spaces; no texture or
 normal map, a textured material's flat colour instead, see "Exterior appearance"), disposed after
 export. glTF: `GLTFExporter`, `binary: true`, `trs: true`. OBJ: `OBJExporter` on the same group with
 the scale reset to 1 (inches; SketchUp asks for units) and each mesh name prefixed with its level,
@@ -958,6 +999,15 @@ TypeScript; ids are renamed to stable ones and the date is fixed, so a second ru
 toolbar's "Open example" (`fileActions.openExample`) loads it with a dynamic import (a separate
 chunk), after the same confirmation as New when the plan has content. Dimensions and the estimates
 are in the README ("Modelling 146 Mick Road").
+
+The exterior follows the photos with the appearance fields (realism plan, docs/history/PLAN-v3-realism.md):
+casement sashes and fixed-centre picture windows, screens in the porch's four bays and a screen door,
+the green half-lite house door, block basement walls with one board wall round a double door, open
+eaves with rafter tails and boards in the stain on weathered metal roofs, and the chimney 24" x 20",
+stained, capped. The script's `addOpeningAt` throws when the store moves an opening to make it fit (a
+jamb past a corner or a partition's face), so every number in it is where the opening is, and
+`example.test.ts` checks that no two surrounds (trim, sill, shutters) on one wall line overlap, which
+would z-fight; the porch's openings have no trim, since its posts are only 3.5" wide.
 
 ## Risks
 

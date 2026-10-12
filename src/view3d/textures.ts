@@ -8,8 +8,9 @@ import type { RoofFinish, WallFinish } from '../model/types';
 // pieces and openings. Every finish with relief (laps, shingle butts and keyways, V-grooves,
 // mortar joints) also has a height field in inches, turned into a normal map. The layouts, the
 // height fields and the normal-map rule are pure (testable in node); only drawing needs a canvas,
-// and `sidingTextures` returns null where there is no `document` (node, tests). Roof textures
-// (corrugated metal, asphalt shingle) follow at the end, on a 24" x 48" tile (`roofTexture`).
+// and `sidingTextures` returns null where there is no `document` (node, tests). A chimney's brick
+// (`brickTextures`) uses the same tile. Roof textures (corrugated metal, asphalt shingle) follow at
+// the end, on a 24" x 48" tile (`roofTexture`).
 
 /** Pixels per side of a texture tile. */
 export const TEXTURE_PX = 512;
@@ -33,6 +34,9 @@ export const GROOVE_HALF = 0.25;
 export const BLOCK_HEIGHT = 8;
 export const BLOCK_LENGTH = 16;
 export const MORTAR_JOINT = 0.375;
+/** Modular brick (a chimney's shaft): a course every 2 2/3" (three to 8"), 8" long, joints included. */
+export const BRICK_COURSE = 8 / 3;
+export const BRICK_LENGTH = 8;
 /** Wire spacing of a screen, in pixels (3/16"): 1 px wires every 2 px. */
 export const SCREEN_MESH_PX = 2;
 
@@ -148,23 +152,31 @@ export interface TileRect {
 }
 
 /**
- * The faces of the concrete blocks in a tile: 6 courses of 3 blocks, every other course shifted by
- * half a block (running bond), each face inset by half a mortar joint all round. Mortar is the rest.
+ * The faces of the units of a running bond over a tile: courses `height` apart, units `length` long
+ * (each with its share of a MORTAR_JOINT), every other course shifted by half a unit, each face inset
+ * by half a joint all round; the last unit of a shifted course wraps round the tile's edge. Mortar is
+ * the rest.
  */
-export function blockFaces(): TileRect[] {
+function runningBond(height: number, length: number): TileRect[] {
   const m = MORTAR_JOINT / 2;
   const out: TileRect[] = [];
-  const courses = Math.round(TILE_INCHES / BLOCK_HEIGHT);
-  const perCourse = Math.round(TILE_INCHES / BLOCK_LENGTH);
+  const courses = Math.round(TILE_INCHES / height);
+  const perCourse = Math.round(TILE_INCHES / length);
   for (let k = 0; k < courses; k++) {
-    const shift = (k % 2) * (BLOCK_LENGTH / 2);
+    const shift = (k % 2) * (length / 2);
     for (let j = 0; j < perCourse; j++) {
-      const x = shift + j * BLOCK_LENGTH;
-      out.push({ x0: x + m, y0: k * BLOCK_HEIGHT + m, x1: x + BLOCK_LENGTH - m, y1: (k + 1) * BLOCK_HEIGHT - m });
+      const x = shift + j * length;
+      out.push({ x0: x + m, y0: k * height + m, x1: x + length - m, y1: (k + 1) * height - m });
     }
   }
   return out;
 }
+
+/** The faces of the concrete blocks in a tile: 6 courses of 3 blocks in running bond. */
+export const blockFaces = (): TileRect[] => runningBond(BLOCK_HEIGHT, BLOCK_LENGTH);
+
+/** The faces of the bricks in a tile (a chimney): 18 courses of 6 bricks in running bond. */
+export const brickFaces = (): TileRect[] => runningBond(BRICK_COURSE, BRICK_LENGTH);
 
 const wrap = (i: number, n: number): number => ((i % n) + n) % n;
 /** Canvas column of a position across the tile, and canvas row of a height up it (rows grow downward). */
@@ -221,6 +233,17 @@ export function sidingHeight(finish: WallFinish): Float32Array | null {
     f.fill(-RELIEF.mortar);
     for (const r of blockFaces()) heightRect(f, r, () => 0);
   } else return null;
+  return f;
+}
+
+/**
+ * The relief of a chimney's brick over one tile, inches in canvas order like sidingHeight: flat
+ * faces, mortar joints raked RELIEF.mortar deep.
+ */
+export function brickHeight(): Float32Array {
+  const f = new Float32Array(TEXTURE_PX * TEXTURE_PX);
+  f.fill(-RELIEF.mortar);
+  for (const r of brickFaces()) heightRect(f, r, () => 0);
   return f;
 }
 
@@ -314,10 +337,13 @@ function shade(color: string, f: number, warmth = 0): string {
   return `rgb(${byte(r * f * (1 + WARMTH * warmth))}, ${byte(g * f)}, ${byte(b * f * (1 - WARMTH * warmth))})`;
 }
 
-/** The mortar between blocks: the block colour lifted toward a pale grey. */
-function mortarColor(color: string): string {
+/** How far mortar is lifted from the unit's colour toward a pale grey: well clear of a block, a little for a stained brick. */
+const BLOCK_MORTAR = 0.45;
+const BRICK_MORTAR = 0.18;
+
+/** The mortar between blocks or bricks: their colour lifted toward a pale grey by `t`. */
+function mortarColor(color: string, t: number): string {
   const [r, g, b] = hexToRgb(color);
-  const t = 0.45;
   return `rgb(${byte(r + (206 - r) * t)}, ${byte(g + (202 - g) * t)}, ${byte(b + (194 - b) * t)})`;
 }
 
@@ -432,7 +458,7 @@ function drawBlock(ctx: Ctx, color: string): void {
   const rand = seeded(47);
   const tile = { x0: 0, y0: 0, x1: TILE_INCHES, y1: TILE_INCHES };
   // Mortar everywhere, lighter than the blocks; then each block's face over it.
-  ctx.fillStyle = mortarColor(color);
+  ctx.fillStyle = mortarColor(color, BLOCK_MORTAR);
   ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
   speckle(ctx, rand, tile, 900);
   for (const f of blockFaces()) {
@@ -441,6 +467,23 @@ function drawBlock(ctx: Ctx, color: string): void {
   }
   // A raked bed joint sits in the shadow of the block above it.
   for (let y = BLOCK_HEIGHT; y <= TILE_INCHES; y += BLOCK_HEIGHT) lapShadow(ctx, y + MORTAR_JOINT / 2, JOINT_SHADOW);
+}
+
+function drawBrick(ctx: Ctx, color: string): void {
+  const rand = seeded(53);
+  const tile = { x0: 0, y0: 0, x1: TILE_INCHES, y1: TILE_INCHES };
+  // Mortar a little lighter than the brick (a stained chimney is near one colour), then each brick a
+  // few percent lighter or darker, a little warmer or cooler, with a few pores.
+  ctx.fillStyle = mortarColor(color, BRICK_MORTAR);
+  ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
+  speckle(ctx, rand, tile, 700);
+  for (const f of brickFaces()) {
+    rect(ctx, f.x0, f.y0, f.x1, f.y1, shade(color, brightness(rand), rand() * 2 - 1));
+    speckle(ctx, rand, f, 24);
+  }
+  // A raked bed joint sits in the shadow of the brick above it.
+  const courses = Math.round(TILE_INCHES / BRICK_COURSE);
+  for (let k = 1; k <= courses; k++) lapShadow(ctx, k * BRICK_COURSE + MORTAR_JOINT / 2, JOINT_SHADOW);
 }
 
 function drawScreen(ctx: Ctx): void {
@@ -542,6 +585,43 @@ export function sidingTextures(finish: WallFinish, color: string, variant: Textu
 /** The colour texture alone (sidingTextures' map), or null. */
 export const sidingTexture = (finish: WallFinish, color: string, variant: TextureVariant = 'plain'): CanvasTexture | null =>
   sidingTextures(finish, color, variant)?.map ?? null;
+
+/** The brick's normal map (the relief does not depend on the colour): undefined until made, null without a canvas. */
+let brickNormal: CanvasTexture | null | undefined;
+const brickCache = new Map<string, SidingTextures | null>();
+
+/**
+ * A chimney's brick (DESIGN.md "Exterior appearance"): 2 2/3" x 8" running bond in `color`, the
+ * mortar a little lighter, on the siding's tile (512 px for 48", `repeat` 1/48: the column's UVs are
+ * in inches, meshes.ts addBoxUVs), with the normal map of the raked joints. Made once per colour,
+ * the normal map once. Null wherever there is no DOM canvas (node), where the material shows the
+ * flat colour.
+ */
+export function brickTextures(color: string): SidingTextures | null {
+  if (typeof document === 'undefined') return null;
+  const hit = brickCache.get(color);
+  if (hit !== undefined) return hit;
+  const tile = tileCanvas();
+  if (!tile) {
+    brickCache.set(color, null);
+    return null;
+  }
+  drawBrick(tile.ctx, color);
+  if (brickNormal === undefined) {
+    const n = tileCanvas();
+    brickNormal = null;
+    if (n) {
+      const img = n.ctx.createImageData(TEXTURE_PX, TEXTURE_PX);
+      normalFromHeight(brickHeight(), TEXTURE_PX, PX_PER_INCH, img.data);
+      n.ctx.putImageData(img, 0, 0);
+      // Directions, not colours: no colour space conversion.
+      brickNormal = tileTexture(n.canvas, NoColorSpace);
+    }
+  }
+  const out = { map: tileTexture(tile.canvas, SRGBColorSpace), normalMap: brickNormal };
+  brickCache.set(color, out);
+  return out;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Roof textures. A roof tile is TEXTURE_PX square and stands for ROOF_TILE: 24" across the slope

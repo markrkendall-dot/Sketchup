@@ -1,9 +1,10 @@
 import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
 import type { FillPart } from '../derive/openings3d';
-import { DEFAULT_LEAF_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import type { ChimneyPart } from '../derive/site';
+import { CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, Phase, RoofFinish, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture } from './groundTexture';
-import { NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures } from './textures';
+import { brickTextures, NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures } from './textures';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
@@ -307,22 +308,44 @@ farGroundMaterial.polygonOffset = true;
 farGroundMaterial.polygonOffsetFactor = -1;
 farGroundMaterial.polygonOffsetUnits = -4;
 
-/** Column colours: brick red for chimneys, trim tan for posts. */
-const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c' };
-
 const columnMaterials = new Map<string, MeshStandardMaterial>();
 
-/** A column's material: by kind; demolished translucent red like walls, new pulled toward the new-work green. */
-export function columnMaterial(kind: Column['kind'], phase: Phase): MeshStandardMaterial {
-  const key = `${kind}|${phase}`;
+/**
+ * A column's shaft: by kind, phase and colour (the column's own, else brick red for a chimney and
+ * tan for a post, model/finish.ts COLUMN_COLOR). A chimney is brick (textures.ts brickTextures:
+ * running bond in the colour, the mortar a little lighter, with its normal map) under a white tint;
+ * a post is the flat colour. Demolished: translucent red like walls; new: the colour pulled toward
+ * the new-work green (the brick drawn in it). The flat colour is kept in `userData.flatColor` for
+ * the export; without a canvas (node) it is the material's colour.
+ */
+export function columnMaterial(kind: Column['kind'], phase: Phase, color: string = COLUMN_COLOR[kind]): MeshStandardMaterial {
+  const key = phase === 'demo' ? 'demo' : `${kind}|${phase}|${color}`;
   let m = columnMaterials.get(key);
   if (!m) {
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
-      const base = new Color(COLUMN_COLOR[kind]);
-      m = make(phase === 'new' ? `#${base.lerp(new Color('#3f8f5f'), 0.45).getHexString()}` : COLUMN_COLOR[kind]);
+      const flat = phase === 'new' ? pullGreen(color) : color;
+      const tex = kind === 'chimney' ? brickTextures(flat) : null;
+      m = make(tex ? '#ffffff' : flat);
+      if (tex) {
+        m.map = tex.map;
+        if (tex.normalMap) {
+          m.normalMap = tex.normalMap;
+          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
+        }
+      }
+      m.userData.flatColor = flat;
     }
     columnMaterials.set(key, m);
   }
   return m;
+}
+
+/**
+ * A capped chimney's parts: the cap in pale concrete (CHIMNEY_CAP_COLOR, demolished red and new
+ * pulled toward green like trim) and the spark arrestor in the window screens' wire mesh
+ * (see-through, no depth write, drawn after the opaque meshes; it casts no shadow).
+ */
+export function chimneyPartMaterial(part: ChimneyPart, phase: Phase): MeshStandardMaterial {
+  return part === 'cap' ? trimLike('chimney-cap', CHIMNEY_CAP_COLOR, phase) : screenMaterial(phase);
 }

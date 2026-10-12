@@ -1,4 +1,4 @@
-import type { Glazing, Opening, Roof, RoofEave, RoofFinish, Wall, WallFinish, WallKind } from './types';
+import type { Column, Glazing, Opening, Roof, RoofEave, RoofFinish, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
@@ -82,3 +82,9 @@ export const sashesOf = (o: Pick<Opening, 'sashes'>): number => o.sashes ?? DEFA
 export const leavesOf = (o: Pick<Opening, 'sashes'>): number => Math.min(MAX_LEAVES, sashesOf(o));
 export const glazingOf = (o: Pick<Opening, 'glazing'>): Glazing => o.glazing ?? 'glass';
 export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColor ?? DEFAULT_LEAF_COLOR;
+
+/** Column colours by kind: brick red for a chimney, trim tan for a post. */
+export const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c' };
+export const columnColorOf = (c: Pick<Column, 'kind' | 'color'>): string => c.color ?? COLUMN_COLOR[c.kind];
+/** A chimney's cap: pale concrete. */
+export const CHIMNEY_CAP_COLOR = '#b8b4ac';

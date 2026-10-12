@@ -146,6 +146,13 @@ export interface Column {
   top: Inches;
   kind: 'post' | 'chimney';
   phase: Phase;
+  /** Hex colour `#rrggbb`. Absent: brick red for a chimney, tan for a post (model/finish.ts). */
+  color?: string;
+  /**
+   * Chimneys: a 4" concrete cap at the top (2" proud all round) and a 12" wire spark arrestor above
+   * it (DESIGN.md "Site and terrain"). Ignored on a post.
+   */
+  cap?: boolean;
 }
 
 /** A spot elevation of the ground (M9). */

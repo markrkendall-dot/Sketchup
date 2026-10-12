@@ -15,7 +15,7 @@ import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type 
 import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, GLAZINGS, glazingOf, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
-import { boardColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
+import { boardColorOf, COLUMN_COLOR, columnColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
@@ -1259,7 +1259,28 @@ function ColumnProps({ column }: { column: Column }) {
       {length('depth', 'Depth', 'positive', 'Along the plan y axis before rotation.')}
       <NumberField label="Rotation" value={column.rotation} onCommit={(v) => updateColumn(column.id, { rotation: v })} hint="Degrees, clockwise on the plan." />
       {length('base', 'Base', 'any', 'Bottom, as an elevation (the ground here is shown below).')}
-      {length('top', 'Top', 'any', 'Top, as an elevation.')}
+      {length('top', 'Top', 'any', column.kind === 'chimney' && column.cap ? 'Top of the cap, as an elevation; the spark arrestor stands 12" above it.' : 'Top, as an elevation.')}
+      <ColorField
+        label="Colour"
+        value={columnColorOf(column)}
+        onCommit={(color) => updateColumn(column.id, { color })}
+        onReset={column.color ? () => updateColumn(column.id, { color: undefined }) : undefined}
+        hint={`Default for a ${column.kind}: ${COLUMN_COLOR[column.kind]}.${column.kind === 'chimney' ? ' The 3D view draws it as brick.' : ''}`}
+      />
+      {column.kind === 'chimney' && (
+        <label className="check-row">
+          <input
+            type="checkbox"
+            aria-label="Cap and spark arrestor"
+            checked={!!column.cap}
+            onChange={(e) => {
+              updateColumn(column.id, { cap: e.target.checked ? true : undefined });
+              releaseFocus(e.currentTarget);
+            }}
+          />
+          Cap and spark arrestor (a 4" concrete cap, a 12" wire box above it)
+        </label>
+      )}
       <SelectField label="Phase" value={column.phase} options={phaseOptions} onChange={(phase) => updateColumn(column.id, { phase })} />
       <ReadOnly label="Height">{formatLength(column.top - column.base, denom)}</ReadOnly>
       <ReadOnly label="Position">

@@ -12,13 +12,15 @@ What it draws:
 
 - **Walls, openings, rooms, stairs** on any number of levels (Basement, First Floor and Second
   Floor to start), with the three levels stacked in 3D and a faint ghost of the level below.
-- **Roofs** (gable, shed, hip, flat) with overhangs, fascia and rake boards; walls under a roof
-  rise to meet it, so a gable end is a triangle.
+- **Roofs** (gable, shed, hip, flat) with overhangs, fascia and rake boards or open eaves with
+  rafter tails; walls under a roof rise to meet it, so a gable end is a triangle.
 - **The site**: spot elevations of the ground (grade points) become a terrain surface, so a walkout
   basement shows on the downhill side and is buried on the uphill side; **chimneys and posts**
-  stand on it.
-- **Exterior appearance**: clapboard, shingle, board or screen siding in any colour, windows with
-  divided lites, trim and shutters, doors with panels, roof colour.
+  stand on it, a chimney with its cap and spark arrestor if it has them.
+- **Exterior appearance**: clapboard, shingle, board, concrete block or screen siding in any
+  colour; windows of one or more sashes with divided lites, picture windows, screens, trim and
+  shutters; doors with panels or glass, double doors and screen doors; corrugated metal roofs that
+  rust; a brick chimney in any colour.
 - **Before and after**: everything you draw is existing, new or to be demolished, and the Existing,
   Proposed and All views show each state, in 2D, in 3D and in the export.
 
@@ -100,18 +102,36 @@ Once the walls are in, these make the 3D model look like the house.
   12), overhang, thickness and fascia, the finish (metal or shingle) and colour. **Fit to walls**
   sets the outline to the outer face of the level's walls when they close one ring. Small roofs
   (a porch, a wing) go on the level they sit on; their ridge and slope are set the same way.
+- **Eaves, boards and rust.** "Eaves" is a fascia board along the eaves, or open with the rafter
+  tails showing under the overhang (set their depth and spacing; 5 1/2" every 24" by default); the
+  rake boards up the gables stay either way. "Board colour" paints the fascia, the rake boards and
+  the rafter tails (tan by default; Default resets it). A metal roof is corrugated sheet, and its
+  "Weathering" (0 to 1) sets how much rust streaks it.
 - **The site (the Site tab under the lowest level).** Grade points (`E`) are spot elevations of
   the ground: click a spot and type its elevation (`-4`, `-6'4`; absolute, like the floor tops
   shown in the level bar). The terrain is smoothed between them. Put one at each house corner
   and a few out where the ground levels off. A chimney or a post (`C`; Tab switches kind) stands
-  on the ground with its base and top set in the panel. The north arrow turns with the plan's
-  north angle, and the sun follows it.
+  on the ground with its base and top set in the panel, in its "Colour" (brick red for a chimney,
+  tan for a post until you set one). A chimney is drawn as brick in its colour; tick "Cap and spark
+  arrestor" for a 4" concrete cap at its top, 2" proud of its faces, and a 12" wire box on the cap
+  (in the export they are two more `Chimney` meshes). The north arrow turns with the plan's north
+  angle, and the sun follows it.
 - **Finishes.** The Level panel's "Exterior finish" and "Exterior colour" set every exterior
-  wall of the level at once; the Wall panel sets one wall. Siding textures are in the 3D view only
-  (the export carries colours). A window panel sets lites (cols x rows), trim width and shutters.
+  wall of the level at once; the Wall panel sets one wall: shingle, clapboard, vertical board,
+  concrete block (for a foundation), plain or screen. The siding, brick and roof textures are in
+  the 3D view only: the export carries their colours.
+- **Windows and doors.** A window's panel sets its "Sashes" (1 to 6 side by side with 2" mullions
+  between them; the lites, cols x rows, are per sash), "Fixed centre pane" (at 3 sashes: a picture
+  window, one undivided pane between two casements at most 24" wide), "Glazing" (glass, or an
+  insect screen in a light frame), the trim width (0 for none) and shutters (one sash wide). A
+  door's panel sets its "Leaves" (2 for a double door), the glazed lites per leaf (1 x 1 is a solid
+  panel), "Half lite" (the lites in the upper part, two panels below), "Glazing" (a screen door:
+  screen above and below a mid rail) and the "Leaf colour".
 - **Walls run through the floors.** An exterior wall on a level with a level above it is taller by
   that level's floor thickness, and the floor slab stops at the inside face of the wall, the way a
   platform-framed house is built, so the siding is continuous from one storey to the next.
+- **Elevations.** The 3D bar's **N**, **S**, **E** and **W** buttons show each side straight on,
+  and the Export menu saves all four as images (see "3D and walk mode" and "Export to SketchUp").
 
 ## Planning the renovation
 
@@ -249,11 +269,13 @@ so a plan with photos can be a few megabytes.
 
 `docs/examples/146-mick-road.json` is a starter plan of the owner's house, made from the site
 sketch, the owner's floor sketches and nine photos (`docs/photos/`) so that the 3D model already reads as the same house:
-the gable roof with deep eaves, the east wing with its own gable, the entry porch with its knee
-walls and west-facing gable, the brick chimney, shingle below and clapboard above, the multi-lite
-windows, the green shutters and the walkout basement on the lake side. It is a **starter, not a
-survey**. Both floors' interiors come from the owner's tape and sketches (face to face): the First
-Floor's rooms, 5" partitions and stair, and the Second Floor's rooms and partitions. The exterior
+the gable roof with deep open eaves and rafter tails under rusting corrugated metal, the east wing
+with its own gable, the screened entry porch with its knee walls and west-facing gable, the chimney
+stained like the house with its cap and spark arrestor, shingle below and clapboard above, the
+casement and picture windows, the green shutters, and the walkout basement on the lake side, grey
+block with vertical boards round its double door. It is a **starter, not a survey**. Both floors'
+interiors come from the owner's tape and sketches (face to face): the First Floor's rooms, 5"
+partitions and stair, and the Second Floor's rooms and partitions. The exterior
 wall thickness (7") and the outside size are derived from those measurements. Everything else (the
 basement, the windows, the roofs, the porch, the terrain) is an estimate from the photos, and every
 room name that depends on one says "(est.)" or "not measured". A room name that says "adjusted"
@@ -278,20 +300,30 @@ and the plan's north angle is 0.
   side falls to the basement floor.
 - **Main block**, on all three levels: outside faces x 0 to 318 (26'6"), y 0 to 315 (26'3"). The wall
   centerlines are placed 3 1/2" inside those faces by hand, which is what "Lengths to: outside
-  face" does for you when you draw. Exterior walls 7"; the basement's concrete-block walls are
-  8", plain grey (`#8a8580`). First Floor shingle, Second Floor clapboard on the south and east
-  faces and shingle on the north and west faces (photos 1, 3, 6 and 8), all `#5a3a35`.
+  face" does for you when you draw. Exterior walls 7"; the basement's walls are 8" grey concrete
+  block (`#8f8a84`, photos 1 and 2). First Floor shingle, Second Floor clapboard on the south and
+  east faces and shingle on the north and west faces (photos 1, 3, 6 and 8), all `#5a3a35`.
 - **East wing** (the Utility), First Floor over a walkout basement bump, flush with the south face,
-  interior 11'6" x 9'5" so outside x 318 to 463, y 188 to 315, with its own gable roof (ridge east-west) and the double door below it.
+  interior 11'6" x 9'5" so outside x 318 to 463, y 188 to 315, with its own gable roof (ridge
+  east-west). Below it the bump's south wall is vertical boards in the stain round a double door of
+  two plain leaves in the stain, with no trim (photo 2).
 - **Entry porch** on the west face at its north end, flush with the north face (photo 8, taken
-  facing east; photos 6 and 7 show the same porch from the road): shingled walls with openings above
-  a 36" knee wall, glazed on its north side and in the front's north bay, open in the front's south
-  bay and on its south side, the entry in line with the house door, and a gable facing west. The
-  wall pieces between the openings stand in for the posts.
-- **Main roof**: gable over the Second Floor, ridge east-west, 8:12, 24" overhang, metal
-  `#6e6259`. **Chimney** against the north wall, centred.
-- **Windows and doors** on the four faces, each with lites; shutters on the two west windows.
-- **Terrain**: fifteen grade points, see below.
+  facing east; photos 6 and 7 show the same porch from the road): shingled walls with screens above
+  a 36" knee wall in all four bays (the two narrow ones of the front either side of the entry, and
+  its north and south sides), a screen door in line with the house door, and a gable facing west.
+  The wall pieces between the openings stand in for the posts; the porch's openings have no trim,
+  since those posts are only 3 1/2" wide.
+- **Roofs**: the main gable over the Second Floor (ridge east-west, 6:12, 24" overhang), the wing's
+  (7:12, 18") and the porch's (5:12, 18"). All are corrugated metal 2 1/2" thick with open eaves
+  (rafter tails 5 1/2" deep every 24", photos 1, 2 and 7) and 7" rake boards, the tails and boards in
+  the stain: weathered galvanized `#8a8378` on the main roof (weathering 0.6) and the porch (0.7),
+  a darker, browner `#6e4b3c` on the wing (0.3, photo 3).
+- **Chimney** against the north wall, centred: 24" along the wall and 20" out from it, stained
+  like the house, with a concrete cap and a wire spark arrestor (photos 6 and 7).
+- **Windows and doors** on the four faces, built from casement sashes with their lites (picture
+  windows of a casement, a fixed pane and a casement on the south and west faces, photos 1 and 8),
+  shutters on the two west windows, and the house door dark green with nine lites over two panels.
+- **Terrain**: nineteen grade points, see below.
 - **The two floors share three north-south bands** (inside faces, from the north wall): the north
   band y 7 to 97 (7'6"), a 5" wall (centerline y 99.5), the stair strip y 102 to 135 (2'9"), a 5"
   wall (centerline y 137.5), and the south band y 140 to 308. The north-south inside length is 301",
@@ -347,7 +379,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | --- | --- | --- |
 | Wall thickness, exterior | 7" (derived: the measured interior 11'6" + 5" + 13'5" = 25'4" against the sketch's 26'6" outside) | At a door jamb |
 | Outside size of the main block | **26'6" x 26'3"** (derived: 25'4" inside east-west, 301" inside north-south from the upstairs west side, plus two 7" walls each way; the site sketch's 25.5' was rounded). **Worth one outside tape measurement** | Corner to corner, outside, at the first-floor sill |
-| Basement wall thickness | 8" (block) | At the basement door jamb |
+| Basement wall thickness | 8" grey concrete block; vertical boards in the stain on the wing's south wall, round the walkout door (photo 2) | At the basement door jamb |
 | First Floor rooms | measured, face to face: Entry hall 15'5" x 7'6", Bath 9'6" x 7'6", Living 13'5" x 14'0" (measured 14'1"), Utility 11'6" x 9'5" | Re-check any that look wrong |
 | Kitchen | 11'6" x 17'2", **adjusted: re-measure.** MK measured 16'3"; the upstairs wins, and the first-floor mistake is suspected near the bottom of the stairs | Kitchen north-south, between the lake wall and the y 99.5 wall |
 | Interior partition thickness | 5" (measured) | At a jamb |
@@ -363,30 +395,33 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Floor thickness | basement slab 4", floors 12" | Joists plus subfloor, at a stair opening |
 | First-floor height above the basement floor | basement floor -100", first floor top +2" | Basement floor to first floor |
 | East wing (Utility) size and place | interior 11'6" x 9'5" (measured), so 12'1" outside east-west past the main wall and 10'7" north-south, flush with the south face | Outside, at the foundation |
-| Wing north wall | y 177" (10'7" from the south face) | From the south-east corner |
-| Entry porch | 5'-6" out x 8' along the wall, flush with the north face | Outside faces, at the floor |
-| Porch openings | knee walls 36"; front: glazed bay 18" wide, entry 36", open bay 18"; north side glazed 44"; south side open 44" | Jamb to jamb, knee wall height |
-| Entry door | 36 x 80, centred 4' from the north corner (y 48") | Jamb to the corner |
-| Chimney | 24 x 40, centred on the north wall (x 159") | Width, projection, position |
-| South windows, first floor | 130 x 60 at x 100" (narrowed from 140 so it clears the Kitchen/Living partition) and 96 x 60 at x 260" (6 x 2 lites), sill 30 | Jamb to corner, rough opening |
-| South windows, second floor | 88 x 48 at x 115" and 64 x 48 at x 256" (6 x 3 lites), sill 30 | Same |
-| West windows | first floor three-sash 96 x 40, sill 47 (head above the door head), at y 203"; second floor 48 x 28, 4 x 2 lites, sill 50, at y 200"; both with shutters | Jamb to the north corner |
-| North windows | first floor 72 x 48 at x 96" and 48 x 36 at x 234"; second floor 48 x 40 at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office) | Jamb to the west corner |
-| East windows | second floor two 46 x 44 (4 x 3 lites, sill 34) at y 98" and y 222"; first floor 40 x 40, sill 42, at y 152" | Jamb to the north corner |
-| Wing windows | east end 56 x 44, 6 x 3 lites; north face 48 x 40; south face 36 x 36 | Rough openings |
-| Basement double door | 60 x 80 on the wing's south wall | Jamb to jamb |
+| Wing north wall | y 188" (10'7" from the south face) | From the south-east corner |
+| Entry porch | 5'-6" out x 8' along the wall, flush with the north face. **Photos 6 and 7 read 7' to 9' out**; the starter keeps 5'6" until it is measured | Outside faces, at the floor |
+| Porch openings | knee walls 36"; screens 44" high above them in all four bays: the front's two 18" bays either side of the entry (y 17.5" and 78.5"), the north and south sides 44"; a 36" screen door at the entry, swinging out; no trim | Jamb to jamb, knee wall height |
+| Entry door | 36 x 80, centred 4' from the north corner (y 48"), dark green, nine lites over two panels (photo 8) | Jamb to the corner |
+| Chimney | 24" along the wall x 20" out (photos 6 and 7), centred on the north wall (x 159"), stained like the house; a 4" concrete cap and a 12" spark arrestor on top | Width, projection, position |
+| South windows, first floor | picture windows of a casement (2 x 3 lites), a fixed pane and a casement (casements 24" wide): 144 x 60 at x 87.5" and 118 x 60 at x 242", sill 30; the jambs clear the Kitchen/Living partition's faces at x 168" and 173" (photo 1) | Jamb to corner, rough opening |
+| South windows, second floor | four casements 88 x 46 at x 115" and three 66 x 46 at x 256", 2 x 3 lites each, sill 34 (photo 1) | Same |
+| West windows | first floor 90 x 44 at y 203", sill 44 (head above the door head): a casement (2 x 3 lites), a fixed pane and a casement; second floor two casements of 2 x 2 lites, 48 x 32 at y 200", sill 48; both with shutters one casement wide (photo 8) | Jamb to the north corner |
+| North windows | first floor three casements (2 x 3 lites) 80 x 56 at x 96", sill 30, west of the chimney, and two single panes 42 x 44 at x 234", sill 34; second floor two casements (2 x 3 lites) 46 x 44, sill 36, at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office; its west jamb is 2" from that wall's face) (photos 6 and 7) | Jamb to the west corner |
+| East windows | second floor two pairs of casements (2 x 3 lites) 46 x 44, sill 34, at y 98" and y 222"; first floor one casement (2 x 3 lites) 36 x 40, sill 42, at y 152" (photo 3) | Jamb to the north corner |
+| Wing windows | pairs of casements (2 x 3 lites): east end 48 x 44 (photo 3), north face 48 x 40, south face 48 x 44 (photos 1 and 2), sill 30 | Rough openings |
+| Basement double door | 72 x 80 on the wing's south wall, two plain leaves in the stain (photo 2) | Jamb to jamb |
 | Roof pitches | main 6:12, wing 7:12, entry porch 5:12 (photos 3 and 8) | A level and a tape against the rafter or the gable |
 | Roof overhangs | main 24", wing 18", entry porch 18" | Eave to the wall face |
-| Roof thickness, fascia | 8", 6" | Fascia board |
+| Roof thickness, eaves | 2 1/2" (corrugated sheet); open eaves, rafter tails 5 1/2" deep every 24" (photos 1 and 7); 7" rake boards | A rafter tail and the rake board |
 | Grade points | see below | Spot levels from the floor top down |
 
 Grade points (absolute elevation in inches; the first floor top is +2", the basement floor -100"):
-north corners of the main block -4, the porch's north-west corner -4 and south-west corner -8, middle of the north wall
--4, middle of the west wall -8, south-west corner -14, south-east corner -88, the wing's south-east
-corner -100 and north-east corner -20, a point 6' east of the main block's east wall -6, a point 10' south of the south wall at its middle -100 and
-another 10' south of the wing -100 (the terrace in front of the doors), and two points 30' north of
-the house at +6 (the road is slightly higher). Measure them down from the first-floor sill with a
-level and a tape or a laser, and edit them in the Site tab.
+five at +1 round the porch, whose floor is about at grade (its two outer corners, the middle of its
+front and its two corners against the house, one of them the main block's north-west corner); the
+main block's north-east corner -4, middle of the north wall -4, middle of the west wall -8,
+south-west corner -14, south-east corner -88, the wing's south-east corner -100 and north-east
+corner -20, a point 6' east of the main block's east wall -6, a point 10' south of the south wall at
+its middle -100 and another 10' south of the wing -100 (the terrace in front of the doors), two at
+the walkout's threshold (-100, 6" out from the wall at the double door's jambs), and two points 30'
+north of the house at +6 (the road is slightly higher). Measure them down from the first-floor sill
+with a level and a tape or a laser, and edit them in the Site tab.
 
 ### The order to measure in
 
@@ -436,7 +471,8 @@ parts green. Export from Existing and from Proposed to give the contractor or Sk
 - **Roofs**: no valleys or dormers; roofs that meet (a wing roof running into the main wall,
   porch roofs) simply overlap, and the walls only follow the roofs on their own level. A hip roof
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
-  edge of a roof.
+  edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
+  show a short stub on the chimney's face.
 - **Not drawn yet**: decks and railings, exterior stairs, retaining walls, the lot outline, porch
   floors and steps, foundations under additions and porches, gutters, cabinets, fixtures,
   furniture, and text or dimension notes you place yourself.

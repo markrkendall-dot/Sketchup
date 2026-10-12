@@ -430,6 +430,46 @@ export function columnOutline(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotati
   });
 }
 
+/**
+ * A capped chimney's parts (Column.cap): a concrete cap `thickness` deep at the top of the shaft,
+ * `proud` past its faces all round, and a wire spark arrestor `arrestor` high on top of it, `inset`
+ * in from the shaft's faces.
+ */
+export const CHIMNEY_CAP = { thickness: 4, proud: 2, arrestor: 12, inset: 1 } as const;
+
+/** True when the column is a chimney with its cap and spark arrestor (a post ignores `cap`). */
+export const hasChimneyCap = (c: Partial<Pick<Column, 'kind' | 'cap'>>): boolean => c.kind === 'chimney' && c.cap === true;
+
+/** The highest point of a column: its top, or the top of the spark arrestor on a capped chimney. */
+export const columnPeak = (c: Pick<Column, 'kind' | 'cap' | 'top'>): number => c.top + (hasChimneyCap(c) ? CHIMNEY_CAP.arrestor : 0);
+
+/** The parts a capped chimney adds to its shaft, each in its own material. */
+export type ChimneyPart = 'cap' | 'arrestor';
+
+/** One part of a capped chimney: its plan rectangle (columnOutline order) and its bottom and top elevations. */
+export interface ChimneyPartBox {
+  part: ChimneyPart;
+  outline: Vec2[];
+  bottom: number;
+  top: number;
+}
+
+/**
+ * The cap and spark arrestor of a capped chimney (none for anything else): the cap from `top` less
+ * its thickness (never below the base) to `top`, its rectangle grown by `proud` on every side; the
+ * arrestor from `top` up, its rectangle the shaft's shrunk by `inset` (at most a quarter of the
+ * shaft, so a slender one keeps some width). Both turn with the column.
+ */
+export function chimneyPartBoxes(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top' | 'kind' | 'cap'>): ChimneyPartBox[] {
+  if (!hasChimneyCap(c)) return [];
+  const { thickness, proud, arrestor } = CHIMNEY_CAP;
+  const inset = Math.min(CHIMNEY_CAP.inset, c.width / 4, c.depth / 4);
+  return [
+    { part: 'cap', outline: columnOutline({ ...c, width: c.width + 2 * proud, depth: c.depth + 2 * proud }), bottom: Math.max(c.base, c.top - thickness), top: c.top },
+    { part: 'arrestor', outline: columnOutline({ ...c, width: c.width - 2 * inset, depth: c.depth - 2 * inset }), bottom: c.top, top: c.top + arrestor },
+  ];
+}
+
 /** True when p lies inside the column's rectangle grown by `slack` on every side. */
 export function pointInColumn(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation'>, p: Vec2, slack = 0): boolean {
   const q = ROTATE({ x: p.x - c.at.x, y: p.y - c.at.y }, -c.rotation);
