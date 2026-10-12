@@ -223,7 +223,7 @@ export function pruneSelection(): void {
     const o = level.openings[id];
     return o && isOpeningVisible(o, level.walls[o.wallId], vm);
   });
-  const rooms = sel.rooms.filter((id) => level.rooms[id]);
+  const rooms = sel.rooms.filter((id) => level.rooms[id] && isVisible(level.rooms[id].phase ?? 'existing', vm));
   const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
   const roofs = sel.roofs.filter((id) => level.roofs[id] && isVisible(level.roofs[id].phase, vm));
   const fixtures = sel.fixtures.filter((id) => level.fixtures[id] && isVisible(level.fixtures[id].phase, vm));

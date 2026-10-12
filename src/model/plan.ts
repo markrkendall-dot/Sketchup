@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
+import { stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
 import { GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
@@ -517,8 +518,8 @@ const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'leafColor'] as const;
-const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride'] as const;
-const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart'] as const;
+const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase'] as const;
+const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
@@ -609,6 +610,8 @@ function migrateRooms(raw: Json): Level['rooms'] {
     room.name = typeof r.name === 'string' && r.name.trim() ? r.name : 'Room';
     room.anchor = { x: r.anchor.x, y: r.anchor.y };
     put(room, 'ceilingOverride', isNum(r.ceilingOverride) && r.ceilingOverride > 0 ? r.ceilingOverride : undefined);
+    // Optional: a label's phase (absent means existing); an unknown one is dropped.
+    put(room, 'phase', typeof r.phase === 'string' && PHASES.has(r.phase) ? r.phase : undefined);
     out[rid] = room as unknown as Room;
   }
   return out;
@@ -616,7 +619,8 @@ function migrateRooms(raw: Json): Level['rooms'] {
 
 /**
  * Keep stairs with a usable position and size; fill in phase and cutsFloorAbove when missing; keep
- * headroom (positive) and holeStart (not negative) only when valid.
+ * headroom (positive), holeStart (not negative), base (not negative), rise (positive) and risers (a
+ * whole number from 1 to MAX_STAIRS_RISERS) only when valid.
  */
 function migrateStairs(raw: Json): Level['stairs'] {
   const out: Level['stairs'] = {};
@@ -632,6 +636,10 @@ function migrateStairs(raw: Json): Level['stairs'] {
     // Optional floor-opening fields: kept when usable, dropped otherwise (the defaults apply).
     put(stairs, 'headroom', isNum(st.headroom) && st.headroom > 0 ? st.headroom : undefined);
     put(stairs, 'holeStart', isNum(st.holeStart) && st.holeStart >= 0 ? st.holeStart : undefined);
+    // Optional height fields of a short flight or a landing (derive/stairs.ts stairsBase, stairsRise).
+    put(stairs, 'base', isNum(st.base) && st.base >= 0 ? st.base : undefined);
+    put(stairs, 'rise', isNum(st.rise) && st.rise > 0 ? st.rise : undefined);
+    put(stairs, 'risers', isNum(st.risers) && stairsRisersOk(st.risers) ? st.risers : undefined);
     out[sid] = stairs as unknown as Stairs;
   }
   return out;

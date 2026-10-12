@@ -304,4 +304,40 @@ describe('migrate a current file', () => {
     expect(text).not.toContain('"extra"');
     expect(text).toBe(clean);
   });
+
+  it('keeps valid stairs base, rise and risers and room phases byte for byte, drops broken ones', () => {
+    const plan = richPlan();
+    const lid = plan.levelOrder[1];
+    const level = plan.levels[lid];
+    level.stairs.landing = { id: 'landing', origin: { x: 25, y: 43 }, direction: 270, width: 36, run: 36, phase: 'new', cutsFloorAbove: false, rise: 14, risers: 1 };
+    level.stairs.main = { id: 'main', origin: { x: 43, y: 25 }, direction: 0, width: 36, run: 126, phase: 'new', cutsFloorAbove: true, base: 14, rise: 94 };
+    level.rooms.bed = { id: 'bed', name: 'Master bedroom', anchor: { x: 380, y: 250 }, phase: 'new' };
+    level.rooms.util = { id: 'util', name: 'Utility', anchor: { x: 380, y: 260 }, phase: 'demo' };
+    level.rooms.plain = { id: 'plain', name: 'Plain', anchor: { x: 10, y: 10 }, phase: 'existing' };
+    const text = JSON.stringify(plan, null, 2);
+    expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
+    // Each broken value is dropped on its own; the rest of the entity stays.
+    const broken = JSON.parse(text);
+    const bl = broken.levels[lid];
+    bl.stairs.landing.risers = 1.5;
+    bl.stairs.main.base = -1;
+    bl.stairs.main.rise = 0;
+    bl.rooms.bed.phase = 'proposed';
+    const loaded = migrate(broken).levels[lid];
+    expect(loaded.stairs.landing).toEqual({ ...level.stairs.landing, risers: undefined });
+    expect('risers' in loaded.stairs.landing).toBe(false);
+    expect(loaded.stairs.landing.rise).toBe(14);
+    expect('base' in loaded.stairs.main).toBe(false);
+    expect('rise' in loaded.stairs.main).toBe(false);
+    expect('phase' in loaded.rooms.bed).toBe(false);
+    expect(loaded.rooms.util.phase).toBe('demo');
+    for (const [k, v] of [['risers', 0], ['risers', 'x'], ['rise', -3], ['rise', Infinity], ['base', 'low']] as const) {
+      const j = JSON.parse(text);
+      j.levels[lid].stairs.landing[k] = v;
+      expect(k in migrate(j).levels[lid].stairs.landing).toBe(false);
+    }
+    // A file without them gains none.
+    const clean = JSON.stringify(richPlan());
+    expect(JSON.stringify(migrate(JSON.parse(clean)))).toBe(clean);
+  });
 });

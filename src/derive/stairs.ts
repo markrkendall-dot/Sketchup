@@ -4,7 +4,9 @@ import type { Degrees, Id, Plan, Stairs, Vec2 } from '../model/types';
 // Stairs (DESIGN.md "Plan document"). `origin` is the middle of the bottom edge of the flight (where
 // you step on), `direction` the plan angle of travel going up (0 = +x, 90 = +y, i.e. down the
 // screen), `run` the horizontal length of the flight and `width` its width, centered on origin.
-// The flight climbs from this level's floor top to the next level's floor top.
+// By default the flight climbs from this level's floor top to the next level's floor top; `base`
+// lifts its bottom (a flight that starts on a landing) and `rise` shortens its climb (a flight up to
+// a landing), and `risers` overrides the step count (a landing is one riser, one deep tread).
 
 export const STAIRS_DEFAULTS = { width: 36, run: 120 } as const;
 /** Sizes the store accepts: width 24" to 96", run 3' to 30'. */
@@ -24,14 +26,49 @@ export function floorToFloor(plan: Plan, levelId: Id): number {
 }
 
 export interface StairSteps {
-  /** Number of risers, floor to floor; the flight's run is split into this many steps. */
+  /** Number of risers over the flight's climb; the flight's run is split into this many steps. */
   risers: number;
   rise: number;
 }
 
-export function stairSteps(totalRise: number): StairSteps {
-  const risers = Math.max(1, Math.round(totalRise / TARGET_RISE));
-  return { risers, rise: totalRise / risers };
+/** Most risers a flight may have (a 30' run at 3.6" a tread). */
+export const MAX_STAIRS_RISERS = 100;
+/** A usable riser count: a whole number from 1 to MAX_STAIRS_RISERS. */
+export const stairsRisersOk = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= MAX_STAIRS_RISERS;
+
+/**
+ * Steps of a climb of `totalRise`: `risers` when given (and usable), else round(totalRise / 7.5"),
+ * at least 1; each step rises totalRise / risers.
+ */
+export function stairSteps(totalRise: number, risers?: number): StairSteps {
+  const n = risers !== undefined && stairsRisersOk(risers) ? risers : Math.max(1, Math.round(totalRise / TARGET_RISE));
+  return { risers: n, rise: totalRise / n };
+}
+
+/** Height of the bottom of the flight above the floor top (0 unless it starts on a landing). */
+export const stairsBase = (s: Pick<Stairs, 'base'>): number => s.base ?? 0;
+
+/** Height the flight climbs: `rise` when set, else from its base to the floor above. */
+export const stairsRise = (s: Pick<Stairs, 'base' | 'rise'>, floorToFloor: number): number => s.rise ?? floorToFloor - stairsBase(s);
+
+/** The flight's own steps: its climb (stairsRise) split by its `risers` override or the 7.5" rule. */
+export const flightSteps = (s: Pick<Stairs, 'base' | 'rise' | 'risers'>, floorToFloor: number): StairSteps =>
+  stairSteps(stairsRise(s, floorToFloor), s.risers);
+
+/**
+ * Why the height fields of a flight cannot be used on a level `floorToFloor` high, or null: the
+ * base must not be negative, the climb must be positive, the top (base + climb) at most an inch
+ * above the floor above, and risers a whole number from 1 to MAX_STAIRS_RISERS. Lower case, like
+ * columnProblem; the panel capitalizes it.
+ */
+export function stairsHeightProblem(s: Pick<Stairs, 'base' | 'rise' | 'risers'>, floorToFloor: number): string | null {
+  if (s.base !== undefined && !(Number.isFinite(s.base) && s.base >= 0)) return 'the bottom of the flight must not be below the floor';
+  if (s.rise !== undefined && !(Number.isFinite(s.rise) && s.rise > 0)) return 'the climb must be greater than 0';
+  if (s.risers !== undefined && !stairsRisersOk(s.risers)) return `risers must be a whole number from 1 to ${MAX_STAIRS_RISERS}`;
+  const rise = stairsRise(s, floorToFloor);
+  if (!(rise > 0)) return 'the flight must start below the floor above';
+  if (stairsBase(s) + rise > floorToFloor + 1) return 'the top of the flight must not be above the floor above';
+  return null;
 }
 
 /** Normalize to [0, 360). */
@@ -77,18 +114,24 @@ export const STAIRS_HEADROOM = 80;
 /** A floor opening shorter than this along the run is not cut. */
 const MIN_HOLE = 1;
 
+type HoleFields = 'run' | 'headroom' | 'base' | 'rise';
+
 /**
  * Where the floor opening starts along the run by the headroom rule, ignoring any override: the
- * flight rises floorToFloor over the run, so headroom to the floor above drops below `headroom` at
- * d0 = run * (floorToFloor - headroom) / floorToFloor (0 when the flight is lower than the headroom).
+ * treads are at base + rise * d / run at distance d up the run, so headroom to the floor above drops
+ * below `headroom` at d0 = run * (floorToFloor - headroom - base) / rise, clamped to [0, run]: 0
+ * when even the bottom step is short of headroom, the whole run (no opening) when the top of the
+ * flight is lower than floorToFloor - headroom (a short flight up to a landing, the landing itself).
  */
-export function headroomHoleStart(s: Pick<Stairs, 'run' | 'headroom'>, floorToFloor: number): number {
-  if (!(floorToFloor > 0)) return 0;
-  return (s.run * Math.max(0, floorToFloor - (s.headroom ?? STAIRS_HEADROOM))) / floorToFloor;
+export function headroomHoleStart(s: Pick<Stairs, HoleFields>, floorToFloor: number): number {
+  const rise = stairsRise(s, floorToFloor);
+  if (!(rise > 0)) return 0;
+  const d0 = (s.run * (floorToFloor - (s.headroom ?? STAIRS_HEADROOM) - stairsBase(s))) / rise;
+  return Math.min(s.run, Math.max(0, d0));
 }
 
 /** Where the floor opening starts along the run: `holeStart` when set, else the headroom rule. */
-export function stairsHoleStart(s: Pick<Stairs, 'run' | 'headroom' | 'holeStart'>, floorToFloor: number): number {
+export function stairsHoleStart(s: Pick<Stairs, HoleFields | 'holeStart'>, floorToFloor: number): number {
   return Math.max(0, s.holeStart ?? headroomHoleStart(s, floorToFloor));
 }
 
@@ -99,7 +142,7 @@ export function stairsHoleStart(s: Pick<Stairs, 'run' | 'headroom' | 'holeStart'
  * all the way up cuts nothing). Ignores cutsFloorAbove; the caller checks it.
  */
 export function stairsHoleOutline(
-  s: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run' | 'headroom' | 'holeStart'>,
+  s: Pick<Stairs, 'origin' | 'direction' | 'width' | HoleFields | 'holeStart'>,
   floorToFloor: number,
 ): Vec2[] | null {
   const d0 = stairsHoleStart(s, floorToFloor);
@@ -115,6 +158,8 @@ export interface StairsSymbol {
   outline: Vec2[];
   /** Nosing lines between steps. */
   treads: Seg[];
+  /** One riser: a landing, drawn as its outline only (no treads, no UP arrow or label). */
+  landing: boolean;
   /** The UP arrow: shaft and head. */
   shaft: Seg;
   head: [Vec2, Vec2, Vec2];
@@ -141,6 +186,7 @@ export function stairsSymbol(s: Pick<Stairs, 'origin' | 'direction' | 'width' | 
   return {
     outline: stairsOutline(s),
     treads,
+    landing: risers <= 1,
     shaft,
     head,
     label: stairsPoint(f, s.run * 0.3, -Math.min(h * 0.55, 10)),

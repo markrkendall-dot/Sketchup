@@ -22,7 +22,7 @@ import {
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import type { Column, Fixture, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
-import { normalizeDegrees, stairsRunOk, stairsWidthOk } from '../derive/stairs';
+import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
 
@@ -143,14 +143,22 @@ export interface PlanState {
   deleteOpenings: (levelId: Id, ids: Id[]) => void;
   /** Add a room label; returns its id, or null when the name is blank or the anchor is not finite. */
   addRoom: (levelId: Id, room: NewRoom) => Id | null;
-  /** Rename or move a room. A blank name or non-finite anchor is ignored. */
+  /**
+   * Rename or move a room, or change its phase. A blank name or non-finite anchor is ignored;
+   * `ceilingOverride` and `phase` take undefined to clear them.
+   */
   updateRoom: (levelId: Id, id: Id, patch: RoomPatch) => void;
   deleteRooms: (levelId: Id, ids: Id[]) => void;
-  /** Add stairs; returns the id, or null when the size or position is not usable. */
+  /**
+   * Add stairs; returns the id, or null when the size or position is not usable, or the heights are
+   * not (derive/stairs.ts stairsHeightProblem: base below the floor, a climb not above 0, a top more
+   * than 1" above the floor above, risers not a whole number from 1 to 100).
+   */
   addStairs: (levelId: Id, stairs: NewStairs) => Id | null;
   /**
-   * Patch stairs; invalid sizes are rejected, the direction is normalized to [0, 360). `headroom`
-   * and `holeStart` take undefined to clear them.
+   * Patch stairs; invalid sizes are rejected, the direction is normalized to [0, 360). Heights are
+   * checked like addStairs when the patch changes one. `headroom`, `holeStart`, `base`, `rise` and
+   * `risers` take undefined to clear them.
    */
   updateStairs: (levelId: Id, id: Id, patch: StairsPatch) => void;
   deleteStairs: (levelId: Id, ids: Id[]) => void;
@@ -203,8 +211,11 @@ export interface PlanState {
   setNorthAngle: (degrees: number) => void;
   /** Delete every grade point (the terrain goes flat again) in one undo step. */
   clearGradePoints: () => void;
-  /** Set the phase of walls, openings, stairs, roofs, fixtures and columns together (e.g. "Mark demolish"). */
-  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; columns?: Id[] }, phase: Phase) => void;
+  /**
+   * Set the phase of walls, openings, stairs, roofs, fixtures, columns and room labels together
+   * (e.g. "Mark demolish"). A room set to existing stores no phase.
+   */
+  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; columns?: Id[]; rooms?: Id[] }, phase: Phase) => void;
   /**
    * Copy the nodes and walls (not openings) of one level into another, merged with whatever is
    * there, in one undo step. Walls that would lie on top of a wall already on the target level
@@ -310,6 +321,8 @@ const validStairs = (s: Omit<Stairs, 'id'>, limits: { width: boolean; run: boole
   Number.isFinite(s.origin.y) &&
   (s.headroom === undefined || (Number.isFinite(s.headroom) && s.headroom > 0)) &&
   (s.holeStart === undefined || (Number.isFinite(s.holeStart) && s.holeStart >= 0));
+
+const STAIRS_HEIGHT_KEYS = ['base', 'rise', 'risers'] as const;
 
 /** A roof's stored form: outline points and rafter sizes copied, ridge angle in [0, 360), colours lower-cased. */
 function cleanRoof(r: Roof): Roof {
@@ -676,7 +689,7 @@ export const usePlanStore = create<PlanState>()(
             if (patch.name !== undefined) {
               const name = patch.name.trim();
               if (!name) return false;
-              if (name === r.name && patch.anchor === undefined && patch.ceilingOverride === undefined) return false;
+              if (name === r.name && patch.anchor === undefined && patch.ceilingOverride === undefined && patch.phase === undefined) return false;
               r.name = name;
             }
             if (patch.anchor !== undefined) {
@@ -686,6 +699,11 @@ export const usePlanStore = create<PlanState>()(
             if ('ceilingOverride' in patch) {
               if (patch.ceilingOverride === undefined) delete r.ceilingOverride;
               else r.ceilingOverride = patch.ceilingOverride;
+            }
+            // Absent means existing; undefined clears it.
+            if ('phase' in patch) {
+              if (patch.phase === undefined) delete r.phase;
+              else r.phase = patch.phase;
             }
           }),
 
@@ -697,16 +715,15 @@ export const usePlanStore = create<PlanState>()(
 
         addStairs: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
-            if (!validStairs(input)) return false;
+          editLevel(levelId, (level, plan) => {
+            if (!validStairs(input) || stairsHeightProblem(input, floorToFloor(plan, levelId))) return false;
             const stairs: Stairs = {
               ...input,
               id: input.id ?? newId(),
               origin: { x: input.origin.x, y: input.origin.y },
               direction: normalizeDegrees(input.direction),
             };
-            if (stairs.headroom === undefined) delete stairs.headroom;
-            if (stairs.holeStart === undefined) delete stairs.holeStart;
+            for (const k of ['headroom', 'holeStart', ...STAIRS_HEIGHT_KEYS] as const) if (stairs[k] === undefined) delete stairs[k];
             level.stairs[stairs.id] = stairs;
             id = stairs.id;
           });
@@ -714,19 +731,23 @@ export const usePlanStore = create<PlanState>()(
         },
 
         updateStairs: (levelId, id, patch) =>
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const st = level.stairs[id];
             if (!st) return false;
             const next = { ...st, ...patch };
             if (!validStairs(next, { width: patch.width !== undefined, run: patch.run !== undefined })) return false;
+            // Heights are checked when they change, so an older flight can still move or change phase
+            // after the level's height changed under it.
+            if (STAIRS_HEIGHT_KEYS.some((k) => k in patch) && stairsHeightProblem(next, floorToFloor(plan, levelId))) return false;
             if (patch.origin) st.origin = { x: patch.origin.x, y: patch.origin.y };
             if (patch.direction !== undefined) st.direction = normalizeDegrees(patch.direction);
             if (patch.width !== undefined) st.width = patch.width;
             if (patch.run !== undefined) st.run = patch.run;
             if (patch.phase !== undefined) st.phase = patch.phase;
             if (patch.cutsFloorAbove !== undefined) st.cutsFloorAbove = patch.cutsFloorAbove;
-            // Optional fields: undefined clears them (back to the headroom rule / 80").
-            for (const k of ['headroom', 'holeStart'] as const) {
+            // Optional fields: undefined clears them (back to the headroom rule / 80", a flight from the
+            // floor to the floor above, the 7.5" riser rule).
+            for (const k of ['headroom', 'holeStart', ...STAIRS_HEIGHT_KEYS] as const) {
               if (!(k in patch)) continue;
               const v = patch[k];
               if (v === undefined) {
@@ -1001,6 +1022,13 @@ export const usePlanStore = create<PlanState>()(
             for (const id of sel.fixtures ?? []) {
               const f = level.fixtures[id];
               if (f && f.phase !== phase) f.phase = phase;
+            }
+            // A room label's phase is optional: existing is stored as no phase at all.
+            for (const id of sel.rooms ?? []) {
+              const r = level.rooms[id];
+              if (!r || (r.phase ?? 'existing') === phase) continue;
+              if (phase === 'existing') delete r.phase;
+              else r.phase = phase;
             }
             for (const id of sel.walls) {
               const w = level.walls[id];

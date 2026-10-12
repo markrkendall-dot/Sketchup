@@ -2,11 +2,11 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { getFootprints } from '../derive/footprint';
 import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
-import { PHASE_LABEL } from '../derive/phase';
+import { isVisible, PHASE_LABEL } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, groundAt } from '../derive/site';
-import { floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsHoleOutline, stairsHoleStart, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
+import { flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool, makeToolContext } from '../editor2d/tools';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
@@ -333,6 +333,11 @@ function common<T, V>(items: T[], get: (t: T) => V): V | null {
 
 // ---------------------------------------------------------------------------------------------
 
+/** Phases of the selected items that have one; a room label without a phase is existing. */
+function phasesOf(items: { phase?: Phase }[]): Phase[] {
+  return items.map((i) => i.phase ?? 'existing');
+}
+
 function SelectionActions({
   levelId,
   walls,
@@ -341,6 +346,7 @@ function SelectionActions({
   roofs,
   fixtures,
   columns,
+  rooms,
 }: {
   levelId: Id;
   walls: Wall[];
@@ -349,13 +355,14 @@ function SelectionActions({
   roofs: Roof[];
   fixtures: Fixture[];
   columns: Column[];
+  rooms: Room[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const items = [...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns];
-  if (items.length === 0 && selectionSize(selection) === 0) return null;
-  const allDemo = items.length > 0 && items.every((i) => i.phase === 'demo');
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns, ...rooms]);
+  if (phases.length === 0 && selectionSize(selection) === 0) return null;
+  const allDemo = phases.length > 0 && phases.every((p) => p === 'demo');
   const ids = {
     walls: walls.map((w) => w.id),
     openings: openings.map((o) => o.id),
@@ -363,10 +370,11 @@ function SelectionActions({
     roofs: roofs.map((r) => r.id),
     fixtures: fixtures.map((f) => f.id),
     columns: columns.map((c) => c.id),
+    rooms: rooms.map((r) => r.id),
   };
   return (
     <div className="panel-actions">
-      {items.length > 0 && (
+      {phases.length > 0 && (
         <button
           className={allDemo ? '' : 'danger'}
           title={allDemo ? 'Mark the selection as existing again' : 'Mark the selection for demolition'}
@@ -913,6 +921,12 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
           }}
         />
       </div>
+      <SelectField
+        label="Phase"
+        value={room.phase ?? 'existing'}
+        options={phaseOptions}
+        onChange={(p) => updateRoom(level.id, room.id, { phase: p === 'existing' ? undefined : p })}
+      />
       {face ? (
         <>
           <ReadOnly label="Net area">{formatArea(face.netArea)}</ReadOnly>
@@ -946,8 +960,18 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
     const i = s.plan.levelOrder.indexOf(level.id);
     return s.plan.levels[s.plan.levelOrder[i + 1]]?.name ?? null;
   });
-  const { risers, rise } = stairSteps(ftf);
+  const base = stairsBase(stairs);
+  const climb = stairsRise(stairs, ftf);
+  const { risers, rise } = flightSteps(stairs, ftf);
+  const ruleRisers = stairSteps(climb).risers;
   const tread = stairs.run / risers;
+  // Base, climb and riser count, checked together (derive/stairs.ts stairsHeightProblem).
+  const setHeights = (patch: Pick<Partial<Stairs>, 'base' | 'rise' | 'risers'>): string | null => {
+    const problem = stairsHeightProblem({ ...stairs, ...patch }, ftf);
+    if (problem) return problem[0].toUpperCase() + problem.slice(1) + ` (floor to floor here is ${formatLength(ftf, denom)}).`;
+    updateStairs(level.id, stairs.id, patch);
+    return null;
+  };
   const dir = String(stairs.direction);
   const options = DIRECTION_OPTIONS.some((o) => o.value === dir)
     ? DIRECTION_OPTIONS
@@ -982,6 +1006,30 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         options={options}
         onChange={(v) => updateStairs(level.id, stairs.id, { direction: Number(v) })}
       />
+      <LengthField
+        label="Starts at"
+        value={stairs.base}
+        bound="nonnegative"
+        allowEmpty
+        placeholder={`${formatLength(0, denom)} (the floor)`}
+        onCommit={(v) => setHeights({ base: v ?? undefined })}
+        hint="Height of the bottom of the flight above the floor, e.g. on a landing."
+      />
+      <LengthField
+        label="Climbs"
+        value={stairs.rise}
+        allowEmpty
+        placeholder={`${formatLength(ftf - base, denom)} (to the floor above)`}
+        onCommit={(v) => setHeights({ rise: v ?? undefined })}
+        hint="Height the flight goes up. Blank climbs to the floor above."
+      />
+      <CountField
+        label="Risers"
+        value={stairs.risers}
+        placeholder={`${ruleRisers} (about 7 1/2" each)`}
+        onCommit={(v) => setHeights({ risers: v ?? undefined })}
+        hint={`${risers} x ${formatLength(rise, denom)}. Blank follows the 7 1/2" rule; 1 makes a landing.`}
+      />
       <SelectField
         label="Phase"
         value={stairs.phase}
@@ -998,12 +1046,12 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         Cuts the floor above{aboveName ? ` (${aboveName})` : ''}
       </label>
       {stairs.cutsFloorAbove && <StairsOpeningFields level={level} stairs={stairs} ftf={ftf} />}
-      <ReadOnly label="Risers">
-        {risers} x {formatLength(rise, denom)}
-      </ReadOnly>
       <ReadOnly label="Step depth">{formatLength(tread, denom)}</ReadOnly>
       <p className="panel-note">
-        Rises {formatLength(ftf, denom)}, floor top to floor top. Drag with the select tool to move.
+        {base > 0 || stairs.rise !== undefined
+          ? `Climbs ${formatLength(climb, denom)}, from ${formatLength(base, denom)} to ${formatLength(base + climb, denom)} above the floor (${formatLength(ftf, denom)} floor top to floor top).`
+          : `Rises ${formatLength(ftf, denom)}, floor top to floor top.`}{' '}
+        Drag with the select tool to move.
       </p>
     </>
   );
@@ -1510,6 +1558,7 @@ function MixedProps({
   roofs,
   fixtures,
   columns,
+  rooms,
 }: {
   levelId: Id;
   sel: Selection;
@@ -1519,6 +1568,7 @@ function MixedProps({
   roofs: Roof[];
   fixtures: Fixture[];
   columns: Column[];
+  rooms: Room[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const updateFixture = usePlanStore((s) => s.updateFixture);
@@ -1532,15 +1582,15 @@ function MixedProps({
   if (sel.gradePoints.length) parts.push(`${sel.gradePoints.length} grade ${sel.gradePoints.length === 1 ? 'point' : 'points'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const items = [...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns];
-  const onlyFixtures = fixtures.length > 0 && items.length === fixtures.length;
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns, ...rooms]);
+  const onlyFixtures = fixtures.length > 0 && phases.length === fixtures.length;
   return (
     <>
       <h3>{parts.join(', ')}</h3>
-      {items.length > 0 && (
+      {phases.length > 0 && (
         <SelectField
           label="Phase"
-          value={common(items, (i) => i.phase)}
+          value={common(phases, (p) => p)}
           options={phaseOptions}
           onChange={(p) =>
             setPhase(
@@ -1552,6 +1602,7 @@ function MixedProps({
                 roofs: roofs.map((r) => r.id),
                 fixtures: fixtures.map((f) => f.id),
                 columns: columns.map((c) => c.id),
+                rooms: rooms.map((r) => r.id),
               },
               p,
             )
@@ -1574,7 +1625,7 @@ function MixedProps({
           />
         </>
       )}
-      {items.length === 0 && <p className="panel-note">{sel.gradePoints.length ? 'Drag grade points with the select tool to move them.' : 'Drag corners with the select tool to move them.'}</p>}
+      {phases.length === 0 && <p className="panel-note">{sel.gradePoints.length ? 'Drag grade points with the select tool to move them.' : 'Drag corners with the select tool to move them.'}</p>}
     </>
   );
 }
@@ -1634,6 +1685,95 @@ function NumberField({
         inputMode="decimal"
         value={text}
         disabled={disabled}
+        onChange={(e) => {
+          setText(e.target.value);
+          setError(null);
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          if (!skipBlur.current && !commit()) {
+            setText(fmt(value));
+            setError(null);
+          }
+          skipBlur.current = false;
+          setFocused(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            if (commit()) {
+              skipBlur.current = true;
+              releaseFocus(e.currentTarget);
+            }
+          } else if (e.key === 'Escape') {
+            setText(fmt(value));
+            setError(null);
+            skipBlur.current = true;
+            releaseFocus(e.currentTarget);
+          }
+        }}
+      />
+      {error && <div className="field-error" role="alert">{error}</div>}
+      {!error && hint && <div className="field-hint">{hint}</div>}
+    </div>
+  );
+}
+
+/**
+ * An optional whole number (blank: the default, shown as the placeholder): commits on Enter or blur,
+ * Escape reverts; blank clears a set value (onCommit(null)). `onCommit` returns an error or null.
+ */
+function CountField({
+  label,
+  value,
+  placeholder,
+  hint,
+  onCommit,
+}: {
+  label: string;
+  value: number | undefined;
+  placeholder?: string;
+  hint?: ReactNode;
+  onCommit: (v: number | null) => string | null;
+}) {
+  const fmt = (v: number | undefined) => (v === undefined ? '' : String(v));
+  const [text, setText] = useState(fmt(value));
+  const [focused, setFocused] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!focused) setText(fmt(value));
+  }, [value, focused]);
+  useEffect(() => setError(null), [value]);
+  const skipBlur = useRef(false);
+  const commit = (): boolean => {
+    const t = text.trim();
+    if (t === '') {
+      if (value === undefined) return true;
+      const err = onCommit(null);
+      setError(err);
+      return !err;
+    }
+    const v = Number(t);
+    if (!Number.isInteger(v) || v < 1) {
+      setError('Enter a whole number, at least 1.');
+      return false;
+    }
+    if (v === value) return true;
+    const err = onCommit(v);
+    setError(err);
+    return !err;
+  };
+  return (
+    <div className={`field${error ? ' has-error' : ''}`}>
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        aria-label={label}
+        aria-invalid={!!error}
+        inputMode="numeric"
+        value={text}
+        placeholder={placeholder}
+        autoComplete="off"
         onChange={(e) => {
           setText(e.target.value);
           setError(null);
@@ -1860,7 +2000,7 @@ function LevelProps({ level }: { level: Level }) {
     const l = s.plan.levels[level.id];
     return l ? getFaces(l, viewMode) : null;
   });
-  const roomCount = Object.keys(level.rooms).length;
+  const roomCount = Object.values(level.rooms).filter((r) => isVisible(r.phase ?? 'existing', viewMode)).length;
   const unlabeled = faces ? faces.faces.filter((f) => !f.roomId).length : 0;
   const [name, setName] = useState(level.name);
   const skipBlur = useRef(false);
@@ -1993,14 +2133,14 @@ export function PropertiesPanel() {
   else if (total === 1 && gradePoints.length === 1) body = <GradePointProps key={gradePoints[0].id} point={gradePoints[0]} />;
   else if (total === 1 && columns.length === 1) body = <ColumnProps key={columns[0].id} column={columns[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} rooms={rooms} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} rooms={rooms} />}
       </div>
     </aside>
   );

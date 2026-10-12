@@ -72,6 +72,11 @@ export interface Room {
   name: string;
   anchor: Vec2;
   ceilingOverride?: Inches;
+  /**
+   * Absent: existing. The label shows only in the views that show its phase (derive/phase.ts
+   * isVisible): a new room's name is hidden in the existing view, a demolished room's in the proposed one.
+   */
+  phase?: Phase;
 }
 
 export interface Stairs {
@@ -89,6 +94,12 @@ export interface Stairs {
   headroom?: Inches;
   /** Where the floor opening starts, along the run from the bottom; overrides the headroom rule. */
   holeStart?: Inches;
+  /** Height of the bottom of the flight above the floor top (default 0): a flight that starts on a landing. */
+  base?: Inches;
+  /** Height the flight climbs (default floor-to-floor minus base): a short flight up to a landing. */
+  rise?: Inches;
+  /** Number of risers (default round(rise / 7.5), at least 1): a landing is one riser with one deep tread. */
+  risers?: number;
 }
 
 export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';

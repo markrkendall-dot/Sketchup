@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  flightSteps,
   floorToFloor,
   headroomHoleStart,
+  stairsBase,
+  stairsHeightProblem,
+  stairsRise,
   hitStairs,
   normalizeDegrees,
   orthoDirection,
@@ -235,5 +239,102 @@ describe('the opening a flight cuts in the floor above (REVIEW-2 A2)', () => {
     expect(loaded[id]).toEqual(level().stairs[id]);
     expect(loaded[plain]).toEqual(level().stairs[plain]);
     expect(JSON.stringify(migrate(JSON.parse(JSON.stringify(store().plan))))).toBe(JSON.stringify(store().plan));
+  });
+});
+
+describe('short flights and landings: base, rise and risers', () => {
+  it('a 22" flight climbing 14" has 2 risers of 7" and cuts no opening', () => {
+    const s = flight({ run: 22, rise: 14 });
+    expect(stairSteps(14)).toEqual({ risers: 2, rise: 7 });
+    expect(stairsBase(s)).toBe(0);
+    expect(stairsRise(s, 108)).toBe(14);
+    expect(flightSteps(s, 108)).toEqual({ risers: 2, rise: 7 });
+    // Its top (14") is far below 108 - 80 = 28": the floor above clears it all the way.
+    expect(headroomHoleStart(s, 108)).toBe(22);
+    expect(stairsHoleStart(s, 108)).toBe(22);
+    expect(stairsHoleOutline(s, 108)).toBeNull();
+    // Drawn with its own two steps: one tread line and the UP arrow.
+    const sym = stairsSymbol(s, flightSteps(s, 108).risers);
+    expect(sym.treads).toHaveLength(1);
+    expect(sym.landing).toBe(false);
+  });
+
+  it('a landing is one riser: no tread lines, no arrow, no opening', () => {
+    const s = flight({ run: 36, rise: 14, risers: 1, cutsFloorAbove: false });
+    expect(flightSteps(s, 108)).toEqual({ risers: 1, rise: 14 });
+    const sym = stairsSymbol(s, flightSteps(s, 108).risers);
+    expect(sym.treads).toHaveLength(0);
+    expect(sym.landing).toBe(true);
+    expect(stairsHoleOutline(s, 108)).toBeNull();
+  });
+
+  it('a flight from a 14" landing climbing 94" over 126": 13 risers, the opening from where the treads reach 28"', () => {
+    const s = flight({ run: 126, base: 14, rise: 94 });
+    const steps = flightSteps(s, 108);
+    expect(steps.risers).toBe(13);
+    expect(steps.rise).toBeCloseTo(94 / 13, 12);
+    const d0 = stairsHoleStart(s, 108);
+    expect(14 + (94 * d0) / 126).toBeCloseTo(108 - 80, 9);
+    expect(d0).toBeCloseTo(18.766, 3);
+    expect(Math.round(d0 * 10) / 10).toBe(18.8);
+    // Up the screen from y 200: the opening runs from 200 - d0 to the top at y 74.
+    const ys = stairsHoleOutline(s, 108)!.map((p) => p.y);
+    expect(Math.min(...ys)).toBe(74);
+    expect(Math.max(...ys)).toBeCloseTo(200 - d0, 9);
+    // The risers override wins over the 7.5" rule; an unusable one is ignored.
+    expect(stairSteps(94, 12)).toEqual({ risers: 12, rise: 94 / 12 });
+    expect(stairSteps(94, 0).risers).toBe(13);
+    expect(stairSteps(94, 2.5).risers).toBe(13);
+    // Rise defaults to the rest of the way up from the base.
+    expect(stairsRise(flight({ base: 14 }), 108)).toBe(94);
+  });
+
+  it('the example stair has none of the new fields and keeps its steps and opening', () => {
+    const plan = migrate(example);
+    const first = plan.levels[plan.levelOrder[1]];
+    const st = Object.values(first.stairs)[0];
+    for (const k of ['base', 'rise', 'risers']) expect(k in st).toBe(false);
+    const ftf = floorToFloor(plan, first.id);
+    expect(flightSteps(st, ftf)).toEqual(stairSteps(ftf));
+    expect(flightSteps(st, ftf).risers).toBe(14);
+    expect(headroomHoleStart(st, ftf)).toBe((125 * (108 - 80)) / 108);
+  });
+
+  it('store: heights are validated against floor to floor, clear with undefined, one undo step each', () => {
+    expect(floorToFloor(store().plan, levelId())).toBe(108);
+    // The top of the flight may be at most 1" above the floor above.
+    expect(store().addStairs(levelId(), flight({ base: 14, rise: 96 }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ base: 109 }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ base: 108 }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ base: -1 }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ rise: 0 }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ rise: Number.NaN }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ risers: 0 }))).toBeNull();
+    expect(store().addStairs(levelId(), flight({ risers: 2.5 }))).toBeNull();
+    expect(stairsHeightProblem({ base: 14, rise: 96 }, 108)).toBe('the top of the flight must not be above the floor above');
+    expect(stairsHeightProblem({ base: 14, rise: 95 }, 108)).toBeNull();
+    expect(Object.keys(level().stairs)).toHaveLength(0);
+    const id = store().addStairs(levelId(), flight({ run: 126, base: 14, rise: 95, risers: 13 }))!;
+    expect(level().stairs[id]).toMatchObject({ base: 14, rise: 95, risers: 13 });
+    const plain = store().addStairs(levelId(), flight({ origin: { x: 400, y: 200 } }))!;
+    for (const k of ['base', 'rise', 'risers']) expect(k in level().stairs[plain]).toBe(false);
+    // A rejected edit leaves the plan untouched (no undo step).
+    const before = store().plan;
+    store().updateStairs(levelId(), id, { rise: 100 });
+    store().updateStairs(levelId(), id, { risers: 0 });
+    store().updateStairs(levelId(), id, { base: -2 });
+    expect(store().plan).toBe(before);
+    store().updateStairs(levelId(), id, { rise: 94 });
+    expect(level().stairs[id].rise).toBe(94);
+    store().updateStairs(levelId(), id, { risers: undefined, base: undefined });
+    expect('risers' in level().stairs[id]).toBe(false);
+    expect('base' in level().stairs[id]).toBe(false);
+    undo();
+    expect(level().stairs[id]).toMatchObject({ base: 14, rise: 94, risers: 13 });
+    undo();
+    expect(level().stairs[id].rise).toBe(95);
+    // Clearing the climb is checked too: from a base of 14" the rest of the way up is fine.
+    store().updateStairs(levelId(), id, { rise: undefined });
+    expect(stairsRise(level().stairs[id], 108)).toBe(94);
   });
 });

@@ -277,13 +277,15 @@ function poleOf(f: Geometry['faces'][number]): Vec2 {
 /**
  * Label rooms: each room's anchor goes to the smallest face containing it; first come, first
  * served. Each face's label point is its room's anchor when that is inside the net polygon, else
- * the pole of inaccessibility.
+ * the pole of inaccessibility. Rooms whose phase the view mode hides (absent: existing) take no part:
+ * they name no face and are not orphans.
  */
-export function labelFaces(geo: Geometry, rooms: Level['rooms']): FaceSet {
+export function labelFaces(geo: Geometry, rooms: Level['rooms'], viewMode: ViewMode = 'all'): FaceSet {
   const owner = new Map<string, Id>();
   const orphanRoomIds: Id[] = [];
   const anchorOf = new Map<Id, Vec2>();
   for (const room of Object.values(rooms)) {
+    if (!isVisible(room.phase ?? 'existing', viewMode)) continue;
     let best: Geometry['faces'][number] | null = null;
     for (const f of geo.faces) {
       if ((!best || f.grossArea < best.grossArea) && pointInPolygon(room.anchor, f.polygon)) best = f;
@@ -325,7 +327,7 @@ export function getFaces(level: Level, viewMode: ViewMode): FaceSet {
   let byRooms = labelCache.get(geo);
   if (!byRooms) labelCache.set(geo, (byRooms = new WeakMap()));
   let set = byRooms.get(level.rooms);
-  if (!set) byRooms.set(level.rooms, (set = labelFaces(geo, level.rooms)));
+  if (!set) byRooms.set(level.rooms, (set = labelFaces(geo, level.rooms, viewMode)));
   return set;
 }
 

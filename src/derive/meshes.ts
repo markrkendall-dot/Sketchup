@@ -14,7 +14,7 @@ import { facesBesideWall, getFaces, slabOutlines, type FaceSet } from './rooms';
 import { CHIMNEY_CAP, chimneyPartBoxes, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
 import { boardColorOf, roofColorOf, ROOF_TILE, weatheringOf } from '../model/finish';
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
-import { floorToFloor, stairsFrame, stairsHoleOutline, stairsPoint, stairSteps } from './stairs';
+import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsPoint } from './stairs';
 
 /** Moved to rooms.ts (the 2D editor uses it for "Fit to walls"); re-exported for the 3D code. */
 export { slabOutlines };
@@ -586,16 +586,18 @@ export function buildFloorGeometry(
 }
 
 /**
- * A flight of stairs: `risers` steps, each a 1/risers slice of the run rising `rise` higher than the
- * last, so the last step is flush with the floor above. Built as one solid (the stepped side profile
- * extruded across the width) rather than separate boxes, so no internal faces show as seams.
+ * A flight of stairs: `risers` steps, each a 1/risers slice of the run rising `rise` (the height of
+ * one riser) higher than the last, the first one `base` + `rise` above the floor top. The flight is
+ * solid down to the floor, so one that starts on a landing (`base` > 0) has no void under it, and a
+ * landing (one riser) is a plain box. Built as one solid (the stepped side profile extruded across
+ * the width) rather than separate boxes, so no internal faces show as seams.
  */
-export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run'>, rise: number, risers: number): BufferGeometry {
+export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run'>, rise: number, risers: number, base = 0): BufferGeometry {
   const d = stairs.run / risers;
   // Profile in (along the run, height).
   const profile: Vec2[] = [{ x: 0, y: 0 }];
   for (let i = 0; i < risers; i++) {
-    profile.push({ x: i * d, y: (i + 1) * rise }, { x: (i + 1) * d, y: (i + 1) * rise });
+    profile.push({ x: i * d, y: base + (i + 1) * rise }, { x: (i + 1) * d, y: base + (i + 1) * rise });
   }
   profile.push({ x: stairs.run, y: 0 });
   // prism() extrudes along its Y slot: positions come out as (along, lateral, height).
@@ -912,8 +914,10 @@ interface FloorEntry {
 
 interface StairsEntry {
   stairs: Stairs;
+  /** Height of one riser. */
   rise: number;
   risers: number;
+  base: number;
   geometry: BufferGeometry;
 }
 
@@ -1193,18 +1197,20 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     floorCache.set(key, floor);
   }
 
-  // Stairs.
-  const { rise, risers } = stairSteps(ftf);
+  // Stairs: each flight its own base, climb and riser count (a short flight, a landing).
   const prevStairs = stairsCache.get(key);
   const nextStairs = new Map<Id, StairsEntry>();
   const stairs: StairsMesh[] = [];
   for (const s of Object.values(level.stairs)) {
     if (!isVisible(s.phase, viewMode) || !(s.width > 0) || !(s.run > 0)) continue;
+    const { rise, risers } = flightSteps(s, ftf);
+    const base = stairsBase(s);
+    if (!(rise > 0)) continue;
     const old = prevStairs?.get(s.id);
     const entry =
-      old && old.stairs === s && old.rise === rise && old.risers === risers
+      old && old.stairs === s && old.rise === rise && old.risers === risers && old.base === base
         ? old
-        : { stairs: s, rise, risers, geometry: buildStairsGeometry(s, rise, risers) };
+        : { stairs: s, rise, risers, base, geometry: buildStairsGeometry(s, rise, risers, base) };
     nextStairs.set(s.id, entry);
     stairs.push({ id: s.id, geometry: entry.geometry, phase: s.phase });
   }

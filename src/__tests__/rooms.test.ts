@@ -3,8 +3,10 @@ import { polylabel, pointToPolygonDistance } from '../derive/polylabel';
 import { computeFaceGeometry, getFaces, insetPolygon, roomDimensions } from '../derive/rooms';
 import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, createLevel, defaultLevelId } from '../model/plan';
-import type { Level, Phase, Vec2 } from '../model/types';
-import { clearHistory, usePlanStore } from '../store/planStore';
+import type { Level, Phase, Vec2, ViewMode } from '../model/types';
+import { clearHistory, undo, usePlanStore } from '../store/planStore';
+import { hitRoomLabel, roomLabels } from '../editor2d/roomLabels';
+import { planSvg } from '../io/exportPlan';
 
 const store = () => usePlanStore.getState();
 const levelId = () => defaultLevelId(store().plan);
@@ -323,5 +325,52 @@ describe('label placement (REVIEW-2 C1)', () => {
     const h = getFaces(level(), 'all').faces[0];
     expect(h.roomId).toBe(id);
     expect(h.labelPoint.x).toBeCloseTo(180, 6);
+  });
+});
+
+describe('room label phases', () => {
+  const names = (vm: ViewMode) => roomLabels(level(), getFaces(level(), vm)).map((l) => l.room?.name ?? null);
+
+  it('a new room is not among the labels of the existing view and is in the proposed one; demo the other way', () => {
+    loop(rect(0, 0, 360, 240));
+    store().addRoom(levelId(), { name: 'Utility', anchor: { x: 100, y: 100 }, phase: 'demo' });
+    const bed = store().addRoom(levelId(), { name: 'Master bedroom', anchor: { x: 120, y: 120 }, phase: 'new' })!;
+    store().addRoom(levelId(), { name: 'Hall', anchor: { x: 500, y: 100 } });
+    // Existing view: the Utility names the face; the new bedroom is neither a label nor an orphan.
+    expect(names('existing')).toEqual(['Utility', 'Hall']);
+    expect(getFaces(level(), 'existing').orphanRoomIds).not.toContain(bed);
+    // Proposed view: the bedroom names the face, the demolished Utility is gone.
+    expect(names('proposed')).toEqual(['Master bedroom', 'Hall']);
+    expect(getFaces(level(), 'proposed').faces[0].roomId).toBe(bed);
+    // All view: both, the later one sharing the face.
+    expect(names('all')).toEqual(['Utility', 'Master bedroom', 'Hall']);
+    // Hit testing follows: the bedroom's label is not hit in the existing view.
+    expect(hitRoomLabel(level(), 'existing', { x: 120, y: 120 }, 1)).not.toBe(bed);
+    expect(hitRoomLabel(level(), 'proposed', { x: 120, y: 120 }, 1)).toBe(bed);
+  });
+
+  it('updateRoom sets and clears the phase; setPhase marks rooms demolished and back (existing is no phase)', () => {
+    const id = store().addRoom(levelId(), { name: 'Den', anchor: { x: 1, y: 2 } })!;
+    expect('phase' in level().rooms[id]).toBe(false);
+    store().updateRoom(levelId(), id, { phase: 'new' });
+    expect(level().rooms[id].phase).toBe('new');
+    store().updateRoom(levelId(), id, { phase: undefined });
+    expect('phase' in level().rooms[id]).toBe(false);
+    undo();
+    expect(level().rooms[id].phase).toBe('new');
+    store().setPhase(levelId(), { walls: [], openings: [], rooms: [id] }, 'demo');
+    expect(level().rooms[id].phase).toBe('demo');
+    store().setPhase(levelId(), { walls: [], openings: [], rooms: [id] }, 'existing');
+    expect('phase' in level().rooms[id]).toBe(false);
+    undo();
+    expect(level().rooms[id].phase).toBe('demo');
+  });
+
+  it('the plan export draws a room name only in the views that show its phase', () => {
+    loop(rect(0, 0, 360, 240));
+    store().addRoom(levelId(), { name: 'Old pantry', anchor: { x: 100, y: 100 }, phase: 'demo' });
+    const plan = store().plan;
+    expect(planSvg(plan, levelId(), 'existing')).toContain('Old pantry');
+    expect(planSvg(plan, levelId(), 'proposed')).not.toContain('Old pantry');
   });
 });

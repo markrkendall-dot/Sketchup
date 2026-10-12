@@ -56,7 +56,10 @@ export interface Opening {
   fixedCenter?: boolean; glazing?: 'glass' | 'screen'; halfLite?: boolean; leafColor?: string;
 }
 
-export interface Room { id: Id; name: string; anchor: Vec2; ceilingOverride?: Inches }
+export interface Room {
+  id: Id; name: string; anchor: Vec2; ceilingOverride?: Inches;
+  phase?: Phase;             // default existing: the label shows only in the views that show its phase
+}
 
 export interface Stairs {
   id: Id; origin: Vec2;      // middle of the bottom edge of the flight
@@ -65,6 +68,9 @@ export interface Stairs {
   phase: Phase; cutsFloorAbove: boolean;
   headroom?: Inches;         // clear height the floor opening above keeps; default 80"
   holeStart?: Inches;        // where that opening starts along the run; overrides the headroom rule
+  base?: Inches;             // bottom of the flight above the floor top; default 0 (a flight on a landing)
+  rise?: Inches;             // height it climbs; default floorToFloor - base (a short flight to a landing)
+  risers?: number;           // step count; default round(rise / 7.5"), at least 1 (a landing is 1)
 }
 
 export interface Underlay {
@@ -216,7 +222,13 @@ as `outerFaces` for slabs) and faces under 1 sq ft. Remove spike pairs `p, q, p`
 is point-in-polygon tested against faces; the containing face gets the name. Rooms whose anchor is in
 no face render at the anchor in a warning colour. Net area: offset each edge inward by half the
 bounding wall thickness; fall back to centerline area if the offset polygon self-intersects.
-Detection runs on the walls visible in the current ViewMode.
+Detection runs on the walls visible in the current ViewMode, and labelling on the rooms visible in
+it: a room's optional `phase` (absent: existing) hides its label where `isVisible(phase, viewMode)`
+is false, so a new room's name names no face and is no orphan in the Existing view, and a
+demolished room's disappears in Proposed. Everything that reads the labelled faces follows (the
+labels, their hit testing, the plan export, the walk start, the room panel); the room panel has a
+"Phase" select and "Mark demolish" (`setPhase`) takes room labels too (existing is stored as no
+phase).
 
 **Label point** (REVIEW-2 C1): the room's anchor when it lies inside the face's net polygon (a label
 dragged by hand stays where it was put), else the net polygon's pole of inaccessibility
@@ -256,17 +268,29 @@ instead). Then:
 - Floor slab: each outer face polygon (reversed, positive), pushed out by half of each edge's wall
   thickness to the exterior faces (`outerFaceThickness` from rooms.ts), with holes for stairs on the
   level below that have `cutsFloorAbove` (only holes that fit strictly inside). A hole is only the
-  part of the flight where headroom is short (`stairsHoleOutline(stairs, floorToFloor)`): from
-  `d0 = holeStart ?? run * max(0, floorToFloor - headroom) / floorToFloor` (headroom default 80")
-  to the top of the run, none when that is under 1". The starter's stair (108" floor to floor, 125"
-  run) opens from 32" up, so the closet over its low end keeps its floor. The 2D view of the level
-  above draws the same opening (dashed, with an X and the treads under it), and the stair panel
-  has "Floor opening starts" (blank follows the rule, shown as the placeholder) and "Headroom". Outer faces nested in
+  part of the flight where headroom is short (`stairsHoleOutline(stairs, floorToFloor)`). The
+  treads are at `base + rise * d / run` at distance d up the run (`base` default 0, `rise` default
+  `floorToFloor - base`), so the hole runs from
+  `d0 = holeStart ?? run * (floorToFloor - headroom - base) / rise`, clamped to [0, run] (headroom
+  default 80"), to the top of the run, none when that is under 1": a flight whose top is lower
+  than `floorToFloor - headroom` (two risers up to a landing, the landing) cuts nothing. The
+  starter's stair (108" floor to floor, 125" run) opens from 32" up, so the closet over its low end
+  keeps its floor; a flight from a 14" landing climbing 94" over 126" opens where
+  `14 + 94 d / 126 = 28`, about 18.8" up. The 2D view of the level above draws the same opening
+  (dashed, with an X and the treads under it), and the stair panel has "Floor opening starts"
+  (blank follows the rule, shown as the placeholder) and "Headroom". Outer faces nested in
   another component are skipped. If a level has no closed outer face, draw no slab. Where the walls
   of the level below run up through the slab, the edge stops at their inside face instead (see
   "Platform framing").
-- Stairs: one solid, the stepped side profile extruded across the width (`risers` =
-  round(floor-to-floor / 7.5")), the last step flush with the floor above.
+- Stairs: one solid, the stepped side profile extruded across the width, per flight
+  (`buildStairsGeometry(stairs, rise, risers, base)`): `risers` = the flight's override, else
+  round(rise / 7.5"), at least 1; the first step `base` + one riser up, the last at `base + rise`
+  (flush with the floor above by default). The profile is solid from the floor up, so a flight
+  that starts on a landing has a block under it, not a void, and a one-riser landing is a box. In
+  2D a flight draws its own riser count; a landing draws its outline only (no treads, no UP arrow).
+  `addStairs` / `updateStairs` refuse a base below 0, a climb not above 0, a top more than 1" above
+  the floor above, or risers that are not a whole number from 1 to 100; the panel has "Starts at",
+  "Climbs" and "Risers" (blank follows the defaults, shown as placeholders).
 
 `getLevelMeshes(plan, levelId, viewMode)` memoizes per level and view mode, reuses each wall's
 geometry while its footprint object, wall, openings list, height and context (bands, neighbour

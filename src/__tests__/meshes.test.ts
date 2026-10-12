@@ -473,6 +473,54 @@ describe('stairs', () => {
     expect(meshes.stairs).toHaveLength(1);
     expect(triangleCount(meshes.stairs[0].geometry)).toBe(triangleCount(g));
   });
+
+  it('a landing (rise 14, one riser, run 36) is one 14" box 36" deep', () => {
+    const { plan, basement, first } = boxPlan({ run: 36, rise: 14, risers: 1, cutsFloorAbove: true });
+    const g = getLevelMeshes(plan, basement.id, 'all').stairs[0].geometry;
+    const b = bbox(g);
+    expect(b.min[1]).toBe(0);
+    expect(b.max[1]).toBeCloseTo(14, 9);
+    expect(b.max[2] - b.min[2]).toBeCloseTo(36, 9);
+    expect(b.max[0] - b.min[0]).toBeCloseTo(36, 9);
+    expect(volume(g)).toBeCloseTo(36 * 36 * 14, 1);
+    expect(closedEdges(g)).toBe(true);
+    // Far below the floor above: no opening even though it may cut one.
+    expect(upArea(getLevelMeshes(plan, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5, 3);
+  });
+
+  it('a 22" flight climbing 14" has 2 steps of 7" and cuts no opening', () => {
+    const { plan, basement, first } = boxPlan({ run: 22, rise: 14 });
+    const g = getLevelMeshes(plan, basement.id, 'all').stairs[0].geometry;
+    expect(bbox(g).max[1]).toBeCloseTo(14, 9);
+    expect(volume(g)).toBeCloseTo(36 * 11 * (7 + 14), 1);
+    expect(upArea(getLevelMeshes(plan, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5, 3);
+  });
+
+  it('a flight on a 14" landing is solid down to the floor and its opening starts where the treads reach 28"', () => {
+    const { plan, basement, first } = boxPlan({ run: 126, base: 14, rise: 94 });
+    const g = getLevelMeshes(plan, basement.id, 'all').stairs[0].geometry;
+    const d = 126 / 13;
+    const r = 94 / 13;
+    const b = bbox(g);
+    expect(b.min[1]).toBe(0);
+    expect(b.max[1]).toBeCloseTo(108, 4);
+    // A 14" block under the whole flight plus the 13 steps above it.
+    expect(volume(g)).toBeCloseTo(36 * (126 * 14 + (d * r * 13 * 14) / 2), 0);
+    // No void under the first step: just above the floor at the bottom edge is inside.
+    expect(inside(g, [60, 7, 199])).toBe(true);
+    expect(inside(g, [60, 14 + r / 2, 199])).toBe(true);
+    expect(inside(g, [60, 14 + r * 1.5, 199])).toBe(false);
+    // The opening in the floor above: from d0 = 126 * 14 / 94 (about 18.8") to the top.
+    const d0 = (126 * (108 - 80 - 14)) / 94;
+    expect(upArea(getLevelMeshes(plan, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * (126 - d0), 2);
+    // A changed climb rebuilds the flight; the same flight is reused.
+    const again = getLevelMeshes(plan, basement.id, 'all').stairs[0].geometry;
+    expect(again).toBe(g);
+    const lower = produce(plan, (p) => {
+      p.levels[basement.id].stairs.s1.rise = 80;
+    });
+    expect(bbox(getLevelMeshes(lower, basement.id, 'all').stairs[0].geometry).max[1]).toBeCloseTo(94, 4);
+  });
 });
 
 describe('a level of walls is one watertight solid', () => {

@@ -7,7 +7,7 @@ import { isOpeningVisible, isVisible } from '../derive/phase';
 import { faceAt, getFaces, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
 import { siteGhostLevelId } from '../derive/site';
-import { floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, stairSteps, type StairsSymbol } from '../derive/stairs';
+import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
@@ -498,19 +498,26 @@ const FixturesLayer = memo(function FixturesLayer({ levelId }: { levelId: Id }) 
   );
 });
 
-/** Stairs symbol: outline, nosing lines, and an UP arrow pointing the way the flight climbs. */
+/**
+ * Stairs symbol: outline, nosing lines, and an UP arrow pointing the way the flight climbs. A landing
+ * (one riser) is its outline only.
+ */
 export function StairsGlyph({ sym, k, className, id }: { sym: StairsSymbol; k: number; className: string; id?: Id }) {
   return (
-    <g className={className} data-stairs-id={id}>
+    <g className={`${className}${sym.landing ? ' stairs-landing' : ''}`} data-stairs-id={id}>
       <path className="stairs-body" d={polyPath(sym.outline)} vectorEffect="non-scaling-stroke" />
       {sym.treads.length > 0 && <path className="stairs-tread" d={segPath(sym.treads)} vectorEffect="non-scaling-stroke" />}
-      <path className="stairs-arrow" d={segPath([sym.shaft])} vectorEffect="non-scaling-stroke" />
-      <path className="stairs-arrow-head" d={`M${pt(sym.head[0])}L${pt(sym.head[1])}L${pt(sym.head[2])}`} vectorEffect="non-scaling-stroke" />
-      <g transform={`translate(${sym.label.x} ${sym.label.y}) rotate(${sym.labelAngle}) scale(${1 / k})`}>
-        <text className="stairs-label" textAnchor="middle" dominantBaseline="central">
-          UP
-        </text>
-      </g>
+      {!sym.landing && (
+        <>
+          <path className="stairs-arrow" d={segPath([sym.shaft])} vectorEffect="non-scaling-stroke" />
+          <path className="stairs-arrow-head" d={`M${pt(sym.head[0])}L${pt(sym.head[1])}L${pt(sym.head[2])}`} vectorEffect="non-scaling-stroke" />
+          <g transform={`translate(${sym.label.x} ${sym.label.y}) rotate(${sym.labelAngle}) scale(${1 / k})`}>
+            <text className="stairs-label" textAnchor="middle" dominantBaseline="central">
+              UP
+            </text>
+          </g>
+        </>
+      )}
     </g>
   );
 }
@@ -521,7 +528,7 @@ const StairsShape = memo(function StairsShape({ levelId, stairsId }: { levelId: 
   const viewMode = useLayerUi((s) => s.viewMode);
   const selected = useLayerUi((s) => s.selection.stairs.includes(stairsId));
   const k = useLayerUi(viewportScale);
-  const sym = useMemo(() => (st ? stairsSymbol(st, stairSteps(ftf).risers) : null), [st, ftf]);
+  const sym = useMemo(() => (st ? stairsSymbol(st, flightSteps(st, ftf).risers) : null), [st, ftf]);
   if (!st || !sym || !isVisible(st.phase, viewMode)) return null;
   return <StairsGlyph sym={sym} k={k} id={stairsId} className={`stairs phase-${st.phase}${selected ? ' is-selected' : ''}`} />;
 });
@@ -558,7 +565,7 @@ const StairHolesLayer = memo(function StairHolesLayer({ levelId }: { levelId: Id
       const hole = stairsHoleOutline(st, ftf);
       if (!hole) continue;
       const start = stairsHoleStart(st, ftf);
-      const sym = stairsSymbol(st, stairSteps(ftf).risers);
+      const sym = stairsSymbol(st, flightSteps(st, ftf).risers);
       // Treads lie across the flight at increasing distance up it; keep the ones over the hole.
       const step = st.run / (sym.treads.length + 1);
       const treads = sym.treads.filter((_, i) => (i + 1) * step > start + 1e-6);
