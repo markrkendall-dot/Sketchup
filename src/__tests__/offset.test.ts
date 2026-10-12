@@ -27,6 +27,8 @@ const wallAt = (a: Vec2, b: Vec2): Id => {
   if (!hit) throw new Error(`no wall ${JSON.stringify([a, b])}`);
   return hit.id;
 };
+/** The example's Kitchen/Living partition: its piece from the south wall up to the stair strip's wall. */
+const kitchenLiving = (): Id => wallAt({ x: 170.5, y: 311.5 }, { x: 170.5, y: 137.5 });
 const roomSize = (name: string) => {
   const l = level();
   const room = Object.values(l.rooms).find((r) => r.name.startsWith(name))!;
@@ -64,7 +66,7 @@ describe('offsetWalls: a partition (REVIEW-2 B1)', () => {
     const kitchen = roomSize('Kitchen');
     const living = roomSize('Living');
     expect([kitchen.width, living.width]).toEqual([138, 161]);
-    const partition = 'f-w16';
+    const partition = kitchenLiving();
     // The partition runs up the screen (a at the south wall): its left side is the Living.
     expect(wallSideNames(level(), getFaces(level(), 'all'), level().walls[partition]).left).toBe('Living');
     const before = usePlanStore.temporal.getState().pastStates.length;
@@ -88,7 +90,8 @@ describe('offsetWalls: a partition (REVIEW-2 B1)', () => {
     store().setPlan(migrate(example));
     lid = store().plan.levelOrder[1];
     ui().setActiveLevel(lid);
-    const problem = runWallMove(lid, 'f-w16', () => store().offsetWalls(lid, ['f-w16'], 6, 'left'), 'Moved the wall 6" toward Living');
+    const partition = kitchenLiving();
+    const problem = runWallMove(lid, partition, () => store().offsetWalls(lid, [partition], 6, 'left'), 'Moved the wall 6" toward Living');
     expect(problem).toBeNull();
     expect(ui().draft.message).toBe(`Moved the wall 6" toward Living. Now Living 12'-11" x 14'-0", Kitchen (17'2" adjusted: re-measure) 12'-0" x 17'-2".`);
   });

@@ -14,5 +14,8 @@
   - `PLAN-v3-realism.md`: the plan for making the exterior and the elevations read like the photos
     (light and shadows, siding and roof textures, sashes and screens, open eaves, the chimney's cap,
     elevation views, and the starter's windows, roofs and finishes re-estimated from the photos).
+  - `PLAN-v4-proposed.md`: the plan for drawing the owner's proposed design into the starter as new
+    and demolished work (master suite, kitchen, stair and front door, powder room, foyer and screen
+    porch), with the flight and room-label fields it needed, and where the built design differs.
   - `QA-FINDINGS.md`: the first hands-on QA pass and the second review's status.
   - `REVIEW-2.md`: the second review of the house and the tools, with the fixes made.

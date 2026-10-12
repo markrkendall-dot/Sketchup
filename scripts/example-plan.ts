@@ -11,7 +11,7 @@ import { columnDefaults } from '../src/derive/site';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import type { Id, Opening, Phase, Plan, Roof, Vec2 } from '../src/model/types';
-import { getPlan, usePlanStore } from '../src/store/planStore';
+import { getPlan, usePlanStore, type NewStairs } from '../src/store/planStore';
 
 const ft = (feet: number): number => feet * 12;
 const round2 = (v: number): number => Math.round(v * 100) / 100;
@@ -54,6 +54,13 @@ const ROOF_WING = '#6e4b3c';
 /** The house door's dark green (photo 08). */
 const DOOR_GREEN = '#2f4a3a';
 const PHASE: Phase = 'existing';
+const NEW: Phase = 'new';
+/**
+ * The proposed powder room's partitions (centerlines): its west wall x 129.5 (faces 127..132, just
+ * west of the hall passage's west jamb at x 132, so the existing passage keeps its place) and its
+ * north wall y 45.5 (faces 43..48, along the south edge of the new stair).
+ */
+const POWDER = { west: 129.5, north: 45.5 };
 
 type Rect = { x0: number; x1: number; y0: number; y1: number };
 const outline = (r: Rect): Vec2[] => [
@@ -69,20 +76,20 @@ const store = () => usePlanStore.getState();
 const level = (id: Id) => getPlan().levels[id];
 
 /** Draw a chain of exterior walls through the points (closed when `close`). Returns the wall ids. */
-function drawWalls(levelId: Id, pts: Vec2[], thickness: number, close = false): Id[] {
+function drawWalls(levelId: Id, pts: Vec2[], thickness: number, close = false, phase: Phase = PHASE): Id[] {
   const out: Id[] = [];
   const n = close ? pts.length : pts.length - 1;
   for (let i = 0; i < n; i++) {
-    const res = store().addWall(levelId, pts[i], pts[(i + 1) % pts.length], { kind: 'exterior', thickness, phase: PHASE });
+    const res = store().addWall(levelId, pts[i], pts[(i + 1) % pts.length], { kind: 'exterior', thickness, phase });
     if (!res) throw new Error(`wall ${i} of ${JSON.stringify(pts)} was rejected`);
     out.push(...res.wallIds);
   }
   return out;
 }
 
-/** Draw one interior partition (5", existing) between two centerline points; it T-joins what it meets. */
-function partition(levelId: Id, a: Vec2, b: Vec2): void {
-  if (!store().addWall(levelId, a, b, { kind: 'interior', thickness: TI, phase: PHASE })) throw new Error(`partition ${JSON.stringify([a, b])} was rejected`);
+/** Draw one interior partition (5") between two centerline points; it T-joins what it meets. */
+function partition(levelId: Id, a: Vec2, b: Vec2, phase: Phase = PHASE): void {
+  if (!store().addWall(levelId, a, b, { kind: 'interior', thickness: TI, phase })) throw new Error(`partition ${JSON.stringify([a, b])} was rejected`);
 }
 
 /** The wall whose centerline passes through p (the opening's centre), and p's distance from its start. */
@@ -121,6 +128,8 @@ interface OpeningSpec {
   swing?: NonNullable<Opening['swing']>;
   /** Doors: the direction the leaf swings toward (picks the swing side from the wall's direction). */
   into?: Vec2;
+  /** Default existing. */
+  phase?: Phase;
 }
 
 /** Add an opening centred at p (on a wall's centerline); throws when it does not fit the wall where it is. */
@@ -143,7 +152,7 @@ function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
     width: o.width,
     height: o.height,
     sill: o.sill ?? (o.type === 'door' ? 0 : 30),
-    phase: PHASE,
+    phase: o.phase ?? PHASE,
     ...(o.type === 'door' ? { swing: swing ?? { hinge: 'a' as const, side: 'left' as const } } : {}),
     ...(o.lites ? { lites: o.lites } : {}),
     ...(o.shutters ? { shutters: true } : {}),
@@ -170,13 +179,13 @@ const win = (levelId: Id, p: Vec2, width: number, height: number, cols: number, 
  * tails showing (5.5" deep every 24", photos 01, 02 and 07) and 7" rake boards, all in the stain
  * (photos 03 and 08). `color` and `weathering` (rust) per roof.
  */
-function roof(levelId: Id, r: Pick<Roof, 'shape' | 'outline' | 'ridgeAngle' | 'pitch' | 'overhang'>, color: string, weathering: number): Id {
+function roof(levelId: Id, r: Pick<Roof, 'shape' | 'outline' | 'ridgeAngle' | 'pitch' | 'overhang'>, color: string, weathering: number, phase: Phase = PHASE): Id {
   const id = store().addRoof(levelId, {
     ...r,
     bearingOffset: 0,
     thickness: 2.5,
     fascia: 7,
-    phase: PHASE,
+    phase,
     finish: 'metal',
     color,
     eave: 'open',
@@ -186,6 +195,11 @@ function roof(levelId: Id, r: Pick<Roof, 'shape' | 'outline' | 'ridgeAngle' | 'p
   });
   if (!id) throw new Error('roof rejected');
   return id;
+}
+
+/** Name a room: a label anchored at `at`. A label of a new or demolished room shows only in the views that show its phase. */
+function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE): void {
+  if (!store().addRoom(levelId, { name, anchor: at, ...(phase === 'existing' ? {} : { phase }) })) throw new Error(`room ${name} rejected`);
 }
 
 /** Replace every generated id with a readable, stable one so the JSON is identical from run to run. */
@@ -271,14 +285,26 @@ export function buildExamplePlan(): Plan {
   //   Bath west wall x 194.5 (faces 192..197), that line up to the north wall.
   //   Stair south wall y 137.5 (faces 135..140), the west wall to the partition.
   const PART = { kl: 170.5, line: 99.5, bathWest: 194.5, stairSouth: 137.5 };
-  partition(fId, { x: CL.x1, y: PART.line }, { x: CL.x0, y: PART.line });
+  // The y 99.5 line is drawn in pieces, east to west, so the two that the proposed design takes out
+  // (the Kitchen/Bath piece east of x 194.5 and the hall/strip piece west of x 129.5) are walls of
+  // their own: the same faces and openings, one extra node at x 129.5, where the proposed powder
+  // room's west wall meets the line.
+  for (const [x0, x1] of [
+    [CL.x1, PART.bathWest],
+    [PART.bathWest, PART.kl],
+    [PART.kl, POWDER.west],
+    [POWDER.west, CL.x0],
+  ]) {
+    partition(fId, { x: x0, y: PART.line }, { x: x1, y: PART.line });
+  }
   partition(fId, { x: PART.kl, y: CL.y1 }, { x: PART.kl, y: PART.line });
   partition(fId, { x: PART.bathWest, y: PART.line }, { x: PART.bathWest, y: CL.y0 });
   partition(fId, { x: PART.kl, y: PART.stairSouth }, { x: CL.x0, y: PART.stairSouth });
   // The stair climbs east from the west wall's inside face (x 7) to x 132, 33" wide (the whole strip,
   // y 102..135), under the Second Floor's landing, and cuts the Second Floor's floor.
   const STRIP_MID = 118.5;
-  if (!store().addStairs(fId, { origin: { x: CL.x0 + HALF, y: STRIP_MID }, direction: 0, width: 33, run: 125, phase: PHASE, cutsFloorAbove: true })) throw new Error('stairs rejected');
+  const stair = store().addStairs(fId, { origin: { x: CL.x0 + HALF, y: STRIP_MID }, direction: 0, width: 33, run: 125, phase: PHASE, cutsFloorAbove: true });
+  if (!stair) throw new Error('stairs rejected');
 
   // ---- Second Floor: the block. Clapboard on the south and east faces, shingle on the north and
   // west ones (photos 01, 03, 06, 08).
@@ -360,8 +386,8 @@ export function buildExamplePlan(): Plan {
   // West face (the entry, photo 08): the house door inside the porch, dark green with nine lites over
   // two panels; a window set high (its head above the door head) of a casement (2 x 3 lites), a fixed
   // pane and a casement, and upstairs two casements of 2 x 2 lites; both windows have shutters.
-  addOpeningAt(fId, { x: west, y: ENTRY_Y }, { type: 'door', width: 36, height: 80, lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN });
-  win(fId, { x: west, y: 203 }, 90, 44, 2, 3, { sashes: 3, fixedCenter: true, shutters: true, sill: 44 });
+  const houseDoor = addOpeningAt(fId, { x: west, y: ENTRY_Y }, { type: 'door', width: 36, height: 80, lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN });
+  const livingWest = win(fId, { x: west, y: 203 }, 90, 44, 2, 3, { sashes: 3, fixedCenter: true, shutters: true, sill: 44 });
   win(sId, { x: west, y: 200 }, 48, 32, 2, 2, { sashes: 2, shutters: true, sill: 48 });
   // The porch (photos 07 and 08): screens above 36" knee walls in all four bays (the two narrow front
   // ones either side of the entry; the south side shows only as light through the porch in photo 07:
@@ -381,7 +407,7 @@ export function buildExamplePlan(): Plan {
   // Living by a 30" opening at x 7..37. Bath: 30" x 80" door, north jamb 6" from the north wall's inside
   // face (y 13..43, an estimate), swinging into the hall.
   addOpeningAt(fId, { x: PART.kl, y: 212 }, { type: 'passage', width: 48, height: 80, sill: 0 });
-  addOpeningAt(fId, { x: 150, y: PART.line }, { type: 'passage', width: 36, height: 80, sill: 0 });
+  const hallPassage = addOpeningAt(fId, { x: 150, y: PART.line }, { type: 'passage', width: 36, height: 80, sill: 0 });
   addOpeningAt(fId, { x: 150, y: PART.stairSouth }, { type: 'passage', width: 36, height: 80, sill: 0 });
   addOpeningAt(fId, { x: 22, y: PART.stairSouth }, { type: 'passage', width: 30, height: 80, sill: 0 });
   addOpeningAt(fId, { x: PART.bathWest, y: 28 }, { type: 'door', width: 30, height: 80, lites: { cols: 1, rows: 1 }, into: WEST });
@@ -405,11 +431,11 @@ export function buildExamplePlan(): Plan {
   // wing; 2 x 3 lites each.
   win(sId, { x: east, y: 98 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
   win(sId, { x: east, y: 222 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
-  win(fId, { x: east, y: 152 }, 36, 40, 2, 3, { sill: 42 });
+  const eastWindow = win(fId, { x: east, y: 152 }, 36, 40, 2, 3, { sill: 42 });
   // The wing: casement pairs of 2 x 3 lites in its east gable end (photo 03), its north face and its
   // south face (photos 01 and 02).
   win(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 }, 48, 44, 2, 3, { sashes: 2 });
-  win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y0 }, 48, 40, 2, 3, { sashes: 2 });
+  const wingNorthWindow = win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y0 }, 48, 40, 2, 3, { sashes: 2 });
   win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, 48, 44, 2, 3, { sashes: 2, sill: 30 });
   // The walkout double door below the wing's south window (photo 02): two plain leaves in the stain,
   // set in the boards with no trim round them.
@@ -421,10 +447,10 @@ export function buildExamplePlan(): Plan {
   // Main roof about 6:12 (photos 03 and 08 both read 5.5 to 7); the wing's ridge meets the main east
   // wall just under the upstairs south window (photo 03), about 7:12.
   roof(sId, { shape: 'gable', outline: outline(MAIN), ridgeAngle: 0, pitch: 6, overhang: 24 }, ROOF_GALVANIZED, 0.6);
-  roof(fId, { shape: 'gable', outline: outline(WING), ridgeAngle: 0, pitch: 7, overhang: 18 }, ROOF_WING, 0.3);
+  const wingRoof = roof(fId, { shape: 'gable', outline: outline(WING), ridgeAngle: 0, pitch: 7, overhang: 18 }, ROOF_WING, 0.3);
   // Entry porch: a gable with its ridge east-west, so the gable faces west over the entry (photo 08;
   // about 5:12, eaves well past the knee walls). The porch's west wall rises into the gable.
-  roof(fId, { shape: 'gable', outline: outline(PORCH), ridgeAngle: 0, pitch: 5, overhang: 18 }, ROOF_GALVANIZED, 0.7);
+  const porchRoof = roof(fId, { shape: 'gable', outline: outline(PORCH), ridgeAngle: 0, pitch: 5, overhang: 18 }, ROOF_GALVANIZED, 0.7);
 
   // ---- Chimney against the middle of the north wall (photo 06; photo 08 shows it at the same spot in
   // perspective): about 24" along the wall and 20" out from it (photos 06 and 07), stained like the
@@ -440,9 +466,6 @@ export function buildExamplePlan(): Plan {
 
   // ---- Room labels, one per area (names say where a number is an estimate). A label is drawn at its
   // anchor (else at the middle of the room's widest part), so the anchors are where each reads best.
-  const label = (levelId: Id, name: string, at: Vec2) => {
-    if (!store().addRoom(levelId, { name, anchor: at })) throw new Error(`room ${name} rejected`);
-  };
   const mid = { x: MAIN.x1 / 2, y: MAIN.y1 / 2 };
   label(bId, 'Basement (unpartitioned, est.)', mid);
   // The walkout bump under the wing is its own space until it is measured (README).
@@ -464,7 +487,193 @@ export function buildExamplePlan(): Plan {
   label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 });
   label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 });
 
+  proposed({ bId, fId, stair, houseDoor, livingWest, hallPassage, eastWindow, wingNorthWindow, wingRoof, porchRoof });
   return getPlan();
+}
+
+/** Ids from the existing house that the proposed design demolishes or builds on. */
+interface ExistingIds {
+  bId: Id;
+  fId: Id;
+  stair: Id;
+  houseDoor: Id;
+  livingWest: Id;
+  hallPassage: Id;
+  eastWindow: Id;
+  wingNorthWindow: Id;
+  wingRoof: Id;
+  porchRoof: Id;
+}
+
+/**
+ * Mark existing work demolished (the store's setPhase, as "Mark demolish" does). Walls are named
+ * by a point on their centerline, rooms by name; a demolished wall takes its openings with it.
+ * Throws when something named is not there.
+ */
+function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id[]; roofs?: Id[]; rooms?: string[] }): void {
+  const lvl = level(levelId);
+  const walls = (d.walls ?? []).map((p) => wallAt(levelId, p).wallId);
+  const openings = [...(d.openings ?? []), ...Object.values(lvl.openings).filter((o) => walls.includes(o.wallId)).map((o) => o.id)];
+  const rooms = (d.rooms ?? []).map((name) => {
+    const r = Object.values(lvl.rooms).find((room) => room.name === name);
+    if (!r) throw new Error(`no room ${name} on ${lvl.name}`);
+    return r.id;
+  });
+  const sel = { walls, openings, stairs: d.stairs ?? [], roofs: d.roofs ?? [], rooms };
+  store().setPhase(levelId, sel, 'demo');
+  const after = level(levelId);
+  const phases = [
+    ...sel.walls.map((id) => after.walls[id]?.phase),
+    ...sel.openings.map((id) => after.openings[id]?.phase),
+    ...sel.stairs.map((id) => after.stairs[id]?.phase),
+    ...sel.roofs.map((id) => after.roofs[id]?.phase),
+    ...sel.rooms.map((id) => after.rooms[id]?.phase),
+  ];
+  if (phases.some((p) => p !== 'demo')) throw new Error(`demolish on ${lvl.name}: something was not marked`);
+}
+
+/**
+ * The proposed design (MK's brief of 12 Oct 2026; docs/history/PLAN-v4-proposed.md), drawn as new
+ * and demolished work on the existing house: the east wing grown north into a master suite, the
+ * kitchen into the old bath, a new stair from a front door on the west wall up to a landing in the
+ * north-west corner and east along the north wall, a powder room in the old hall, and a foyer with a
+ * screen porch on the west face in place of the entry porch. Everything is demolished first, so the
+ * existing openings are clamped against the proposed walls only once, and none of them moves.
+ */
+function proposed(ids: ExistingIds): void {
+  const { bId, fId } = ids;
+  const wing = centerline(WING, HALF);
+  const NORTH = { x: 0, y: -1 };
+  const SOUTH = { x: 0, y: 1 };
+  const EAST = { x: 1, y: 0 };
+  const pc = centerline(PORCH, HALF);
+  // First floor top (+2"): the basement floor -100" plus its 90" walls and the 12" floor.
+  const FLOOR_TOP = 2;
+
+  // ---- Demolition (First Floor). The entry porch: its three walls (their screens go with them),
+  // its roof and its label. The wing's north wall with its window, the main block's east window (it
+  // would face into the new bedroom), the wing's roof. The y 99.5 piece between the Kitchen and the
+  // Bath, and the one between the hall and the stair strip west of the powder room, with the hall's
+  // passage (the powder room takes its place). The stair and the house door. The Living's west
+  // window: its north shutter would sit inside the foyer, against the new door's trim, so a window
+  // without shutters replaces it.
+  demolish(fId, {
+    walls: [
+      { x: (pc.x0 + CL.x0) / 2, y: pc.y0 },
+      { x: pc.x0, y: ENTRY_Y },
+      { x: (pc.x0 + CL.x0) / 2, y: pc.y1 },
+      { x: (WING.x0 + WING.x1) / 2, y: wing.y0 },
+      { x: 250, y: 99.5 },
+      { x: 60, y: 99.5 },
+    ],
+    openings: [ids.eastWindow, ids.wingNorthWindow, ids.hallPassage, ids.houseDoor, ids.livingWest],
+    stairs: [ids.stair],
+    roofs: [ids.wingRoof, ids.porchRoof],
+    rooms: ['Entry porch (est.)', 'Utility', 'Bath', 'Stair'],
+  });
+
+  // ---- 1. East addition: the wing grows north to the road corner at the same depth, one wing down
+  // the whole east side, outside x 318..463, y 0..315. Its north wall continues the main block's,
+  // its east wall the wing's; a 5" partition at y 120 divides the master bath (north) from the master
+  // bedroom (the old Utility plus 6').
+  const ADD = { y: 120 };
+  const addition = drawWalls(fId, [{ x: CL.x1, y: CL.y0 }, { x: wing.x1, y: CL.y0 }, { x: wing.x1, y: wing.y0 }], T, false, NEW);
+  store().updateWalls(fId, addition, { finish: 'shingle', color: FINISH_COLOR });
+  partition(fId, { x: CL.x1, y: ADD.y }, { x: wing.x1, y: ADD.y }, NEW);
+  // The foundation under it: 8" block from the main block's north-east corner to the bump's.
+  const footing = drawWalls(bId, [{ x: CL.x1, y: CL.y0 }, { x: wing.x1, y: CL.y0 }, { x: wing.x1, y: wing.y0 }], TB, false, NEW);
+  store().updateWalls(bId, footing, { finish: 'block', color: BLOCK_COLOR });
+
+  // ---- 5. Foyer and screen porch on the west face, outside x -96..0. The foyer's north wall runs
+  // through the post between the old porch's screen door and its south screen (y 66..69.5) and its
+  // south wall stops north of the Living's west window (y 158..248), so the old porch's openings and
+  // the Living window keep their places in the existing view: foyer y 64.25..158 (7'10" x 8'), the
+  // screen porch y 158..315 (13'1" x 8'). The foyer's north wall crosses the old porch's west wall,
+  // which normalizeLevel splits at the crossing.
+  const FOYER = { x0: -96, y0: 64.25, y1: 158 };
+  const fy = { west: FOYER.x0 + HALF, north: FOYER.y0 + HALF, south: FOYER.y1 - HALF };
+  const foyer = drawWalls(fId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], T, false, NEW);
+  const porch = drawWalls(fId, [{ x: fy.west, y: fy.south }, { x: fy.west, y: CL.y1 }, { x: CL.x0, y: CL.y1 }], T, false, NEW);
+  store().updateWalls(fId, [...foyer, ...porch], { finish: 'shingle', color: FINISH_COLOR });
+
+  // ---- 4. Powder room in the old hall, south of the new flight: x 132..192, y 48..97 inside
+  // (5' x 4'1"), its west wall clear of the old hall passage's jamb.
+  partition(fId, { x: POWDER.west, y: 99.5 }, { x: POWDER.west, y: POWDER.north }, NEW);
+  partition(fId, { x: POWDER.west, y: POWDER.north }, { x: 194.5, y: POWDER.north }, NEW);
+
+  // ---- Openings, all new. Windows 2 x 3 lites per sash, sill 30 unless given.
+  const add = (p: Vec2, o: OpeningSpec) => addOpeningAt(fId, p, { ...o, phase: NEW });
+  // Master suite: the bath's door in the partition, the bedroom's door from the kitchen in the main
+  // block's east wall (beside the demolished window), and windows north and east.
+  add({ x: 345, y: ADD.y }, { type: 'door', width: 28, height: 80, into: NORTH });
+  add({ x: CL.x1, y: 150 }, { type: 'door', width: 32, height: 80, into: EAST });
+  add({ x: 390, y: CL.y0 }, { type: 'window', width: 36, height: 36, sill: 48, lites: { cols: 2, rows: 3 } });
+  add({ x: wing.x1, y: 62 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
+  add({ x: wing.x1, y: 160 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
+  // The house door moves to the middle of the old stair strip (y 118.5): 32", so its jambs (102.5 to
+  // 134.5) clear the strip's partition faces at 102 and 135; green, nine lites over two panels.
+  const halfLite = { lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN };
+  add({ x: CL.x0, y: 118.5 }, { type: 'door', width: 32, height: 80, into: EAST, ...halfLite });
+  // The foyer: the 36" front door in its west wall in line with the house door, a window in its
+  // north wall (x -42: x -48 would put its west jamb across the old porch wall's crossing at x -62.5).
+  add({ x: fy.west, y: 118.5 }, { type: 'door', width: 36, height: 80, into: EAST, ...halfLite });
+  add({ x: -42, y: fy.north }, { type: 'window', width: 36, height: 44, sill: 36, lites: { cols: 2, rows: 3 } });
+  // The Living's west window again, without shutters (it looks into the screen porch), 4" south so
+  // its trim clears the foyer's south wall.
+  add({ x: CL.x0, y: 207 }, { type: 'window', width: 90, height: 44, sill: 44, sashes: 3, fixedCenter: true, lites: { cols: 2, rows: 3 } });
+  // Screen porch: screens above 36" knee walls, two 56" bays in the west wall either side of the
+  // middle post and one 44" in the south wall; screen doors from the foyer and out to the lawn.
+  const screen = { type: 'window' as const, height: 44, sill: 36, glazing: 'screen' as const, trim: 0 };
+  add({ x: fy.west, y: 199 }, { ...screen, width: 56 });
+  add({ x: fy.west, y: 273 }, { ...screen, width: 56 });
+  add({ x: -62, y: CL.y1 }, { ...screen, width: 44 });
+  const screenDoor = { type: 'door' as const, width: 36, height: 80, leafColor: FINISH_COLOR, glazing: 'screen' as const, trim: 0 };
+  add({ x: -48, y: fy.south }, { ...screenDoor, into: SOUTH });
+  add({ x: -20, y: CL.y1 }, { ...screenDoor, into: SOUTH });
+  // Powder room door from the hall.
+  add({ x: POWDER.west, y: 72 }, { type: 'door', width: 28, height: 80, into: EAST });
+
+  // ---- 3. The stair, 36" wide: two risers north from the old hall up to a 14" landing in the
+  // north-west corner, then the main flight east along the north wall to the Bunk's east wall face
+  // upstairs (x 169). The short flight's run is 36" (two 18" treads, y 79 to 43), the shortest run
+  // the store takes. The main flight is 35.5" wide, 1/2" off the north wall's inside face, so its
+  // floor opening lies inside the Second Floor's slab (which ends at that face) and is cut.
+  const flight = (s: Omit<NewStairs, 'phase'>) => {
+    if (!store().addStairs(fId, { ...s, phase: NEW })) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
+  };
+  flight({ origin: { x: 25, y: 79 }, direction: 270, width: 36, run: 36, rise: 14, risers: 2, cutsFloorAbove: false });
+  flight({ origin: { x: 25, y: 43 }, direction: 270, width: 36, run: 36, rise: 14, risers: 1, cutsFloorAbove: false });
+  flight({ origin: { x: 43, y: 25.25 }, direction: 0, width: 35.5, run: 126, base: 14, rise: 94, cutsFloorAbove: true });
+
+  // ---- Roofs, new sheet (little rust). The wing: one gable over the whole east side, ridge
+  // north-south, the wing roof's pitch and colour. The foyer: a gable facing west over the front door
+  // like the old porch's; the screen porch: a shed high at the house wall (128") and down to 96" at
+  // its outer wall, meeting the gable's eave line. The two overlap at y 158 (no valley). Both
+  // outlines stop 18" short of the house wall (x -18): an overhang is the same on every edge, so
+  // their east edges' overhang ends at the wall's outside face instead of running 18" into the
+  // house (a rake board and rafter tails upstairs). The slopes are the same either way.
+  const ROOF_EAST = MAIN.x0 - 18;
+  roof(fId, { shape: 'gable', outline: outline({ x0: MAIN.x1, x1: WING.x1, y0: MAIN.y0, y1: MAIN.y1 }), ridgeAngle: 90, pitch: 7, overhang: 18 }, ROOF_WING, 0.1, NEW);
+  roof(fId, { shape: 'gable', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y0, y1: FOYER.y1 }), ridgeAngle: 0, pitch: 8, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
+  roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
+
+  // ---- The porch's posts: 8" x 8" in the stain, flush with the outside face of its west wall, at
+  // its north corner, between the two screen bays and at its south-west corner, from the porch floor
+  // to the roof's underside over each (columnDefaults).
+  for (const y of [162, 236, 311]) {
+    const at = { x: -92, y };
+    const d = columnDefaults(getPlan(), 'post', at, NEW);
+    if (!store().addColumn({ at, kind: 'post', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP, top: round2(d.top), color: FINISH_COLOR })) throw new Error(`post at y ${y} rejected`);
+  }
+
+  // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two
+  // never share a face there.
+  label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW);
+  label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW);
+  label(fId, 'Powder room (proposed)', { x: 162, y: 72.5 }, NEW);
+  label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW);
+  label(fId, 'Screen porch (proposed)', { x: -48, y: 236 }, NEW);
+  label(bId, 'Crawl space (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 97 }, NEW);
 }
 
 /** The starter plan as the JSON text of docs/examples/146-mick-road.json (stable ids, fixed date). */

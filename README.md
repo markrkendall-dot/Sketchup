@@ -338,7 +338,8 @@ is a measurement that disagreed with a neighbour and was changed to make the hou
 below). The plan's name says so too.
 
 Open it with **Open example**. Replace the estimates one by one with tape measurements, in the
-order below, then draw the renovation on top.
+order below. The owner's proposed design is already drawn on top as new and demolished work (see
+"The proposed design in the starter"): the Existing view shows the house as it stands.
 
 ### How the starter was built
 
@@ -498,38 +499,71 @@ with a level and a tape or a laser, and edit them in the Site tab.
    rooms marked "adjusted" first: the Kitchen, the Guest and the Office / hall, and the bottom of
    the stair); the basement is still to do (delete its "unpartitioned" label as you go).
 
-### Drawing the renovation on top of it
+### The proposed design in the starter
 
-Set the view to **All** and **Draw as: new**, then:
+The starter also holds the owner's proposed design (his brief of 12 Oct 2026), drawn as *new* and
+*demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
+`proposed()`; the plan is `docs/history/PLAN-v4-proposed.md`, with the places where the built
+design differs from it). Five changes, all on the First Floor:
 
-- **The extension above the walkout basement.** On the First Floor, draw the new walls over the
-  basement terrace in front of the walkout doors, as *new*: their outside faces on the basement's
-  outside faces, joining the house at T junctions, then add a roof (`K`, still *new*) with its
-  own pitch and overhang. Windows and doors in those walls are *new* too. Where the new wall
-  replaces an existing wall or window, select the old one and **Mark demolish**, then draw the new
-  wall beside it: a wall drawn on top of an existing one is refused ("A wall is already there"),
-  so the existing wall is never replaced by accident.
-- **The porch.** Select the existing porch's three walls and its roof, **Mark demolish**. Draw the
-  larger porch as new: its walls (with openings above the knee walls, or posts from the Site tab,
-  `C`, Tab for a post), its roof, and any steps. The entry door stays unless you change it.
-- **The garage.** From the sketch: 24' x 26', 55' west of the house and 20' from the road. Draw it
-  on the First Floor as *new* with the Box tool (`B`, then `24' x 26'` and Enter), outside the house
-  (the retaining walls themselves are not modelled). A new room over the wing on the Second Floor
-  is the same: turn on "Show level below", press `B`, click the wing's corner and type its inside
-  size with Lengths to set to inside face.
+1. **Master suite.** The east wing grows north to the road corner at the same depth: one
+   one-storey wing down the whole east side, outside 12'1" x 26'3", under one new gable roof with
+   its ridge north-south. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2" inside)
+   from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom door is in the
+   main block's east wall, from the kitchen. The wing's north wall, its window and its roof, and the
+   main block's first-floor east window, are demolished. New 8" block walls carry the new part
+   (a crawl space).
+2. **Kitchen.** The wall between the kitchen and the old bath is demolished, so the kitchen is an
+   L round the old bath's area. The bath's door becomes a door from the hall.
+3. **Stair and front door.** The old stair and the house door at the porch are demolished. The new
+   house door (32", green) is in the west wall in the middle of the old stair strip. Inside, two
+   risers go north to a 14" landing in the north-west corner, then the flight climbs east along
+   the north wall to the Bunk's east wall upstairs, and cuts the Second Floor's floor from about
+   19" up its run. The wall between the hall and the strip, west of the powder room, is demolished,
+   so the hall, the strip and the stair are one room.
+4. **Powder room**, 5' x 4'1", in the old hall south of the top of the flight, where the hall's
+   passage to the strip was.
+5. **Foyer and screen porch** on the west face in place of the entry porch: an enclosed foyer
+   (7'10" x 8') with the 36" front door in line with the house door and a gable facing west, and
+   south of it a screen porch (13'1" x 8') with screens above knee walls, two screen doors, three 8"
+   timber posts in the stain and a shed roof high at the house wall. The Living's west window,
+   which now looks into the porch, is replaced by the same window without shutters.
 
-Existing then shows the house as it stands with the demolished porch and no extension; Proposed shows
-the extension and the new porch only; All shows both, the demolished parts dashed red and the new
-parts green. Export from Existing and from Proposed to give the contractor or SketchUp each state.
+Which view to use:
+
+- **Proposed** for the 3D view, the elevations, walk mode and exports of the house after the work.
+- **Existing** for the house as it stands; the parts to be demolished show in translucent red.
+- **All** to see both on the plan: demolished walls dashed red, new walls green. The demolished
+  rooms keep their labels in the All view and the new labels sit beside them (the Utility and the
+  master bedroom's new north part are two areas there).
+
+Still open:
+
+- The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the
+  foyer's gable and the porch's shed overlap with no valley).
+- How the bedroom is reached: its door opens from the kitchen, the only room beside it; a hall or a
+  closet wall can be added later. The old bath's door now opens from the hall into a pocket
+  between the top of the flight and the powder room: decide whether it stays.
+- Upstairs: the Bunk becomes the stair hall and needs a new layout and a railing round the stair
+  opening; neither is drawn.
+- The knee braces and the timber truss in the foyer's gable are not modelled.
+- Every new size is from the plan, not measured: check them on site before ordering anything.
+- The garage from the site sketch (24' x 26', 55' west of the house and 20' from the road) is not
+  drawn: on the First Floor, **Draw as: new**, the Box tool (`B`, `24' x 26'`, Enter).
+
+To change the design, edit it in the app (select, move, **Mark demolish**, draw with **Draw as:
+new**) or edit `proposed()` in the script and run `npm run build:example`.
 
 ## Known limitations
 
 - **Roofs**: no valleys or dormers; roofs that meet (a wing roof running into the main wall,
-  porch roofs) simply overlap, and the walls only follow the roofs on their own level. A hip roof
+  porch roofs, the starter's proposed foyer gable and porch shed) simply overlap, and the walls
+  only follow the roofs on their own level. A roof's overhang on an edge against a wall runs into
+  the house unless its outline stops short of the wall by the overhang. A hip roof
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
   edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
-- **Not drawn yet**: decks and railings, exterior stairs, retaining walls, the lot outline, porch
+- **Not drawn yet**: decks and railings (a stair opening has no railing round it), exterior stairs, retaining walls, the lot outline, porch
   floors and steps, foundations under additions and porches, gutters, bathroom fixtures,
   furniture, and text or dimension notes you place yourself.
 - **Cabinets** are boxes with simple fronts: no door swings on the plan, no backsplash, open
