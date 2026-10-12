@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "build:example": "node scripts/run-ts.mjs scripts/build-example.ts"
+    "build:example": "node scripts/run-ts.mjs scripts/build-example.ts",
+    "build:viewer": "tsc -b && vite build --config vite.viewer.config.ts && node scripts/build-viewer.mjs docs/examples/146-mick-road.json"
   },
   "dependencies": {
     "@react-three/drei": "10.7.9",

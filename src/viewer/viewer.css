@@ -1,0 +1,180 @@
+/* The standalone viewer (src/viewer/): a full-height column, touch-sized controls. */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #e9edf1;
+}
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  background: #e9edf1;
+  color: #27272a;
+}
+
+.viewer-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid var(--border, #d4d4d8);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.viewer-title {
+  font-weight: 650;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.viewer-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f1f2f4;
+}
+
+.viewer-tabs button {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  color: #3f3f46;
+}
+
+.viewer-tabs button.active {
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.viewer-phases button.active.view-proposed {
+  color: #166534;
+}
+
+.viewer-phases button.active.view-existing {
+  color: #991b1b;
+}
+
+.viewer-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewer-body .view3d-host {
+  flex: 1;
+}
+
+.viewer-levels {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border, #d4d4d8);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.viewer-levels button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+}
+
+.viewer-levels button.active {
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.plan-zoom {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+  background: #fff;
+}
+
+.plan-zoom-content {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.viewer-plan {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The export's SVG fills the area (its own inch size is for printing). */
+.viewer-plan svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-empty {
+  margin: 80px 24px;
+  text-align: center;
+  color: #71717a;
+}
+
+/* The 3D view's own toolbar: readable and tappable on a tablet. */
+.viewer .view3d-toolbar {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  .viewer .view3d-toolbar {
+    font-size: 14px;
+    gap: 6px 14px;
+    padding: 8px 10px;
+  }
+
+  .viewer .view3d-toolbar button {
+    font-size: 14px;
+    min-height: 36px;
+    padding: 4px 12px;
+  }
+
+  .viewer .view3d-toolbar input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+}

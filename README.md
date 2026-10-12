@@ -245,6 +245,16 @@ visible levels): to export the proposed design, switch to Proposed first.
   open (Split or 3D layout), and the browser may ask once to allow several downloads. They are
   pictures, not scaled drawings.
 
+## Share a viewer
+
+`npm run build:viewer` makes `dist-viewer/146-mick-road-viewer.html`: one self-contained HTML
+file (about 1.6 MB, no network access needed) that shows the house in 3D (drag or one finger to
+orbit, two fingers to pinch and pan, level checkboxes, the four elevations, Fit) and the plan of
+each level (pinch or scroll to zoom, drag to pan, double-tap to reset), with no editing. Put it on
+any static host and send the link, or send the file; on an iPad, open the link in Safari (Mail's
+and Files' previews of an HTML attachment do not run its script). To bake another plan in, save
+it from the editor and run `node scripts/build-viewer.mjs that-plan.json` after the build.
+
 ## Export the plan
 
 **Export > Export plan (.svg)** saves the active level's 2D plan as a drawing for a contractor or a

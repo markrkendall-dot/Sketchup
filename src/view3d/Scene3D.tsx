@@ -326,6 +326,8 @@ function View3dToolbar() {
   const grid = useUiStore((s) => s.show3dGrid);
   const walking = useUiStore((s) => s.cameraMode === 'walk');
   const preset = useUiStore((s) => s.view3dPreset);
+  // The standalone viewer has no walk mode (keyboard driven) and no grid.
+  const viewer = useUiStore((s) => s.viewerMode);
   const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, requestFit3d, setCameraMode, setView3dPreset } = useUiStore.getState();
   const nameList = names.split('\u0000');
   return (
@@ -341,10 +343,12 @@ function View3dToolbar() {
         <input type="checkbox" checked={only} onChange={(e) => setOnly3dActiveAndBelow(e.target.checked)} />
         Only active level and below
       </label>
-      <label title="Grid lines on the ground (12 inch cells, 10 foot sections)">
-        <input type="checkbox" checked={grid} onChange={(e) => setShow3dGrid(e.target.checked)} />
-        Grid
-      </label>
+      {!viewer && (
+        <label title="Grid lines on the ground (12 inch cells, 10 foot sections)">
+          <input type="checkbox" checked={grid} onChange={(e) => setShow3dGrid(e.target.checked)} />
+          Grid
+        </label>
+      )}
       <span className="sep" />
       <div className="group" role="group" aria-label="View">
         {PRESET_BUTTONS.map((b) => {
@@ -377,17 +381,19 @@ function View3dToolbar() {
         disabled={walking} title="Frame the visible levels in the 3D view">
         Fit 3D
       </button>
-      <button
-        className={walking ? 'active' : ''}
-        aria-pressed={walking}
-        onClick={() => {
-          setCameraMode(walking ? 'orbit' : 'walk');
-          focusCanvas();
-        }}
-        title="Walk through the model in first person (F); Esc returns to orbit"
-      >
-        Walk <kbd>F</kbd>
-      </button>
+      {!viewer && (
+        <button
+          className={walking ? 'active' : ''}
+          aria-pressed={walking}
+          onClick={() => {
+            setCameraMode(walking ? 'orbit' : 'walk');
+            focusCanvas();
+          }}
+          title="Walk through the model in first person (F); Esc returns to orbit"
+        >
+          Walk <kbd>F</kbd>
+        </button>
+      )}
     </div>
   );
 }
@@ -430,12 +436,14 @@ function WalkOverlay() {
 export default function Scene3D() {
   // Walking moves the camera every frame; orbiting renders only on change.
   const walking = useUiStore((s) => s.cameraMode === 'walk');
+  // A retina tablet renders the sky and the shadow map full screen: a lower cap keeps it fluid.
+  const viewer = useUiStore((s) => s.viewerMode);
   return (
     <section className={`view3d-host${walking ? ' walking' : ''}`} aria-label="3D view">
       <Canvas
         className="view3d-canvas"
         frameloop={walking ? 'always' : 'demand'}
-        dpr={[1, 2]}
+        dpr={viewer ? [1, 1.5] : [1, 2]}
         // PCF filtering: what r3f's default "soft" falls back to in three 0.186, without the warning.
         shadows="percentage"
         camera={{ fov: 50, near: 1, far: CAMERA_FAR, position: [900, 700, 1200] }}

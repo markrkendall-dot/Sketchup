@@ -312,6 +312,8 @@ export interface UiState {
   canvasSize: { width: number; height: number };
   /** 2D plan, 3D model, or both side by side. */
   layout: Layout;
+  /** The standalone viewer (src/viewer/): no editing, so the 3D bar drops its Grid and Walk controls. */
+  viewerMode: boolean;
   /** Split layout: fraction of the width given to the 2D plan. */
   splitRatio: number;
   /** 3D view: levels the user unchecked. */
@@ -455,6 +457,7 @@ export const useUiStore = create<UiState>()((set) => ({
   spaceHeld: false,
   canvasSize: { width: 0, height: 0 },
   layout: '2d',
+  viewerMode: false,
   splitRatio: 0.5,
   hidden3dLevels: [],
   only3dActiveAndBelow: false,
