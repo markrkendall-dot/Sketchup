@@ -17,5 +17,9 @@
   - `PLAN-v4-proposed.md`: the plan for drawing the owner's proposed design into the starter as new
     and demolished work (master suite, kitchen, stair and front door, powder room, foyer and screen
     porch), with the flight and room-label fields it needed, and where the built design differs.
+  - `PLAN-v5-kitchen.md`: the plan for the proposed kitchen in the starter (the island with the sink
+    and dishwasher facing the lake, two stools, the refrigerator between pantries, the range wall
+    and counter in the old bath's alcove, the closet and the moved bedroom door), and where the
+    built kitchen differs.
   - `QA-FINDINGS.md`: the first hands-on QA pass and the second review's status.
   - `REVIEW-2.md`: the second review of the house and the tools, with the fixes made.

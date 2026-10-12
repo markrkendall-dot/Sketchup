@@ -503,18 +503,44 @@ with a level and a tape or a laser, and edit them in the Site tab.
 
 The starter also holds the owner's proposed design (his brief of 12 Oct 2026), drawn as *new* and
 *demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
-`proposed()`; the plan is `docs/history/PLAN-v4-proposed.md`, with the places where the built
-design differs from it). Five changes, all on the First Floor:
+`proposed()`; the plans are `docs/history/PLAN-v4-proposed.md` and, for the kitchen,
+`docs/history/PLAN-v5-kitchen.md`, with the places where the built design differs from them).
+Five changes, all on the First Floor:
 
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
    one-storey wing down the whole east side, outside 12'1" x 26'3", under one new gable roof with
    its ridge north-south. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2" inside)
-   from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom door is in the
-   main block's east wall, from the kitchen. The wing's north wall, its window and its roof, and the
+   from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom door (32") is
+   in the main block's east wall, from the kitchen, south of the pantry run (jambs 15'8" and 18'4"
+   from the north wall's inside face). The wing's north wall, its window and its roof, and the
    main block's first-floor east window, are demolished. New 8" block walls carry the new part
    (a crawl space).
 2. **Kitchen.** The wall between the kitchen and the old bath is demolished, so the kitchen is an
-   L round the old bath's area. The bath's door becomes a door from the hall.
+   L: the main kitchen (11'6" x 17'2") and the old bath as an alcove at its north-east corner. All
+   of its casework is new (the cabinets drawn are the proposed ones; today's are not measured):
+   - An **island** with its fronts facing north, so whoever is at the sink faces the lake: a 24"
+     dishwasher and a 36" sink cabinet under one top 66" x 37" (5'6" x 3'1"), overhanging 3" at
+     each end and 12" on the lake side as a seating ledge, with **two stools** beyond it. It
+     leaves 36" walkways at both ends (to the Living partition and to the east wall), and 60" from
+     the ledge to the lake wall behind the stools; north of it the work aisle opens into the
+     alcove.
+   - On the east wall, the **refrigerator between two tall pantry cabinets** (24" each, 84"
+     high), with a wall cabinet over the refrigerator.
+   - In the alcove, the **range wall** on its east side: the range between two 30" base cabinets,
+     a hood over it and wall cabinets over the bases. That wall is the one shared with the master
+     bath and the second floor is overhead, so the hood's duct goes out through the wall and up
+     through the wing roof, or the hood recirculates.
+   - Along the alcove's north wall a **counter** (66" of base cabinets) meets the range wall's
+     counter at the corner. The old bath's window over it is replaced by a shorter one set higher
+     (42" x 36", sill 44").
+   - The **work triangle**, centre to centre: sink to refrigerator about 6', refrigerator to range
+     about 7'8", range to sink about 13'7", about 27' in all (a little over the usual 26').
+   - The old bath's 30" door could not open into the 23" pocket west of it, between the top of the
+     new flight and the alcove: the pocket is closed from the hall by a partition at the top of the
+     flight and becomes a **closet** off the kitchen (18" x 36" inside) with a 24" door.
+
+   The cabinet colour, the counter colour and the fronts are the First Floor's casework defaults:
+   change them in the Level panel (select nothing on the First Floor), or per cabinet in its panel.
 3. **Stair and front door.** The old stair and the house door at the porch are demolished. The new
    house door (32", green) is in the west wall in the middle of the old stair strip. Inside, two
    risers go north to a 14" landing in the north-west corner, then the flight climbs east along
@@ -541,9 +567,13 @@ Still open:
 
 - The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the
   foyer's gable and the porch's shed overlap with no valley).
-- How the bedroom is reached: its door opens from the kitchen, the only room beside it; a hall or a
-  closet wall can be added later. The old bath's door now opens from the hall into a pocket
-  between the top of the flight and the powder room: decide whether it stays.
+- How the bedroom is reached: its door opens from the kitchen, the only room beside it. It moved
+  south of where the first proposed plan had it (beside the old east window), because the pantry
+  run now takes that part of the wall; a hall can still be added later. (The old bath's door, and
+  the pocket it opened into, are settled: the pocket is the kitchen's closet.)
+- The kitchen: the closet is shallow (18"); the stools stand clear of the ledge rather than under
+  it; the hood's duct route (out through the master bath's ceiling, or a recirculating hood) and
+  the range's distance from the sink (the triangle is a little over 26') are worth a second look.
 - Upstairs: the Bunk becomes the stair hall and needs a new layout and a railing round the stair
   opening; neither is drawn.
 - The knee braces and the timber truss in the foyer's gable are not modelled.

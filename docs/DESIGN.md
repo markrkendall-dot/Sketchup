@@ -1143,6 +1143,12 @@ jamb past a corner or a partition's face), so every number in it is where the op
 `example.test.ts` checks that no two surrounds (trim, sill, shutters) on one wall line overlap, which
 would z-fight; the porch's openings have no trim, since its posts are only 3.5" wide.
 
+The proposed kitchen (docs/history/PLAN-v5-kitchen.md) is placed through `fixture()`, which throws
+when the store refuses one; fixture ids are renamed like the rest (`f-c1` ...). `example.test.ts`
+checks that every fixture lies inside the kitchen's faces in the proposed view, overlaps no wall
+footprint and shares no space with another fixture (plan and height), and that `counterRuns` gives
+the island one 66 x 37 top.
+
 ## Risks
 
 - Miter blow-up at acute angles: cap and bevel; collinear -> square cap.

@@ -75,9 +75,10 @@ describe('offsetWalls: a partition (REVIEW-2 B1)', () => {
     expect(roomSize('Kitchen')).toEqual({ width: 144, depth: kitchen.depth });
     expect(roomSize('Living')).toEqual({ width: 155, depth: living.depth });
     // The collinear piece past the Stair moved with it; the south wall and the Stair wall stayed straight.
+    // (The proposed closet's wall at x 171.5, north of the powder room, is not on that line.)
     const l = level();
     const xs = Object.values(l.walls)
-      .filter((w) => l.nodes[w.a].x === l.nodes[w.b].x && l.nodes[w.a].x > 150 && l.nodes[w.a].x < 180)
+      .filter((w) => l.nodes[w.a].x === l.nodes[w.b].x && l.nodes[w.a].x > 150 && l.nodes[w.a].x < 180 && Math.min(l.nodes[w.a].y, l.nodes[w.b].y) > 50)
       .map((w) => l.nodes[w.a].x);
     expect(new Set(xs)).toEqual(new Set([164.5]));
     // Every wall is still straight along x or y (the south wall and the Stair wall stretched, not bent).

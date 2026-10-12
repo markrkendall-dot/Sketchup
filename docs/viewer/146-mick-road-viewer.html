@@ -374,13 +374,23 @@
           "id": "f-n30",
           "x": 194.5,
           "y": 45.5
+        },
+        "f-n31": {
+          "id": "f-n31",
+          "x": 171.5,
+          "y": 3.5
+        },
+        "f-n32": {
+          "id": "f-n32",
+          "x": 171.5,
+          "y": 45.5
         }
       },
       "walls": {
         "f-w1": {
           "id": "f-w1",
           "a": "f-n1",
-          "b": "f-n17",
+          "b": "f-n31",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -760,7 +770,7 @@
         "f-w41": {
           "id": "f-w41",
           "a": "f-n29",
-          "b": "f-n30",
+          "b": "f-n32",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -772,6 +782,32 @@
           "thickness": 5,
           "kind": "interior",
           "phase": "existing"
+        },
+        "f-w43": {
+          "id": "f-w43",
+          "a": "f-n31",
+          "b": "f-n32",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w44": {
+          "id": "f-w44",
+          "a": "f-n31",
+          "b": "f-n17",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w45": {
+          "id": "f-w45",
+          "a": "f-n32",
+          "b": "f-n30",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
         }
       },
       "openings": {
@@ -956,7 +992,7 @@
           "width": 30,
           "height": 80,
           "sill": 0,
-          "phase": "existing",
+          "phase": "demo",
           "swing": {
             "hinge": "a",
             "side": "left"
@@ -989,7 +1025,7 @@
           "width": 42,
           "height": 44,
           "sill": 34,
-          "phase": "existing",
+          "phase": "demo",
           "lites": {
             "cols": 1,
             "rows": 1
@@ -1071,9 +1107,9 @@
           "id": "f-o21"
         },
         "f-o22": {
-          "wallId": "f-w29",
+          "wallId": "f-w6",
           "type": "door",
-          "offset": 30,
+          "offset": 19.5,
           "width": 32,
           "height": 80,
           "sill": 0,
@@ -1281,6 +1317,35 @@
             "side": "right"
           },
           "id": "f-o35"
+        },
+        "f-o36": {
+          "wallId": "f-w22",
+          "type": "window",
+          "offset": 39.5,
+          "width": 42,
+          "height": 36,
+          "sill": 44,
+          "phase": "new",
+          "lites": {
+            "cols": 2,
+            "rows": 3
+          },
+          "sashes": 2,
+          "id": "f-o36"
+        },
+        "f-o37": {
+          "wallId": "f-w42",
+          "type": "door",
+          "offset": 14.5,
+          "width": 24,
+          "height": 80,
+          "sill": 0,
+          "phase": "new",
+          "swing": {
+            "hinge": "a",
+            "side": "right"
+          },
+          "id": "f-o37"
         }
       },
       "rooms": {
@@ -1372,22 +1437,31 @@
           "id": "f-r10"
         },
         "f-r11": {
+          "name": "Closet (proposed)",
+          "anchor": {
+            "x": 183,
+            "y": 25
+          },
+          "phase": "new",
+          "id": "f-r11"
+        },
+        "f-r12": {
           "name": "Foyer (proposed)",
           "anchor": {
             "x": -48,
             "y": 125
           },
           "phase": "new",
-          "id": "f-r11"
+          "id": "f-r12"
         },
-        "f-r12": {
+        "f-r13": {
           "name": "Screen porch (proposed)",
           "anchor": {
             "x": -48,
             "y": 236
           },
           "phase": "new",
-          "id": "f-r12"
+          "id": "f-r13"
         }
       },
       "stairs": {
@@ -1638,7 +1712,246 @@
           "id": "f-k5"
         }
       },
-      "fixtures": {}
+      "fixtures": {
+        "f-c1": {
+          "elevation": 0,
+          "kind": "dishwasher",
+          "origin": {
+            "x": 224,
+            "y": 236
+          },
+          "direction": 270,
+          "width": 24,
+          "depth": 24,
+          "height": 34.5,
+          "counterOverhang": {
+            "front": 1,
+            "back": 12,
+            "left": 3,
+            "right": 0
+          },
+          "phase": "new",
+          "id": "f-c1"
+        },
+        "f-c2": {
+          "elevation": 0,
+          "kind": "sink",
+          "origin": {
+            "x": 254,
+            "y": 236
+          },
+          "direction": 270,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "counterOverhang": {
+            "front": 1,
+            "back": 12,
+            "left": 0,
+            "right": 3
+          },
+          "phase": "new",
+          "id": "f-c2"
+        },
+        "f-c3": {
+          "elevation": 0,
+          "kind": "box",
+          "origin": {
+            "x": 226,
+            "y": 266
+          },
+          "direction": 270,
+          "width": 16,
+          "depth": 16,
+          "height": 30,
+          "label": "Stool",
+          "phase": "new",
+          "id": "f-c3"
+        },
+        "f-c4": {
+          "elevation": 0,
+          "kind": "box",
+          "origin": {
+            "x": 258,
+            "y": 266
+          },
+          "direction": 270,
+          "width": 16,
+          "depth": 16,
+          "height": 30,
+          "label": "Stool",
+          "phase": "new",
+          "id": "f-c4"
+        },
+        "f-c5": {
+          "elevation": 0,
+          "kind": "tall",
+          "origin": {
+            "x": 311,
+            "y": 114
+          },
+          "direction": 180,
+          "width": 24,
+          "depth": 24,
+          "height": 84,
+          "phase": "new",
+          "id": "f-c5"
+        },
+        "f-c6": {
+          "elevation": 0,
+          "kind": "fridge",
+          "origin": {
+            "x": 311,
+            "y": 144
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 30,
+          "height": 70,
+          "phase": "new",
+          "id": "f-c6"
+        },
+        "f-c7": {
+          "elevation": 0,
+          "kind": "tall",
+          "origin": {
+            "x": 311,
+            "y": 174
+          },
+          "direction": 180,
+          "width": 24,
+          "depth": 24,
+          "height": 84,
+          "phase": "new",
+          "id": "f-c7"
+        },
+        "f-c8": {
+          "elevation": 70,
+          "kind": "wall",
+          "origin": {
+            "x": 311,
+            "y": 144
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 15,
+          "height": 15,
+          "phase": "new",
+          "id": "f-c8"
+        },
+        "f-c9": {
+          "elevation": 0,
+          "kind": "base",
+          "origin": {
+            "x": 311,
+            "y": 22
+          },
+          "direction": 180,
+          "width": 30,
+          "depth": 24,
+          "height": 34.5,
+          "phase": "new",
+          "id": "f-c9"
+        },
+        "f-c10": {
+          "elevation": 0,
+          "kind": "range",
+          "origin": {
+            "x": 311,
+            "y": 52
+          },
+          "direction": 180,
+          "width": 30,
+          "depth": 25,
+          "height": 36,
+          "phase": "new",
+          "id": "f-c10"
+        },
+        "f-c11": {
+          "elevation": 0,
+          "kind": "base",
+          "origin": {
+            "x": 311,
+            "y": 82
+          },
+          "direction": 180,
+          "width": 30,
+          "depth": 24,
+          "height": 34.5,
+          "phase": "new",
+          "id": "f-c11"
+        },
+        "f-c12": {
+          "elevation": 66,
+          "kind": "hood",
+          "origin": {
+            "x": 311,
+            "y": 52
+          },
+          "direction": 180,
+          "width": 30,
+          "depth": 18,
+          "height": 30,
+          "phase": "new",
+          "id": "f-c12"
+        },
+        "f-c13": {
+          "elevation": 54,
+          "kind": "wall",
+          "origin": {
+            "x": 311,
+            "y": 22
+          },
+          "direction": 180,
+          "width": 30,
+          "depth": 12,
+          "height": 30,
+          "phase": "new",
+          "id": "f-c13"
+        },
+        "f-c14": {
+          "elevation": 54,
+          "kind": "wall",
+          "origin": {
+            "x": 311,
+            "y": 82
+          },
+          "direction": 180,
+          "width": 30,
+          "depth": 12,
+          "height": 30,
+          "phase": "new",
+          "id": "f-c14"
+        },
+        "f-c15": {
+          "elevation": 0,
+          "kind": "base",
+          "origin": {
+            "x": 239,
+            "y": 7
+          },
+          "direction": 90,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "phase": "new",
+          "id": "f-c15"
+        },
+        "f-c16": {
+          "elevation": 0,
+          "kind": "base",
+          "origin": {
+            "x": 272,
+            "y": 7
+          },
+          "direction": 90,
+          "width": 30,
+          "depth": 24,
+          "height": 34.5,
+          "phase": "new",
+          "id": "f-c16"
+        }
+      }
     },
     "level-s": {
       "id": "level-s",
