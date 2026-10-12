@@ -170,20 +170,21 @@ describe('stairs store actions', () => {
 });
 
 describe('the opening a flight cuts in the floor above (REVIEW-2 A2)', () => {
-  it("the example stair: 108\" floor to floor, 125\" run, the opening starts 32\" up, past the 30\" closet", () => {
+  it("the example stair: 108\" floor to floor, 101\" run from x 31, the opening starts 26\" up, past the 30\" closet", () => {
     const plan = migrate(example);
     const first = plan.levels[plan.levelOrder[1]];
     const st = Object.values(first.stairs)[0];
     const ftf = floorToFloor(plan, first.id);
     expect(ftf).toBe(108);
     expect(STAIRS_HEADROOM).toBe(80);
-    expect(stairsHoleStart(st, ftf)).toBeCloseTo((125 * 28) / 108, 9);
-    expect(Math.round(stairsHoleStart(st, ftf))).toBe(32);
+    expect(stairsHoleStart(st, ftf)).toBeCloseTo((101 * 28) / 108, 9);
+    expect(Math.round(stairsHoleStart(st, ftf))).toBe(26);
     const hole = stairsHoleOutline(st, ftf)!;
-    // Climbing east from x 7: the opening runs from x 39.4 to 132, the whole 33" width.
+    // Climbing east from x 31 (its bottom riser about 2' in from the west wall): the opening runs from
+    // x 57.2 to 132, the whole 33" width.
     const xs = hole.map((p) => p.x);
     const ys = hole.map((p) => p.y);
-    expect(Math.min(...xs)).toBeCloseTo(7 + (125 * 28) / 108, 9);
+    expect(Math.min(...xs)).toBeCloseTo(31 + (101 * 28) / 108, 9);
     expect(Math.min(...xs)).toBeGreaterThan(7 + 30); // past the closet (x 7 to 37 inside)
     expect(Math.max(...xs)).toBe(132);
     expect(Math.max(...ys) - Math.min(...ys)).toBe(33);
@@ -297,7 +298,7 @@ describe('short flights and landings: base, rise and risers', () => {
     const ftf = floorToFloor(plan, first.id);
     expect(flightSteps(st, ftf)).toEqual(stairSteps(ftf));
     expect(flightSteps(st, ftf).risers).toBe(14);
-    expect(headroomHoleStart(st, ftf)).toBe((125 * (108 - 80)) / 108);
+    expect(headroomHoleStart(st, ftf)).toBe((101 * (108 - 80)) / 108);
   });
 
   it('store: heights are validated against floor to floor, clear with undefined, one undo step each', () => {

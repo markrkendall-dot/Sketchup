@@ -55,7 +55,7 @@ describe('planSvg', () => {
     const svg = planSvg(plan, first, 'all', { date });
     expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true);
     expect(svg).toContain('<title>146 Mick Road (starter, estimates flagged) - First Floor</title>');
-    for (const name of ['Kitchen', 'Living', 'Entry hall', 'Utility']) expect(svg).toContain(name);
+    for (const name of ['Kitchen', 'Living', 'Front room', 'Utility']) expect(svg).toContain(name);
     expect(svg).toContain('First Floor, All view');
     expect(svg).toContain(`Scale 1/4&quot; = 1'-0&quot; at 96 dpi`);
     expect(svg).toContain('2026-10-11');

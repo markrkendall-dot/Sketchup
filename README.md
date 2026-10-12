@@ -323,7 +323,7 @@ so a plan with photos can be a few megabytes.
 ## Modelling 146 Mick Road
 
 `docs/examples/146-mick-road.json` is a starter plan of the owner's house, made from the site
-sketch, the owner's floor sketches and nine photos (`docs/photos/`) so that the 3D model already reads as the same house:
+sketch, the owner's floor sketches and photos (`docs/photos/`: 01 to 09 outside, 13 to 23 of the first floor inside and the lake side) so that the 3D model already reads as the same house:
 the gable roof with deep open eaves and rafter tails under rusting corrugated metal, the east wing
 with its own gable, the screened entry porch with its knee walls and west-facing gable, the chimney
 stained like the house with its cap and spark arrestor, shingle below and clapboard above, the
@@ -344,8 +344,8 @@ order below. The owner's proposed design is already drawn on top as new and demo
 ### How the starter was built
 
 `scripts/example-plan.ts` builds it through the editor's own store actions (`addWall`,
-`addOpening`, `addRoof`, `addColumn`, `addGradePoint`; the kitchen's cabinets are not in it, the
-existing ones have not been measured, so every level's `fixtures` is empty), so every wall passes through the same
+`addOpening`, `addRoof`, `addColumn`, `addGradePoint`, `addFixture`; today's kitchen, bath and
+front-room fixtures are drawn from photos 13 to 22, not measured), so every wall passes through the same
 joining, clamping and validation as a wall you draw), and `npm run build:example` writes the JSON.
 The script is the readable record of every number: read it before changing the file, edit the
 script rather than the JSON for bulk changes, and run `npm test` (a test checks the file against
@@ -379,23 +379,42 @@ and the plan's north angle is 0.
   like the house, with a concrete cap and a wire spark arrestor (photos 6 and 7).
 - **Windows and doors** on the four faces, built from casement sashes with their lites (picture
   windows of a casement, a fixed pane and a casement on the south and west faces, photos 1 and 8),
-  shutters on the two west windows, and the house door dark green with nine lites over two panels.
-- **Terrain**: nineteen grade points, see below.
+  shutters on the two west windows, and the house door dark green outside with one large lite over
+  two panels, swinging in (photos 8 and 19). The first-floor picture windows' casements are 2 x 4
+  lites on the south face and 2 x 2 on the west (photos 14, 17, 18 and 23).
+- **Terrain**: thirty grade points, see below, with the lake side's terrace behind the retaining
+  wall.
 - **The two floors share three north-south bands** (inside faces, from the north wall): the north
   band y 7 to 97 (7'6"), a 5" wall (centerline y 99.5), the stair strip y 102 to 135 (2'9"), a 5"
-  wall (centerline y 137.5), and the south band y 140 to 308. The north-south inside length is 301",
+  wall upstairs (centerline y 137.5; on the First Floor there is none, see below), and the south
+  band y 140 to 308. The north-south inside length is 301",
   which is the upstairs west side (Bunk 90 + 5 + strip 33 + 5 + Master 168).
-- **First Floor interior** (measured, face to face; partitions 5", existing): the y 99.5 line from
-  the east wall to the west wall (the Kitchen's north wall and the hall's south wall) with a 36"
-  passage at x 132 to 168; the Kitchen/Living partition (x 170.5) with a 48" passage (y 188 to
-  236, south jamb 6' from the lake wall); the Bath's west wall (x 194.5) with a 30" x 80" door;
-  and the stair's south wall (y 137.5) with a 36" passage at x 132 to 168 and a 30" opening at
-  x 7 to 37 (the stair's bottom, from Living). The stair climbs **east** from the west wall's
-  inside face (x 7) to x 132, 33" wide (the whole 2'9" strip), under the Second Floor's landing,
-  and cuts the Second Floor's floor from 32" up the run (where the headroom drops under 80"), so the
-  Master closet over its low end keeps its floor. Rooms, east-west x north-south: Entry hall 15'5" x 7'6",
-  Bath 9'6" x 7'6", Kitchen 11'6" x 17'2" (adjusted, see below), Living 13'5" x 14'0", Stair
-  13'5" x 2'9" (the strip), Utility 11'6" x 9'5". There are **no open wall ends** on this floor.
+- **First Floor interior** (measured, face to face; partitions 5", existing; openings from photos
+  13 to 22): the y 99.5 line from the east wall to the west wall (the Kitchen's north wall and the
+  front room's south wall) with a tall cased opening, 36" x 88", at x 132 to 168; the Kitchen/Living
+  partition (x 170.5) with a 48" passage (y 188 to 236, south jamb 6' from the lake wall) and,
+  south of it past a short wall, a 48" **pass-through** with a shelf ledge, sill 42", head 84"
+  (y 252 to 300); the Bath's west wall (x 194.5) with a flush stained 30" door at its south end
+  (y 63 to 93) swinging into the Bath; and in the main block's east wall a grey 32" half-lite door
+  of 3 x 3 lites from the Kitchen into the Utility (y 248 to 280), swinging into the Utility. There
+  is **no wall on the stair's south side**: the flight is open to the Living, with a newel, a
+  spindle rail and shelves under it (photo 16), so the strip is part of the Living. The stair
+  climbs **east** from about 2' in from the west wall (x 31, photos 16 and 18; the stringer reads
+  about 45 degrees) to x 132, a 101" run, 33" wide (the whole 2'9" strip), under the Second Floor's
+  landing, and cuts the Second Floor's floor from 26" up the run (where the headroom drops under
+  80"), so the Master closet over its low end keeps its floor. Rooms, east-west x north-south:
+  Front room (MK's name for the old entry hall) 15'5" x 7'6", Bath 9'6" x 7'6", Kitchen 11'6" x
+  17'2" (adjusted, see below), Living 13'5" x 14'0" south of the strip and 17'2" with it, Utility
+  11'6" x 9'5". There are **no open wall ends** on this floor.
+- **Fixtures as they are** (photos 13 to 22, sizes estimated; knotty pine fronts and a light
+  laminate counter are the First Floor's casework defaults). Kitchen north wall, west to east: a
+  30" top-freezer refrigerator, a 24" base, the 30" range under its hood, a 15" drawer bank; a 30"
+  base set at 45 degrees in the north-east corner; on the east wall the sink base under the window,
+  the dishwasher and a 24" drawer base; wall cabinets up to the crown, one of them across the
+  corner. Bath: a 60" tub along the east wall, the toilet south of it, a 36" vanity on the south
+  wall, the dryer and the washer along the north wall (labelled boxes). Front room: the wood stove
+  on its hearth near the north-east corner, by the chimney. All of them are demolished in the
+  Proposed view.
 - **Second Floor interior** (the owner's sketch, face to face; partitions 5", existing): the Bunk's
   south wall (y 99.5) and east wall (x 171.5), the Master's north wall (y 137.5) and the
   Master/Guest partition (x 171.5), the closet's east wall (x 39.5), the Bath's east (x 220.5) and
@@ -412,9 +431,24 @@ and the plan's north angle is 0.
   and the walkout bump under the wing is labelled separately as "Utility (below)": it is closed off
   from the main block by the block's east wall in the starter, and stays a separate space until you
   measure how the two connect (delete or move the wall and the labels as you go).
-- Not modelled: the deck and its stairs, the concrete retaining wall, the lot, the entry porch
-  floor and steps, the foundation under the wing and porches (the ground meets them where the
-  grade points say it does).
+- **Retaining wall and terrace** (photos 2 and 23): a poured concrete wall, 10" thick, drawn on
+  the Basement level about 10' south of the main block, from 10' past its west face east to the
+  corner of the main block and the wing, then north to it; its top is 2" over the terrace behind
+  it, which sits a few inches under the first floor, so only the wing's basement walks out. Its
+  west end is free, so the Basement shows one open wall end (a red dot) by design. A wooden stair
+  climbs north along the wing's east side from the walkout's terrace (11 risers, an estimate). The
+  fence on the wall and the stair's railings are not drawn.
+- Not modelled: the deck, the lot, the entry porch floor and steps, the foundation under the wing
+  and porches (the ground meets them where the grade points say it does).
+
+### Inside finishes from the photos (not drawn yet)
+
+The app has no interior finishes yet, so these are recorded here: the Kitchen has blue gingham
+wallpaper, a knotty pine tongue-and-groove ceiling with boards running east-west, pine crown and
+baseboard, and beige vinyl tile; the Living and the front room have cream-painted walls (vertical
+boards in the Living, smooth in the front room), white-painted board or flat ceilings, and a dark
+red-brown painted board floor; the Bath has knotty pine wainscot about 40" high, green paint above,
+a pine ceiling and parquet tile. The appliances are white (the app draws them as steel).
 
 ### Check the sides first
 
@@ -437,13 +471,15 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Wall thickness, exterior | 7" (derived: the measured interior 11'6" + 5" + 13'5" = 25'4" against the sketch's 26'6" outside) | At a door jamb |
 | Outside size of the main block | **26'6" x 26'3"** (derived: 25'4" inside east-west, 301" inside north-south from the upstairs west side, plus two 7" walls each way; the site sketch's 25.5' was rounded). **Worth one outside tape measurement** | Corner to corner, outside, at the first-floor sill |
 | Basement wall thickness | 8" grey concrete block; vertical boards in the stain on the wing's south wall, round the walkout door (photo 2) | At the basement door jamb |
-| First Floor rooms | measured, face to face: Entry hall 15'5" x 7'6", Bath 9'6" x 7'6", Living 13'5" x 14'0" (measured 14'1"), Utility 11'6" x 9'5" | Re-check any that look wrong |
+| First Floor rooms | measured, face to face: Front room 15'5" x 7'6", Bath 9'6" x 7'6", Living 13'5" x 14'0" (measured 14'1") south of the open stair strip, Utility 11'6" x 9'5" | Re-check any that look wrong |
 | Kitchen | 11'6" x 17'2", **adjusted: re-measure.** MK measured 16'3"; the upstairs wins, and the first-floor mistake is suspected near the bottom of the stairs | Kitchen north-south, between the lake wall and the y 99.5 wall |
 | Interior partition thickness | 5" (measured) | At a jamb |
-| Stair | 33" wide, 125" run climbing east from the west wall to x 132 (under the upstairs landing), cuts the Second Floor floor from 32" up the run (80" headroom); the 2'9" strip | Width, run, riser count |
-| Bath door (First Floor) | 30" x 80" in the Bath's west wall, north jamb 6" from the north wall's inside face (y 13 to 43); **position is an estimate** | Jamb to the north wall |
+| Stair | 33" wide, 101" run climbing east from x 31 (about 2' in from the west wall, photos 16 and 18) to x 132 (under the upstairs landing), cuts the Second Floor floor from 26" up the run (80" headroom); open to the Living on its south side | **Distance from the west wall to the bottom riser**, run, riser count |
+| Bath door (First Floor) | 30" x 80" flush, at the south end of the Bath's west wall (y 63 to 93), swinging into the Bath (photos 20 and 22); **position is an estimate** | Jamb to the Bath's south wall |
 | Kitchen/Living passage | 48" wide, south jamb 6' from the lake wall (y 188 to 236), sill 0, 80" high | Jamb to jamb |
-| Hall and Living passages | 36" wide at x 132 to 168 in the y 99.5 line and the y 137.5 wall; 30" opening at x 7 to 37 (the stair's bottom, from Living) | Jamb to jamb |
+| Kitchen/Living pass-through | 48" wide, sill 42", head 84", south jamb 8" from the lake wall's inside face (y 252 to 300; photos 14 and 17) | **Width, sill, head, distance from the south-west corner** |
+| Kitchen to Utility door | 32" x 80" grey half-lite, 3 x 3 lites, south jamb 28" from the lake wall's inside face (y 248 to 280), swinging into the Utility (photos 13 and 14) | **Width and distance from the lake wall** |
+| Front room to the stair strip | a tall cased opening, 36" x 88", at x 132 to 168 in the y 99.5 line (photos 16 and 20) | Jamb to jamb, head |
 | Second Floor rooms | Bunk 13'6" x 7'6", Bath 3'8" x 6'2", Master closet 2'6" x 2'9", Master 13'6" x 14'0" (sketch) | Face to face |
 | Guest | 11'5" x 12'9", **adjusted:** MK measured 11'8" east-west; the north side adds up to Bath 3'8" + 5" + Office 7'4" = 11'5", so the Guest takes 3" less | Guest east-west, between the Master/Guest partition and the east wall |
 | Office / hall | 7'4" x 11'11", **adjusted:** MK measured 11'6" north-south; the 301" inside length less the Guest's 12'9" and a 5" wall leaves 11'11" | North wall to the Guest's north wall, at the east wall |
@@ -455,14 +491,15 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Wing north wall | y 188" (10'7" from the south face) | From the south-east corner |
 | Entry porch | 5'-6" out x 8' along the wall, flush with the north face. **Photos 6 and 7 read 7' to 9' out**; the starter keeps 5'6" until it is measured | Outside faces, at the floor |
 | Porch openings | knee walls 36"; screens 44" high above them in all four bays: the front's two 18" bays either side of the entry (y 17.5" and 78.5"), the north and south sides 44"; a 36" screen door at the entry, swinging out; no trim | Jamb to jamb, knee wall height |
-| Entry door | 36 x 80, centred 4' from the north corner (y 48"), dark green, nine lites over two panels (photo 8) | Jamb to the corner |
+| Entry door | 36 x 80, centred 4' from the north corner (y 48"), dark green outside, one lite over two panels, swinging in (photos 8 and 19) | Jamb to the corner |
 | Chimney | 24" along the wall x 20" out (photos 6 and 7), centred on the north wall (x 159"), stained like the house; a 4" concrete cap and a 12" spark arrestor on top | Width, projection, position |
-| South windows, first floor | picture windows of a casement (2 x 3 lites), a fixed pane and a casement (casements 24" wide): 144 x 60 at x 87.5" and 118 x 60 at x 242", sill 30; the jambs clear the Kitchen/Living partition's faces at x 168" and 173" (photo 1) | Jamb to corner, rough opening |
+| South windows, first floor | picture windows of a casement (2 x 4 lites, photos 14, 17 and 23), a fixed pane and a casement (casements 24" wide): 144 x 60 at x 87.5" and 118 x 60 at x 242", sill 30; the jambs clear the Kitchen/Living partition's faces at x 168" and 173" (photo 1) | Jamb to corner, rough opening |
 | South windows, second floor | four casements 88 x 46 at x 115" and three 66 x 46 at x 256", 2 x 3 lites each, sill 34 (photo 1) | Same |
-| West windows | first floor 90 x 44 at y 203", sill 44 (head above the door head): a casement (2 x 3 lites), a fixed pane and a casement; second floor two casements of 2 x 2 lites, 48 x 32 at y 200", sill 48; both with shutters one casement wide (photo 8) | Jamb to the north corner |
-| North windows | first floor three casements (2 x 3 lites) 80 x 56 at x 96", sill 30, west of the chimney, and two single panes 42 x 44 at x 234", sill 34; second floor two casements (2 x 3 lites) 46 x 44, sill 36, at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office; its west jamb is 2" from that wall's face) (photos 6 and 7) | Jamb to the west corner |
-| East windows | second floor two pairs of casements (2 x 3 lites) 46 x 44, sill 34, at y 98" and y 222"; first floor one casement (2 x 3 lites) 36 x 40, sill 42, at y 152" (photo 3) | Jamb to the north corner |
-| Wing windows | pairs of casements (2 x 3 lites): east end 48 x 44 (photo 3), north face 48 x 40, south face 48 x 44 (photos 1 and 2), sill 30 | Rough openings |
+| West windows | first floor 90 x 44 at y 203", sill 44 (head above the door head): a casement (2 x 2 lites, photo 18), a fixed pane and a casement; second floor two casements of 2 x 2 lites, 48 x 32 at y 200", sill 48; both with shutters one casement wide (photo 8) | Jamb to the north corner |
+| North windows | first floor three casements (2 x 3 lites) 80 x 56 at x 96", sill 30, west of the chimney, and two single panes 48 x 44 at x 234", sill 42 (the Bath's, over the washer and dryer, its sill just above the wainscot, photo 22); second floor two casements (2 x 3 lites) 46 x 44, sill 36, at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office; its west jamb is 2" from that wall's face) (photos 6 and 7) | Jamb to the west corner |
+| East windows | second floor two pairs of casements (2 x 3 lites) 46 x 44, sill 34, at y 98" and y 222"; first floor a casement pair (2 x 3 lites) 40 x 40, sill 42, at y 160" over the Kitchen sink (photos 3, 13 and 15) | **Jamb to the north corner, and where the wing's north wall meets this wall: the sink sits further south than the model's wing allows** |
+| Wing windows | pairs of casements: east end 48 x 44 (photo 3) and north face 48 x 40, 2 x 3 lites; south face 48 x 44, 2 x 2 lites (photo 23); sill 30 | Rough openings |
+| Retaining wall | poured concrete, 10" thick, top 96" above the basement floor, about 10' south of the main block, from 10' past its west face to the wing's corner (photos 2 and 23) | **Distance from the house, height, where it ends west** |
 | Basement double door | 72 x 80 on the wing's south wall, two plain leaves in the stain (photo 2) | Jamb to jamb |
 | Roof pitches | main 6:12, wing 7:12, entry porch 5:12 (photos 3 and 8) | A level and a tape against the rafter or the gable |
 | Roof overhangs | main 24", wing 18", entry porch 18" | Eave to the wall face |
@@ -473,9 +510,11 @@ Grade points (absolute elevation in inches; the first floor top is +2", the base
 five at +1 round the porch, whose floor is about at grade (its two outer corners, the middle of its
 front and its two corners against the house, one of them the main block's north-west corner); the
 main block's north-east corner -4, middle of the north wall -4, middle of the west wall -8,
-south-west corner -14, south-east corner -88, the wing's south-east corner -100 and north-east
-corner -20, a point 6' east of the main block's east wall -6, a point 10' south of the south wall at
-its middle -100 and another 10' south of the wing -100 (the terrace in front of the doors), two at
+south-west corner -14, south-east corner -8 (the terrace), the wing's south-east corner -100 and
+north-east corner -20, a point 6' east of the main block's east wall -6, pairs either side of the
+retaining wall (-6 on the terrace just inside it; -50, -60, -85 and -100 on the lawn just outside,
+west to east, and -100 east of its return), a point 10' south of the wing -100 (the terrace in
+front of the doors), two at
 the walkout's threshold (-100, 6" out from the wall at the double door's jambs), and two points 30'
 north of the house at +6 (the road is slightly higher). Measure them down from the first-floor sill
 with a level and a tape or a laser, and edit them in the Site tab.
@@ -497,7 +536,10 @@ with a level and a tape or a laser, and edit them in the Site tab.
 5. **Interior partitions and stairs**, room by room, face to face: `X` for interior walls, `T` for
    stairs, `R` to name the rooms. The First Floor and the Second Floor are done (re-measure the
    rooms marked "adjusted" first: the Kitchen, the Guest and the Office / hall, and the bottom of
-   the stair); the basement is still to do (delete its "unpartitioned" label as you go).
+   the stair); the basement is still to do (delete its "unpartitioned" label as you go). The
+   photos added five items to check (bold in the table): the Kitchen's east window and the wing's
+   north wall, the Kitchen to Utility door, the pass-through, the stair's bottom riser, and the
+   retaining wall.
 
 ### The proposed design in the starter
 
@@ -517,7 +559,8 @@ Five changes, all on the First Floor:
    (a crawl space).
 2. **Kitchen.** The wall between the kitchen and the old bath is demolished, so the kitchen is an
    L: the main kitchen (11'6" x 17'2") and the old bath as an alcove at its north-east corner. All
-   of its casework is new (the cabinets drawn are the proposed ones; today's are not measured):
+   of its casework is new; today's cabinets, the bath's fixtures and the wood stove (photos 13 to
+   22) are demolished:
    - An **island** with its fronts facing north, so whoever is at the sink faces the lake: a 24"
      dishwasher and a 36" sink cabinet under one top 66" x 37" (5'6" x 3'1"), overhanging 3" at
      each end and 12" on the lake side as a seating ledge, with **two stools** beyond it. It
@@ -546,7 +589,9 @@ Five changes, all on the First Floor:
    risers go north to a 14" landing in the north-west corner, then the flight climbs east along
    the north wall to the Bunk's east wall upstairs, and cuts the Second Floor's floor from about
    19" up its run. The wall between the hall and the strip, west of the powder room, is demolished,
-   so the hall, the strip and the stair are one room.
+   so the hall, the strip and the stair are one room. The brief keeps a wall between the strip and
+   the Living, but there is none today (photo 16), so that wall (5", with a 36" opening at x 132 to
+   168 and a 30" one at x 7 to 37) is **new** work in the design.
 4. **Powder room**, 5' x 4'1", in the old hall south of the top of the flight, where the hall's
    passage to the strip was.
 5. **Foyer and screen porch** on the west face in place of the entry porch: an enclosed foyer
@@ -567,6 +612,11 @@ Still open:
 
 - The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the
   foyer's gable and the porch's shed overlap with no valley).
+- **Two doors from the kitchen into the bedroom**: today's grey Kitchen to Utility door (photos 13
+  and 14, y 248 to 280) stays, 21" south of the design's new 32" bedroom door (y 195 to 227). One
+  of them should go: keeping the existing one saves a new opening.
+- **The wall between the stair strip and the Living** is new work (there is none today); delete it
+  to leave the new front door opening straight into the Living.
 - How the bedroom is reached: its door opens from the kitchen, the only room beside it. It moved
   south of where the first proposed plan had it (beside the old east window), because the pantry
   run now takes that part of the wall; a hall can still be added later. (The old bath's door, and
@@ -593,9 +643,12 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
   edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
-- **Not drawn yet**: decks and railings (a stair opening has no railing round it), exterior stairs, retaining walls, the lot outline, porch
-  floors and steps, foundations under additions and porches, gutters, bathroom fixtures,
-  furniture, and text or dimension notes you place yourself.
+- **Not drawn yet**: decks and railings (a stair opening or an open stair side has no railing),
+  exterior steps (an outside stair is a flight on a level, as the starter's wing stair is), fences,
+  the lot outline, porch floors and steps, foundations under additions and porches, gutters,
+  interior finishes (wallpaper, paint, ceilings, floors), furniture, and text or dimension notes
+  you place yourself. Bathroom fixtures and a wood stove are labelled boxes. A retaining wall is a
+  wall on the lowest level; its free end shows as an open wall end.
 - **Cabinets** are boxes with simple fronts: no door swings on the plan, no backsplash, open
   shelves or corner cabinets (an inside corner is two cabinets whose counter is mitred), and a
   counter is only joined across cabinets turned by a quarter turn (a cabinet at 45° carries its
