@@ -38,7 +38,7 @@ export interface Wall {
   kind: 'exterior' | 'interior';
   phase: Phase;
   heightOverride?: Inches;   // defaults to level.wallHeight
-  finish?: 'clapboard' | 'shingle' | 'board' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
+  finish?: 'clapboard' | 'shingle' | 'board' | 'block' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
 }
 
 export interface Opening {
@@ -52,6 +52,8 @@ export interface Opening {
   phase: Phase;
   swing?: { hinge: 'a' | 'b'; side: 'left' | 'right' };
   lites?: { cols: number; rows: number }; shutters?: boolean; trim?: Inches; // see "Exterior appearance"
+  sashes?: number;           // windows: 1..6 side by side; doors: 1 or 2 leaves
+  fixedCenter?: boolean; glazing?: 'glass' | 'screen'; halfLite?: boolean; leafColor?: string;
 }
 
 export interface Room { id: Id; name: string; anchor: Vec2; ceilingOverride?: Inches }
@@ -432,31 +434,50 @@ visible columns as `Chimney` / `Post` (materials `column_<kind>_<phase>`).
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
 All of it is optional data on existing elements (no schema bump: `migrate()` reads the fields when they are
-valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | board | plain | screen`; an unknown value is
-dropped) and `Wall.color` (`#rrggbb`, lower-cased on load), `Opening.lites {cols, rows}` (whole numbers 1 to 12),
-`Opening.shutters`, `Opening.trim` (0 to 24"), `Roof.color`. Defaults when absent (`wallFinishOf`, `wallColorOf`,
-`roofColorOf`): exterior walls shingle in the house's stain `#5a3a35`, interior walls plain `#e8e4dc`, a metal roof
-`#6e6259`, a shingle roof `#4a4a4a`; the fascia, rake boards and window trim are tan `#d9c9a3`. The Level panel's
+valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | board | block | plain | screen`; an unknown
+value is dropped) and `Wall.color` (`#rrggbb`, lower-cased on load), `Opening.lites {cols, rows}` (whole numbers 1 to
+12), `Opening.shutters`, `Opening.trim` (0 to 24"), `Opening.sashes` (whole number 1 to 6), `Opening.fixedCenter`,
+`Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`.
+Defaults when absent (`wallFinishOf`, `wallColorOf`, `roofColorOf`, `sashesOf`, `glazingOf`, `leafColorOf`):
+exterior walls shingle in the house's stain `#5a3a35`, interior walls plain `#e8e4dc`, a metal roof `#6e6259`, a
+shingle roof `#4a4a4a`, one sash, glass, a dark green door leaf `#2f3a33`; the fascia, rake boards and window trim are
+tan `#d9c9a3`. The Level panel's
 "Exterior finish" and "Exterior colour" set every exterior wall of the level with one `updateWalls` (one undo step);
 the Wall, Opening and Roof panels edit one element. The colour picker commits once when it closes (native
 `change`), the hex field on Enter or blur. `updateWalls`, `updateOpening` and `updateRoof` take `undefined` to clear
 an optional field.
 
-**Siding textures** (`textures.ts`): `sidingTexture(finish, color)` draws a 256 x 256 canvas that stands for 48" x 48"
-of wall (a texel is 3/16"), once per finish and colour, cached, `RepeatWrapping`, `repeat` 1/48, so wall UVs are in
-inches. Clapboard: 6" courses (8 per tile), a 1 px darker shadow line at the bottom of each course, a few percent
-of brightness variation per course. Shingle: 4.8" courses (10 per tile; 5" does not divide 48" and the tile must
-repeat), vertical joints every 4" to 8" that sum to exactly 48" per course and stagger from course to course
-(`shingleJoints`), the same shadow line, a joint line and brightness variation per shingle. Board: 8" vertical boards
-(6 per tile) with a joint line. Plain: no texture, a flat colour. Screen: a see-through mesh (1 px lines every 8 px
-on a translucent grey, material `transparent`, opacity 0.4, no depth write, `DoubleSide`). The layout maths
-(`courseBoundaries`, `shingleJoints`, `seeded`) is pure and tested; drawing needs `document`, and
-`sidingTexture` returns null without it (node, tests), where materials fall back to the flat colour.
+**Siding textures** (`textures.ts`): `sidingTextures(finish, color)` draws a 512 x 512 canvas that stands for 48" x
+48" of wall (a texel is 3/32"), once per finish and colour, cached with its normal map, `RepeatWrapping`, `repeat`
+1/48, so wall UVs are in inches (`sidingTexture` is the colour map alone). Clapboard: 8" courses (6 per tile), each
+lap shading the top of the board below (darkest for 3 px, fading over 6), 6% brightness either way per board, faint
+horizontal grain. Shingle: 4.8" courses (10 per tile; 5" does not divide 48" and the tile must repeat), vertical
+joints every 4" to 8" that sum to exactly 48" per course and stagger from course to course (`shingleJoints`,
+`shingleCourses`), a dark keyway at each joint, each course's butts shading the top of the course below, per-shingle
+brightness and a slight warm or cool shift, fine vertical grain. Board: 8" vertical boards (6 per tile) with a
+V-groove at each joint. Block: 8" x 16" concrete block in running bond (`blockFaces`), 3/8" mortar lighter than the
+faces, per-block brightness and speckle, the top of each bed joint in the shadow of the block above. Plain: no
+texture, a flat colour. Screen: 1 px wires every 2 px (3/16") over a translucent dark grey (alpha 0.55), a fine mesh
+up close and an even grey veil further off (as a wall finish: material `transparent`, opacity 0.4, no depth write,
+`DoubleSide`).
+
+**Relief**: every finish but plain and screen has a height field in inches (`sidingHeight`): clapboard tapers from
+its butt to nothing under the next board (a 0.6" step at each lap), shingles taper from a 0.4" butt, each a little
+proud or shy of its neighbours, with 0.3" deep keyways, boards have 0.2" V-grooves, block mortar is raked 0.25".
+`normalFromHeight` makes a tangent-space normal map of it with Sobel derivatives sampled modulo the tile (no seam
+line) at the true slope (strength `PX_PER_INCH`). Canvas y grows downward and the texture's v upward (flipY), so
+R = 0.5 - 0.5 k dh/dx and G = 0.5 + 0.5 k dh/dy (then normalized): a lap's butt, higher above than below, faces down.
+The normal texture is one per finish whatever the colour, `NoColorSpace`, with the colour map's wrap, repeat and
+anisotropy; `wallMaterial` attaches it as `normalMap` with `normalScale` 0.6 (no tangent attribute: three derives the
+frame from screen-space derivatives, flat shading included). The layouts, height fields and the normal-map rule are
+pure and tested; drawing needs `document`, and `sidingTextures` returns null without it (node, tests), where
+materials fall back to the flat colour.
 `wallMaterial(phase, kind, finish, color)` keys its shared materials by phase, finish and colour: existing walls
 use the texture with a white tint, new ones use the texture's `new` variant (REVIEW-2 C4: the drawn canvas
 blended 50% toward `#a9dcb7` per pixel, `blendPixels`, alpha kept) also with a white tint, so new siding reads
 as the finish washed with light green rather than the stain multiplied into near-black; their flat colour
-(`wallFlatColor`, export and no-canvas fallback) is the same blend (`newWorkColor`). Demolished walls stay
+(`wallFlatColor`, export and no-canvas fallback) is the same blend (`newWorkColor`), kept on a textured material as
+`userData.flatColor`. Demolished walls stay
 translucent red with no texture, plain walls are the colour itself (pulled toward green when new). The wall mesh is one merged
 geometry with one material, so it cannot tell the faces of a wall apart: **both faces of an exterior wall show the
 siding** (the inside of a window reveal shows shingle too); interior walls are plain unless given a finish.
@@ -470,29 +491,44 @@ level's floor top, and need not line up across a corner (the horizontal courses 
 
 **Opening fills** (`openings3d.ts openingFill`, pure): a window or door becomes boxes in the wall's own frame (s along
 the centerline, d from the mid plane toward the outside, y above the floor top); `meshes.ts buildOpeningFill` turns
-each into a `prism` and merges them per material part. Window: trim (head and two jambs, `trim` wide, 4" default,
-1" proud of the outside face), a 1.5" sill projecting 1" past the trim, a sash frame of four 1.5" boards 1.75" deep,
-`(cols - 1)` vertical and `(rows - 1)` horizontal 0.75" muntins (default 2 x 3 lites), one 0.25" glass pane at mid-wall,
-and with `shutters` two 1" boards each a third of the window width flanking the trim. Door: the same trim, door
-frame boards 1.5" wide, a 1.75" leaf of two stiles (5") and two rails (5" top, 8" bottom) round a 0.75" recessed
-panel; lites larger than 1 x 1 (the default) glaze the panel with glass and muntins instead. Passages stay open.
+each into a `prism`, merges them per material part and gives each part UVs in inches (`addWallUVs`, so the screen
+mesh has the siding's scale). Window: trim (head and two jambs, `trim` wide, 4" default, 1" proud of the outside
+face), a 1.5" sill projecting 1" past the trim, and `sashes` side by side (`sashSpans`) with 2" mullions between them
+(part `sash`, the full hole height, 1.75" deep); with `fixedCenter` and 3 sashes the side sashes are
+min(24", (w - 4") / 4) wide and the centre one takes the rest (24 / 92 / 24 at 144"). Each sash has its own frame of
+four 1.5" boards 1.75" deep round its own pane: `(cols - 1)` vertical and `(rows - 1)` horizontal 0.75" muntins
+(default 2 x 3 lites per sash, never wider than half a lite) over one 0.25" glass pane at mid-wall, a single pane in
+a fixed centre, or with `glazing: 'screen'` a 1" frame round a screen (part `screen`) and no muntins. `shutters` add a
+1" board each side flanking the trim, one sash wide (w / sashes, clamped to 10" to 18"), with two 3" battens across it
+at a quarter and three quarters of its height, 0.75" proud (kind `batten`). Door: the same trim, one frame of 1.5"
+boards, and one 1.75" leaf, or two meeting at the centre when `sashes` is 2 or more (a double door). A leaf has two
+stiles (5") and two rails (5" top, 8" bottom) round a 0.75" recessed panel; lites larger than 1 x 1 (the default)
+glaze the panel with glass and muntins instead; `halfLite` glazes the upper 55% of the panel area with the lite grid,
+with a rail under the glass and two recessed panels either side of a 5" centre stile below it. A door's muntins are
+part `leaf` (its colour). A screen door (`glazing: 'screen'`) has a leaf of 1.5" stiles and rails, a 4" mid rail
+(kind `midRail`) centred 36" up and a screen above and below it, no panel. Passages stay open.
 The outside is found by `outwardSide`: the side of the wall with no closed room beside it when the other has one
 (`facesBesideWall`), else the side facing away from the level's node centroid. `getLevelMeshes` returns
-`openings: OpeningMesh[]` (id, type, phase and one geometry per part: `trim`, `sash`, `glass`, `leaf`, `shutter`),
-cached per opening object, wall object, footprint, wall height and outside side, and disposed like the rest. Materials
-(`openingMaterial`): trim tan, sash and muntins white `#f4f1ea`, glass `#bcd4e6` at opacity 0.35 (transparent, no depth
-write, drawn after the opaque meshes), leaf `#2f3a33`, shutters `#3f6f5f`; a demolished opening is translucent red,
-a new one pulled toward green. Fills follow `isOpeningVisible` like the hole they sit in.
+`openings: OpeningMesh[]` (id, type, phase, `leafColor` after its default, and one geometry per part: `trim`, `sash`,
+`glass`, `screen`, `leaf`, `shutter`), cached per opening object, wall object, footprint, wall height and outside
+side, and disposed like the rest. Materials (`openingMaterial(part, phase, leafColor)`): trim tan, sash and window
+muntins white `#f4f1ea`, glass `#bcd4e6` at opacity 0.35 (transparent, no depth write, drawn after the opaque
+meshes), the screen with the screen texture (transparent, opacity 0.85 over the texture's alpha, no depth write,
+drawn after the opaque meshes; `FrontSide`, since the pane is a closed box and both faces at once would double its
+darkness), leaf `#2f3a33` or its `leafColor` (materials shared per part, phase and colour), shutters `#3f6f5f`; a
+demolished opening is translucent red, a new one pulled toward green. Fills follow `isOpeningVisible` like the hole
+they sit in. The Opening panel has "Sashes" (1 to 6; "Leaves", 1 or 2, for a door), "Fixed centre pane" at 3 sashes,
+"Glazing", the lite grid per sash or leaf, and for a door "Half lite" and "Leaf colour" with a reset.
 
 **Roofs** are two geometries per roof (`buildRoofParts`: the slab, and the fascia and rake boards in tan); the colour
 field changes the slab only. The chimney stays brick red.
 
-**Export** is colours only. Wall materials are clones of the live ones with `map` dropped and the flat colour
-(`wallFlatColor`) set, named `wall_<phase>_<kind>` for the default look and `..._<finish>_<hex>` otherwise;
+**Export** is colours only. Wall materials are clones of the live ones with `map` and `normalMap` dropped and the
+flat colour (`wallFlatColor`) set, named `wall_<phase>_<kind>` for the default look and `..._<finish>_<hex>` otherwise;
 roofs `roof_<finish>_<phase>` (plus `_<hex>` when recoloured), `Fascia` meshes `fascia_<phase>`. Each opening part is
-a mesh named `Window` or `Door` with the material `trim`, `sash`, `glass`, `door_leaf` or `shutter` (`_new` / `_demo`
-for other phases). UV attributes are still written; no texture or image is. The Export menu says "Siding textures are
-not exported; colours are."
+a mesh named `Window` or `Door` with the material `trim`, `sash`, `glass`, `screen`, `door_leaf` (`door_leaf_<hex>`
+for a leaf in another colour, unless demolished) or `shutter` (`_new` / `_demo` for other phases). UV attributes are
+still written; no texture or image is. The Export menu says "Siding textures are not exported; colours are."
 
 ## 2D editor
 

@@ -18,7 +18,9 @@ export interface Node {
 
 export type WallKind = 'exterior' | 'interior';
 /** How a wall's face is dressed in 3D (DESIGN.md "Exterior appearance"). */
-export type WallFinish = 'clapboard' | 'shingle' | 'board' | 'plain' | 'screen';
+export type WallFinish = 'clapboard' | 'shingle' | 'board' | 'block' | 'plain' | 'screen';
+/** What fills a window's sashes or a door's lites: glass, or insect screen. */
+export type Glazing = 'glass' | 'screen';
 
 export interface Wall {
   id: Id;
@@ -50,6 +52,19 @@ export interface Opening {
   shutters?: boolean;
   /** Width of the trim round the opening on the outside face (default 4"). */
   trim?: Inches;
+  /**
+   * Windows: sashes side by side (1 to 6, default 1), divided by 2" mullions; the lite grid applies
+   * to each sash. Doors: leaves, 1 or 2 (a double door).
+   */
+  sashes?: number;
+  /** A window of 3 sashes: the middle one is one fixed pane, the side sashes at most 24" wide. */
+  fixedCenter?: boolean;
+  /** Glass (default) or insect screen; a door with a screen is a screen door. */
+  glazing?: Glazing;
+  /** Doors: the lite grid glazes the upper 55% of the leaf, with two panels below. */
+  halfLite?: boolean;
+  /** Doors: hex colour `#rrggbb` of the leaf. Absent: the dark green of the house door. */
+  leafColor?: string;
 }
 
 export interface Room {

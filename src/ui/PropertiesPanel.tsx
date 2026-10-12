@@ -14,7 +14,7 @@ import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
 import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
-import { DEFAULT_TRIM, defaultWallColor, defaultWallFinish, litesOf, MAX_LITES, normalizeHex, ROOF_COLOR, roofColorOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
+import { DEFAULT_LEAF_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, GLAZINGS, glazingOf, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
 import type { Column, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
@@ -604,6 +604,8 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   };
   const viewMode = useUiStore((s) => s.viewMode);
   const wording = wall ? swingWording(level, wall, getFaces(level, viewMode)) : null;
+  const door = opening.type === 'door';
+  const screened = glazingOf(opening) === 'screen';
   const changeType = (type: OpeningType) => {
     if (type === opening.type) return;
     const def = OPENING_DEFAULTS[type];
@@ -702,18 +704,63 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
       {opening.type !== 'passage' && (
         <>
           <NumberField
-            label={opening.type === 'door' ? 'Glazed columns' : 'Lites across'}
-            value={litesOf(opening).cols}
-            check={liteCheck}
-            onCommit={(cols) => updateOpening(levelId, opening.id, { lites: { cols, rows: litesOf(opening).rows } })}
-            hint={opening.type === 'door' ? 'A door is a solid panel at 1 x 1; more lites glaze its panel.' : undefined}
+            label={door ? 'Leaves' : 'Sashes'}
+            value={door ? leavesOf(opening) : sashesOf(opening)}
+            check={door ? leafCheck : sashCheck}
+            onCommit={(n) => updateOpening(levelId, opening.id, { sashes: n === DEFAULT_SASHES ? undefined : n })}
+            hint={door ? 'Two makes a double door.' : 'Side by side, with 2" mullions between them.'}
           />
-          <NumberField
-            label={opening.type === 'door' ? 'Glazed rows' : 'Lites down'}
-            value={litesOf(opening).rows}
-            check={liteCheck}
-            onCommit={(rows) => updateOpening(levelId, opening.id, { lites: { cols: litesOf(opening).cols, rows } })}
+          {opening.type === 'window' && sashesOf(opening) === 3 && (
+            <label className="check-row">
+              <input
+                type="checkbox"
+                aria-label="Fixed centre pane"
+                checked={!!opening.fixedCenter}
+                onChange={(e) => {
+                  updateOpening(levelId, opening.id, { fixedCenter: e.target.checked ? true : undefined });
+                  releaseFocus(e.currentTarget);
+                }}
+              />
+              Fixed centre pane (side sashes at most 24" wide)
+            </label>
+          )}
+          <SelectField
+            label="Glazing"
+            value={glazingOf(opening)}
+            options={glazingOptions}
+            onChange={(g) => updateOpening(levelId, opening.id, { glazing: g === 'glass' ? undefined : g })}
           />
+          {!screened && (
+            <>
+              <NumberField
+                label={door ? 'Glazed columns per leaf' : 'Lites across per sash'}
+                value={litesOf(opening).cols}
+                check={liteCheck}
+                onCommit={(cols) => updateOpening(levelId, opening.id, { lites: { cols, rows: litesOf(opening).rows } })}
+                hint={door ? (opening.halfLite ? 'The grid glazes the upper part of the leaf.' : 'A leaf is a solid panel at 1 x 1; more lites glaze its panel.') : undefined}
+              />
+              <NumberField
+                label={door ? 'Glazed rows per leaf' : 'Lites down per sash'}
+                value={litesOf(opening).rows}
+                check={liteCheck}
+                onCommit={(rows) => updateOpening(levelId, opening.id, { lites: { cols: litesOf(opening).cols, rows } })}
+              />
+            </>
+          )}
+          {door && !screened && (
+            <label className="check-row">
+              <input
+                type="checkbox"
+                aria-label="Half lite"
+                checked={!!opening.halfLite}
+                onChange={(e) => {
+                  updateOpening(levelId, opening.id, { halfLite: e.target.checked ? true : undefined });
+                  releaseFocus(e.currentTarget);
+                }}
+              />
+              Half lite (glass above, two panels below)
+            </label>
+          )}
           <LengthField
             label="Trim width"
             value={trimOf(opening)}
@@ -721,6 +768,15 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
             onCommit={(v) => void (v !== null && updateOpening(levelId, opening.id, { trim: v }))}
             hint={`Outside face, default ${formatLength(DEFAULT_TRIM, denom)}.`}
           />
+          {door && (
+            <ColorField
+              label="Leaf colour"
+              value={leafColorOf(opening)}
+              onCommit={(leafColor) => updateOpening(levelId, opening.id, { leafColor })}
+              onReset={opening.leafColor ? () => updateOpening(levelId, opening.id, { leafColor: undefined }) : undefined}
+              hint={screened ? 'The screen door frame.' : `Default ${DEFAULT_LEAF_COLOR}.`}
+            />
+          )}
         </>
       )}
       {opening.type === 'window' && (
@@ -734,7 +790,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
               releaseFocus(e.currentTarget);
             }}
           />
-          Shutters (two boards flanking the trim)
+          Shutters (a board each side, one sash wide)
         </label>
       )}
       <ReadOnly label="Wall length">{formatLength(L, denom)}</ReadOnly>
@@ -743,6 +799,9 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
 }
 
 const liteCheck = (v: number): string | null => (Number.isInteger(v) && v >= 1 && v <= MAX_LITES ? null : `A whole number from 1 to ${MAX_LITES}.`);
+const sashCheck = (v: number): string | null => (Number.isInteger(v) && v >= 1 && v <= MAX_SASHES ? null : `A whole number from 1 to ${MAX_SASHES}.`);
+const leafCheck = (v: number): string | null => (v === 1 || v === MAX_LEAVES ? null : 'One leaf, or two for a double door.');
+const glazingOptions = GLAZINGS.map((g) => ({ value: g, label: GLAZING_LABEL[g] }));
 
 /**
  * The room's sides measured face to face (the net outline), so typed lengths can be checked against

@@ -43,6 +43,18 @@ export interface AddWallResult {
 export type WallPatch = Partial<Omit<Wall, 'id'>>;
 export type OpeningPatch = Partial<Omit<Opening, 'id'>>;
 export type NewOpening = Omit<Opening, 'id'> & { id?: Id };
+/** The fields of an opening that updateOpening removes when the patch sets them to undefined. */
+const OPTIONAL_OPENING_KEYS: ReadonlySet<keyof Opening> = new Set<keyof Opening>([
+  'swing',
+  'lites',
+  'shutters',
+  'trim',
+  'sashes',
+  'fixedCenter',
+  'glazing',
+  'halfLite',
+  'leafColor',
+]);
 export type RoomPatch = Partial<Omit<Room, 'id'>>;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 export type StairsPatch = Partial<Omit<Stairs, 'id'>>;
@@ -571,8 +583,9 @@ export const usePlanStore = create<PlanState>()(
               if (target && !openingFitsHeight(next, wallHeightOf(level, target))) return false;
             }
             for (const [key, value] of Object.entries(patch) as [keyof Opening, unknown][]) {
+              // undefined clears an optional field; required fields are never removed.
               if (value === undefined) {
-                if (key === 'swing' || key === 'lites' || key === 'shutters' || key === 'trim') delete o[key];
+                if (OPTIONAL_OPENING_KEYS.has(key)) delete o[key];
               } else (o as unknown as Record<string, unknown>)[key] = value;
             }
             if (o.type !== 'door' && o.swing) delete o.swing;

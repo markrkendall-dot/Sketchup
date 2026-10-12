@@ -52,8 +52,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
               key={p.part}
               name={`opening:${o.id}:${p.part}`}
               geometry={p.geometry}
-              material={openingMaterial(p.part, o.phase)}
-              renderOrder={o.phase === 'demo' || p.part === 'glass' ? 1 : 0}
+              material={openingMaterial(p.part, o.phase, o.leafColor)}
+              renderOrder={o.phase === 'demo' || p.part === 'glass' || p.part === 'screen' ? 1 : 0}
               dispose={null}
             />
           ))}

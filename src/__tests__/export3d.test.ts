@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearMeshCache, getLevelMeshes } from '../derive/meshes';
 import { buildExportScene, disposeExportScene, METRES_PER_INCH, toGlb, toObj, type ExportLevelVisibility } from '../io/export3d';
 import { createEmptyPlan } from '../model/plan';
-import type { Id, Plan } from '../model/types';
+import type { Id, Phase, Plan } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 
 const store = () => usePlanStore.getState();
@@ -214,6 +214,28 @@ describe('buildExportScene', () => {
     expect(byName(proposed, 'First Floor')!.children.some((c) => c.name === 'Roof')).toBe(false);
     expect(byName(proposed, 'Second Floor')!.children.some((c) => c.name === 'Roof')).toBe(true);
     disposeExportScene(proposed);
+  });
+
+  it('names opening materials: screen, door_leaf_<hex> for a leaf in another colour, then the phase', () => {
+    const { first } = fixture();
+    const l = store().plan.levels[first];
+    const top = Object.values(l.walls).find((w) => l.nodes[w.a].y === 0 && l.nodes[w.b].y === 0)!;
+    store().updateOpening(first, Object.keys(l.openings)[0], { glazing: 'screen', sashes: 2 });
+    const door = (offset: number, phase: Phase, leafColor?: string) =>
+      expect(store().addOpening(first, { wallId: top.id, type: 'door', offset, width: 36, height: 80, sill: 0, phase, ...(leafColor ? { leafColor } : {}) })).not.toBeNull();
+    door(160, 'existing');
+    door(200, 'existing', '#2f4a3a');
+    door(240, 'new', '#2f4a3a');
+    door(280, 'demo', '#2f4a3a');
+    const root = buildExportScene(store().plan, 'all', allVisible(first));
+    const parts = byName(root, 'First Floor')!.children.filter((c) => c.name === 'Window' || c.name === 'Door') as Mesh[];
+    const names = new Set(parts.map((m) => (m.material as MeshStandardMaterial).name));
+    expect([...names].sort()).toEqual(['door_leaf', 'door_leaf_2f4a3a', 'door_leaf_2f4a3a_new', 'door_leaf_demo', 'sash', 'sash_demo', 'sash_new', 'screen', 'trim', 'trim_demo', 'trim_new']);
+    const screen = parts.find((m) => (m.material as MeshStandardMaterial).name === 'screen')!;
+    expect(screen.name).toBe('Window');
+    expect((screen.material as MeshStandardMaterial).transparent).toBe(true);
+    expect((screen.material as MeshStandardMaterial).map).toBeNull();
+    disposeExportScene(root);
   });
 
   it('the proposed view leaves the demolished wall out', () => {

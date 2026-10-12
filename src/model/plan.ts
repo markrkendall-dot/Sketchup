@@ -1,9 +1,9 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
-import { isHexColor, MAX_LITES, WALL_FINISHES } from './finish';
+import { GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
-import type { Column, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { Column, Glazing, GradePoint, Id, Level, Opening, Phase, Plan, PlanSettings, Roof, RoofShape, Room, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 2 as const;
@@ -503,7 +503,7 @@ const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 
 const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
-const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim'] as const;
+const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color'] as const;
@@ -575,6 +575,11 @@ function migrateOpenings(raw: Json, walls: Level['walls']): Level['openings'] {
     put(opening, 'lites', isObject(lites) && liteCount(lites.cols) && liteCount(lites.rows) ? { cols: lites.cols, rows: lites.rows } : undefined);
     put(opening, 'shutters', typeof o.shutters === 'boolean' ? o.shutters : undefined);
     put(opening, 'trim', isNum(o.trim) && o.trim >= 0 && o.trim <= 24 ? o.trim : undefined);
+    put(opening, 'sashes', isNum(o.sashes) && Number.isInteger(o.sashes) && o.sashes >= 1 && o.sashes <= MAX_SASHES ? o.sashes : undefined);
+    put(opening, 'fixedCenter', typeof o.fixedCenter === 'boolean' ? o.fixedCenter : undefined);
+    put(opening, 'glazing', typeof o.glazing === 'string' && GLAZINGS.includes(o.glazing as Glazing) ? o.glazing : undefined);
+    put(opening, 'halfLite', typeof o.halfLite === 'boolean' ? o.halfLite : undefined);
+    put(opening, 'leafColor', isHexColor(o.leafColor) ? o.leafColor.toLowerCase() : undefined);
     out[oid] = opening as unknown as Opening;
   }
   return out;

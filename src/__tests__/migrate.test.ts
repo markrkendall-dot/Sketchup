@@ -164,8 +164,8 @@ describe('migrate a current file', () => {
     const last = s.addWall(lid, { x: 0, y: 180 }, { x: 0, y: 0 }, o)!;
     s.addWall(lid, { x: 120, y: 0 }, { x: 120, y: 180 }, { kind: 'interior', thickness: 4.5, phase: 'new' });
     const w = Object.values(store().plan.levels[lid].walls)[0];
-    s.addOpening(lid, { wallId: w.id, type: 'door', offset: 60, width: 36, height: 80, sill: 0, phase: 'existing', swing: { hinge: 'a', side: 'left' } });
-    s.addOpening(lid, { wallId: last.wallIds[0], type: 'window', offset: 90, width: 30, height: 48, sill: 36, phase: 'demo' });
+    s.addOpening(lid, { wallId: w.id, type: 'door', offset: 60, width: 36, height: 80, sill: 0, phase: 'existing', swing: { hinge: 'a', side: 'left' }, halfLite: true, leafColor: '#2f4a3a', sashes: 2 });
+    s.addOpening(lid, { wallId: last.wallIds[0], type: 'window', offset: 90, width: 30, height: 48, sill: 36, phase: 'demo', sashes: 3, fixedCenter: true, glazing: 'screen' });
     s.updateWalls(lid, [w.id], { heightOverride: 100 });
     s.addRoom(lid, { name: 'Kitchen', anchor: { x: 60, y: 90 } });
     s.addStairs(lid, { origin: { x: 180, y: 170 }, direction: 270, width: 36, run: 120, phase: 'existing', cutsFloorAbove: true });
@@ -230,6 +230,10 @@ describe('migrate a current file', () => {
     const plan = richPlan();
     expect(plan.schemaVersion).toBe(2);
     expect(Object.values(plan.levels).reduce((n, l) => n + Object.keys(l.roofs).length, 0)).toBe(2);
+    // The optional opening fields (sashes, glazing, door leaves) are part of the round trip.
+    const openings = Object.values(plan.levels[plan.levelOrder[1]].openings);
+    expect(openings.find((o) => o.type === 'door')).toMatchObject({ halfLite: true, leafColor: '#2f4a3a', sashes: 2 });
+    expect(openings.find((o) => o.type === 'window')).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen' });
     const text = JSON.stringify(plan, null, 2);
     expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
   });

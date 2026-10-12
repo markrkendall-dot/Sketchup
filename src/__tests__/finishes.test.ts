@@ -1,15 +1,35 @@
 import { produce } from 'immer';
-import type { BufferGeometry } from 'three';
+import { FrontSide, type BufferGeometry } from 'three';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { computeFootprints } from '../derive/footprint';
 import { buildWallGeometry, clearMeshCache, getLevelMeshes } from '../derive/meshes';
-import { muntinCounts, openingFill, type FillInput } from '../derive/openings3d';
-import { DEFAULT_EXTERIOR_COLOR, DEFAULT_INTERIOR_COLOR, normalizeHex, roofColorOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { muntinCounts, openingFill, sashSpans, shutterWidth, type FillBox, type FillInput } from '../derive/openings3d';
+import { DEFAULT_EXTERIOR_COLOR, DEFAULT_INTERIOR_COLOR, DEFAULT_LEAF_COLOR, normalizeHex, roofColorOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
 import { createEmptyPlan, createLevel, migrate } from '../model/plan';
 import type { Level, Opening, Plan, Wall } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
-import { blendPixels, brightness, courseBoundaries, hexToRgb, newWorkColor, NEW_WORK_GREEN, seeded, shingleJoints, sidingTexture, TILE_INCHES } from '../view3d/textures';
-import { wallFlatColor } from '../view3d/materials';
+import {
+  blendPixels,
+  blockFaces,
+  brightness,
+  CLAPBOARD_COURSE,
+  courseBoundaries,
+  hexToRgb,
+  newWorkColor,
+  NEW_WORK_GREEN,
+  normalFromHeight,
+  PX_PER_INCH,
+  RELIEF,
+  seeded,
+  shingleCourses,
+  shingleJoints,
+  sidingHeight,
+  sidingTexture,
+  sidingTextures,
+  TEXTURE_PX,
+  TILE_INCHES,
+} from '../view3d/textures';
+import { openingMaterial, wallFlatColor } from '../view3d/materials';
 import { wallMaterial } from '../view3d/materials';
 
 const store = () => usePlanStore.getState();
@@ -140,18 +160,50 @@ describe('opening fills', () => {
     expect(openingFill({ ...base, trim: 6 }).find((b) => b.kind === 'trim' && b.y0 === 84)!.y1).toBeCloseTo(90, 9);
   });
 
-  it('shutters add two boards, each a third of the window width, flanking the trim', () => {
+  it('shutters: a board each side flanking the trim, one sash wide within 10" to 18", with two battens across it', () => {
     const plain = openingFill(base);
     const shut = openingFill({ ...base, shutters: true });
-    expect(shut.length - plain.length).toBe(2);
-    const boards = shut.filter((b) => b.part === 'shutter');
+    expect(shut.length - plain.length).toBe(6);
+    const boards = shut.filter((b) => b.kind === 'shutter');
+    const battens = shut.filter((b) => b.kind === 'batten');
     expect(boards).toHaveLength(2);
+    expect(battens).toHaveLength(4);
+    expect(shut.filter((b) => b.part === 'shutter')).toHaveLength(6);
+    // A 36" window of one sash: 36 clamps to 18.
     for (const b of boards) {
-      expect(b.s1 - b.s0).toBeCloseTo(12, 9);
+      expect(b.s1 - b.s0).toBeCloseTo(18, 9);
       expect(b.d1 - b.d0).toBeCloseTo(1, 9);
+      expect(b.d0).toBeCloseTo(3.25, 9);
     }
     expect(boards[0].s1).toBeCloseTo(100 - 4, 9);
     expect(boards[1].s0).toBeCloseTo(136 + 4, 9);
+    // Battens: 3" tall, 0.75" proud of the board, centred at a quarter and three quarters of the height.
+    for (const b of battens) {
+      expect(b.y1 - b.y0).toBeCloseTo(3, 9);
+      expect(b.d0).toBeCloseTo(4.25, 9);
+      expect(b.d1).toBeCloseTo(5, 9);
+    }
+    expect(battens.map((b) => (b.y0 + b.y1) / 2).sort((p, q) => p - q)).toEqual([48, 48, 72, 72]);
+    // Each batten lies across its own board.
+    for (const t of battens) expect(boards.some((b) => t.s0 >= b.s0 - 1e-9 && t.s1 <= b.s1 + 1e-9)).toBe(true);
+  });
+
+  it('shutter width is the window width over its sashes, clamped to 10" to 18"', () => {
+    const width = (w: number, sashes?: number) => {
+      const boxes = openingFill({ ...base, j0: 0, j1: w, sashes, shutters: true });
+      const boards = boxes.filter((b) => b.kind === 'shutter');
+      expect(boards).toHaveLength(2);
+      expect(boards[0].s1 - boards[0].s0).toBeCloseTo(boards[1].s1 - boards[1].s0, 9);
+      return boards[0].s1 - boards[0].s0;
+    };
+    expect(width(90, 3)).toBeCloseTo(18, 9); // 30 clamps to 18
+    expect(width(48, 4)).toBeCloseTo(12, 9);
+    expect(width(24, 2)).toBeCloseTo(12, 9);
+    expect(width(36, 6)).toBeCloseTo(10, 9); // 6 clamps to 10
+    expect(width(14)).toBeCloseTo(14, 9);
+    for (const [w, n] of [[90, 3], [48, 4], [24, 2], [36, 6], [14, 1], [200, 1]]) {
+      expect(shutterWidth(w, n)).toBeCloseTo(Math.min(18, Math.max(10, w / n)), 9);
+    }
   });
 
   it('a door has a leaf with a recessed panel and no sill; a passage has nothing', () => {
@@ -182,6 +234,186 @@ describe('opening fills', () => {
         expect(b.s1).toBeGreaterThan(b.s0);
         expect(b.d1).toBeGreaterThan(b.d0);
         expect(b.y1).toBeGreaterThan(b.y0);
+      }
+    }
+  });
+});
+
+describe('sashes, screens and doors', () => {
+  const count = (boxes: FillBox[], kind: string) => boxes.filter((b) => b.kind === kind).length;
+  const width = (b: FillBox) => b.s1 - b.s0;
+  const bySpan = (p: FillBox, q: FillBox) => p.s0 - q.s0;
+  /** A 144" x 60" picture window, sill 30" above the floor. */
+  const wide: FillInput = { type: 'window', j0: 0, j1: 144, bottom: 30, top: 90, thickness: 6.5 };
+  const door: FillInput = { type: 'door', j0: 0, j1: 36, bottom: 0, top: 80, thickness: 6.5 };
+
+  it('3 sashes with 2 x 3 lites: 2 mullions, 3 glass panes, 9 muntins, a frame of four boards per sash', () => {
+    const boxes = openingFill({ ...wide, sashes: 3, lites: { cols: 2, rows: 3 } });
+    expect(count(boxes, 'mullion')).toBe(2);
+    expect(count(boxes, 'glass')).toBe(3);
+    expect(count(boxes, 'muntin')).toBe(9);
+    expect(count(boxes, 'sashFrame')).toBe(12);
+    // Mullions: 2" wide, the full hole height, as deep as the sashes, in the sash material.
+    const sash = (144 - 2 * 2) / 3;
+    const mullions = boxes.filter((b) => b.kind === 'mullion').sort(bySpan);
+    mullions.forEach((m, i) => {
+      expect(m.part).toBe('sash');
+      expect(width(m)).toBeCloseTo(2, 9);
+      expect(m.s0).toBeCloseTo((i + 1) * sash + i * 2, 9);
+      expect([m.y0, m.y1]).toEqual([30, 90]);
+      expect(m.d1 - m.d0).toBeCloseTo(1.75, 9);
+    });
+    // Each pane sits inside its own sash's 1.5" frame.
+    for (const g of boxes.filter((b) => b.kind === 'glass')) expect(width(g)).toBeCloseTo(sash - 3, 9);
+    // One sash is the window as before.
+    expect(count(openingFill(wide), 'mullion')).toBe(0);
+    expect(count(openingFill({ ...wide, sashes: 1 }), 'sashFrame')).toBe(4);
+  });
+
+  it('a fixed centre pane: side sashes min(24, (w - 4) / 4), 24 / 92 / 24 at 144", the middle pane undivided', () => {
+    expect(sashSpans(0, 144, 3, true).map(([a, b]) => b - a)).toEqual([24, 92, 24]);
+    expect(sashSpans(0, 118, 3, true).map(([a, b]) => b - a)).toEqual([24, 66, 24]);
+    expect(sashSpans(0, 40, 3, true).map(([a, b]) => b - a)).toEqual([9, 18, 9]);
+    const boxes = openingFill({ ...wide, sashes: 3, fixedCenter: true, lites: { cols: 2, rows: 3 } });
+    expect(boxes.filter((b) => b.kind === 'glass').sort(bySpan).map(width)).toEqual([21, 89, 21]);
+    expect(count(boxes, 'mullion')).toBe(2);
+    // Muntins only in the side sashes.
+    expect(count(boxes, 'muntin')).toBe(6);
+    expect(boxes.filter((b) => b.kind === 'muntin').every((b) => b.s1 <= 24 || b.s0 >= 120)).toBe(true);
+    // Only with 3 sashes: 4 stay equal.
+    expect(sashSpans(0, 144, 4, true).map(([a, b]) => b - a)).toEqual([34.5, 34.5, 34.5, 34.5]);
+  });
+
+  it('sashSpans: one span per sash from jamb to jamb; unusable counts are one sash, more than 6 is 6', () => {
+    expect(sashSpans(10, 46)).toEqual([[10, 46]]);
+    expect(sashSpans(0, 36, 2)).toEqual([
+      [0, 17],
+      [19, 36],
+    ]);
+    expect(sashSpans(0, 36, 0)).toEqual([[0, 36]]);
+    expect(sashSpans(0, 36, Number.NaN)).toEqual([[0, 36]]);
+    expect(sashSpans(0, 120, 9)).toHaveLength(6);
+    // A narrow window keeps every sash wider than its mullions.
+    const narrow = sashSpans(0, 6, 6);
+    narrow.forEach(([a, b], i) => {
+      expect(b - a).toBeGreaterThan(0.5);
+      if (i > 0) expect(a - narrow[i - 1][1]).toBeLessThan(b - a);
+    });
+    expect(narrow[5][1]).toBe(6);
+  });
+
+  it('a screened window: one screen per sash in a 1" frame, no glass and no muntins', () => {
+    const boxes = openingFill({ ...wide, j1: 44, glazing: 'screen', lites: { cols: 2, rows: 3 } });
+    expect(count(boxes, 'glass')).toBe(0);
+    expect(count(boxes, 'muntin')).toBe(0);
+    const screens = boxes.filter((b) => b.kind === 'screen');
+    expect(screens).toHaveLength(1);
+    expect(screens[0].part).toBe('screen');
+    expect(screens[0].s0).toBeCloseTo(1, 9);
+    expect(width(screens[0])).toBeCloseTo(42, 9);
+    expect(screens[0].y0).toBeCloseTo(31, 9);
+    expect(screens[0].d0 + screens[0].d1).toBeCloseTo(0, 9);
+    expect(boxes.filter((b) => b.kind === 'sashFrame').every((b) => Math.min(width(b), b.y1 - b.y0) === 1)).toBe(true);
+    expect(count(openingFill({ ...wide, sashes: 3, glazing: 'screen' }), 'screen')).toBe(3);
+  });
+
+  it('a screen door: a 1.5" frame, a 4" mid rail at 36", screen above and below it, no panel', () => {
+    const boxes = openingFill({ ...door, glazing: 'screen', lites: { cols: 3, rows: 3 }, halfLite: true });
+    expect(count(boxes, 'panel')).toBe(0);
+    expect(count(boxes, 'glass')).toBe(0);
+    expect(count(boxes, 'muntin')).toBe(0);
+    expect(count(boxes, 'doorFrame')).toBe(3);
+    const frame = boxes.filter((b) => b.kind === 'leaf');
+    expect(frame).toHaveLength(4);
+    expect(frame.every((b) => Math.min(width(b), b.y1 - b.y0) === 1.5)).toBe(true);
+    const rails = boxes.filter((b) => b.kind === 'midRail');
+    expect(rails).toHaveLength(1);
+    expect(rails[0].part).toBe('leaf');
+    expect(rails[0].y1 - rails[0].y0).toBeCloseTo(4, 9);
+    expect((rails[0].y0 + rails[0].y1) / 2).toBeCloseTo(36, 9);
+    const screens = boxes.filter((b) => b.kind === 'screen').sort((p, q) => p.y0 - q.y0);
+    expect(screens.map((b) => b.part)).toEqual(['screen', 'screen']);
+    // Under the mid rail from the bottom rail; above it to the top rail (under the frame's 1.5" head).
+    expect([screens[0].y0, screens[0].y1]).toEqual([1.5, 34]);
+    expect([screens[1].y0, screens[1].y1]).toEqual([38, 77]);
+    expect(screens.every((b) => b.s0 === 3 && b.s1 === 33)).toBe(true);
+  });
+
+  it('a half-lite door: the lite grid glazes the upper 55% of the panel area, two panels below either side of a 5" stile', () => {
+    const boxes = openingFill({ ...door, halfLite: true, lites: { cols: 3, rows: 3 } });
+    expect(count(boxes, 'glass')).toBe(1);
+    expect(count(boxes, 'panel')).toBe(2);
+    expect(count(boxes, 'muntin')).toBe(4);
+    // Panel area: inside 5" stiles, a 5" top rail and an 8" bottom rail, under the 1.5" head: 8" to 73.5".
+    const glass = boxes.find((b) => b.kind === 'glass')!;
+    expect(glass.y1).toBeCloseTo(73.5, 9);
+    expect(glass.y1 - glass.y0).toBeCloseTo(0.55 * 65.5, 9);
+    const panels = boxes.filter((b) => b.kind === 'panel').sort(bySpan);
+    for (const p of panels) {
+      expect(p.y0).toBeCloseTo(8, 9);
+      expect(p.y1).toBeLessThan(glass.y0);
+      expect(p.part).toBe('leaf');
+    }
+    expect(panels[1].s0 - panels[0].s1).toBeCloseTo(5, 9);
+    // A door's muntins are the leaf's (its colour); a window's are the sash's (white).
+    expect(boxes.filter((b) => b.kind === 'muntin').every((b) => b.part === 'leaf')).toBe(true);
+    expect(openingFill(wide).filter((b) => b.kind === 'muntin').every((b) => b.part === 'sash')).toBe(true);
+    // A 1 x 1 grid still glazes the upper part: one pane, no muntins.
+    const plain = openingFill({ ...door, halfLite: true });
+    expect([count(plain, 'glass'), count(plain, 'muntin'), count(plain, 'panel')]).toEqual([1, 0, 2]);
+  });
+
+  it('a double door: two full leaves meeting at the centre, in one frame', () => {
+    const wideDoor = { ...door, j1: 72 };
+    const single = openingFill(wideDoor);
+    const double = openingFill({ ...wideDoor, sashes: 2 });
+    expect(count(single, 'leaf')).toBe(4);
+    expect(count(double, 'leaf')).toBe(8);
+    expect(count(double, 'panel')).toBe(2);
+    expect(count(double, 'doorFrame')).toBe(3);
+    // The stiles: two per leaf, the inner two meeting at the middle of the 69" between the jambs.
+    const stiles = double.filter((b) => b.kind === 'leaf' && b.y0 === 0 && b.y1 === 78.5).sort(bySpan);
+    expect(stiles.map((b) => [b.s0, b.s1])).toEqual([
+      [1.5, 6.5],
+      [31, 36],
+      [36, 41],
+      [65.5, 70.5],
+    ]);
+    // A glazed double door has a lite grid per leaf; more than two leaves is still a double door.
+    expect(count(openingFill({ ...wideDoor, sashes: 2, lites: { cols: 1, rows: 3 } }), 'glass')).toBe(2);
+    expect(count(openingFill({ ...wideDoor, sashes: 4 }), 'leaf')).toBe(8);
+    // Double screen doors: a mid rail and two screens per leaf.
+    const screens = openingFill({ ...wideDoor, sashes: 2, glazing: 'screen' });
+    expect([count(screens, 'midRail'), count(screens, 'screen')]).toEqual([2, 4]);
+  });
+
+  it('whatever the options, every box has a positive size and the sashes, leaves and panes stay inside the hole', () => {
+    for (const type of ['window', 'door'] as const) {
+      for (const [j1, top] of [
+        [144, 90],
+        [20, 50],
+        [6, 36],
+      ]) {
+        for (const sashes of [1, 2, 3, 6]) {
+          for (const glazing of ['glass', 'screen'] as const) {
+            for (const flag of [false, true]) {
+              const input: FillInput = { type, j0: 0, j1, bottom: 30, top, thickness: 6.5, sashes, glazing, fixedCenter: flag, halfLite: flag, shutters: flag, lites: { cols: 3, rows: 4 } };
+              const boxes = openingFill(input);
+              expect(boxes.length).toBeGreaterThan(5);
+              for (const b of boxes) {
+                expect(b.s1 - b.s0).toBeGreaterThan(0);
+                expect(b.d1 - b.d0).toBeGreaterThan(0);
+                expect(b.y1 - b.y0).toBeGreaterThan(0);
+                if (b.part === 'trim' || b.part === 'shutter') continue;
+                expect(b.s0).toBeGreaterThanOrEqual(-1e-9);
+                expect(b.s1).toBeLessThanOrEqual(j1 + 1e-9);
+                expect(b.y0).toBeGreaterThanOrEqual(30 - 1e-9);
+                expect(b.y1).toBeLessThanOrEqual(top + 1e-9);
+                expect(Math.max(-b.d0, b.d1)).toBeLessThanOrEqual(1.75 / 2 + 1e-9);
+              }
+            }
+          }
+        }
       }
     }
   });
@@ -221,9 +453,10 @@ describe('opening fill meshes', () => {
     const [z0, z1] = range(trim, 'position', 2);
     expect(z1).toBeCloseTo(-3.25, 5);
     expect(z0).toBeCloseTo(-5.25, 5);
+    // The shutter boards are 1" thick on the face, their battens 0.75" proud of them.
     const [sz0, sz1] = range(parts.find((p) => p.part === 'shutter')!.geometry, 'position', 2);
     expect(sz1).toBeCloseTo(-3.25, 5);
-    expect(sz0).toBeCloseTo(-4.25, 5);
+    expect(sz0).toBeCloseTo(-5, 5);
     // The glass is mid-wall.
     const [gz0, gz1] = range(parts.find((p) => p.part === 'glass')!.geometry, 'position', 2);
     expect((gz0 + gz1) / 2).toBeCloseTo(0, 5);
@@ -246,6 +479,58 @@ describe('opening fill meshes', () => {
     const { plan, first } = house([{ phase: 'new' }]);
     expect(getLevelMeshes(plan, first, 'existing').openings).toHaveLength(0);
     expect(getLevelMeshes(plan, first, 'proposed').openings).toHaveLength(1);
+  });
+
+  it('a screened window has a screen part and no glass; a door reports its leaf colour; the parts carry UVs in inches', () => {
+    const { plan, first } = house([{ glazing: 'screen', sashes: 2 }, { type: 'door', offset: 180, height: 80, sill: 0, leafColor: '#2f4a3a' }]);
+    const m = getLevelMeshes(plan, first, 'all');
+    expect(m.openings[0].parts.map((p) => p.part).sort()).toEqual(['sash', 'screen', 'trim']);
+    expect(m.openings[0].leafColor).toBe(DEFAULT_LEAF_COLOR);
+    expect(m.openings[1].leafColor).toBe('#2f4a3a');
+    // The wall runs along +x from its start at x = 0: on faces along the wall u is x and v the height.
+    const screen = m.openings[0].parts.find((p) => p.part === 'screen')!.geometry;
+    const pos = screen.getAttribute('position');
+    const nor = screen.getAttribute('normal');
+    const uv = screen.getAttribute('uv');
+    expect(uv.count).toBe(pos.count);
+    let along = 0;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(nor.getZ(i)) < 0.99) continue;
+      along++;
+      expect(uv.getX(i)).toBeCloseTo(pos.getX(i), 5);
+      expect(uv.getY(i)).toBeCloseTo(pos.getY(i), 5);
+    }
+    expect(along).toBe(2 * 2 * 6); // two panes, front and back, two triangles each
+    for (const o of m.openings) for (const p of o.parts) expect(p.geometry.getAttribute('uv')).toBeDefined();
+  });
+});
+
+describe('opening materials', () => {
+  it('a leaf colour keys its own material; the other parts keep theirs', () => {
+    const def = openingMaterial('leaf', 'existing');
+    expect(def.color.getHexString()).toBe(DEFAULT_LEAF_COLOR.slice(1));
+    expect(openingMaterial('leaf', 'existing', DEFAULT_LEAF_COLOR)).toBe(def);
+    const green = openingMaterial('leaf', 'existing', '#2f4a3a');
+    expect(green).not.toBe(def);
+    expect(green.color.getHexString()).toBe('2f4a3a');
+    expect(openingMaterial('leaf', 'existing', '#2f4a3a')).toBe(green);
+    expect(openingMaterial('leaf', 'new', '#2f4a3a')).not.toBe(green);
+    expect(openingMaterial('sash', 'existing', '#2f4a3a')).toBe(openingMaterial('sash', 'existing'));
+    expect(openingMaterial('leaf', 'demo', '#2f4a3a').color.getHexString()).toBe('e0413a');
+  });
+
+  it('a screen is see-through and drawn without depth writes; one face of its box shows from either side', () => {
+    const screen = openingMaterial('screen', 'existing');
+    expect(screen).toBe(openingMaterial('screen', 'existing', '#2f4a3a'));
+    expect(screen.transparent).toBe(true);
+    expect(screen.depthWrite).toBe(false);
+    expect(screen.opacity).toBeLessThan(1);
+    expect(screen.side).toBe(FrontSide);
+    // No canvas in node: the flat grey without the mesh texture.
+    expect(screen.map).toBeNull();
+    expect(screen.color.getHexString()).toBe('4a4d4c');
+    expect(openingMaterial('screen', 'new').color.getHexString()).toBe(newWorkColor('#4a4d4c').slice(1));
+    expect(openingMaterial('screen', 'demo').color.getHexString()).toBe('e0413a');
   });
 });
 
@@ -306,6 +591,17 @@ describe('wall finish and colour', () => {
     l.nodes.q = { id: 'q', x: 240, y: 0 };
     l.walls.w = { id: 'w', a: 'p', b: 'q', thickness: 6.5, kind: 'exterior', phase: 'existing', finish: 'board' };
     expect(getLevelMeshes(plan, first, 'all').walls[0]).toMatchObject({ finish: 'board', color: '#5a3a35' });
+  });
+
+  it('concrete block is a finish of its own, labelled for the panel, with the colour as its flat colour', () => {
+    expect(WALL_FINISHES).toContain('block');
+    expect(WALL_FINISH_LABEL.block).toBe('Concrete block');
+    expect(new Set(WALL_FINISHES).size).toBe(Object.keys(WALL_FINISH_LABEL).length);
+    expect(wallFlatColor('existing', 'block', '#8f8a84')).toBe('#8f8a84');
+    expect(wallFlatColor('new', 'block', '#8f8a84')).toBe(newWorkColor('#8f8a84'));
+    const m = wallMaterial('existing', 'exterior', 'block', '#8f8a84');
+    expect(m).not.toBe(wallMaterial('existing', 'exterior', 'shingle', '#8f8a84'));
+    expect(m.color.getHexString()).toBe('8f8a84');
   });
 
   it('materials are shared per phase, finish and colour; demolished walls stay translucent red', () => {
@@ -378,6 +674,49 @@ describe('migrate: optional appearance fields', () => {
     expect('color' in roof).toBe(false);
   });
 
+  it('accepts the block finish and the sash, glazing and door fields; lower-cases the leaf colour', () => {
+    const { wall, opening } = readBack(file({ finish: 'block', color: '#8f8a84' }, { sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: false, leafColor: '#2F4A3A' }));
+    expect(wall.finish).toBe('block');
+    expect(opening).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: false, leafColor: '#2f4a3a' });
+    const door = readBack(file({}, { type: 'door', sill: 0, height: 80, sashes: 2, glazing: 'glass', halfLite: true })).opening;
+    expect(door).toMatchObject({ sashes: 2, glazing: 'glass', halfLite: true });
+    for (const sashes of [1, 6]) expect(readBack(file({}, { sashes })).opening.sashes).toBe(sashes);
+  });
+
+  it('drops malformed sashes, fixed centre, glazing, half lite and leaf colour', () => {
+    for (const sashes of [0, 7, 2.5, -1, '3', null, true]) expect('sashes' in readBack(file({}, { sashes })).opening).toBe(false);
+    const { opening } = readBack(file({}, { fixedCenter: 'yes', glazing: 'mesh', halfLite: 1, leafColor: 'green' }));
+    for (const k of ['fixedCenter', 'glazing', 'halfLite', 'leafColor']) expect(k in opening).toBe(false);
+    expect('glazing' in readBack(file({}, { glazing: 'Screen' })).opening).toBe(false);
+    expect('leafColor' in readBack(file({}, { leafColor: '#2f4a3' })).opening).toBe(false);
+    expect('finish' in readBack(file({ finish: 'cinder block' })).wall).toBe(false);
+  });
+
+  it('a file with every new field round-trips byte for byte', () => {
+    const extra = { sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, leafColor: '#2f4a3a', lites: { cols: 2, rows: 3 }, shutters: true, trim: 4 };
+    const f = file({ finish: 'block', color: '#8f8a84' }, extra);
+    const text = JSON.stringify(f, null, 2);
+    expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
+    // The new keys keep their place in the file's order.
+    expect(Object.keys(readBack(f).opening).slice(-8)).toEqual(Object.keys(extra));
+    const once = JSON.stringify(migrate(file({}, { leafColor: '#2F4A3A', sashes: 2 })));
+    expect(JSON.stringify(migrate(JSON.parse(once)))).toBe(once);
+  });
+
+  it('updateOpening sets the new fields and removes them when given undefined', () => {
+    const first = store().plan.levelOrder[1];
+    store().addWall(first, { x: 0, y: 0 }, { x: 240, y: 0 }, { kind: 'exterior', thickness: 6.5, phase: 'existing' });
+    const wallId = Object.keys(store().plan.levels[first].walls)[0];
+    const id = store().addOpening(first, { wallId, type: 'window', offset: 120, width: 72, height: 48, sill: 36, phase: 'existing' })!;
+    const keys = ['sashes', 'fixedCenter', 'glazing', 'halfLite', 'leafColor'] as const;
+    store().updateOpening(first, id, { sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, leafColor: '#2f4a3a' });
+    const o = () => store().plan.levels[first].openings[id];
+    expect(o()).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, leafColor: '#2f4a3a' });
+    store().updateOpening(first, id, { sashes: undefined, fixedCenter: undefined, glazing: undefined, halfLite: undefined, leafColor: undefined });
+    for (const k of keys) expect(k in o()).toBe(false);
+    expect(o()).toMatchObject({ width: 72, height: 48, sill: 36 });
+  });
+
   it('a file without the fields loads without them and without a version bump', () => {
     const { wall, opening, roof } = readBack(file({}));
     expect(Object.keys(wall)).not.toContain('finish');
@@ -438,6 +777,108 @@ describe('siding texture layout', () => {
     expect(typeof document).toBe('undefined');
     expect(sidingTexture('clapboard', '#5a3a35')).toBeNull();
     expect(sidingTexture('plain', '#e8e4dc')).toBeNull();
+    expect(sidingTextures('block', '#8f8a84')).toBeNull();
+  });
+
+  it('the tile: 512 px for 48" (a texel is 3/32"), clapboard at 8" courses, 6 per tile', () => {
+    expect(TEXTURE_PX).toBe(512);
+    expect(1 / PX_PER_INCH).toBeCloseTo(3 / 32, 12);
+    expect(CLAPBOARD_COURSE).toBe(8);
+    expect(courseBoundaries(TILE_INCHES, CLAPBOARD_COURSE)).toEqual([0, 8, 16, 24, 32, 40, 48]);
+  });
+
+  it('shingle courses: the staggered joints of each course, a few percent of brightness and warmth per shingle', () => {
+    const courses = shingleCourses();
+    expect(courses).toHaveLength(10);
+    courses.forEach((c, k) => {
+      expect(c.y1 - c.y0).toBeCloseTo(4.8, 9);
+      expect(c.shingles.reduce((t, s) => t + s.x1 - s.x0, 0)).toBeCloseTo(TILE_INCHES, 9);
+      for (const s of c.shingles) {
+        expect(s.shade).toBeGreaterThanOrEqual(0.94);
+        expect(s.shade).toBeLessThan(1.06);
+        expect(Math.abs(s.warmth)).toBeLessThanOrEqual(1);
+        expect(s.lift).toBeGreaterThanOrEqual(0);
+      }
+      if (k > 0) expect(c.shingles[0].x0).not.toBeCloseTo(courses[k - 1].shingles[0].x0, 3);
+    });
+    expect(shingleCourses()).toEqual(courses);
+  });
+
+  it('block: 18 blocks a tile, 15 5/8" x 7 5/8" faces in running bond', () => {
+    const faces = blockFaces();
+    expect(faces).toHaveLength(18);
+    for (const f of faces) {
+      expect(f.x1 - f.x0).toBeCloseTo(15.625, 9);
+      expect(f.y1 - f.y0).toBeCloseTo(7.625, 9);
+    }
+    const starts = (k: number) =>
+      faces
+        .filter((f) => Math.abs(f.y0 - (8 * k + 0.1875)) < 1e-9)
+        .map((f) => f.x0 - 0.1875)
+        .sort((p, q) => p - q);
+    expect(starts(0)).toEqual([0, 16, 32]);
+    expect(starts(1)).toEqual([8, 24, 40]);
+    expect(starts(5)).toEqual([8, 24, 40]);
+  });
+
+  it('height fields: a lap step at every clapboard course, V-grooves between boards, mortar recessed between blocks', () => {
+    expect(sidingHeight('plain')).toBeNull();
+    expect(sidingHeight('screen')).toBeNull();
+    const clap = sidingHeight('clapboard')!;
+    expect(clap).toHaveLength(TEXTURE_PX * TEXTURE_PX);
+    // Up a column the height falls through each board and jumps back by the lap at each course line
+    // (the row above it is a butt, the row below the thin top of the board underneath).
+    const at = (f: Float32Array, row: number, col = 100) => f[((row + TEXTURE_PX) % TEXTURE_PX) * TEXTURE_PX + col];
+    const laps: number[] = [];
+    for (let row = 0; row < TEXTURE_PX; row++) if (at(clap, row) - at(clap, row + 1) > 0.9 * RELIEF.lap) laps.push(row);
+    expect(laps).toEqual([0, 8, 16, 24, 32, 40].map((y) => TEXTURE_PX - Math.round((y + 8) * PX_PER_INCH) - 1).map((r) => (r + TEXTURE_PX) % TEXTURE_PX).sort((p, q) => p - q));
+    // The same in every column: the courses run level.
+    expect(at(clap, 200, 0)).toBe(at(clap, 200, 511));
+    // Six grooves across a row of the board tile (a run of recessed pixels each), RELIEF.groove deep at most.
+    const board = sidingHeight('board')!;
+    const row = Array.from({ length: TEXTURE_PX }, (_, c) => board[c]);
+    expect(row.filter((h, c) => h < 0 && !(row[(c + TEXTURE_PX - 1) % TEXTURE_PX] < 0))).toHaveLength(6);
+    expect(Math.min(...row)).toBeGreaterThanOrEqual(-RELIEF.groove - 1e-6); // stored as 32-bit floats
+    expect(Math.min(...row)).toBeLessThan(-RELIEF.groove / 2);
+    const block = sidingHeight('block')!;
+    const mortar = block.filter((h) => h === -RELIEF.mortar).length / block.length;
+    expect(mortar).toBeCloseTo(1 - (18 * 15.625 * 7.625) / (48 * 48), 2);
+    const shingle = sidingHeight('shingle')!;
+    expect(shingle.reduce((m, h) => Math.min(m, h), 0)).toBeLessThan(0); // keyways
+    expect(shingle.reduce((m, h) => Math.max(m, h), 0)).toBeGreaterThan(RELIEF.butt); // a butt standing proud
+  });
+
+  it('normal maps: on a one-step height field a step down the canvas faces down (G below 128), sampling wraps round the tile', () => {
+    const size = 8;
+    const h = new Float32Array(size * size);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < size; x++) h[y * size + x] = 1; // the upper half is raised
+    const px = normalFromHeight(h, size, 2);
+    const at = (x: number, y: number) => Array.from(px.slice((y * size + x) * 4, (y * size + x) * 4 + 4));
+    for (let x = 0; x < size; x++) {
+      // Flat rows: straight out.
+      for (const y of [1, 2, 5, 6]) expect(at(x, y)).toEqual([128, 128, 255, 255]);
+      // The step: higher above, lower below, so the face looks down: G < 128 (dh/dy = -0.5, n = (0, -1, 1) / sqrt 2).
+      for (const y of [3, 4]) expect(at(x, y)).toEqual([128, 37, 218, 255]);
+      // The tile's seam: its bottom row is low and its top row high, so the step there faces up.
+      for (const y of [7, 0]) expect(at(x, y)).toEqual([128, 218, 218, 255]);
+    }
+    // Across x: the left half raised, so the step faces right (R above 128).
+    const v = new Float32Array(size * size);
+    for (let y = 0; y < size; y++) for (let x = 0; x < 4; x++) v[y * size + x] = 1;
+    const vx = normalFromHeight(v, size, 2);
+    expect(vx[(2 * size + 3) * 4]).toBeGreaterThan(128);
+    expect(vx[(2 * size + 3) * 4 + 1]).toBe(128);
+    expect(vx[(2 * size + 0) * 4]).toBeLessThan(128);
+  });
+
+  it("clapboard's normal map: each board's face tilts up a little, each lap faces down", () => {
+    const n = normalFromHeight(sidingHeight('clapboard')!, TEXTURE_PX, PX_PER_INCH);
+    const g = (row: number) => n[(row * TEXTURE_PX + 50) * 4 + 1];
+    const lap = TEXTURE_PX - Math.round(8 * PX_PER_INCH); // the first row under the lap at 8"
+    expect(g(lap)).toBeLessThan(64);
+    expect(g(lap - 1)).toBeLessThan(64);
+    expect(g(lap + 40)).toBeGreaterThan(128);
+    expect(g(lap + 40)).toBeLessThan(150);
   });
 });
 

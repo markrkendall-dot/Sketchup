@@ -1,14 +1,15 @@
-import type { Opening, Roof, RoofFinish, Wall, WallFinish, WallKind } from './types';
+import type { Glazing, Opening, Roof, RoofFinish, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
 
-export const WALL_FINISHES: readonly WallFinish[] = ['shingle', 'clapboard', 'board', 'plain', 'screen'];
+export const WALL_FINISHES: readonly WallFinish[] = ['shingle', 'clapboard', 'board', 'block', 'plain', 'screen'];
 
 export const WALL_FINISH_LABEL: Record<WallFinish, string> = {
   shingle: 'Shingle',
   clapboard: 'Clapboard',
   board: 'Vertical board',
+  block: 'Concrete block',
   plain: 'Plain',
   screen: 'Screen',
 };
@@ -47,3 +48,18 @@ export const MAX_LITES = 12;
 export const litesOf = (o: Pick<Opening, 'type' | 'lites'>): { cols: number; rows: number } =>
   o.lites ?? (o.type === 'door' ? DEFAULT_LITES.door : DEFAULT_LITES.window);
 export const trimOf = (o: Pick<Opening, 'trim'>): number => o.trim ?? DEFAULT_TRIM;
+
+/** Sashes of a window (leaves of a door): 1 by default, at most 6 (a door uses 1 or 2). */
+export const DEFAULT_SASHES = 1;
+export const MAX_SASHES = 6;
+export const MAX_LEAVES = 2;
+export const GLAZINGS: readonly Glazing[] = ['glass', 'screen'];
+export const GLAZING_LABEL: Record<Glazing, string> = { glass: 'Glass', screen: 'Screen' };
+/** A door leaf: the dark green of the house door. */
+export const DEFAULT_LEAF_COLOR = '#2f3a33';
+
+export const sashesOf = (o: Pick<Opening, 'sashes'>): number => o.sashes ?? DEFAULT_SASHES;
+/** A door's leaves: one, or two for a double door (any sash count above one). */
+export const leavesOf = (o: Pick<Opening, 'sashes'>): number => Math.min(MAX_LEAVES, sashesOf(o));
+export const glazingOf = (o: Pick<Opening, 'glazing'>): Glazing => o.glazing ?? 'glass';
+export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColor ?? DEFAULT_LEAF_COLOR;

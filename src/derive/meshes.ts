@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
 import type { Column, Id, Level, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { getFootprints, type Footprint } from './footprint';
-import { DEFAULT_TRIM, wallColorOf, wallFinishOf } from '../model/finish';
+import { DEFAULT_TRIM, leafColorOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible } from './phase';
@@ -648,13 +648,28 @@ function roofParts(roof: Roof, bearing: number): { geometry: BufferGeometry; fas
 /**
  * The geometry of an opening's fill, one merged geometry per material part. `side` is +1 when the
  * wall's left normal points outside, -1 when the right one does (trim, sills and shutters go on
- * the outside face). Level-local, like the wall.
+ * the outside face). Level-local, like the wall. UVs are in inches like the wall's (addWallUVs), so
+ * a textured part (the screen mesh) has the same scale as the siding round it.
  */
 export function buildOpeningFill(fp: Footprint, o: Opening, wallHeight: number, side: 1 | -1): OpeningMesh['parts'] {
   const sym = openingSymbol(fp, o);
   const bottom = Math.max(0, o.sill);
   const top = Math.min(wallHeight, o.sill + o.height);
-  const boxes = openingFill({ type: o.type, j0: sym.j0, j1: sym.j1, bottom, top, thickness: fp.thickness, lites: o.lites, trim: o.trim ?? DEFAULT_TRIM, shutters: o.shutters });
+  const boxes = openingFill({
+    type: o.type,
+    j0: sym.j0,
+    j1: sym.j1,
+    bottom,
+    top,
+    thickness: fp.thickness,
+    lites: o.lites,
+    trim: o.trim ?? DEFAULT_TRIM,
+    shutters: o.shutters,
+    sashes: o.sashes,
+    fixedCenter: o.fixedCenter,
+    glazing: o.glazing,
+    halfLite: o.halfLite,
+  });
   const byPart = new Map<FillPart, BufferGeometry[]>();
   for (const b of boxes) {
     const list = byPart.get(b.part);
@@ -662,7 +677,10 @@ export function buildOpeningFill(fp: Footprint, o: Opening, wallHeight: number, 
     if (list) list.push(g);
     else byPart.set(b.part, [g]);
   }
-  return [...byPart].map(([part, gs]) => ({ part, geometry: mergeAll(gs) })).filter((p) => triangleCount(p.geometry) > 0);
+  return [...byPart]
+    .map(([part, gs]) => ({ part, geometry: mergeAll(gs) }))
+    .filter((p) => triangleCount(p.geometry) > 0)
+    .map((p) => ({ part: p.part, geometry: addWallUVs(p.geometry, fp) }));
 }
 
 /** A fill box in plan space: a rectangle along the wall (s, outward d) extruded from y0 to y1. */
@@ -727,6 +745,8 @@ export interface OpeningMesh {
   id: Id;
   type: 'window' | 'door';
   phase: Phase;
+  /** The door leaf's colour after the default (model/finish.ts leafColorOf); windows carry the default. */
+  leafColor: string;
   /** One merged geometry per material part, level-local like the walls. */
   parts: { part: FillPart; geometry: BufferGeometry }[];
 }
@@ -1078,7 +1098,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
           ? old
           : { fp, opening: o, wall, height, side, parts: buildOpeningFill(fp, o, height, side) };
       nextFills.set(o.id, entry);
-      if (entry.parts.length) openingMeshes.push({ id: o.id, type: o.type, phase: o.phase, parts: entry.parts });
+      if (entry.parts.length) openingMeshes.push({ id: o.id, type: o.type, phase: o.phase, leafColor: leafColorOf(o), parts: entry.parts });
     }
   }
   if (prevFills) for (const [id, e] of prevFills) if (nextFills.get(id) !== e) for (const p of e.parts) p.geometry.dispose();

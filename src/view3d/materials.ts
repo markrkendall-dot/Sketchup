@@ -1,8 +1,8 @@
 import { Color, DoubleSide, FrontSide, MeshStandardMaterial } from 'three';
 import type { FillPart } from '../derive/openings3d';
-import { defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import { DEFAULT_LEAF_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, Phase, RoofFinish, WallFinish, WallKind } from '../model/types';
-import { newWorkColor, sidingTexture } from './textures';
+import { NORMAL_SCALE, newWorkColor, sidingTexture, sidingTextures } from './textures';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
@@ -49,11 +49,12 @@ export function wallFlatColor(phase: Phase, finish: WallFinish, color: string): 
 
 /**
  * A wall's material. Exterior walls (and any wall given a finish) carry the procedural siding
- * texture of their finish and colour (textures.ts); the wall mesh is one merged geometry, so both
- * faces of an exterior wall show the siding. Plain walls are a flat colour. Demolished walls stay
- * translucent red whatever their finish; new ones use the texture's green-washed `new` variant. A screen is
- * a see-through mesh. Textures exist only where a canvas does: elsewhere (node, tests) the flat
- * colour is used.
+ * texture of their finish and colour (textures.ts) and its normal map (the relief of laps, joints
+ * and mortar); the wall mesh is one merged geometry, so both faces of an exterior wall show the
+ * siding. Plain walls are a flat colour. Demolished walls stay translucent red whatever their
+ * finish; new ones use the texture's green-washed `new` variant. A screen is a see-through mesh.
+ * Textures exist only where a canvas does: elsewhere (node, tests) the flat colour is used. A
+ * textured material keeps its flat colour in `userData.flatColor` for the export (colours only).
  */
 export function wallMaterial(
   phase: Phase,
@@ -67,9 +68,16 @@ export function wallMaterial(
   if (!m) {
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
-      const tex = textured ? sidingTexture(finish, color, phase === 'new' ? 'new' : 'plain') : null;
+      const tex = textured ? sidingTextures(finish, color, phase === 'new' ? 'new' : 'plain') : null;
       m = make(tex ? '#ffffff' : wallFlatColor(phase, finish, color));
-      if (tex) m.map = tex;
+      if (tex) {
+        m.map = tex.map;
+        if (tex.normalMap) {
+          m.normalMap = tex.normalMap;
+          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
+        }
+        m.userData.flatColor = wallFlatColor(phase, finish, color);
+      }
       if (finish === 'screen') {
         m.transparent = true;
         m.opacity = 0.4;
@@ -126,7 +134,8 @@ export function fasciaMaterial(phase: Phase): MeshStandardMaterial {
 const partMaterials = new Map<string, MeshStandardMaterial>();
 
 function trimLike(name: string, color: string, phase: Phase): MeshStandardMaterial {
-  const key = `${name}|${phase}`;
+  // Keyed by colour too, so a leaf in a second colour gets its own material.
+  const key = `${name}|${phase}|${color}`;
   let m = partMaterials.get(key);
   if (!m) {
     m = phase === 'demo' ? make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 }) : make(phase === 'new' ? pullGreen(color) : color);
@@ -135,16 +144,51 @@ function trimLike(name: string, color: string, phase: Phase): MeshStandardMateri
   return m;
 }
 
-/** Window and door parts: tan trim, white sash and muntins, glass, dark green leaf, green shutters. */
-const OPENING_COLOR: Record<Exclude<FillPart, 'glass'>, string> = {
+/** Window and door parts: tan trim, white sash and muntins, dark green leaf (unless coloured), green shutters. */
+const OPENING_COLOR: Record<Exclude<FillPart, 'glass' | 'screen'>, string> = {
   trim: TRIM_COLOR,
   sash: '#f4f1ea',
-  leaf: '#2f3a33',
+  leaf: DEFAULT_LEAF_COLOR,
   shutter: '#3f6f5f',
 };
 
-export function openingMaterial(part: FillPart, phase: Phase): MeshStandardMaterial {
-  if (part !== 'glass') return trimLike(part, OPENING_COLOR[part], phase);
+/** Insect screen: the dark grey of the screen siding's mesh. */
+const SCREEN_COLOR = '#4a4d4c';
+/** A screen's opacity over its texture's own alpha (the mesh is about 3/4 opaque on its own). */
+const SCREEN_OPACITY = 0.85;
+
+/**
+ * The screen of a screened window or door: the siding's screen mesh (textures.ts), transparent with
+ * no depth write and drawn after the opaque meshes like glass. FrontSide: the pane is a closed box,
+ * so one face of it shows from either side (both faces at once would double the mesh's darkness).
+ */
+function screenMaterial(phase: Phase): MeshStandardMaterial {
+  const key = `screen|${phase}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      const flat = phase === 'new' ? newWorkColor(SCREEN_COLOR) : SCREEN_COLOR;
+      const tex = sidingTexture('screen', SCREEN_COLOR, phase === 'new' ? 'new' : 'plain');
+      // Without a canvas (node), a flat translucent grey.
+      m = make(tex ? '#ffffff' : flat, { transparent: true, opacity: tex ? SCREEN_OPACITY : 0.6 });
+      if (tex) {
+        m.map = tex;
+        m.userData.flatColor = flat;
+      }
+    }
+    partMaterials.set(key, m);
+  }
+  return m;
+}
+
+/**
+ * The material of a window or door part. `color` is the door leaf's colour (OpeningMesh.leafColor);
+ * the other parts keep theirs.
+ */
+export function openingMaterial(part: FillPart, phase: Phase, color?: string): MeshStandardMaterial {
+  if (part === 'screen') return screenMaterial(phase);
+  if (part !== 'glass') return trimLike(part, part === 'leaf' && color ? color : OPENING_COLOR[part], phase);
   const key = `glass|${phase}`;
   let m = partMaterials.get(key);
   if (!m) {
