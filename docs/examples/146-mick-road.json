@@ -1195,7 +1195,7 @@
           "width": 48,
           "height": 44,
           "sill": 30,
-          "phase": "existing",
+          "phase": "demo",
           "lites": {
             "cols": 2,
             "rows": 2
@@ -1222,14 +1222,15 @@
           "wallId": "f-w23",
           "type": "window",
           "offset": 75.5,
-          "width": 36,
-          "height": 36,
-          "sill": 48,
+          "width": 46,
+          "height": 18,
+          "sill": 70,
           "phase": "new",
           "lites": {
             "cols": 2,
-            "rows": 3
+            "rows": 1
           },
+          "sashes": 2,
           "id": "f-o21"
         },
         "f-o22": {
@@ -1263,6 +1264,25 @@
           "id": "f-o23"
         },
         "f-o24": {
+          "wallId": "f-w8",
+          "type": "door",
+          "offset": 69,
+          "width": 72,
+          "height": 80,
+          "sill": 0,
+          "phase": "new",
+          "swing": {
+            "hinge": "a",
+            "side": "left"
+          },
+          "lites": {
+            "cols": 2,
+            "rows": 4
+          },
+          "sliding": true,
+          "id": "f-o24"
+        },
+        "f-o25": {
           "wallId": "f-w45",
           "type": "door",
           "offset": 19,
@@ -1280,9 +1300,9 @@
           },
           "halfLite": true,
           "leafColor": "#2f4a3a",
-          "id": "f-o24"
+          "id": "f-o25"
         },
-        "f-o25": {
+        "f-o26": {
           "wallId": "f-w32",
           "type": "door",
           "offset": 50.75,
@@ -1300,9 +1320,9 @@
           },
           "halfLite": true,
           "leafColor": "#2f4a3a",
-          "id": "f-o25"
+          "id": "f-o26"
         },
-        "f-o26": {
+        "f-o27": {
           "wallId": "f-w28",
           "type": "window",
           "offset": 45.5,
@@ -1314,9 +1334,9 @@
             "cols": 2,
             "rows": 3
           },
-          "id": "f-o26"
+          "id": "f-o27"
         },
-        "f-o27": {
+        "f-o28": {
           "wallId": "f-w4",
           "type": "window",
           "offset": 104.5,
@@ -1330,9 +1350,9 @@
           },
           "sashes": 3,
           "fixedCenter": true,
-          "id": "f-o27"
+          "id": "f-o28"
         },
-        "f-o28": {
+        "f-o29": {
           "wallId": "f-w35",
           "type": "window",
           "offset": 44.5,
@@ -1342,9 +1362,9 @@
           "phase": "new",
           "trim": 0,
           "glazing": "screen",
-          "id": "f-o28"
+          "id": "f-o29"
         },
-        "f-o29": {
+        "f-o30": {
           "wallId": "f-w35",
           "type": "window",
           "offset": 118.5,
@@ -1354,9 +1374,9 @@
           "phase": "new",
           "trim": 0,
           "glazing": "screen",
-          "id": "f-o29"
+          "id": "f-o30"
         },
-        "f-o30": {
+        "f-o31": {
           "wallId": "f-w36",
           "type": "window",
           "offset": 30.5,
@@ -1366,9 +1386,9 @@
           "phase": "new",
           "trim": 0,
           "glazing": "screen",
-          "id": "f-o30"
+          "id": "f-o31"
         },
-        "f-o31": {
+        "f-o32": {
           "wallId": "f-w33",
           "type": "door",
           "offset": 44.5,
@@ -1383,9 +1403,9 @@
           "trim": 0,
           "glazing": "screen",
           "leafColor": "#5a3a35",
-          "id": "f-o31"
+          "id": "f-o32"
         },
-        "f-o32": {
+        "f-o33": {
           "wallId": "f-w36",
           "type": "door",
           "offset": 72.5,
@@ -1400,9 +1420,9 @@
           "trim": 0,
           "glazing": "screen",
           "leafColor": "#5a3a35",
-          "id": "f-o32"
+          "id": "f-o33"
         },
-        "f-o33": {
+        "f-o34": {
           "wallId": "f-w37",
           "type": "door",
           "offset": 27.5,
@@ -1415,9 +1435,9 @@
             "side": "right"
           },
           "leafColor": "#8a5a34",
-          "id": "f-o33"
+          "id": "f-o34"
         },
-        "f-o34": {
+        "f-o35": {
           "wallId": "f-w22",
           "type": "window",
           "offset": 39.5,
@@ -1430,9 +1450,9 @@
             "rows": 3
           },
           "sashes": 2,
-          "id": "f-o34"
+          "id": "f-o35"
         },
-        "f-o35": {
+        "f-o36": {
           "wallId": "f-w39",
           "type": "door",
           "offset": 14.5,
@@ -1445,9 +1465,9 @@
             "side": "right"
           },
           "leafColor": "#8a5a34",
-          "id": "f-o35"
+          "id": "f-o36"
         },
-        "f-o36": {
+        "f-o37": {
           "wallId": "f-w43",
           "type": "passage",
           "offset": 20.5,
@@ -1455,9 +1475,9 @@
           "height": 80,
           "sill": 0,
           "phase": "new",
-          "id": "f-o36"
+          "id": "f-o37"
         },
-        "f-o37": {
+        "f-o38": {
           "wallId": "f-w43",
           "type": "passage",
           "offset": 148.5,
@@ -1465,7 +1485,7 @@
           "height": 80,
           "sill": 0,
           "phase": "new",
-          "id": "f-o37"
+          "id": "f-o38"
         }
       },
       "rooms": {

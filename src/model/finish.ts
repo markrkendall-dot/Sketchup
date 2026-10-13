@@ -135,6 +135,10 @@ export const sashesOf = (o: Pick<Opening, 'sashes'>): number => o.sashes ?? DEFA
 /** A door's leaves: one, or two for a double door (any sash count above one). */
 export const leavesOf = (o: Pick<Opening, 'sashes'>): number => Math.min(MAX_LEAVES, sashesOf(o));
 export const glazingOf = (o: Pick<Opening, 'glazing'>): Glazing => o.glazing ?? 'glass';
+/** A sliding door: a door with `sliding` set (the flag means nothing on a window or a passage). */
+export const isSlidingDoor = (o: Pick<Opening, 'type' | 'sliding'>): boolean => o.type === 'door' && !!o.sliding;
+/** How far a sliding door's two panels overlap at the middle (where they meet in their tracks). */
+export const SLIDING_LAP = 2;
 export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColor ?? DEFAULT_LEAF_COLOR;
 
 /** Column colours by kind: brick red for a chimney, trim tan for a post. */

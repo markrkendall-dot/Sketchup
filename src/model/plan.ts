@@ -517,7 +517,7 @@ const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 
 const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
-const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'leafColor'] as const;
+const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
@@ -596,6 +596,7 @@ function migrateOpenings(raw: Json, walls: Level['walls']): Level['openings'] {
     put(opening, 'fixedCenter', typeof o.fixedCenter === 'boolean' ? o.fixedCenter : undefined);
     put(opening, 'glazing', typeof o.glazing === 'string' && GLAZINGS.includes(o.glazing as Glazing) ? o.glazing : undefined);
     put(opening, 'halfLite', typeof o.halfLite === 'boolean' ? o.halfLite : undefined);
+    put(opening, 'sliding', typeof o.sliding === 'boolean' ? o.sliding : undefined);
     put(opening, 'leafColor', isHexColor(o.leafColor) ? o.leafColor.toLowerCase() : undefined);
     out[oid] = opening as unknown as Opening;
   }

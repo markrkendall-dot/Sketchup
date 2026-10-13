@@ -357,6 +357,25 @@ describe('opening geometry', () => {
     expect(right.leaf![1]).toEqual({ x: 78, y: 39 });
   });
 
+  it('a sliding door: two panels a third of the way out either side of the centerline, overlapping 2" at the middle; no leaf or swing', () => {
+    const sym = openingSymbol(g, { type: 'door', offset: 60, width: 72, swing: { hinge: 'a', side: 'left' }, sliding: true });
+    expect([sym.j0, sym.j1]).toEqual([24, 96]);
+    expect([sym.leaf, sym.arc]).toEqual([null, null]);
+    // Left of a->b along +x is -y on the plan; the wall is 6" thick, so the tracks are 1" out.
+    expect(sym.lines).toEqual([
+      [
+        { x: 24, y: -1 },
+        { x: 61, y: -1 },
+      ],
+      [
+        { x: 59, y: 1 },
+        { x: 96, y: 1 },
+      ],
+    ]);
+    // On a window the flag means nothing: its three lines.
+    expect(openingSymbol(g, { type: 'window', offset: 60, width: 36, sliding: true }).lines).toHaveLength(3);
+  });
+
   it('wall pieces leave a gap closed by jamb lines', () => {
     const p = wallPieces(g, quad, [
       [42, 78],

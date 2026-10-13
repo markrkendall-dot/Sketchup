@@ -331,12 +331,12 @@ function smallestFaceBeside(set: FaceSet): Map<Id, number> {
 /**
  * Where along a wall (distance from its a end) the dimension label goes, and how much room it has:
  * the middle of the longest stretch not crossed by the swing of a door that opens to the label's
- * side, or the middle of the wall when no such door is there.
+ * side (a sliding door has none), or the middle of the wall when no such door is there.
  */
 function labelSpan(fp: Footprint, wall: Wall, openings: readonly Opening[] | undefined, viewMode: ViewMode, side: 1 | -1): { at: number; room: number } {
   const swings: [number, number][] = [];
   for (const o of openings ?? []) {
-    if (o.type !== 'door' || !isOpeningVisible(o, wall, viewMode)) continue;
+    if (o.type !== 'door' || o.sliding || !isOpeningVisible(o, wall, viewMode)) continue;
     if ((o.swing?.side ?? 'left') !== (side === 1 ? 'left' : 'right')) continue;
     const sym = openingSymbol(fp, o);
     swings.push([sym.j0, sym.j1]);

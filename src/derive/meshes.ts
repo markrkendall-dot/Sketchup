@@ -5,7 +5,7 @@ import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishe
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
@@ -879,6 +879,7 @@ export function buildOpeningFill(fp: Footprint, o: Opening, wallHeight: number, 
     fixedCenter: o.fixedCenter,
     glazing: o.glazing,
     halfLite: o.halfLite,
+    sliding: isSlidingDoor(o),
   });
   const byPart = new Map<FillPart, BufferGeometry[]>();
   for (const b of boxes) {

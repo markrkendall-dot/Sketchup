@@ -166,6 +166,8 @@ interface OpeningSpec {
   fixedCenter?: boolean;
   glazing?: Opening['glazing'];
   halfLite?: boolean;
+  /** Doors: a sliding door (two glazed panels, no swing). */
+  sliding?: boolean;
   leafColor?: string;
   swing?: NonNullable<Opening['swing']>;
   /** Doors: the direction the leaf swings toward (picks the swing side from the wall's direction). */
@@ -203,6 +205,7 @@ function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
     ...(o.fixedCenter ? { fixedCenter: true } : {}),
     ...(o.glazing ? { glazing: o.glazing } : {}),
     ...(o.halfLite ? { halfLite: true } : {}),
+    ...(o.sliding ? { sliding: true } : {}),
     ...(o.leafColor ? { leafColor: o.leafColor } : {}),
   });
   if (!id) throw new Error(`opening at ${JSON.stringify(p)} on ${level(levelId).name} was rejected`);
@@ -530,7 +533,7 @@ export function buildExamplePlan(): Plan {
   // The wing: casement pairs in its east gable end (photo 03), 2 x 3 lites, and in its south face,
   // 2 x 2 lites (photo 23). Its north face has no window (MK).
   win(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 }, 48, 44, 2, 3, { sashes: 2 });
-  win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, 48, 44, 2, 2, { sashes: 2, sill: 30 });
+  const wingSouth = win(fId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, 48, 44, 2, 2, { sashes: 2, sill: 30 });
   // The walkout double door below the wing's south window (photo 02): two plain leaves in the stain,
   // set in the boards with no trim round them.
   addOpeningAt(bId, { x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, { type: 'door', width: 72, height: 80, lites: { cols: 1, rows: 1 }, sashes: 2, leafColor: FINISH_COLOR, trim: 0 });
@@ -667,7 +670,7 @@ export function buildExamplePlan(): Plan {
   label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, PLACEHOLDER_ROOM);
   label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
 
-  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
+  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingSouth, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
   return getPlan();
 }
 
@@ -683,6 +686,8 @@ interface ExistingIds {
   eastWindow: Id;
   /** The Second Floor's two east windows (the Office / hall's at y 98, the Guest's at y 222). */
   eastUpstairs: Id[];
+  /** The wing's south window (the Utility's, over the walkout doors). */
+  wingSouth: Id;
   wingRoof: Id;
   porchRoof: Id;
   /** The old bath's door (x 194.5, at the south end of the wall, y 54..84) and its north window (x 234). */
@@ -741,7 +746,8 @@ function proposed(ids: ExistingIds): void {
 
   // ---- Demolition (First Floor). The entry porch: its three walls (their screens go with them),
   // its roof and its label. The wing's north wall, the main block's east window (it
-  // would face into the new bedroom), the wing's roof. The y 99.5 piece between the Kitchen and the
+  // would face into the new bedroom), the wing's roof and its south window (a sliding door takes
+  // its place). The y 99.5 piece between the Kitchen and the
   // Bath, and the one between the hall and the stair strip west of the powder room, with the hall's
   // passage (the powder room takes its place). The stair and the house door. The Living's west
   // window: its north shutter would sit inside the foyer, against the new door's trim, so a window
@@ -759,7 +765,7 @@ function proposed(ids: ExistingIds): void {
       { x: 250, y: 99.5 },
       { x: 60, y: 99.5 },
     ],
-    openings: [ids.eastWindow, ids.hallPassage, ids.houseDoor, ids.livingWest, ids.bathDoor, ids.bathWindow],
+    openings: [ids.eastWindow, ids.wingSouth, ids.hallPassage, ids.houseDoor, ids.livingWest, ids.bathDoor, ids.bathWindow],
     stairs: [ids.stair],
     roofs: [ids.wingRoof, ids.porchRoof],
     fixtures: ids.fixtures,
@@ -814,14 +820,20 @@ function proposed(ids: ExistingIds): void {
 
   // ---- Openings, all new. Windows 2 x 3 lites per sash, sill 30 unless given.
   const add = (p: Vec2, o: OpeningSpec) => addOpeningAt(fId, p, { ...o, phase: NEW });
-  // Master suite: the bath's door in the partition, and windows north and east. The bedroom is
+  // Master suite: the bath's door in the partition, a transom north and windows east. The bedroom is
   // reached from the kitchen through today's grey Kitchen to Utility door (y 248..280), which stays
   // (MK chose it over a new 32" door at y 195..227). Interior leaves are stained like the old Bath
   // door.
   add({ x: 345, y: ADD.y }, { type: 'door', width: 28, height: 80, into: NORTH, leafColor: STAINED_DOOR });
-  add({ x: 390, y: CL.y0 }, { type: 'window', width: 36, height: 36, sill: 48, lites: { cols: 2, rows: 3 } });
+  // The bath's north window is a transom, high for privacy from the road: 46 x 18, two sashes of
+  // 2 x 1 lites, sill 70 (head 88).
+  add({ x: 390, y: CL.y0 }, { type: 'window', width: 46, height: 18, sill: 70, sashes: 2, lites: { cols: 2, rows: 1 } });
   add({ x: wing.x1, y: 62 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
   add({ x: wing.x1, y: 160 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
+  // The bedroom's south window becomes a 72 x 80 sliding door on the same centre, over the walkout's
+  // 72" double door below, two panels of 2 x 4 lites. No transom over it: under the 96" ceiling it
+  // could be 12" at most with its head at the ceiling (no room for a header or a casing).
+  add({ x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, { type: 'door', width: 72, height: 80, sliding: true, lites: { cols: 2, rows: 4 } });
   // The house door moves to the middle of the old stair strip (y 118.5): 32", so its jambs (102.5 to
   // 134.5) clear the strip's partition faces at 102 and 135; green, nine lites over two panels.
   const halfLite = { lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN };
@@ -943,7 +955,7 @@ function proposed(ids: ExistingIds): void {
   // door's swing. The powder room (x 132..192, y 48..97, door in its west wall at y 60..84): the WC
   // against the east wall, a 24" vanity on the south wall. The master bath (x 318..456, y 7..117.5,
   // door at x 331..359 swinging in from the partition): a 36" shower in the north-west corner, a
-  // 48" vanity on the north wall under the window's 48" sill, the WC against the east wall south of
+  // 48" vanity on the north wall under the transom (sill 70), the WC against the east wall south of
   // the east window (y 38..86).
   const WC = { kind: 'box' as const, label: 'WC', width: 20, depth: 28, height: 30, frontColor: WHITE };
   kitchen({ ...WC, origin: { x: 192, y: 62 }, direction: 180 });

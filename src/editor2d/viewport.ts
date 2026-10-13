@@ -64,12 +64,13 @@ export function visibleBounds(v: Viewport, size: Size): Bounds {
 export function fitLevel(level: Level, size: Size, withUnderlay = true): Viewport | null {
   const points: Vec2[] = Object.values(level.nodes);
   if (withUnderlay && level.underlay) points.push(...underlayCorners(level.underlay));
-  // A door's swing can reach a door width beyond its wall (a front door opening outward).
+  // A door's swing can reach a door width beyond its wall (a front door opening outward); a
+  // sliding door stays in its wall.
   for (const o of Object.values(level.openings)) {
     const w = level.walls[o.wallId];
     const a = w && level.nodes[w.a];
     const b = w && level.nodes[w.b];
-    if (o.type !== 'door' || !a || !b) continue;
+    if (o.type !== 'door' || o.sliding || !a || !b) continue;
     const len = Math.hypot(b.x - a.x, b.y - a.y);
     if (len < 1e-9) continue;
     const d = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };

@@ -74,6 +74,12 @@ export interface Opening {
   glazing?: Glazing;
   /** Doors: the lite grid glazes the upper 55% of the leaf, with two panels below. */
   halfLite?: boolean;
+  /**
+   * Doors: a sliding (patio) door, two glazed panels framed like window sashes, in two tracks and
+   * overlapping at the middle. It has no swing (the swing is kept, not drawn); `sashes` and
+   * `halfLite` do not apply, and the lite grid is per panel.
+   */
+  sliding?: boolean;
   /** Doors: hex colour `#rrggbb` of the leaf. Absent: the dark green of the house door. */
   leafColor?: string;
 }

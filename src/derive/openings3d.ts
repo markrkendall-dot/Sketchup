@@ -1,4 +1,4 @@
-import { DEFAULT_LITES, DEFAULT_TRIM, MAX_SASHES } from '../model/finish';
+import { DEFAULT_LITES, DEFAULT_TRIM, MAX_SASHES, SLIDING_LAP } from '../model/finish';
 import type { Opening } from '../model/types';
 
 // Window and door fills (DESIGN.md "Exterior appearance"). Pure: an opening becomes a list of axis
@@ -58,6 +58,9 @@ export const SCREEN_THICKNESS = 0.125;
 export const SCREEN_DOOR_FRAME = 1.5;
 export const MID_RAIL = 4;
 export const MID_RAIL_HEIGHT = 36;
+/** A sliding door's panels: stiles and the top rail, and the deeper bottom rail. */
+export const SLIDING_STILE = 2.5;
+export const SLIDING_BOTTOM_RAIL = 4;
 /** A half-lite door: the share of the panel area that is glazed, and the stile between the two panels below. */
 export const HALF_LITE = 0.55;
 export const CENTER_STILE = 5;
@@ -84,6 +87,7 @@ export interface FillInput {
   fixedCenter?: boolean;
   glazing?: Opening['glazing'];
   halfLite?: boolean;
+  sliding?: boolean;
 }
 
 /** Number of (vertical, horizontal) muntins for a lite grid. */
@@ -153,30 +157,32 @@ export function openingFill(input: FillInput): FillBox[] {
   const sd = depth / 2;
 
   /**
-   * Glass at mid-wall and the muntins of a lite grid across it: white like the sash in a window,
-   * the leaf's own colour in a door.
+   * Glass at mid-wall (or centred `dc` out from it, the muntins at most `half` either side) and the
+   * muntins of a lite grid across it: white like the sash in a window, the leaf's own colour in a
+   * door, or `part`.
    */
-  const glaze = (g0: number, g1: number, gy0: number, gy1: number, lites: { cols: number; rows: number }) => {
+  const glaze = (g0: number, g1: number, gy0: number, gy1: number, lites: { cols: number; rows: number }, at: { dc?: number; half?: number; part?: FillPart } = {}) => {
     if (!(g1 - g0 > 1e-6) || !(gy1 - gy0 > 1e-6)) return;
-    add('glass', 'glass', g0, g1, -GLASS_THICKNESS / 2, GLASS_THICKNESS / 2, gy0, gy1);
+    const dc = at.dc ?? 0;
+    add('glass', 'glass', g0, g1, dc - GLASS_THICKNESS / 2, dc + GLASS_THICKNESS / 2, gy0, gy1);
     const { vertical, horizontal } = muntinCounts(lites);
-    const md = Math.min(MUNTIN_DEPTH, thickness) / 2;
-    const part: FillPart = type === 'door' ? 'leaf' : 'sash';
+    const md = Math.min(MUNTIN_DEPTH / 2, thickness / 2, at.half ?? Infinity);
+    const part: FillPart = at.part ?? (type === 'door' ? 'leaf' : 'sash');
     // A muntin is never wider than half a lite (a tiny sash keeps its muntins inside it).
     const mv = Math.min(MUNTIN, (g1 - g0) / (2 * (vertical + 1)));
     const mh = Math.min(MUNTIN, (gy1 - gy0) / (2 * (horizontal + 1)));
     for (let i = 1; i <= vertical; i++) {
       const c = g0 + ((g1 - g0) * i) / (vertical + 1);
-      add(part, 'muntin', c - mv / 2, c + mv / 2, -md, md, gy0, gy1);
+      add(part, 'muntin', c - mv / 2, c + mv / 2, dc - md, dc + md, gy0, gy1);
     }
     for (let i = 1; i <= horizontal; i++) {
       const c = gy0 + ((gy1 - gy0) * i) / (horizontal + 1);
-      add(part, 'muntin', g0, g1, -md, md, c - mh / 2, c + mh / 2);
+      add(part, 'muntin', g0, g1, dc - md, dc + md, c - mh / 2, c + mh / 2);
     }
   };
-  /** An insect screen at mid-wall: one pane, no muntins. */
-  const screen = (g0: number, g1: number, gy0: number, gy1: number) =>
-    add('screen', 'screen', g0, g1, -SCREEN_THICKNESS / 2, SCREEN_THICKNESS / 2, gy0, gy1);
+  /** An insect screen at mid-wall (or centred `dc` out from it): one pane, no muntins. */
+  const screen = (g0: number, g1: number, gy0: number, gy1: number, dc = 0) =>
+    add('screen', 'screen', g0, g1, dc - SCREEN_THICKNESS / 2, dc + SCREEN_THICKNESS / 2, gy0, gy1);
 
   if (type === 'window') {
     // Sill: 1.5" thick, projecting 1" beyond the trim.
@@ -272,6 +278,30 @@ export function openingFill(input: FillInput): FillBox[] {
   };
   const l0 = j0 + fr;
   const l1 = j1 - fr;
+  if (input.sliding) {
+    // A sliding door: two panels framed like window sashes (part sash), each from its jamb to
+    // SLIDING_LAP / 2 past the middle, the start one in the outside track and the end one in the
+    // inside track (each half the leaf's depth), with glass and the lite grid, or a screen, in it.
+    const mid = (l0 + l1) / 2;
+    const lap = Math.min(SLIDING_LAP, (l1 - l0) / 4) / 2;
+    const tk = ld / 2;
+    const panels: [number, number, number][] = [
+      [l0, mid + lap, tk],
+      [mid - lap, l1, -tk],
+    ];
+    for (const [a, b, dc] of panels) {
+      const st = Math.min(SLIDING_STILE, (b - a) / 4);
+      const tr = Math.min(SLIDING_STILE, lh / 6);
+      const br = Math.min(SLIDING_BOTTOM_RAIL, lh / 5);
+      add('sash', 'sashFrame', a, a + st, dc - tk, dc + tk, ly0, ly1);
+      add('sash', 'sashFrame', b - st, b, dc - tk, dc + tk, ly0, ly1);
+      add('sash', 'sashFrame', a + st, b - st, dc - tk, dc + tk, ly1 - tr, ly1);
+      add('sash', 'sashFrame', a + st, b - st, dc - tk, dc + tk, ly0, ly0 + br);
+      if (screened) screen(a + st, b - st, ly0 + br, ly1 - tr, dc);
+      else glaze(a + st, b - st, ly0 + br, ly1 - tr, lites, { dc, half: tk, part: 'sash' });
+    }
+    return boxes;
+  }
   if (sashCount(input.sashes) >= 2) {
     // A double door: two full leaves meeting at the centre.
     const mid = (l0 + l1) / 2;

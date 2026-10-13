@@ -57,7 +57,7 @@ export interface Opening {
   swing?: { hinge: 'a' | 'b'; side: 'left' | 'right' };
   lites?: { cols: number; rows: number }; shutters?: boolean; trim?: Inches; // see "Exterior appearance"
   sashes?: number;           // windows: 1..6 side by side; doors: 1 or 2 leaves
-  fixedCenter?: boolean; glazing?: 'glass' | 'screen'; halfLite?: boolean; leafColor?: string;
+  fixedCenter?: boolean; glazing?: 'glass' | 'screen'; halfLite?: boolean; sliding?: boolean; leafColor?: string;
 }
 
 export interface Room {
@@ -659,7 +659,7 @@ All of it is optional data on existing elements (no schema bump: `migrate()` rea
 valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | board | block | plain | screen`; an unknown
 value is dropped) and `Wall.color` (`#rrggbb`, lower-cased on load), `Opening.lites {cols, rows}` (whole numbers 1 to
 12), `Opening.shutters`, `Opening.trim` (0 to 24"), `Opening.sashes` (whole number 1 to 6), `Opening.fixedCenter`,
-`Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`,
+`Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.sliding`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`,
 `Roof.eave` (`fascia | open`), `Roof.rafter` (finite `depth` and `spacing` above 0, rebuilt as `{ depth, spacing }`),
 `Roof.boardColor` (`#rrggbb`, lower-cased), `Roof.weathering` (0 to 1), `Column.color` (`#rrggbb`, lower-cased) and
 `Column.cap` (true or false; see "Site and terrain").
@@ -813,7 +813,14 @@ stiles (5") and two rails (5" top, 8" bottom) round a 0.75" recessed panel; lite
 glaze the panel with glass and muntins instead; `halfLite` glazes the upper 55% of the panel area with the lite grid,
 with a rail under the glass and two recessed panels either side of a 5" centre stile below it. A door's muntins are
 part `leaf` (its colour). A screen door (`glazing: 'screen'`) has a leaf of 1.5" stiles and rails, a 4" mid rail
-(kind `midRail`) centred 36" up and a screen above and below it, no panel. Passages stay open.
+(kind `midRail`) centred 36" up and a screen above and below it, no panel. A sliding door (`sliding`, on a door
+only: `isSlidingDoor`) has the same trim and frame and two panels in place of leaves, framed like window sashes
+(part `sash`, so the sash colour): each from its jamb to 1" past the middle (`SLIDING_LAP`, 2" of overlap), the start
+one in the outside half of the leaf's 1.75" and the other in the inside half, with 2.5" stiles and top rail and a 4"
+bottom rail round a pane with the lite grid per panel (1 x 1 by default, one pane) or a screen; `sashes` and
+`halfLite` do not apply. On the plan (`openingSymbol`) it is two lines, one per panel, a third of the wall's
+thickness out from the centerline either side, with no leaf and no swing arc; its swing is kept but not drawn, and
+the dimension labels and Fit ignore it. Passages stay open.
 The outside is found by `outwardSide`: the side of the wall with no closed room beside it when the other has one
 (`facesBesideWall`), else the side facing away from the level's node centroid. `getLevelMeshes` returns
 `openings: OpeningMesh[]` (id, type, phase, `leafColor` after its default, and one geometry per part: `trim`, `sash`,
@@ -825,7 +832,8 @@ drawn after the opaque meshes; `FrontSide`, since the pane is a closed box and b
 darkness), leaf `#2f3a33` or its `leafColor` (materials shared per part, phase and colour), shutters `#3f6f5f`; a
 demolished opening is translucent red, a new one pulled toward green. Fills follow `isOpeningVisible` like the hole
 they sit in. The Opening panel has "Sashes" (1 to 6; "Leaves", 1 or 2, for a door), "Fixed centre pane" at 3 sashes,
-"Glazing", the lite grid per sash or leaf, and for a door "Half lite" and "Leaf colour" with a reset.
+"Glazing", the lite grid per sash, leaf or panel, and for a door "Sliding" (which hides the hinge, the swing, the
+leaves, "Half lite" and "Leaf colour"), "Half lite" and "Leaf colour" with a reset.
 
 **Roofs** are three geometries per roof (`buildRoofParts`): the slab with the ridge cap (the roof's material), the fascia
 and rake boards (`fasciaMaterial(phase, boardColor)`), and the rafter tails (`rafterMaterial(phase, boardColor)`, the same

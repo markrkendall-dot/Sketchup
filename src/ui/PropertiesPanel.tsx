@@ -33,7 +33,7 @@ import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
 import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
-import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
+import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import type { Column, Fixture, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
@@ -641,6 +641,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   const viewMode = useUiStore((s) => s.viewMode);
   const wording = wall ? swingWording(level, wall, getFaces(level, viewMode)) : null;
   const door = opening.type === 'door';
+  const sliding = isSlidingDoor(opening);
   const screened = glazingOf(opening) === 'screen';
   const changeType = (type: OpeningType) => {
     if (type === opening.type) return;
@@ -715,7 +716,21 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
         options={phaseOptions}
         onChange={(p) => updateOpening(levelId, opening.id, { phase: p })}
       />
-      {opening.type === 'door' && (
+      {door && (
+        <label className="check-row">
+          <input
+            type="checkbox"
+            aria-label="Sliding"
+            checked={sliding}
+            onChange={(e) => {
+              updateOpening(levelId, opening.id, { sliding: e.target.checked ? true : undefined });
+              releaseFocus(e.currentTarget);
+            }}
+          />
+          Sliding (two glazed panels in tracks, no swing)
+        </label>
+      )}
+      {door && !sliding && (
         <>
           <SelectField
             label="Hinge"
@@ -739,13 +754,15 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
       )}
       {opening.type !== 'passage' && (
         <>
-          <NumberField
-            label={door ? 'Leaves' : 'Sashes'}
-            value={door ? leavesOf(opening) : sashesOf(opening)}
-            check={door ? leafCheck : sashCheck}
-            onCommit={(n) => updateOpening(levelId, opening.id, { sashes: n === DEFAULT_SASHES ? undefined : n })}
-            hint={door ? 'Two makes a double door.' : 'Side by side, with 2" mullions between them.'}
-          />
+          {!sliding && (
+            <NumberField
+              label={door ? 'Leaves' : 'Sashes'}
+              value={door ? leavesOf(opening) : sashesOf(opening)}
+              check={door ? leafCheck : sashCheck}
+              onCommit={(n) => updateOpening(levelId, opening.id, { sashes: n === DEFAULT_SASHES ? undefined : n })}
+              hint={door ? 'Two makes a double door.' : 'Side by side, with 2" mullions between them.'}
+            />
+          )}
           {opening.type === 'window' && sashesOf(opening) === 3 && (
             <label className="check-row">
               <input
@@ -769,21 +786,29 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
           {!screened && (
             <>
               <NumberField
-                label={door ? 'Glazed columns per leaf' : 'Lites across per sash'}
+                label={sliding ? 'Lites across per panel' : door ? 'Glazed columns per leaf' : 'Lites across per sash'}
                 value={litesOf(opening).cols}
                 check={liteCheck}
                 onCommit={(cols) => updateOpening(levelId, opening.id, { lites: { cols, rows: litesOf(opening).rows } })}
-                hint={door ? (opening.halfLite ? 'The grid glazes the upper part of the leaf.' : 'A leaf is a solid panel at 1 x 1; more lites glaze its panel.') : undefined}
+                hint={
+                  sliding
+                    ? 'Each panel is glass; 1 x 1 is one pane.'
+                    : door
+                      ? opening.halfLite
+                        ? 'The grid glazes the upper part of the leaf.'
+                        : 'A leaf is a solid panel at 1 x 1; more lites glaze its panel.'
+                      : undefined
+                }
               />
               <NumberField
-                label={door ? 'Glazed rows per leaf' : 'Lites down per sash'}
+                label={sliding ? 'Lites down per panel' : door ? 'Glazed rows per leaf' : 'Lites down per sash'}
                 value={litesOf(opening).rows}
                 check={liteCheck}
                 onCommit={(rows) => updateOpening(levelId, opening.id, { lites: { cols: litesOf(opening).cols, rows } })}
               />
             </>
           )}
-          {door && !screened && (
+          {door && !sliding && !screened && (
             <label className="check-row">
               <input
                 type="checkbox"
@@ -804,7 +829,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
             onCommit={(v) => void (v !== null && updateOpening(levelId, opening.id, { trim: v }))}
             hint={`Outside face, default ${formatLength(DEFAULT_TRIM, denom)}.`}
           />
-          {door && (
+          {door && !sliding && (
             <ColorField
               label="Leaf colour"
               value={leafColorOf(opening)}

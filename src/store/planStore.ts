@@ -55,6 +55,7 @@ const OPTIONAL_OPENING_KEYS: ReadonlySet<keyof Opening> = new Set<keyof Opening>
   'fixedCenter',
   'glazing',
   'halfLite',
+  'sliding',
   'leafColor',
 ]);
 export type RoomPatch = Partial<Omit<Room, 'id'>>;

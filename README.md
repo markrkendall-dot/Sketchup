@@ -20,7 +20,7 @@ What it draws:
   stand on it, a chimney with its cap and spark arrestor if it has them.
 - **Exterior appearance**: clapboard, shingle, board, concrete block or screen siding in any
   colour; windows of one or more sashes with divided lites, picture windows, screens, trim and
-  shutters; doors with panels or glass, double doors and screen doors; corrugated metal roofs that
+  shutters; doors with panels or glass, double, sliding and screen doors; corrugated metal roofs that
   rust; a brick chimney in any colour.
 - **Kitchens**: base, wall and tall cabinets, islands, sinks, ranges, fridges, dishwashers, wall
   ovens, hoods and microwaves placed along the walls, with one counter top running over each run
@@ -139,9 +139,10 @@ Once the walls are in, these make the 3D model look like the house.
   between them; the lites, cols x rows, are per sash), "Fixed centre pane" (at 3 sashes: a picture
   window, one undivided pane between two casements at most 24" wide), "Glazing" (glass, or an
   insect screen in a light frame), the trim width (0 for none) and shutters (one sash wide). A
-  door's panel sets its "Leaves" (2 for a double door), the glazed lites per leaf (1 x 1 is a solid
-  panel), "Half lite" (the lites in the upper part, two panels below), "Glazing" (a screen door:
-  screen above and below a mid rail) and the "Leaf colour".
+  door's panel sets "Sliding" (a patio door: two glass panels in tracks, framed in the window
+  colour, no swing; its lites are per panel), its "Leaves" (2 for a double door), the glazed lites
+  per leaf (1 x 1 is a solid panel), "Half lite" (the lites in the upper part, two panels below),
+  "Glazing" (a screen door: screen above and below a mid rail) and the "Leaf colour".
 - **Walls run through the floors.** An exterior wall on a level with a level above it is taller by
   that level's floor thickness, and the floor slab stops at the inside face of the wall, the way a
   platform-framed house is built, so the siding is continuous from one storey to the next.
@@ -594,10 +595,15 @@ Five changes, all on the First Floor apart from the upstairs east windows over t
    (head 84"), 9" over the roof. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2"
    inside) from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom is entered
    from the kitchen through today's grey Kitchen to Utility door, which stays (MK chose it over a
-   new 32" door further north). The wing's north wall and its roof, and the
-   main block's first-floor east window, are demolished. New 8" block walls carry the new part
-   (a crawl space). The master bath has **placeholder** fixtures: a 36" shower in the north-west
-   corner, a 48" vanity under the north window and a WC on the east wall.
+   new 32" door further north). The bedroom's south window becomes a 72" x 80" sliding door on the
+   same centre, over the walkout's 72" double door, two glass panels of 2 x 4 lites. There is no
+   transom over it: under the 96" ceiling it could be 12" at most with its head at the ceiling, no
+   room for a header or a casing (it would suit a ceiling vaulted up under the shed, which the
+   starter does not draw). The master bath's north window is a transom, high for privacy from the
+   road: 46" x 18", two sashes of 2 x 1 lites, sill 70" (head 88"). The wing's north wall, its
+   roof and its south window, and the main block's first-floor east window, are demolished. New 8"
+   block walls carry the new part (a crawl space). The master bath has **placeholder** fixtures: a
+   36" shower in the north-west corner, a 48" vanity under the transom and a WC on the east wall.
 2. **Kitchen.** The wall between the kitchen and the old bath is demolished, so the kitchen is an
    L: the main kitchen (11'6" x 17'2") and the old bath as an alcove at its north-east corner. All
    of its casework is new; today's cabinets, the bath's fixtures and the wood stove (photos 13 to
@@ -666,6 +672,9 @@ Which view to use:
 
 Still open:
 
+- **A deck for the bedroom's sliding door.** It opens 8'6" above the walkout's terrace (photo 2:
+  the bump's double door is right under it), so it needs a deck or a balcony with a railing, or a
+  guard rail across it. Decks are not drawn.
 - **The pipe chase** in the front room's north-east corner carries the pipes of the Bath upstairs
   (MK), but the design demolishes it with the wood stove: the new flight's top and the kitchen's
   closet (x 174 to 192, y 7 to 43) take that corner, and the closet's door (y 19 to 43) opens where

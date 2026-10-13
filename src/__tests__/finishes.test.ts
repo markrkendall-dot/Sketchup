@@ -387,6 +387,38 @@ describe('sashes, screens and doors', () => {
     expect([count(screens, 'midRail'), count(screens, 'screen')]).toEqual([2, 4]);
   });
 
+  it('a sliding door: two glazed panels framed like sashes, one per track, overlapping 2" at the middle', () => {
+    const slider: FillInput = { ...door, j1: 72, sliding: true };
+    const boxes = openingFill(slider);
+    // The door frame, then each panel's four boards round one pane: no leaf and no panel.
+    expect([count(boxes, 'doorFrame'), count(boxes, 'leaf'), count(boxes, 'panel'), count(boxes, 'sashFrame')]).toEqual([3, 0, 0, 8]);
+    // Inside the 1.5" frame the panels run 1.5..37 and 35..70.5 with 2.5" stiles, the start one in
+    // the outside track (d > 0), the other inside, each half the leaf's 1.75".
+    const stiles = boxes.filter((b) => b.kind === 'sashFrame' && b.y1 - b.y0 > 70).sort(bySpan);
+    expect(stiles.map((b) => [b.s0, b.s1, b.d0, b.d1])).toEqual([
+      [1.5, 4, 0, 0.875],
+      [34.5, 37, 0, 0.875],
+      [35, 37.5, -0.875, 0],
+      [68, 70.5, -0.875, 0],
+    ]);
+    // One pane each, between a 4" bottom rail and a 2.5" top rail under the frame's head.
+    const glass = boxes.filter((b) => b.kind === 'glass').sort(bySpan);
+    expect(glass.map((b) => [b.s0, b.s1, b.y0, b.y1])).toEqual([
+      [4, 34.5, 4, 76],
+      [37.5, 68, 4, 76],
+    ]);
+    expect([glass[0].d0 > 0, glass[1].d1 < 0]).toEqual([true, true]);
+    // A lite grid per panel; its boards and muntins are the sash's (the window colour), each in its track.
+    const grid = openingFill({ ...slider, lites: { cols: 2, rows: 4 } });
+    expect(count(grid, 'muntin')).toBe(8);
+    expect(grid.filter((b) => b.kind === 'muntin' || b.kind === 'sashFrame').every((b) => b.part === 'sash')).toBe(true);
+    expect(grid.filter((b) => b.kind === 'muntin').every((b) => b.d0 >= 0 || b.d1 <= 0)).toBe(true);
+    // Leaves and half lite do not apply; with a screen, a screen fills each panel.
+    expect(openingFill({ ...slider, sashes: 2, halfLite: true })).toEqual(boxes);
+    const screens = openingFill({ ...slider, glazing: 'screen' });
+    expect([count(screens, 'screen'), count(screens, 'glass')]).toEqual([2, 0]);
+  });
+
   it('whatever the options, every box has a positive size and the sashes, leaves and panes stay inside the hole', () => {
     for (const type of ['window', 'door'] as const) {
       for (const [j1, top] of [
@@ -397,7 +429,7 @@ describe('sashes, screens and doors', () => {
         for (const sashes of [1, 2, 3, 6]) {
           for (const glazing of ['glass', 'screen'] as const) {
             for (const flag of [false, true]) {
-              const input: FillInput = { type, j0: 0, j1, bottom: 30, top, thickness: 6.5, sashes, glazing, fixedCenter: flag, halfLite: flag, shutters: flag, lites: { cols: 3, rows: 4 } };
+              const input: FillInput = { type, j0: 0, j1, bottom: 30, top, thickness: 6.5, sashes, glazing, fixedCenter: flag, halfLite: flag, sliding: flag, shutters: flag, lites: { cols: 3, rows: 4 } };
               const boxes = openingFill(input);
               expect(boxes.length).toBeGreaterThan(5);
               for (const b of boxes) {
@@ -684,25 +716,26 @@ describe('migrate: optional appearance fields', () => {
     expect(opening).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: false, leafColor: '#2f4a3a' });
     const door = readBack(file({}, { type: 'door', sill: 0, height: 80, sashes: 2, glazing: 'glass', halfLite: true })).opening;
     expect(door).toMatchObject({ sashes: 2, glazing: 'glass', halfLite: true });
+    expect(readBack(file({}, { type: 'door', sill: 0, height: 80, sliding: true })).opening.sliding).toBe(true);
     for (const sashes of [1, 6]) expect(readBack(file({}, { sashes })).opening.sashes).toBe(sashes);
   });
 
   it('drops malformed sashes, fixed centre, glazing, half lite and leaf colour', () => {
     for (const sashes of [0, 7, 2.5, -1, '3', null, true]) expect('sashes' in readBack(file({}, { sashes })).opening).toBe(false);
-    const { opening } = readBack(file({}, { fixedCenter: 'yes', glazing: 'mesh', halfLite: 1, leafColor: 'green' }));
-    for (const k of ['fixedCenter', 'glazing', 'halfLite', 'leafColor']) expect(k in opening).toBe(false);
+    const { opening } = readBack(file({}, { fixedCenter: 'yes', glazing: 'mesh', halfLite: 1, sliding: 'yes', leafColor: 'green' }));
+    for (const k of ['fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor']) expect(k in opening).toBe(false);
     expect('glazing' in readBack(file({}, { glazing: 'Screen' })).opening).toBe(false);
     expect('leafColor' in readBack(file({}, { leafColor: '#2f4a3' })).opening).toBe(false);
     expect('finish' in readBack(file({ finish: 'cinder block' })).wall).toBe(false);
   });
 
   it('a file with every new field round-trips byte for byte', () => {
-    const extra = { sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, leafColor: '#2f4a3a', lites: { cols: 2, rows: 3 }, shutters: true, trim: 4 };
+    const extra = { sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, sliding: true, leafColor: '#2f4a3a', lites: { cols: 2, rows: 3 }, shutters: true, trim: 4 };
     const f = file({ finish: 'block', color: '#8f8a84' }, extra);
     const text = JSON.stringify(f, null, 2);
     expect(JSON.stringify(migrate(JSON.parse(text)), null, 2)).toBe(text);
     // The new keys keep their place in the file's order.
-    expect(Object.keys(readBack(f).opening).slice(-8)).toEqual(Object.keys(extra));
+    expect(Object.keys(readBack(f).opening).slice(-9)).toEqual(Object.keys(extra));
     const once = JSON.stringify(migrate(file({}, { leafColor: '#2F4A3A', sashes: 2 })));
     expect(JSON.stringify(migrate(JSON.parse(once)))).toBe(once);
   });
@@ -712,11 +745,11 @@ describe('migrate: optional appearance fields', () => {
     store().addWall(first, { x: 0, y: 0 }, { x: 240, y: 0 }, { kind: 'exterior', thickness: 6.5, phase: 'existing' });
     const wallId = Object.keys(store().plan.levels[first].walls)[0];
     const id = store().addOpening(first, { wallId, type: 'window', offset: 120, width: 72, height: 48, sill: 36, phase: 'existing' })!;
-    const keys = ['sashes', 'fixedCenter', 'glazing', 'halfLite', 'leafColor'] as const;
-    store().updateOpening(first, id, { sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, leafColor: '#2f4a3a' });
+    const keys = ['sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
+    store().updateOpening(first, id, { sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, sliding: true, leafColor: '#2f4a3a' });
     const o = () => store().plan.levels[first].openings[id];
-    expect(o()).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, leafColor: '#2f4a3a' });
-    store().updateOpening(first, id, { sashes: undefined, fixedCenter: undefined, glazing: undefined, halfLite: undefined, leafColor: undefined });
+    expect(o()).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen', halfLite: true, sliding: true, leafColor: '#2f4a3a' });
+    store().updateOpening(first, id, { sashes: undefined, fixedCenter: undefined, glazing: undefined, halfLite: undefined, sliding: undefined, leafColor: undefined });
     for (const k of keys) expect(k in o()).toBe(false);
     expect(o()).toMatchObject({ width: 72, height: 48, sill: 36 });
   });

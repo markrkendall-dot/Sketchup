@@ -93,7 +93,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // the Basement are existing. Today's grey Kitchen to Utility door stays as the bedroom's door
     // (MK), so no new one is cut.
     expect(count(all('walls'))).toEqual({ existing: 57, demo: 7, new: 20 });
-    expect(count(all('openings'))).toEqual({ existing: 19, demo: 13, new: 20 });
+    expect(count(all('openings'))).toEqual({ existing: 18, demo: 14, new: 21 });
     // The demolished stair; the wing's outside stair on the Basement stays.
     expect(count(all('stairs'))).toEqual({ existing: 1, demo: 1, new: 3 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
@@ -103,7 +103,8 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 21 });
     expect(count(Object.values(plan.site.columns))).toEqual({ existing: 1, demo: 0, new: 3 });
     // Demolished: the stair, the house door, the entry porch with its five screen openings, its roof
-    // and label, the wing's north wall (it has no window) and the wing's roof, the east window into the
+    // and label, the wing's north wall (it has no window), the wing's roof and its south window (a
+    // sliding door replaces it), the east window into the
     // new bedroom, the hall passage, the Living's west window (replaced without shutters), the old
     // bath's door (inside the powder room; a closet door replaces it) and its north window (raised
     // over the counter). Upstairs, the two east windows (the wing's shed rises past their sills;
@@ -521,7 +522,8 @@ describe('docs/examples/146-mick-road.json', () => {
   it('swings each new door into the room the design names', () => {
     const f = plan.levels[plan.levelOrder[1]];
     const set = getFaces(f, 'proposed');
-    const doors = Object.values(f.openings).filter((o) => o.type === 'door' && o.phase === 'new');
+    // Every new door but the master bedroom's sliding door (no swing; next test).
+    const doors = Object.values(f.openings).filter((o) => o.type === 'door' && !o.sliding && o.phase === 'new');
     const into = (o: Opening) => {
       const w = f.walls[o.wallId];
       const a = f.nodes[w.a];
@@ -545,6 +547,31 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([grey.phase, into(grey)]).toEqual(['existing', 'Master bedroom']);
     // Interior doors are stained, not the house door's green.
     expect(doors.filter((o) => ['Master bath', 'Powder room', 'Kitchen'].includes(into(o))).every((o) => o.leafColor === '#8a5a34')).toBe(true);
+  });
+
+  it("has the master bedroom's sliding door and the master bath's north transom", () => {
+    const [b, f] = plan.levelOrder.map((id) => plan.levels[id]);
+    // The centre of an opening on its wall's centerline.
+    const at = (lvl: Level, o: Opening) => {
+      const w = lvl.walls[o.wallId];
+      const a = lvl.nodes[w.a];
+      const d = normalize(sub(lvl.nodes[w.b], a));
+      return { x: a.x + d.x * o.offset, y: a.y + d.y * o.offset };
+    };
+    // The sliding door: 72 x 80, two panels of 2 x 4 lites, in the wing's south wall where today's
+    // window was (demolished), over the walkout's 72" double door; no window over it.
+    const sliders = Object.values(f.openings).filter((o) => o.sliding);
+    expect(sliders).toHaveLength(1);
+    const [slider] = sliders;
+    expect(slider).toMatchObject({ type: 'door', phase: 'new', width: 72, height: 80, sill: 0, lites: { cols: 2, rows: 4 } });
+    expect(at(f, slider)).toEqual({ x: 390.5, y: 311.5 });
+    const onWall = Object.values(f.openings).filter((o) => o.wallId === slider.wallId && o.id !== slider.id);
+    expect(onWall.map((o) => [o.type, o.phase, at(f, o).x])).toEqual([['window', 'demo', 390.5]]);
+    const walkout = Object.values(b.openings).find((o) => o.type === 'door' && o.sashes === 2)!;
+    expect([at(b, walkout).x, walkout.width]).toEqual([390.5, 72]);
+    // The master bath's north window is a transom over the vanity: 46 x 18, sill 70, head 88.
+    const north = Object.values(f.openings).filter((o) => o.phase === 'new' && o.type === 'window' && Math.abs(at(f, o).y - 3.5) < 1e-9 && at(f, o).x > 318);
+    expect(north.map((o) => [at(f, o).x, o.width, o.height, o.sill, o.sashes, o.lites])).toEqual([[390, 46, 18, 70, 2, { cols: 2, rows: 1 }]]);
   });
 
   it('has the proposed kitchen: the island facing the lake, the pantry run, the range wall in the alcove', () => {

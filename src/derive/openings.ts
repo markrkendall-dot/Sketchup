@@ -1,4 +1,5 @@
 import { add, cross, dist, dot, scale, sub } from '../model/geometry';
+import { isSlidingDoor, SLIDING_LAP } from '../model/finish';
 import { clampOpeningOffset } from '../model/openings';
 import type { Id, Level, Opening, Phase, Plan, Vec2, ViewMode } from '../model/types';
 import { computeFootprints, forgetFootprintLevels, getFootprints, type Footprint, type Footprints } from './footprint';
@@ -44,7 +45,7 @@ export const displayCenter = (g: WallGeom, o: Pick<Opening, 'offset' | 'width'>)
 
 export function openingSymbol(
   g: WallGeom,
-  o: Pick<Opening, 'type' | 'offset' | 'width' | 'swing'>,
+  o: Pick<Opening, 'type' | 'offset' | 'width' | 'swing' | 'sliding'>,
 ): OpeningSymbol {
   const center = displayCenter(g, o);
   const w = Math.min(o.width, g.s1 - g.s0);
@@ -57,6 +58,12 @@ export function openingSymbol(
     for (const off of [h, 0, -h]) sym.lines.push([wallPoint(g, j0, off), wallPoint(g, j1, off)]);
   } else if (o.type === 'passage') {
     for (const off of [h, -h]) sym.dashed.push([wallPoint(g, j0, off), wallPoint(g, j1, off)]);
+  } else if (isSlidingDoor(o)) {
+    // A sliding door: its two panels, one in each track a third of the way out from the
+    // centerline, each from its jamb to SLIDING_LAP / 2 past the middle; no leaf and no swing.
+    const mid = (j0 + j1) / 2;
+    const lap = Math.min(SLIDING_LAP, w / 4) / 2;
+    sym.lines.push([wallPoint(g, j0, h / 3), wallPoint(g, mid + lap, h / 3)], [wallPoint(g, mid - lap, -h / 3), wallPoint(g, j1, -h / 3)]);
   } else {
     const swing = o.swing ?? { hinge: 'a', side: 'left' };
     const side = swing.side === 'left' ? 1 : -1;
