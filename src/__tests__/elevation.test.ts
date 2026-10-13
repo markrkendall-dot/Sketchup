@@ -1,12 +1,8 @@
 import {
-  BufferAttribute,
   BufferGeometry,
   DirectionalLight,
-  DoubleSide,
   Mesh,
-  MeshBasicMaterial,
   OrthographicCamera,
-  Raycaster,
   Scene,
   ShaderMaterial,
   Vector3,
@@ -152,16 +148,43 @@ describe('elevation ground cut', () => {
   const box: Box3d = { min: [0, -110, 0], max: [318, 340, 306] };
   const size = { width: 1052, height: 851 };
 
-  /** The rendered ground's height at (x, z): a ray down onto the grid's triangles. */
+  /**
+   * The rendered ground's height at (x, z): the grid triangle under the point, interpolated (what a
+   * ray down onto the drawn triangles hits). Triangles are bucketed by 24" cell once, so a lookup
+   * tests a handful of them rather than the whole grid.
+   */
   function groundAt(grid: TerrainGrid) {
-    const g = new BufferGeometry();
-    g.setAttribute('position', new BufferAttribute(grid.positions, 3));
-    g.setIndex(new BufferAttribute(grid.indices, 1));
-    const mesh = new Mesh(g, new MeshBasicMaterial({ side: DoubleSide }));
-    const ray = new Raycaster();
+    const pos = grid.positions;
+    const idx = grid.indices;
+    const CELL = 24;
+    const buckets = new Map<string, number[]>();
+    for (let t = 0; t < idx.length; t += 3) {
+      const xs = [pos[idx[t] * 3], pos[idx[t + 1] * 3], pos[idx[t + 2] * 3]];
+      const zs = [pos[idx[t] * 3 + 2], pos[idx[t + 1] * 3 + 2], pos[idx[t + 2] * 3 + 2]];
+      for (let i = Math.floor(Math.min(...xs) / CELL); i <= Math.floor(Math.max(...xs) / CELL); i++) {
+        for (let j = Math.floor(Math.min(...zs) / CELL); j <= Math.floor(Math.max(...zs) / CELL); j++) {
+          const k = `${i},${j}`;
+          const list = buckets.get(k);
+          if (list) list.push(t);
+          else buckets.set(k, [t]);
+        }
+      }
+    }
     return (x: number, z: number) => {
-      ray.set(new Vector3(x, 1e4, z), new Vector3(0, -1, 0));
-      return ray.intersectObject(mesh)[0]?.point.y ?? NaN;
+      let best = NaN;
+      for (const t of buckets.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`) ?? []) {
+        const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]].map((v) => [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]]);
+        const d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+        if (Math.abs(d) < 1e-12) continue;
+        const wa = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / d;
+        const wb = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / d;
+        const wc = 1 - wa - wb;
+        if (wa < -1e-9 || wb < -1e-9 || wc < -1e-9) continue;
+        const y = wa * a[1] + wb * b[1] + wc * c[1];
+        // The topmost surface, as a ray from above would hit first.
+        if (!(y <= best)) best = y;
+      }
+      return best;
     };
   }
 

@@ -700,9 +700,9 @@ export type InteriorTexture = 'wall-boards' | 'wall-pine' | 'wall-check' | 'floo
 
 /**
  * The relief of an interior finish over one tile, inches in canvas order like sidingHeight, or
- * null for one without (a check, parquet). Painted boards are the siding's board; pine the same
- * V-groove every 6"; floor boards a shallow groove along each row and at each board's end; tile
- * recessed grout.
+ * null for one without (a check). Painted boards are the siding's board; pine the same V-groove
+ * every 6"; floor boards a shallow groove along each row and at each board's end; tile recessed
+ * grout; parquet a fine joint round each slat.
  */
 export function interiorHeight(kind: InteriorTexture): Float32Array | null {
   if (kind === 'wall-boards') return sidingHeight('board');
@@ -717,6 +717,9 @@ export function interiorHeight(kind: InteriorTexture): Float32Array | null {
   } else if (kind === 'floor-tile') {
     f.fill(-RELIEF.mortar / 2);
     for (const t of tileGrid()) heightRect(f, t, () => 0);
+  } else if (kind === 'floor-parquet') {
+    f.fill(-RELIEF.groove / 2);
+    for (const sl of parquetSlats()) heightRect(f, { x0: sl.x0 + 0.05, y0: sl.y0 + 0.05, x1: sl.x1 - 0.05, y1: sl.y1 - 0.05 }, () => 0);
   } else return null;
   return f;
 }

@@ -471,6 +471,10 @@ wood in the Utility), the Kitchen's pine crown and baseboard, and window reveals
 siding). The appliances are white (the app draws them as steel). In the Proposed view the Kitchen's
 check and tile carry on into the old bath's alcove, which becomes part of the kitchen.
 
+The Second Floor's rooms (no photos) have **placeholder** finishes: off-white paint and wood board
+floors, tile in the Bath; their doors are stained like the First Floor's Bath door. Change them in
+each room's panel once you know them.
+
 ### Check the sides first
 
 With the lake to the south and the road to the north, east is on your left when you stand on
@@ -578,11 +582,12 @@ Five changes, all on the First Floor:
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
    one-storey wing down the whole east side, outside 12'1" x 26'3", under one new gable roof with
    its ridge north-south. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2" inside)
-   from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom door (32") is
-   in the main block's east wall, from the kitchen, south of the pantry run (jambs 15'8" and 18'4"
-   from the north wall's inside face). The wing's north wall and its roof, and the
+   from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom is entered
+   from the kitchen through today's grey Kitchen to Utility door, which stays (MK chose it over a
+   new 32" door further north). The wing's north wall and its roof, and the
    main block's first-floor east window, are demolished. New 8" block walls carry the new part
-   (a crawl space).
+   (a crawl space). The master bath has **placeholder** fixtures: a 36" shower in the north-west
+   corner, a 48" vanity under the north window and a WC on the east wall.
 2. **Kitchen.** The wall between the kitchen and the old bath is demolished, so the kitchen is an
    L: the main kitchen (11'6" x 17'2") and the old bath as an alcove at its north-east corner. All
    of its casework is new; today's cabinets, the bath's fixtures and the wood stove (photos 13 to
@@ -619,12 +624,19 @@ Five changes, all on the First Floor:
    the Living, but there is none today (photo 16), so that wall (5", with a 36" opening at x 132 to
    168 and a 30" one at x 7 to 37) is **new** work in the design.
 4. **Powder room**, 5' x 4'1", in the old hall south of the top of the flight, where the hall's
-   passage to the strip was.
+   passage to the strip was, with **placeholder** fixtures: a WC on its east wall and a 24" vanity
+   on its south wall.
 5. **Foyer and screen porch** on the west face in place of the entry porch: an enclosed foyer
    (7'10" x 8') with the 36" front door in line with the house door and a gable facing west, and
    south of it a screen porch (13'1" x 8') with screens above knee walls, two screen doors, three 8"
    timber posts in the stain and a shed roof high at the house wall. The Living's west window,
-   which now looks into the porch, is replaced by the same window without shutters.
+   which now looks into the porch, is replaced by the same window without shutters. The foyer
+   stands on 8" block walls (a crawl space) like the east addition; the screen porch on its posts.
+
+The new rooms have **placeholder** finishes until you choose them (off-white paint, wood board
+floors, tile in the baths and the foyer, a wood floor on the screen porch), which also cover the
+inside faces of the old outside walls the additions enclose. Interior doors are stained like the
+old Bath door.
 
 Which view to use:
 
@@ -643,15 +655,11 @@ Still open:
   with a new upstairs bath), or the closet gives way to the chase.
 - The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the
   foyer's gable and the porch's shed overlap with no valley).
-- **Two doors from the kitchen into the bedroom**: today's grey Kitchen to Utility door (photos 13
-  and 14, y 248 to 280) stays, 21" south of the design's new 32" bedroom door (y 195 to 227). One
-  of them should go: keeping the existing one saves a new opening.
 - **The wall between the stair strip and the Living** is new work (there is none today); delete it
   to leave the new front door opening straight into the Living.
-- How the bedroom is reached: its door opens from the kitchen, the only room beside it. It moved
-  south of where the first proposed plan had it (beside the old east window), because the pantry
-  run now takes that part of the wall; a hall can still be added later. (The old bath's door, and
-  the pocket it opened into, are settled: the pocket is the kitchen's closet.)
+- How the bedroom is reached: through today's grey door from the kitchen, the only room beside it
+  (settled: MK kept it rather than cut a new door); a hall can still be added later. (The old bath's
+  door, and the pocket it opened into, are settled: the pocket is the kitchen's closet.)
 - The kitchen: the closet is shallow (18"); the stools stand clear of the ledge rather than under
   it; the hood's duct route (out through the master bath's ceiling, or a recirculating hood) and
   the range's distance from the sink (the triangle is a little over 26') are worth a second look.

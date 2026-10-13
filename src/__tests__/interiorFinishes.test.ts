@@ -304,6 +304,7 @@ describe('textures and materials', () => {
     expect(slats.filter((s) => s.along === 'x').length).toBe(slats.length / 2);
     expect(interiorHeight('wall-check')).toBeNull();
     expect(interiorHeight('floor-tile')).not.toBeNull();
+    expect(interiorHeight('floor-parquet')).not.toBeNull();
   });
 
   it('has no textures in node: the materials show their flat colours', () => {

@@ -745,7 +745,7 @@ dresses nothing.
 strength, the full colour where two cross); `boards` the siding's 8" V-groove boards; `pine` 6" boards with grain,
 knots and grooves; floor `boards` 3" rows of 16" to 48" boards with staggered joints (`floorBoards`); `tile` 12"
 squares with 1/8" grout (`tileGrid`); `parquet` 6" basket-weave blocks of four slats (`parquetSlats`). Boards, pine,
-floor boards and tile have normal maps (`interiorHeight`). `roomWallMaterial` and `floorFinishMaterial` key by
+floor boards, tile and parquet have normal maps (`interiorHeight`). `roomWallMaterial` and `floorFinishMaterial` key by
 surface, phase, finish and colour; new work uses the green-washed variant; the flat colour (`interiorFlatColor`, a
 check's blended a little toward its ground) is kept for the export and node.
 
@@ -1212,7 +1212,9 @@ would z-fight; the porch's openings have no trim, since its posts are only 3.5" 
 The First Floor's rooms carry their interior finishes from the photos (the Utility's from the owner) through
 `label()`'s finishes: the Kitchen's blue check wallpaper and beige tile, the Living's cream boards and the front
 room's cream paint over red-brown painted boards, the Bath's green paint over a 40" pine wainscot on parquet, and the
-Utility's pine paneling on a wood floor. The Second Floor and the basement have none (no photos).
+Utility's pine paneling on a wood floor. The Second Floor's rooms and the proposed rooms have placeholder finishes
+(`PLACEHOLDER_ROOM`, `PLACEHOLDER_WET`: off-white paint, wood boards, tile in the baths and the foyer) until the
+owner chooses; the basement has none.
 
 The proposed kitchen (docs/history/PLAN-v5-kitchen.md) is placed through `fixture()`, which throws
 when the store refuses one; fixture ids are renamed like the rest (`f-c1` ...). `example.test.ts`

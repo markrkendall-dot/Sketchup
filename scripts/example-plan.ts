@@ -76,6 +76,13 @@ const FLOOR_RED_BROWN = '#5e2a22';
 const BATH_GREEN = '#2f7a68';
 /** The Utility's unpainted wood floor (MK). */
 const WOOD_FLOOR = '#a87a4c';
+/**
+ * Placeholder finishes for the rooms with no photos (the Second Floor) and the proposed rooms (MK:
+ * neutral placeholders until he chooses): walls painted the default off-white, wood board floors,
+ * tile in the baths and the foyer. Not from photos; change them in each room's panel.
+ */
+const PLACEHOLDER_ROOM = { wallFinish: 'paint', floorFinish: 'boards', floorColor: WOOD_FLOOR } as const;
+const PLACEHOLDER_WET = { wallFinish: 'paint', floorFinish: 'tile' } as const;
 const FRIDGE_BLUE = '#3a5fa0';
 /**
  * Centre of the Kitchen's east window and the sink under it: the sink base comes right after the
@@ -497,11 +504,12 @@ export function buildExamplePlan(): Plan {
   addOpeningAt(fId, { x: east, y: 264 }, { type: 'door', width: 32, height: 80, lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: UTILITY_DOOR_GREY, into: EAST });
   // Second Floor doors and openings (the sketch): Bunk and Master doors 28" off the landing, closet
   // opening 24", Bath door 24" swinging out into the hall, Guest door 30" into the Guest.
-  addOpeningAt(sId, { x: 150, y: UP.line }, { type: 'door', width: 28, height: 80, into: NORTH });
-  addOpeningAt(sId, { x: 150, y: UP.strip }, { type: 'door', width: 28, height: 80, into: SOUTH });
+  // The leaves are stained like the First Floor's Bath door (photo 22): an estimate, no photos.
+  addOpeningAt(sId, { x: 150, y: UP.line }, { type: 'door', width: 28, height: 80, into: NORTH, leafColor: STAINED_DOOR });
+  addOpeningAt(sId, { x: 150, y: UP.strip }, { type: 'door', width: 28, height: 80, into: SOUTH, leafColor: STAINED_DOOR });
   addOpeningAt(sId, { x: 22, y: UP.strip }, { type: 'passage', width: 24, height: 80, sill: 0 });
-  addOpeningAt(sId, { x: 196, y: UP.bathSouth }, { type: 'door', width: 24, height: 80, into: SOUTH });
-  addOpeningAt(sId, { x: 196, y: UP.guestNorth }, { type: 'door', width: 30, height: 80, into: SOUTH });
+  addOpeningAt(sId, { x: 196, y: UP.bathSouth }, { type: 'door', width: 24, height: 80, into: SOUTH, leafColor: STAINED_DOOR });
+  addOpeningAt(sId, { x: 196, y: UP.guestNorth }, { type: 'door', width: 30, height: 80, into: SOUTH, leafColor: STAINED_DOOR });
   // North face (the road, photos 06 and 07): on the first floor three casements of 2 x 3 lites west of
   // the chimney (jambs x 56..136) and two single panes east of it (the Bath's, 48" over the washer and
   // dryer, its sill just above the 40" wainscot, photo 22); upstairs two casement pairs.
@@ -650,12 +658,13 @@ export function buildExamplePlan(): Plan {
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
   // Second Floor. The Office / hall is one face with the landing and the stair well.
-  label(sId, 'Bunk', { x: 90, y: 52 });
-  label(sId, 'Bath', { x: (UP.ew + 2.5 + (UP.bathEast - 2.5)) / 2, y: 45 });
-  label(sId, 'Master closet', { x: (CL.x0 + HALF + (UP.closet - 2.5)) / 2, y: STRIP_MID });
-  label(sId, 'Master', { x: 90, y: 225 });
-  label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 });
-  label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 });
+  // Placeholder finishes (no photos of the Second Floor).
+  label(sId, 'Bunk', { x: 90, y: 52 }, PHASE, PLACEHOLDER_ROOM);
+  label(sId, 'Bath', { x: (UP.ew + 2.5 + (UP.bathEast - 2.5)) / 2, y: 45 }, PHASE, PLACEHOLDER_WET);
+  label(sId, 'Master closet', { x: (CL.x0 + HALF + (UP.closet - 2.5)) / 2, y: STRIP_MID }, PHASE, PLACEHOLDER_ROOM);
+  label(sId, 'Master', { x: 90, y: 225 }, PHASE, PLACEHOLDER_ROOM);
+  label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, PLACEHOLDER_ROOM);
+  label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
 
   proposed({ bId, fId, stair, houseDoor, livingWest, hallPassage, eastWindow, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
   return getPlan();
@@ -775,6 +784,10 @@ function proposed(ids: ExistingIds): void {
   const foyer = drawWalls(fId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], T, false, NEW);
   const porch = drawWalls(fId, [{ x: fy.west, y: fy.south }, { x: fy.west, y: CL.y1 }, { x: CL.x0, y: CL.y1 }], T, false, NEW);
   store().updateWalls(fId, [...foyer, ...porch], { finish: 'shingle', color: FINISH_COLOR });
+  // The foyer is a closed, heated room: 8" block under its three walls, like the east addition's
+  // (a crawl space). The screen porch stands on its posts (porch floors and piers are not drawn).
+  const foyerFooting = drawWalls(bId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], TB, false, NEW);
+  store().updateWalls(bId, foyerFooting, { finish: 'block', color: BLOCK_COLOR });
 
   // ---- 4. Powder room in the old hall, south of the new flight: x 132..192, y 48..97 inside
   // (5' x 4'1"), its west wall clear of the old hall passage's jamb.
@@ -793,13 +806,11 @@ function proposed(ids: ExistingIds): void {
 
   // ---- Openings, all new. Windows 2 x 3 lites per sash, sill 30 unless given.
   const add = (p: Vec2, o: OpeningSpec) => addOpeningAt(fId, p, { ...o, phase: NEW });
-  // Master suite: the bath's door in the partition, the bedroom's door from the kitchen in the main
-  // block's east wall south of the kitchen's pantry run (y 102..186), beside the island's east
-  // walkway, and windows north and east. The east wall is in two pieces either side of y 191.5,
-  // where the old wing's north wall meets it, so the door's jambs (y 195..227) start at that old
-  // wall's south face, clear of the joint.
-  add({ x: 345, y: ADD.y }, { type: 'door', width: 28, height: 80, into: NORTH });
-  add({ x: CL.x1, y: 211 }, { type: 'door', width: 32, height: 80, into: EAST });
+  // Master suite: the bath's door in the partition, and windows north and east. The bedroom is
+  // reached from the kitchen through today's grey Kitchen to Utility door (y 248..280), which stays
+  // (MK chose it over a new 32" door at y 195..227). Interior leaves are stained like the old Bath
+  // door.
+  add({ x: 345, y: ADD.y }, { type: 'door', width: 28, height: 80, into: NORTH, leafColor: STAINED_DOOR });
   add({ x: 390, y: CL.y0 }, { type: 'window', width: 36, height: 36, sill: 48, lites: { cols: 2, rows: 3 } });
   add({ x: wing.x1, y: 62 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
   add({ x: wing.x1, y: 160 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
@@ -824,13 +835,13 @@ function proposed(ids: ExistingIds): void {
   add({ x: -48, y: fy.south }, { ...screenDoor, into: SOUTH });
   add({ x: -20, y: CL.y1 }, { ...screenDoor, into: SOUTH });
   // Powder room door from the hall.
-  add({ x: POWDER.west, y: 72 }, { type: 'door', width: 28, height: 80, into: EAST });
+  add({ x: POWDER.west, y: 72 }, { type: 'door', width: 28, height: 80, into: EAST, leafColor: STAINED_DOOR });
   // The old bath's north window again, raised over the kitchen's north counter: 42 x 36, two sashes
   // of 2 x 3 lites, sill 44 (the counter top is at 36).
   add({ x: ft(19.5), y: CL.y0 }, { type: 'window', width: 42, height: 36, sill: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
   // The closet (x 174..192, y 7..43): a 24" door from the kitchen (jambs y 19..43) in place of the
   // old bath's 30" one, swinging into the kitchen clear of the north counter (from x 221).
-  add({ x: 194.5, y: 31 }, { type: 'door', width: 24, height: 80, into: EAST });
+  add({ x: 194.5, y: 31 }, { type: 'door', width: 24, height: 80, into: EAST, leafColor: STAINED_DOOR });
   // The new strip wall's two openings (above).
   add({ x: 150, y: STAIR_SOUTH }, { type: 'passage', width: 36, height: 80, sill: 0 });
   add({ x: 22, y: STAIR_SOUTH }, { type: 'passage', width: 30, height: 80, sill: 0 });
@@ -910,15 +921,30 @@ function proposed(ids: ExistingIds): void {
   kitchen({ kind: 'base', origin: { x: 239, y: ALCOVE_NORTH }, direction: 90, width: 36, depth: 24, height: COUNTER_HEIGHT });
   kitchen({ kind: 'base', origin: { x: 272, y: ALCOVE_NORTH }, direction: 90, width: 30, depth: 24, height: COUNTER_HEIGHT });
 
+  // ---- Placeholder bath fixtures (MK: standard sizes until the layouts are chosen), clear of each
+  // door's swing. The powder room (x 132..192, y 48..97, door in its west wall at y 60..84): the WC
+  // against the east wall, a 24" vanity on the south wall. The master bath (x 318..456, y 7..117.5,
+  // door at x 331..359 swinging in from the partition): a 36" shower in the north-west corner, a
+  // 48" vanity on the north wall under the window's 48" sill, the WC against the east wall south of
+  // the east window (y 38..86).
+  const WC = { kind: 'box' as const, label: 'WC', width: 20, depth: 28, height: 30, frontColor: WHITE };
+  kitchen({ ...WC, origin: { x: 192, y: 62 }, direction: 180 });
+  kitchen({ kind: 'sink', origin: { x: 175, y: 97 }, direction: 270, width: 24, depth: 18, height: 31.5 });
+  kitchen({ kind: 'box', label: 'Shower', origin: { x: 336, y: 7 }, direction: 90, width: 36, depth: 36, height: 78, frontColor: WHITE });
+  kitchen({ kind: 'sink', origin: { x: 424, y: 7 }, direction: 90, width: 48, depth: 21, height: 34.5 });
+  kitchen({ ...WC, origin: { x: 456, y: 100 }, direction: 180 });
+
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two
-  // never share a face there.
-  label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW);
-  label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW);
-  label(fId, 'Powder room (proposed)', { x: 162, y: 72.5 }, NEW);
-  label(fId, 'Closet (proposed)', { x: 183, y: 25 }, NEW);
-  label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW);
-  label(fId, 'Screen porch (proposed)', { x: -48, y: 236 }, NEW);
+  // never share a face there. Placeholder finishes (MK), which also dress the faces of the old
+  // exterior walls the additions enclose; the screen porch keeps its shingle inside.
+  label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW, PLACEHOLDER_ROOM);
+  label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW, PLACEHOLDER_WET);
+  label(fId, 'Powder room (proposed)', { x: 162, y: 72.5 }, NEW, PLACEHOLDER_WET);
+  label(fId, 'Closet (proposed)', { x: 183, y: 25 }, NEW, PLACEHOLDER_ROOM);
+  label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW, PLACEHOLDER_WET);
+  label(fId, 'Screen porch (proposed)', { x: -48, y: 236 }, NEW, { floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(bId, 'Crawl space (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 97 }, NEW);
+  label(bId, 'Crawl space under the foyer (proposed)', { x: -48, y: 111 }, NEW);
 }
 
 /** The starter plan as the JSON text of docs/examples/146-mick-road.json (stable ids, fixed date). */
