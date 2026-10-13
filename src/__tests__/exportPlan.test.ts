@@ -87,3 +87,16 @@ describe('planSvg', () => {
     expect(PLAN_RULES).not.toContain('.snap-marker');
   });
 });
+
+describe('phase styling on the plan', () => {
+  // Red and green only where the two layouts overlay (All); Existing draws the house as it stands
+  // and Proposed the finished house, every element as existing (phase.ts shownPhase).
+  const date = new Date(2026, 0, 1);
+  // The phases on the drawn elements' class attributes (the embedded stylesheet names them all).
+  const classes = (svg: string) => new Set([...svg.matchAll(/class="[^"]*\bphase-(existing|demo|new)\b[^"]*"/g)].map((m) => m[1]));
+  it('draws demolished work red and new work green only in All', () => {
+    expect(classes(planSvg(plan, first, 'all', { date }))).toEqual(new Set(['existing', 'demo', 'new']));
+    expect(classes(planSvg(plan, first, 'existing', { date }))).toEqual(new Set(['existing']));
+    expect(classes(planSvg(plan, first, 'proposed', { date }))).toEqual(new Set(['existing']));
+  });
+});

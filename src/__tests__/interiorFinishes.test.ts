@@ -221,14 +221,14 @@ describe('wall faces dressed by a room', () => {
     expect(recut.faces![0].geometry).not.toBe(first.faces![0].geometry);
   });
 
-  it('never dresses a demolished wall', () => {
+  it('never dresses a wall drawn demolished (All), but does in Existing, where it stands solid', () => {
     const { lid, west } = boxRooms();
     store().updateRoom(lid, west, { wallFinish: 'pine' });
     const l = level(lid);
     const partition = Object.values(l.walls).find((w) => w.kind === 'interior')!;
     store().setPhase(lid, { walls: [partition.id], openings: [] }, 'demo');
-    const m = getLevelMeshes(store().plan, lid, 'existing');
-    expect(m.walls.find((w) => w.id === partition.id)!.faces).toBeUndefined();
+    expect(getLevelMeshes(store().plan, lid, 'all').walls.find((w) => w.id === partition.id)!.faces).toBeUndefined();
+    expect(getLevelMeshes(store().plan, lid, 'existing').walls.find((w) => w.id === partition.id)!.faces?.length).toBe(1);
   });
 });
 

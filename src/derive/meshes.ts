@@ -8,7 +8,7 @@ import { getFootprints, type Footprint } from './footprint';
 import { columnColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
-import { isOpeningVisible, isVisible } from './phase';
+import { isOpeningVisible, isVisible, shownPhase } from './phase';
 import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, wallSideFaces, type FaceSet } from './rooms';
 import { CHIMNEY_CAP, chimneyPartBoxes, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
@@ -1246,6 +1246,8 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const level = plan.levels[levelId];
   if (!level) return { walls: [], floorFinishes: [], stairs: [], roofs: [], openings: [], fixtures: [], counters: [] };
   const key = `${levelId}|${viewMode}`;
+  // Every mesh carries the phase it is drawn in (phase.ts shownPhase): red and green only in All.
+  const sp = (p: Phase): Phase => shownPhase(p, viewMode);
   const idx = plan.levelOrder.indexOf(levelId);
   const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
   const ftf = floorToFloor(plan, levelId);
@@ -1306,7 +1308,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     if (!fp) continue;
     for (const n of [w.a, w.b]) {
       const list = atNode.get(n);
-      const item = { id: w.id, h: topOf(w), seeThrough: isSeeThrough(w.phase), dir: fp.dir, t: w.thickness };
+      const item = { id: w.id, h: topOf(w), seeThrough: isSeeThrough(sp(w.phase)), dir: fp.dir, t: w.thickness };
       if (list) list.push(item);
       else atNode.set(n, [item]);
     }
@@ -1315,11 +1317,11 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   // one of them is see-through.
   const buttCover = (nodeId: Id, wall: Wall, dir: Vec2) => {
     const butts = (atNode.get(nodeId) ?? []).filter((x) => x.id !== wall.id && Math.abs(cross(x.dir, dir)) > 1e-6);
-    if (!butts.length || butts.some((x) => x.seeThrough !== isSeeThrough(wall.phase))) return 0;
+    if (!butts.length || butts.some((x) => x.seeThrough !== isSeeThrough(sp(wall.phase)))) return 0;
     return Math.min(...butts.map((x) => x.h));
   };
   const lowestOther = (nodeId: Id, wall: Wall) => {
-    const hs = (atNode.get(nodeId) ?? []).filter((x) => x.id !== wall.id && x.seeThrough === isSeeThrough(wall.phase)).map((x) => x.h);
+    const hs = (atNode.get(nodeId) ?? []).filter((x) => x.id !== wall.id && x.seeThrough === isSeeThrough(sp(wall.phase))).map((x) => x.h);
     return hs.length ? Math.min(...hs) : 0; // nothing covers the join
   };
   for (const wall of Object.values(level.walls)) {
@@ -1336,7 +1338,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const raisedAt = (nodeId: Id) =>
       !!roofTop &&
       (atNode.get(nodeId) ?? []).some(
-        (x) => x.id !== wall.id && Math.abs(cross(x.dir, fp.dir)) < 1e-6 && x.seeThrough === isSeeThrough(wall.phase) && Math.abs(x.t - wall.thickness) < 1e-9 && profiles.has(x.id),
+        (x) => x.id !== wall.id && Math.abs(cross(x.dir, fp.dir)) < 1e-6 && x.seeThrough === isSeeThrough(sp(wall.phase)) && Math.abs(x.t - wall.thickness) < 1e-9 && profiles.has(x.id),
       );
     const raisedJoin = { a: raisedAt(wall.a), b: raisedAt(wall.b) };
     const ctxKey = [
@@ -1350,7 +1352,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     ].join('|');
     // The long faces a room on that side dresses (never a demolished or screen wall's).
     const sides = sideFaces.get(wall.id);
-    const dressable = wall.phase !== 'demo' && wallFinishOf(wall) !== 'screen';
+    const dressable = sp(wall.phase) !== 'demo' && wallFinishOf(wall) !== 'screen';
     const sideLook = (side: 'left' | 'right') => {
       const room = dressable ? roomOf(sides?.[side]) : undefined;
       const look = room ? roomWallLookOf(room) : null;
@@ -1388,7 +1390,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     walls.push({
       id: wall.id,
       geometry: entry.split ? entry.split.core : entry.geometry,
-      phase: wall.phase,
+      phase: sp(wall.phase),
       kind: wall.kind,
       finish: wallFinishOf(wall),
       color: wallColorOf(wall),
@@ -1445,7 +1447,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
         ? old
         : { net: f.netPolygon, holes: finishHoles, geometry: buildFloorFinishGeometry(f.netPolygon, finishHoles) };
     nextFinishes.set(room.id, entry);
-    if (entry.geometry) floorFinishes.push({ roomId: room.id, phase: room.phase ?? 'existing', finish: look.finish, color: look.color, geometry: entry.geometry });
+    if (entry.geometry) floorFinishes.push({ roomId: room.id, phase: sp(room.phase ?? 'existing'), finish: look.finish, color: look.color, geometry: entry.geometry });
   }
   if (prevFinishes) for (const [id, e] of prevFinishes) if (nextFinishes.get(id) !== e) e.geometry?.dispose();
   floorFinishCache.set(key, nextFinishes);
@@ -1465,7 +1467,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
         ? old
         : { stairs: s, rise, risers, base, geometry: buildStairsGeometry(s, rise, risers, base) };
     nextStairs.set(s.id, entry);
-    stairs.push({ id: s.id, geometry: entry.geometry, phase: s.phase });
+    stairs.push({ id: s.id, geometry: entry.geometry, phase: sp(s.phase) });
   }
   if (prevStairs) for (const [id, e] of prevStairs) if (nextStairs.get(id) !== e) e.geometry.dispose();
   stairsCache.set(key, nextStairs);
@@ -1483,7 +1485,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       geometry: entry.geometry,
       fascia: entry.fascia,
       rafters: entry.rafters,
-      phase: roof.phase,
+      phase: sp(roof.phase),
       finish: roof.finish,
       color: roofColorOf(roof),
       boardColor: boardColorOf(roof),
@@ -1513,7 +1515,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
           ? old
           : { fp, opening: o, wall, height, side, parts: buildOpeningFill(fp, o, height, side) };
       nextFills.set(o.id, entry);
-      if (entry.parts.length) openingMeshes.push({ id: o.id, type: o.type, phase: o.phase, leafColor: leafColorOf(o), parts: entry.parts });
+      if (entry.parts.length) openingMeshes.push({ id: o.id, type: o.type, phase: sp(o.phase), leafColor: leafColorOf(o), parts: entry.parts });
     }
   }
   if (prevFills) for (const [id, e] of prevFills) if (nextFills.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
@@ -1533,7 +1535,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const old = prevFixtures?.get(f.id);
     const entry: FixtureEntry = old && old.fixture === f && old.style === style ? old : { fixture: f, style, parts: buildFixtureParts(f, finishes) };
     nextFixtures.set(f.id, entry);
-    if (entry.parts.length) fixtureMeshes.push({ id: f.id, kind: f.kind, phase: f.phase, frontColor: frontColorOf(f, finishes), parts: entry.parts });
+    if (entry.parts.length) fixtureMeshes.push({ id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts });
   }
   if (prevFixtures) for (const [id, e] of prevFixtures) if (nextFixtures.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
   fixtureCache.set(key, nextFixtures);
@@ -1547,7 +1549,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     counters = counterRuns(counterFixtures).map((run) => ({
       id: run.fixtureIds.join('+'),
       geometry: buildCounterGeometry(run),
-      phase: counterPhase(run.fixtureIds.map((id) => byId.get(id)!)),
+      phase: sp(counterPhase(run.fixtureIds.map((id) => byId.get(id)!))),
       fixtureIds: run.fixtureIds,
     }));
     counterCache.set(key, { fixtures: counterFixtures, counters });
@@ -1843,7 +1845,7 @@ export function getSiteMeshes(plan: Plan, viewMode: ViewMode): SiteMeshes {
     const old = prev?.get(c.id);
     const entry = old && old.column === c ? old : { column: c, geometry: buildColumnGeometry(c), parts: buildColumnParts(c) };
     next.set(c.id, entry);
-    out.push({ id: c.id, geometry: entry.geometry, phase: c.phase, kind: c.kind, color: columnColorOf(c), ...(entry.parts.length ? { parts: entry.parts } : {}) });
+    out.push({ id: c.id, geometry: entry.geometry, phase: shownPhase(c.phase, viewMode), kind: c.kind, color: columnColorOf(c), ...(entry.parts.length ? { parts: entry.parts } : {}) });
   }
   if (prev) for (const [id, e] of prev) if (next.get(id) !== e) disposeColumnEntry(e);
   columnCache.set(viewMode, next);

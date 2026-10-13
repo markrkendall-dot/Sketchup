@@ -664,7 +664,15 @@ describe('getLevelMeshes memoization', () => {
     });
     expect(getLevelMeshes(demo, id, 'all').walls.map((w) => w.id)).toContain('free');
     expect(getLevelMeshes(demo, id, 'proposed').walls.map((w) => w.id)).not.toContain('free');
-    expect(getLevelMeshes(demo, id, 'existing').walls.find((w) => w.id === 'free')?.phase).toBe('demo');
+    // Red only where the layouts overlay: in All it is drawn demolished, in Existing as it stands.
+    expect(getLevelMeshes(demo, id, 'all').walls.find((w) => w.id === 'free')?.phase).toBe('demo');
+    expect(getLevelMeshes(demo, id, 'existing').walls.find((w) => w.id === 'free')?.phase).toBe('existing');
+    // Likewise new work is green only in All, and finished in Proposed.
+    const added = produce(plan, (d) => {
+      d.levels[id].walls.free.phase = 'new';
+    });
+    expect(getLevelMeshes(added, id, 'all').walls.find((w) => w.id === 'free')?.phase).toBe('new');
+    expect(getLevelMeshes(added, id, 'proposed').walls.find((w) => w.id === 'free')?.phase).toBe('existing');
   });
 
   it('a window wall has more triangles than a plain wall', () => {

@@ -16,6 +16,18 @@ export function isVisible(phase: Phase, viewMode: ViewMode): boolean {
   }
 }
 
+/**
+ * The phase an element is drawn in. Red and green only help where the two layouts overlay, in the
+ * All view; the Existing view shows the house as it stands, so what the design demolishes is drawn
+ * as existing (solid, in its own finish), and the Proposed view shows the finished house, so new
+ * work is drawn as existing too.
+ */
+export function shownPhase(phase: Phase, viewMode: ViewMode): Phase {
+  if (viewMode === 'existing' && phase === 'demo') return 'existing';
+  if (viewMode === 'proposed' && phase === 'new') return 'existing';
+  return phase;
+}
+
 /** An opening shows only when both it and its host wall are visible. */
 export function isOpeningVisible(opening: Opening, wall: Wall | undefined, viewMode: ViewMode): boolean {
   return !!wall && isVisible(opening.phase, viewMode) && isVisible(wall.phase, viewMode);

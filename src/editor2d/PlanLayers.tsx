@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
 import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
-import { isOpeningVisible, isVisible } from '../derive/phase';
+import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
 import { faceAt, getFaces, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
 import { siteGhostLevelId } from '../derive/site';
@@ -107,10 +107,14 @@ function wallPiecesFor(fp: Footprint, wall: Wall, openings: readonly Opening[] |
   return pieces;
 }
 
-const wallClass = (wall: Wall) => `wall wall-${wall.kind} phase-${wall.phase}`;
+/** The class of a wall's paths: its kind and the phase it is drawn in (phase.ts shownPhase: red and green only in All). */
+const wallClass = (wall: Wall, viewMode: ViewMode) => `wall wall-${wall.kind} phase-${shownPhase(wall.phase, viewMode)}`;
 
 /** Paint order of fill groups: where two styles meet, the later one's hairline wins consistently. */
-const fillRank = (wall: Wall) => (wall.phase === 'demo' ? 0 : wall.phase === 'new' ? 10 : 20) + (wall.kind === 'interior' ? 0 : 1);
+const fillRank = (wall: Wall, viewMode: ViewMode) => {
+  const phase = shownPhase(wall.phase, viewMode);
+  return (phase === 'demo' ? 0 : phase === 'new' ? 10 : 20) + (wall.kind === 'interior' ? 0 : 1);
+};
 
 /** A positive (consistently wound) polygon path, so same-style pieces merge without seams. */
 const orientedPath = (poly: readonly Vec2[]) => polyPath(polygonSignedArea(poly) < 0 ? [...poly].reverse() : poly);
@@ -191,7 +195,7 @@ function useWallGroups(levelId: Id): StyleGroup[] {
     const map = new Map<string, StyleGroup>();
     for (const wall of Object.values(walls)) {
       const fp = fps.get(wall.id);
-      if (fp) addToGroup(map, wallClass(wall), fillRank(wall), wall, fp, byWall, viewMode);
+      if (fp) addToGroup(map, wallClass(wall, viewMode), fillRank(wall, viewMode), wall, fp, byWall, viewMode);
     }
     return finishGroups(map);
   }, [walls, fps, byWall, viewMode]);
@@ -219,8 +223,8 @@ function useHighlightGroups(levelId: Id): StyleGroup[] {
       if (!wall || !fp) return;
       const sel = selected.includes(id);
       const hov = hovered === id;
-      const cls = `${wallClass(wall)}${sel ? ' is-selected' : ''}${hov ? ' is-hovered' : ''}`;
-      addToGroup(map, cls, (sel ? 200 : 100) + fillRank(wall), wall, fp, byWall, viewMode);
+      const cls = `${wallClass(wall, viewMode)}${sel ? ' is-selected' : ''}${hov ? ' is-hovered' : ''}`;
+      addToGroup(map, cls, (sel ? 200 : 100) + fillRank(wall, viewMode), wall, fp, byWall, viewMode);
     };
     for (const id of selected) add(id);
     if (hovered && !selected.includes(hovered)) add(hovered);
@@ -280,7 +284,7 @@ const OpeningShape = memo(function OpeningShape({ levelId, openingId }: { levelI
   const hovered = useLayerUi((s) => s.hover.openingId === openingId);
   const sym = useMemo(() => (fp && o ? openingSymbol(fp, o) : null), [fp, o]);
   if (!o || !sym || !isOpeningVisible(o, wall, viewMode)) return null;
-  const cls = `opening opening-${o.type} phase-${o.phase}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}`;
+  const cls = `opening opening-${o.type} phase-${shownPhase(o.phase, viewMode)}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}`;
   return (
     <g className={cls} data-opening-id={openingId}>
       <polygon className="opening-gap" points={sym.gap.map(pt).join(' ')} />
@@ -456,7 +460,7 @@ const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelI
   const k = useLayerUi(viewportScale);
   const sym = useMemo(() => (f ? fixtureSymbol(f) : null), [f]);
   if (!f || !sym || !isVisible(f.phase, viewMode)) return null;
-  return <FixtureGlyph sym={sym} k={k} id={fixtureId} className={`fixture fixture-${f.kind} phase-${f.phase}${selected ? ' is-selected' : ''}`} />;
+  return <FixtureGlyph sym={sym} k={k} id={fixtureId} className={`fixture fixture-${f.kind} phase-${shownPhase(f.phase, viewMode)}${selected ? ' is-selected' : ''}`} />;
 });
 
 /** The counter slabs' outlines (one path per run, so an L-shaped counter reads as one top). */
@@ -469,7 +473,7 @@ const CounterLayer = memo(function CounterLayer({ levelId }: { levelId: Id }) {
     return counterRuns(shown).map((r) => ({
       id: r.fixtureIds.join('+'),
       d: polyPath(r.outline) + r.holes.map(polyPath).join(''),
-      phase: shown.filter((f) => r.fixtureIds.includes(f.id)).every((f) => f.phase === 'demo') ? 'demo' : shown.some((f) => r.fixtureIds.includes(f.id) && f.phase === 'new') ? 'new' : 'existing',
+      phase: shownPhase(shown.filter((f) => r.fixtureIds.includes(f.id)).every((f) => f.phase === 'demo') ? 'demo' : shown.some((f) => r.fixtureIds.includes(f.id) && f.phase === 'new') ? 'new' : 'existing', viewMode),
     }));
   }, [fixtures, viewMode]);
   if (runs.length === 0) return null;
@@ -530,7 +534,7 @@ const StairsShape = memo(function StairsShape({ levelId, stairsId }: { levelId: 
   const k = useLayerUi(viewportScale);
   const sym = useMemo(() => (st ? stairsSymbol(st, flightSteps(st, ftf).risers) : null), [st, ftf]);
   if (!st || !sym || !isVisible(st.phase, viewMode)) return null;
-  return <StairsGlyph sym={sym} k={k} id={stairsId} className={`stairs phase-${st.phase}${selected ? ' is-selected' : ''}`} />;
+  return <StairsGlyph sym={sym} k={k} id={stairsId} className={`stairs phase-${shownPhase(st.phase, viewMode)}${selected ? ' is-selected' : ''}`} />;
 });
 
 const StairsLayer = memo(function StairsLayer({ levelId }: { levelId: Id }) {
@@ -611,7 +615,7 @@ const RoofShape = memo(function RoofShape({ levelId, roofId, ghost }: { levelId:
   if (!roof || !isVisible(roof.phase, viewMode)) return null;
   const d = roofPaths(roof);
   return (
-    <g className={`roof phase-${roof.phase}${selected ? ' is-selected' : ''}${ghost ? ' roof-ghost' : ''}`} data-roof-id={ghost ? undefined : roofId}>
+    <g className={`roof phase-${shownPhase(roof.phase, viewMode)}${selected ? ' is-selected' : ''}${ghost ? ' roof-ghost' : ''}`} data-roof-id={ghost ? undefined : roofId}>
       <path className="roof-overhang" d={d.overhang} vectorEffect="non-scaling-stroke" />
       <path className="roof-outline" d={d.outline} vectorEffect="non-scaling-stroke" />
       {d.ridge && <path className="roof-ridge" d={d.ridge} vectorEffect="non-scaling-stroke" />}
@@ -1066,7 +1070,7 @@ const ColumnShape = memo(function ColumnShape({ columnId }: { columnId: Id }) {
   if (!c || !isVisible(c.phase, viewMode)) return null;
   return (
     <g
-      className={`column column-${c.kind} phase-${c.phase}${selected ? ' is-selected' : ''}`}
+      className={`column column-${c.kind} phase-${shownPhase(c.phase, viewMode)}${selected ? ' is-selected' : ''}`}
       data-column-id={columnId}
       transform={`translate(${c.at.x} ${c.at.y}) rotate(${c.rotation})`}
     >

@@ -27,6 +27,10 @@ export interface Vec2 { x: Inches; y: Inches }
 export type Phase = 'existing' | 'demo' | 'new';
 export type ViewMode = 'existing' | 'proposed' | 'all';
 // existing view shows {existing, demo}; proposed shows {existing, new}; all shows everything, styled.
+// Only All draws the phases (red demolished, green new): phase.ts shownPhase draws a demolished
+// element as existing in the Existing view and a new one as existing in Proposed, on the plan
+// (its phase-* class) and in 3D (every LevelMeshes/SiteMeshes entry carries the shown phase, so
+// materials, see-through joins, shadows, room finishes and the export follow).
 
 export interface Node { id: Id; x: Inches; y: Inches }
 
@@ -1022,7 +1026,8 @@ selection is `uiStore.underlaySelected`, exclusive with the entity selection. St
 r3f `<Canvas frameloop="demand">` (lazy-loaded chunk), invalidate on plan changes and on the UI
 settings the 3D view uses (not on the 2D draft). One `<group>` per level at its floor top; meshes use
 the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat shading, FrontSide:
-existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior walls
+existing warm grey, demolished translucent red (0.35, no depth write), new light green (in the All view only:
+each mesh carries its shown phase, phase.ts `shownPhase`), exterior walls
 textured by finish and colour (see "Exterior appearance"), the faces and floors rooms dress by their interior finishes
 (see "Interior finishes"); slabs tan, stairs grey; roofs textured by finish (metal `#6e6259`
 corrugated with rust streaks, metalness 0.35, roughness 0.55; shingle `#4a4a4a`), boards and rafter tails in the roof's board

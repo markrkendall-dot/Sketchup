@@ -176,7 +176,8 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
 ## Planning the renovation
 
 1. Switch the view to **All** (the toolbar, or `V` to cycle). All shows existing walls in grey,
-   walls to demolish in dashed red and new walls in green.
+   walls to demolish in dashed red and new walls in green. Existing and Proposed show each layout
+   on its own, in real finishes, with no red or green.
 2. Set **Draw as: new**. Everything you draw from now on is new work: new walls, roofs and posts,
    the addition (start its walls on the existing exterior wall so they join as T junctions),
    new doors.
@@ -641,8 +642,11 @@ old Bath door.
 Which view to use:
 
 - **Proposed** for the 3D view, the elevations, walk mode and exports of the house after the work.
-- **Existing** for the house as it stands; the parts to be demolished show in translucent red.
-- **All** to see both on the plan: demolished walls dashed red, new walls green. The demolished
+- **Existing** for the house as it stands, every part solid in its own finish (what the design
+  takes out included).
+- **Proposed** shows the finished house the same way: new work in its own finish, not green.
+- **All** to overlay the two layouts: demolished work dashed red on the plan and translucent red in
+  3D, new work green. This is the only view with phase colours. The demolished
   rooms keep their labels in the All view and the new labels sit beside them (the Utility and the
   master bedroom's new north part are two areas there).
 

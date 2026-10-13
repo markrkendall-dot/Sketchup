@@ -27,7 +27,8 @@ async function boot(): Promise<void> {
     const ui = useUiStore.getState();
     ui.setActiveLevel(defaultLevelId(plan));
     ui.setLayout('3d');
-    useUiStore.setState({ viewerMode: true, viewMode: 'all' });
+    // It opens on the house as it stands, solid in its own finishes; Proposed and All are a tap away.
+    useUiStore.setState({ viewerMode: true, viewMode: 'existing' });
     document.title = `${plan.name.replace(/\s*\(.*\)\s*$/, '')} Viewer`;
     createRoot(root).render(
       <StrictMode>
