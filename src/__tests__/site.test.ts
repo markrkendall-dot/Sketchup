@@ -33,6 +33,7 @@ import {
   terrainFor,
   terrainGrid,
   terrainHeightAt,
+  delaunay,
   TERRAIN_MARGIN,
   TERRAIN_MAX_CELLS,
   TERRAIN_STEP,
@@ -131,7 +132,38 @@ describe('terrainHeightAt', () => {
     expect(terrainHeightAt(one, { x: -400, y: 900 }, -104)).toBeCloseTo(-30, 9);
   });
 
-  it('weights by inverse square distance', () => {
+  it('is linear over the Delaunay triangles of three or more points, and level beyond their hull', () => {
+    const site = siteWith(gp(0, 0, 0), gp(100, 0, 100), gp(0, 100, 0), gp(100, 100, 100));
+    // A plane through the four points: the height is x.
+    for (const [x, y] of [[50, 50], [10, 90], [75, 20], [99, 1]]) expect(terrainHeightAt(site, { x, y }, 0)).toBeCloseTo(x, 9);
+    // Beyond the hull: the height of the nearest point of its edge.
+    expect(terrainHeightAt(site, { x: 50, y: -400 }, 0)).toBeCloseTo(50, 9);
+    expect(terrainHeightAt(site, { x: 900, y: 50 }, 0)).toBeCloseTo(100, 9);
+    expect(terrainHeightAt(site, { x: -900, y: 900 }, 0)).toBeCloseTo(0, 9);
+  });
+
+  it('is level between points at one height, however low the points around them', () => {
+    // A terrace at -6 with a lawn at -100 just past it: the terrace stays at -6 all over.
+    const site = siteWith(gp(0, 0, -6), gp(200, 0, -6), gp(200, 100, -6), gp(0, 100, -6), gp(0, 116, -100), gp(200, 116, -100), gp(100, 300, -100));
+    for (let x = 0; x <= 200; x += 20) for (let y = 0; y <= 100; y += 20) expect(terrainHeightAt(site, { x, y }, 0)).toBeCloseTo(-6, 9);
+    // Never outside the range of the points' elevations.
+    for (let x = -300; x <= 500; x += 37) for (let y = -300; y <= 600; y += 41) {
+      const h = terrainHeightAt(site, { x, y }, 0);
+      expect(h).toBeGreaterThanOrEqual(-100 - 1e-9);
+      expect(h).toBeLessThanOrEqual(-6 + 1e-9);
+    }
+  });
+
+  it('delaunay triangulates the points once each, skipping one within 1" of another', () => {
+    const t = delaunay([gp(0, 0, 0), gp(100, 0, 0), gp(0, 100, 0), gp(100, 100, 0), gp(50, 40, 3), gp(50.5, 40.5, 9)].map((g) => g));
+    expect(t.pts.length).toBe(5);
+    // Four triangles round the inner point, all counter-clockwise; the hull is the square's four sides.
+    expect(t.tris.length).toBe(4);
+    for (const [a, b, c] of t.tris) expect((t.pts[b].x - t.pts[a].x) * (t.pts[c].y - t.pts[a].y) - (t.pts[c].x - t.pts[a].x) * (t.pts[b].y - t.pts[a].y)).toBeGreaterThan(0);
+    expect(t.hull.length).toBe(4);
+  });
+
+  it('with points in a line, weights by inverse square distance', () => {
     const site = siteWith(gp(0, 0, 0), gp(100, 0, 100));
     // Midway: equal weights.
     expect(terrainHeightAt(site, { x: 50, y: 0 }, 0)).toBeCloseTo(50, 9);

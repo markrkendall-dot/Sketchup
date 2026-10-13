@@ -6,7 +6,7 @@ import { shutterWidth, SILL_THICKNESS } from '../derive/openings3d';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { roofBearing, roofExtremes, roofHeightAt } from '../derive/roofs';
 import { faceAt, getFaces } from '../derive/rooms';
-import { columnDefaults } from '../derive/site';
+import { columnDefaults, groundAt } from '../derive/site';
 import { flightSteps, floorToFloor, stairsBase, stairsRise } from '../derive/stairs';
 import { normalize, perpLeft, pointInPolygon, polygonSignedArea, sub } from '../model/geometry';
 import { counterRuns, fixtureOutline } from '../derive/casework';
@@ -285,7 +285,14 @@ describe('docs/examples/146-mick-road.json', () => {
     // The porch: screens in its four bays and a screen door.
     expect(openings.filter((o) => o.glazing === 'screen').map((o) => `${o.type} ${o.width}`).sort()).toEqual(['door 36', 'window 18', 'window 18', 'window 44', 'window 44']);
     expect(Object.values(plan.levels[plan.levelOrder[1]].rooms).some((r) => r.name === 'Entry porch (est.)')).toBe(true);
-    expect(Object.keys(plan.site.gradePoints)).toHaveLength(30);
+    expect(Object.keys(plan.site.gradePoints)).toHaveLength(33);
+    // The lake-side terrace is filled in level at -6 from the house's south face to the retaining
+    // wall, and from the wall's free west end to the wing (MK); the ground along the house's other
+    // faces stays within a foot of the first floor (no sag between grade points).
+    for (let x = -110; x <= 300; x += 15) for (const y of [316, 350, 390, 425]) expect(groundAt(plan, { x, y }), `${x},${y}`).toBeCloseTo(-6, 6);
+    for (let x = 0; x <= 318; x += 6) expect(groundAt(plan, { x, y: -1 })).toBeGreaterThan(-10);
+    for (let y = 0; y <= 315; y += 6) expect(groundAt(plan, { x: -1, y })).toBeGreaterThan(-10);
+    for (let y = 0; y <= 180; y += 6) expect(groundAt(plan, { x: 319, y })).toBeGreaterThan(-10);
     // The porch's floor (top +2) is at grade: the ground is at +1 round it, its corners against the
     // house too; the walkout's threshold is at the basement floor in front of both jambs.
     const grade = (x: number, y: number) => Object.values(plan.site.gradePoints).find((g) => g.at.x === x && g.at.y === y)?.elevation;

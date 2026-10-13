@@ -380,9 +380,11 @@ export function buildExamplePlan(): Plan {
   partition(sId, { x: UP.ew, y: UP.guestNorth }, { x: CL.x1, y: UP.guestNorth }); // Guest north wall
 
   // ---- Terrain (all estimates, see the README): the road side meets the first floor; on the lake
-  // side a level terrace a few inches under the first floor runs the length of the main block,
-  // held up by the concrete retaining wall about 10' out (photos 02 and 23), and only the wing's
-  // basement walks out, onto the lower terrace in front of its doors.
+  // side a level terrace at -6, a few inches under the first floor, fills the space between the main
+  // block and the concrete retaining wall about 10' out (photos 01, 02 and 23), from the wall's free
+  // west end, where it meets the west lawn at the same level (MK), east to the wing; only the wing's
+  // basement walks out, onto the lower terrace in front of its doors. The ground is the triangulated
+  // surface through these points (derive/site.ts), so points at one height make it level.
   const gp = (x: number, y: number, elevation: number) => {
     if (!store().addGradePoint({ at: { x, y }, elevation })) throw new Error('grade point rejected');
   };
@@ -397,8 +399,13 @@ export function buildExamplePlan(): Plan {
   gp(PORCH.x1, PORCH.y1, 1);
   gp(MAIN.x1 / 2, MAIN.y0, -4);
   gp(MAIN.x0, MAIN.y1 / 2, -8);
-  gp(MAIN.x0, MAIN.y1, -14);
-  gp(MAIN.x1, MAIN.y1, -8);
+  // The terrace along the main block's south face, the house's corners included, and its west end
+  // beside the retaining wall's free end, with the lawn just west of that end at the same level.
+  gp(MAIN.x0, MAIN.y1, -6);
+  gp(MAIN.x1 / 2, MAIN.y1, -6);
+  gp(MAIN.x1, MAIN.y1, -6);
+  gp(RETAIN.west, MAIN.y1, -6);
+  gp(RETAIN.west - 36, RETAIN.y, -6);
   gp(WING.x1, WING.y1, -100);
   // The lawn reaches nearly to the first floor at the wing's north-east corner and drops under the
   // deck toward the lake (photo 03).
@@ -406,7 +413,7 @@ export function buildExamplePlan(): Plan {
   gp(MAIN.x1 + ft(6), ft(8), -6);
   // The retaining wall (drawn on the Basement level below): the terrace at -6 just inside it, the lawn
   // just outside it falling from about -50 at its west end to the walkout's -100 at the wing. The
-  // terrain is a coarse interpolated grid, so the drop is a short ramp that the wall mostly hides.
+  // terrain is sampled on a 24" grid, so the drop is a short ramp that the wall mostly hides.
   for (const [x, outside] of [[RETAIN.west + 10, -50], [MAIN.x0, -60], [MAIN.x1 / 2, -85], [MAIN.x1 - 16, -100]]) {
     gp(x, RETAIN.y - 8, -6);
     gp(x, RETAIN.y + 8, outside);
@@ -448,8 +455,9 @@ export function buildExamplePlan(): Plan {
   // the Kitchen/Living partition's faces at x 168 and 173 (Living x 15.5..159.5, Kitchen x 183..301).
   win(fId, { x: 87.5, y: south }, 144, 60, 2, 4, { sashes: 3, fixedCenter: true });
   win(fId, { x: 242, y: south }, 118, 60, 2, 4, { sashes: 3, fixedCenter: true });
-  // Second floor: four casements over the Master and three over the Guest, 2 x 3 lites each.
-  win(sId, { x: 115, y: south }, 88, 46, 2, 3, { sashes: 4, sill: 34 });
+  // Second floor: three casements over the Master (about 78", photo 01) and three over the Guest,
+  // 2 x 3 lites each.
+  win(sId, { x: 115, y: south }, 78, 46, 2, 3, { sashes: 3, sill: 34 });
   win(sId, { x: 256, y: south }, 66, 46, 2, 3, { sashes: 3, sill: 34 });
   // West face (the entry, photo 08): the house door inside the porch, dark green outside (pale
   // blue-green inside, photo 19; a leaf has one colour), one large lite over two panels, swinging into

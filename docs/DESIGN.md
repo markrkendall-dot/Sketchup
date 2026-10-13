@@ -413,8 +413,18 @@ The plan's `site` holds the ground (grade points: spot elevations), the columns 
 the north angle. None of it belongs to a level.
 
 **Terrain** (`site.ts`, pure, position arrays like `roofs.ts`; `meshes.ts` wraps them). `terrainHeightAt`
-is the inverse-distance-weighted (power 2) average of the grade points: exactly a point's elevation
-within 1" of it, flat for a single point, `fallback` (the bottom of the lowest level's slab,
+is the triangulated surface through the grade points (a TIN): `delaunay` (Bowyer-Watson in a super
+triangle 100 times the points' extent, a point within 1" of another left out, triangles touching the
+super triangle dropped) is made once per grade-point record, the height inside a triangle is linear
+between its three corners, and beyond the hull (the edges only one triangle uses) it is the hull's
+height at the nearest point of its edge, so the ground runs on level outward. The ground between two
+points is the straight line between them and three points at one height make a level plane, so a
+terrace or a lawn set by a few points stays level however low the points beyond it are. (It was an
+inverse-distance-weighted average until the starter's terrace, between the house and its retaining
+wall, sagged toward the low lawn past the wall, and the ground along every face of the house sagged
+between its points, showing a foot or two of foundation.) Exactly a point's elevation within 1" of
+it, flat for a single point, the inverse-distance (power 2) average when the points do not span an
+area (two, or all in a line), and `fallback` (the bottom of the lowest level's slab,
 `fallbackElevation`) without points. `terrainGrid(site, bounds, fallback)` samples it on a 24" grid over
 the plan bounds (`siteBounds`: nodes of every level, roof outlines, columns, grade points) plus 1200"
 (`TERRAIN_MARGIN`, 100'), rounded outward to whole cells, so a wall moving about does not change the grid;
@@ -457,7 +467,7 @@ outside the terrain that edge showed as a dark line). It is rebuilt whenever the
 The drei grid stays as an overlay
 ("Grid" checkbox in the 3D bar, `uiStore.show3dGrid`, default on) 1" above the fallback elevation: with
 grade points the terrain is above it and hides it, which is the point (no z-fighting). Under the lowest
-level the ground sits 2" below its slab, so the basement interior is empty. A weighted average never
+level the ground sits 2" below its slab, so the basement interior is empty. The triangulated surface never
 leaves the range of the grade points' elevations, so with every grade point at or below the First Floor
 slab's underside (the "north pair at first floor top minus 12 inches" of the renovation scenario) the
 ground never reaches that slab; a grade point above it would, and nothing clamps it.

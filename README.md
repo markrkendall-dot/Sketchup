@@ -391,7 +391,7 @@ and the plan's north angle is 0.
   shutters on the two west windows, and the house door dark green outside with one large lite over
   two panels, swinging in (photos 8 and 19). The first-floor picture windows' casements are 2 x 4
   lites on the south face and 2 x 2 on the west (photos 14, 17, 18 and 23).
-- **Terrain**: thirty grade points, see below, with the lake side's terrace behind the retaining
+- **Terrain**: thirty-three grade points, see below, with the lake side's terrace behind the retaining
   wall.
 - **The two floors share three north-south bands** (inside faces, from the north wall): the north
   band y 7 to 97 (7'6"), a 5" wall (centerline y 99.5), the stair strip y 102 to 135 (2'9"), a 5"
@@ -517,7 +517,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Entry door | 36 x 80, centred 4' from the north corner (y 48"), dark green outside, one lite over two panels, swinging in (photos 8 and 19) | Jamb to the corner |
 | Chimney | 24" along the wall x 20" out (photos 6 and 7), centred on the north wall (x 159"), stained like the house; a 4" concrete cap and a 12" spark arrestor on top | Width, projection, position |
 | South windows, first floor | picture windows of a casement (2 x 4 lites, photos 14, 17 and 23), a fixed pane and a casement (casements 24" wide): 144 x 60 at x 87.5" and 118 x 60 at x 242", sill 30; the jambs clear the Kitchen/Living partition's faces at x 168" and 173" (photo 1) | Jamb to corner, rough opening |
-| South windows, second floor | four casements 88 x 46 at x 115" and three 66 x 46 at x 256", 2 x 3 lites each, sill 34 (photo 1) | Same |
+| South windows, second floor | three casements 78 x 46 at x 115" (photo 1 shows three over the Master, not four) and three 66 x 46 at x 256", 2 x 3 lites each, sill 34 (photo 1) | Same |
 | West windows | first floor 90 x 44 at y 203", sill 44 (head above the door head): a casement (2 x 2 lites, photo 18), a fixed pane and a casement; second floor two casements of 2 x 2 lites, 48 x 32 at y 200", sill 48; both with shutters one casement wide (photo 8) | Jamb to the north corner |
 | North windows | first floor three casements (2 x 3 lites) 80 x 56 at x 96", sill 30, west of the chimney, and two single panes 48 x 44 at x 234", sill 42 (the Bath's, over the washer and dryer, its sill just above the wainscot, photo 22); second floor two casements (2 x 3 lites) 46 x 44, sill 36, at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office; its west jamb is 2" from that wall's face) (photos 6 and 7) | Jamb to the west corner |
 | East windows | second floor two pairs of casements (2 x 3 lites) 46 x 44, sill 34, at y 98" and y 222"; first floor a casement pair (2 x 3 lites) 40 x 40, sill 42, at y 160" over the Kitchen sink (photos 3, 13 and 15) | **Jamb to the north corner, and where the wing's north wall meets this wall: the sink sits further south than the model's wing allows** |
@@ -532,8 +532,11 @@ from the main block's outside corners (north-west corner = 0, 0).
 Grade points (absolute elevation in inches; the first floor top is +2", the basement floor -100"):
 five at +1 round the porch, whose floor is about at grade (its two outer corners, the middle of its
 front and its two corners against the house, one of them the main block's north-west corner); the
-main block's north-east corner -4, middle of the north wall -4, middle of the west wall -8,
-south-west corner -14, south-east corner -8 (the terrace), the wing's south-east corner -100 and
+main block's north-east corner -4, middle of the north wall -4, middle of the west wall -8; the
+terrace, level at -6 between the house and the retaining wall (MK: filled in, level with the west
+lawn), at the main block's south-west corner, the middle of its south face and its south-east
+corner, at the retaining wall's west end against the house's line, and on the lawn 3' west of that
+end; the wing's south-east corner -100 and
 north-east corner -20, a point 6' east of the main block's east wall -6, pairs either side of the
 retaining wall (-6 on the terrace just inside it; -50, -60, -85 and -100 on the lawn just outside,
 west to east, and -100 east of its return), a point 10' south of the wing -100 (the terrace in
@@ -682,7 +685,8 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   counter is only joined across cabinets turned by a quarter turn (a cabinet at 45° carries its
   own).
 - **Walk mode has no collision**: you can walk through walls and the ground.
-- The terrain is the average of your grade points, weighted by distance. Under the lowest level's
+- The terrain is the triangulated surface through your grade points: straight between neighbouring
+  points, level between points at one height, and level beyond the outermost ones. Under the lowest level's
   footprint (out to its walls' outside faces) it drops to 2" below that level's slab, so the
   basement is empty; the ground is not shaped any further around the house (no window wells,
   no foundation under a wing or porch that has no basement).

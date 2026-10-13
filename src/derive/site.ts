@@ -8,9 +8,9 @@ import { getFaces, slabOutlines } from './rooms';
 // The site (DESIGN.md "Site and terrain"). Pure: no three, no React, so the 2D editor can use it
 // without loading the 3D chunk; derive/meshes.ts wraps the grid in a BufferGeometry.
 //
-// Grade points are spot elevations of the ground. The terrain is the inverse-distance-weighted
-// surface through them, sampled on a coarse grid around the plan; columns (chimneys, posts) are
-// boxes standing on it.
+// Grade points are spot elevations of the ground. The terrain is the triangulated surface through
+// them (a TIN: linear over the Delaunay triangles of the points, level beyond their hull), sampled
+// on a coarse grid around the plan; columns (chimneys, posts) are boxes standing on it.
 
 /** Grid cell size of the terrain. */
 export const TERRAIN_STEP = 24;
@@ -44,11 +44,148 @@ const ROTATE = (p: Vec2, deg: number): Vec2 => {
 // Terrain
 
 /**
- * Inverse-distance-weighted (power 2) average of the grade points at p. Within GRADE_SNAP of a grade
- * point the result is exactly that point's elevation; with no points it is `fallback` (flat ground).
+ * The ground's elevation at p: linear over the Delaunay triangle of grade points that contains p,
+ * and beyond the points' hull the hull's elevation at the nearest point of its edge, so the ground
+ * between two points is the straight line between them and three points at one height make a
+ * level plane (no pull toward distant points). Within GRADE_SNAP of a grade point the result is
+ * exactly that point's elevation; with no points it is `fallback` (flat ground), with one it is
+ * level at it, and with points that do not span an area (all in a line) it is their
+ * inverse-distance (power 2) average.
  */
 export function terrainHeightAt(site: Pick<Site, 'gradePoints'>, p: Vec2, fallback: number): number {
-  return idw(Object.values(site.gradePoints), p.x, p.y, fallback);
+  const points = Object.values(site.gradePoints);
+  if (points.length < 3) return idw(points, p.x, p.y, fallback);
+  return tinHeight(tinOf(site.gradePoints), points, p.x, p.y, fallback);
+}
+
+/** A triangulated irregular network: the grade points, their Delaunay triangles and the edges on the hull. */
+export interface Tin {
+  pts: { x: number; y: number; z: number }[];
+  /** Counter-clockwise in plan maths (positive area), by index into pts. */
+  tris: [number, number, number][];
+  /** The edges that belong to one triangle only: the hull. */
+  hull: [number, number][];
+}
+
+/**
+ * Delaunay triangulation of the grade points (Bowyer-Watson in a super triangle far larger than the
+ * points). A point within GRADE_SNAP of one already in is left out. Triangles touching the super
+ * triangle are dropped, and the edges of the rest that only one triangle uses are the hull (which
+ * the height outside follows, convex or not).
+ */
+export function delaunay(points: readonly { at: Vec2; elevation: number }[]): Tin {
+  const pts: Tin['pts'] = [];
+  for (const g of points) {
+    if (pts.some((q) => (q.x - g.at.x) ** 2 + (q.y - g.at.y) ** 2 <= GRADE_SNAP * GRADE_SNAP)) continue;
+    pts.push({ x: g.at.x, y: g.at.y, z: g.elevation });
+  }
+  const n = pts.length;
+  if (n < 3) return { pts, tris: [], hull: [] };
+  const b = boundsOf(pts)!;
+  const span = Math.max(b.maxX - b.minX, b.maxY - b.minY, 1);
+  const cx = (b.minX + b.maxX) / 2;
+  const cy = (b.minY + b.maxY) / 2;
+  const all = [...pts, { x: cx - 100 * span, y: cy - 100 * span, z: 0 }, { x: cx + 100 * span, y: cy - 100 * span, z: 0 }, { x: cx, y: cy + 100 * span, z: 0 }];
+  type T = { a: number; b: number; c: number; ox: number; oy: number; r2: number };
+  const circum = (a: number, bi: number, c: number): T => {
+    const A = all[a];
+    const B = all[bi];
+    const C = all[c];
+    const d = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+    const a2 = A.x * A.x + A.y * A.y;
+    const b2 = B.x * B.x + B.y * B.y;
+    const c2 = C.x * C.x + C.y * C.y;
+    const ox = (a2 * (B.y - C.y) + b2 * (C.y - A.y) + c2 * (A.y - B.y)) / d;
+    const oy = (a2 * (C.x - B.x) + b2 * (A.x - C.x) + c2 * (B.x - A.x)) / d;
+    return { a, b: bi, c, ox, oy, r2: (A.x - ox) ** 2 + (A.y - oy) ** 2 };
+  };
+  let tris: T[] = [circum(n, n + 1, n + 2)];
+  for (let i = 0; i < n; i++) {
+    const p = all[i];
+    const bad: T[] = [];
+    const keep: T[] = [];
+    for (const t of tris) ((p.x - t.ox) ** 2 + (p.y - t.oy) ** 2 < t.r2 * (1 - 1e-12) ? bad : keep).push(t);
+    // The cavity's boundary: the edges of exactly one bad triangle.
+    const edges = new Map<string, [number, number]>();
+    for (const t of bad) {
+      for (const [u, v] of [
+        [t.a, t.b],
+        [t.b, t.c],
+        [t.c, t.a],
+      ]) {
+        const k = u < v ? `${u},${v}` : `${v},${u}`;
+        if (edges.has(k)) edges.delete(k);
+        else edges.set(k, [u, v]);
+      }
+    }
+    for (const [u, v] of edges.values()) {
+      const area = cross(sub(all[v], all[u]), sub(p, all[u]));
+      if (Math.abs(area) > 1e-9) keep.push(circum(u, v, i));
+    }
+    tris = keep;
+  }
+  const out: Tin['tris'] = [];
+  for (const t of tris) {
+    if (t.a >= n || t.b >= n || t.c >= n) continue;
+    const area = cross(sub(pts[t.b], pts[t.a]), sub(pts[t.c], pts[t.a]));
+    if (Math.abs(area) < 1e-9) continue;
+    out.push(area > 0 ? [t.a, t.b, t.c] : [t.a, t.c, t.b]);
+  }
+  const count = new Map<string, [number, number] | null>();
+  for (const [a, bi, c] of out) {
+    for (const [u, v] of [
+      [a, bi],
+      [bi, c],
+      [c, a],
+    ] as [number, number][]) {
+      const k = u < v ? `${u},${v}` : `${v},${u}`;
+      count.set(k, count.has(k) ? null : [u, v]);
+    }
+  }
+  const hull = [...count.values()].filter((e): e is [number, number] => e !== null);
+  return { pts, tris: out, hull };
+}
+
+const tinCache = new WeakMap<Site['gradePoints'], Tin>();
+
+/** The grade points' triangulation, made once per grade-point record (a grade edit replaces the record). */
+function tinOf(gradePoints: Site['gradePoints']): Tin {
+  let t = tinCache.get(gradePoints);
+  if (!t) tinCache.set(gradePoints, (t = delaunay(Object.values(gradePoints))));
+  return t;
+}
+
+/** The TIN's height at (x, y); points that span no triangle fall back to the weighted average. */
+function tinHeight(tin: Tin, points: readonly { at: Vec2; elevation: number }[], x: number, y: number, fallback: number): number {
+  for (const q of tin.pts) if ((q.x - x) ** 2 + (q.y - y) ** 2 <= GRADE_SNAP * GRADE_SNAP) return q.z;
+  if (!tin.tris.length) return idw(points, x, y, fallback);
+  const { pts } = tin;
+  for (const [a, b, c] of tin.tris) {
+    const A = pts[a];
+    const B = pts[b];
+    const C = pts[c];
+    const d = (B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y);
+    const wa = ((B.y - C.y) * (x - C.x) + (C.x - B.x) * (y - C.y)) / d;
+    const wb = ((C.y - A.y) * (x - C.x) + (A.x - C.x) * (y - C.y)) / d;
+    const wc = 1 - wa - wb;
+    if (wa >= -1e-9 && wb >= -1e-9 && wc >= -1e-9) return wa * A.z + wb * B.z + wc * C.z;
+  }
+  // Outside the hull: level with the nearest point of its edge.
+  let best = Infinity;
+  let z = fallback;
+  for (const [a, b] of tin.hull) {
+    const A = pts[a];
+    const B = pts[b];
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const t = Math.max(0, Math.min(1, ((x - A.x) * dx + (y - A.y) * dy) / (dx * dx + dy * dy)));
+    const d2 = (A.x + t * dx - x) ** 2 + (A.y + t * dy - y) ** 2;
+    if (d2 < best) {
+      best = d2;
+      z = A.z + t * (B.z - A.z);
+    }
+  }
+  return z;
 }
 
 function idw(points: readonly { at: Vec2; elevation: number }[], x: number, y: number, fallback: number): number {
@@ -142,6 +279,7 @@ export function terrainGrid(
   const nx = cellsX + 1;
   const ny = cellsY + 1;
   const points = Object.values(site.gradePoints);
+  const tin = tinOf(site.gradePoints);
   const cut = footprintCut(footprints);
   const grade = new Float64Array(nx * ny);
   const inside = new Uint8Array(nx * ny);
@@ -150,7 +288,7 @@ export function terrainGrid(
     for (let i = 0; i < nx; i++) {
       const x = tb.minX + i * step;
       const v = j * nx + i;
-      grade[v] = idw(points, x, y, fallback);
+      grade[v] = points.length < 3 ? idw(points, x, y, fallback) : tinHeight(tin, points, x, y, fallback);
       if (cut && cut.contains(x, y)) inside[v] = 1;
     }
   }
