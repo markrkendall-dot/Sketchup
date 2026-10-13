@@ -77,17 +77,18 @@ export function seeded(seed: number): () => number {
 }
 
 /**
- * Vertical joint positions of one shingle course across the tile: widths of 4" to 8" that sum to
- * exactly `tile`, starting at a course-dependent offset so the joints stagger. Returns the joint
- * positions in [0, tile), ascending (the first is the tile's left edge, 0).
+ * Vertical joint positions of one shingle course across the tile: widths of `min` to `max` (4" to
+ * 8" for cedar shingles) that sum to exactly `tile`, starting at a course-dependent offset so the
+ * joints stagger. Returns the joint positions in [0, tile), ascending (the first is the tile's left
+ * edge, 0).
  */
-export function shingleJoints(course: number, tile = TILE_INCHES, rand: () => number = seeded(course * 7919 + 13)): number[] {
+export function shingleJoints(course: number, tile = TILE_INCHES, rand: () => number = seeded(course * 7919 + 13), min = 4, max = 8): number[] {
   const widths: number[] = [];
   let left = tile;
-  while (left > 8) {
-    // Leave at least 4" for the rest.
-    const max = Math.min(8, left - 4);
-    const w = 4 + rand() * (max - 4);
+  while (left > max) {
+    // Leave at least `min` for the rest.
+    const top = Math.min(max, left - min);
+    const w = min + rand() * (top - min);
     widths.push(w);
     left -= w;
   }
@@ -122,6 +123,33 @@ export interface ShingleCourse {
   y0: number;
   y1: number;
   shingles: Shingle[];
+}
+
+/** Painted engineered shakes: 7 courses to the tile (a 6 6/7" exposure), shakes 6" to 12" wide. */
+export const SHAKE_COURSES = 7;
+export const SHAKE_WIDTH = { min: 6, max: 12 } as const;
+
+/**
+ * The shake courses of a tile, bottom to top: staggered joints like shingles but wider and more
+ * even, and painted, so each shake is within a couple of percent of the colour, with no warmth and
+ * no lift (engineered panels lie flat).
+ */
+export function shakeCourses(): ShingleCourse[] {
+  const b = courseBoundaries(TILE_INCHES, TILE_INCHES / SHAKE_COURSES);
+  const out: ShingleCourse[] = [];
+  for (let k = 0; k + 1 < b.length; k++) {
+    const rand = seeded(k * 197 + 11);
+    const joints = shingleJoints(k, TILE_INCHES, rand, SHAKE_WIDTH.min, SHAKE_WIDTH.max);
+    const shingles = joints.map((x0, j) => ({
+      x0,
+      x1: j + 1 < joints.length ? joints[j + 1] : TILE_INCHES + joints[0],
+      shade: 0.98 + rand() * 0.04,
+      warmth: 0,
+      lift: 0,
+    }));
+    out.push({ y0: b[k], y1: b[k + 1], shingles });
+  }
+  return out;
 }
 
 /** The shingle courses of a tile, bottom to top: staggered joints (shingleJoints) and each shingle's looks. */
@@ -216,8 +244,8 @@ export function sidingHeight(finish: WallFinish): Float32Array | null {
   if (finish === 'clapboard') {
     const b = courseBoundaries(TILE_INCHES, CLAPBOARD_COURSE);
     for (let k = 0; k + 1 < b.length; k++) heightRect(f, { x0: 0, y0: b[k], x1: TILE_INCHES, y1: b[k + 1] }, (_, fy) => RELIEF.lap * (1 - fy));
-  } else if (finish === 'shingle') {
-    const courses = shingleCourses();
+  } else if (finish === 'shingle' || finish === 'shake') {
+    const courses = finish === 'shake' ? shakeCourses() : shingleCourses();
     for (const c of courses) {
       for (const s of c.shingles) heightRect(f, { x0: s.x0, y0: c.y0, x1: s.x1, y1: c.y1 }, (_, fy) => RELIEF.butt * (1 - fy) + s.lift);
     }
@@ -437,6 +465,25 @@ function drawShingle(ctx: Ctx, color: string): void {
   for (const c of courses) lapShadow(ctx, c.y1, BUTT_SHADOW);
 }
 
+/** Painted shakes: an even painted tone, a faint texture, dark keyways, a shadow under each butt. */
+function drawShake(ctx: Ctx, color: string): void {
+  const rand = seeded(31);
+  const courses = shakeCourses();
+  for (const c of courses) {
+    for (const s of c.shingles) {
+      rect(ctx, s.x0, c.y0, s.x1, c.y1, shade(color, s.shade));
+      // Embossed grain, faint under the paint.
+      grain(ctx, rand, 'y', { x0: s.x0, y0: c.y0, x1: s.x1, y1: c.y1 }, Math.round((s.x1 - s.x0) * 0.6));
+    }
+    ctx.fillStyle = shade(color, 0.6);
+    for (const s of c.shingles) {
+      const c0 = colOf(s.x0 - SHINGLE_KEYWAY / 2);
+      pixelRect(ctx, c0, rowOf(c.y1), Math.max(1, colOf(s.x0 + SHINGLE_KEYWAY / 2) - c0), rowOf(c.y0) - rowOf(c.y1));
+    }
+  }
+  for (const c of courses) lapShadow(ctx, c.y1, BUTT_SHADOW);
+}
+
 function drawBoard(ctx: Ctx, color: string): void {
   const rand = seeded(29);
   const b = courseBoundaries(TILE_INCHES, BOARD_WIDTH);
@@ -569,6 +616,7 @@ export function sidingTextures(finish: WallFinish, color: string, variant: Textu
   const { canvas, ctx } = tile;
   if (finish === 'clapboard') drawClapboard(ctx, color);
   else if (finish === 'shingle') drawShingle(ctx, color);
+  else if (finish === 'shake') drawShake(ctx, color);
   else if (finish === 'board') drawBoard(ctx, color);
   else if (finish === 'block') drawBlock(ctx, color);
   else drawScreen(ctx);
@@ -980,6 +1028,7 @@ const wrapAcross = (dx: number): number => dx - ROOF_TILE.across * Math.round(dx
  * sunk to the course underneath.
  */
 export function roofHeight(finish: RoofFinish): Float32Array {
+  if (finish === 'seam') return seamHeight();
   const f = new Float32Array(TEXTURE_PX * TEXTURE_PX);
   if (finish === 'metal') {
     for (let col = 0; col < TEXTURE_PX; col++) {
@@ -1115,6 +1164,84 @@ function drawRoofShingle(ctx: Ctx, color: string): void {
   }
 }
 
+// Standing seam: flat pans between raised seams every SEAM_SPACING across the slope. The texture is
+// SEAM_TILE (48") square, so it covers two of the roof's 24" UV tiles across (repeat 0.5 across, 1
+// down) and the seams land every 16" on the roof.
+
+export const SEAM_SPACING = 16;
+export const SEAM_TILE = 48;
+/** How far a seam stands above the pan, and its width at the top (the taper either side is extra). */
+export const SEAM_HEIGHT = 1;
+export const SEAM_WIDTH = 0.75;
+/** Pixels per inch of the seam texture, both ways. */
+export const SEAM_PX = TEXTURE_PX / SEAM_TILE;
+
+/** The seams' positions across the texture, inches: 0, 16 and 32. */
+export const seamPositions = (): number[] => Array.from({ length: Math.round(SEAM_TILE / SEAM_SPACING) }, (_, i) => i * SEAM_SPACING);
+
+/** Distance across the texture from x to the nearest seam, inches (the texture wraps). */
+function seamDistance(x: number): number {
+  const d = (((x % SEAM_SPACING) + SEAM_SPACING) % SEAM_SPACING);
+  return Math.min(d, SEAM_SPACING - d);
+}
+
+/**
+ * The relief of a standing-seam roof, inches in canvas order (every row the same): each seam
+ * SEAM_HEIGHT tall and SEAM_WIDTH across its top, sloping to the pan over 1/4" either side, and two
+ * faint pencil ribs in each pan.
+ */
+export function seamHeight(): Float32Array {
+  const f = new Float32Array(TEXTURE_PX * TEXTURE_PX);
+  for (let col = 0; col < TEXTURE_PX; col++) {
+    const x = (col + 0.5) / SEAM_PX;
+    const d = seamDistance(x);
+    const half = SEAM_WIDTH / 2;
+    let h = d <= half ? SEAM_HEIGHT : d <= half + 0.25 ? SEAM_HEIGHT * (1 - (d - half) / 0.25) : 0;
+    for (const rib of [SEAM_SPACING / 3, (2 * SEAM_SPACING) / 3]) {
+      const r = Math.abs((((x - rib) % SEAM_SPACING) + SEAM_SPACING) % SEAM_SPACING);
+      const dr = Math.min(r, SEAM_SPACING - r);
+      if (dr < 0.2) h = Math.max(h, 0.05 * (1 - dr / 0.2));
+    }
+    for (let row = 0; row < TEXTURE_PX; row++) f[row * TEXTURE_PX + col] = h;
+  }
+  return f;
+}
+
+/** Standing seam: each pan a shade apart, faint streaks down the slope, the seams lit on one side and shaded on the other. */
+function drawSeam(ctx: Ctx, color: string): void {
+  const rand = seeded(97);
+  const pans = seamPositions();
+  for (const x0 of pans) {
+    ctx.fillStyle = shade(color, 0.97 + rand() * 0.06);
+    ctx.fillRect(Math.round(x0 * SEAM_PX), 0, Math.round(SEAM_SPACING * SEAM_PX), TEXTURE_PX);
+  }
+  // Faint streaks down the slope (the coating's roll marks).
+  for (let k = 0; k < 160; k++) {
+    const dark = rand() < 0.5;
+    ctx.fillStyle = dark ? `rgba(0, 0, 0, ${(0.02 + rand() * 0.03).toFixed(3)})` : `rgba(255, 255, 255, ${(0.015 + rand() * 0.025).toFixed(3)})`;
+    ctx.fillRect(Math.floor(rand() * TEXTURE_PX), 0, 1, TEXTURE_PX);
+  }
+  for (const x of pans) {
+    const c = Math.round(x * SEAM_PX);
+    const w = Math.max(2, Math.round(SEAM_WIDTH * SEAM_PX));
+    // The seam's top, a little lighter; a highlight on its lit side and a shadow on the other.
+    ctx.fillStyle = shade(color, 1.12);
+    pixelRect(ctx, c - Math.floor(w / 2), 0, w, TEXTURE_PX);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    pixelRect(ctx, c - Math.floor(w / 2) - 1, 0, 1, TEXTURE_PX);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    pixelRect(ctx, c + Math.ceil(w / 2), 0, 2, TEXTURE_PX);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    pixelRect(ctx, c + Math.ceil(w / 2) + 2, 0, 3, TEXTURE_PX);
+  }
+}
+
+/** A seam texture repeats once per 48" across the slope: half a roof UV tile's repeat across. */
+function seamRepeat(tex: CanvasTexture): CanvasTexture {
+  tex.repeat.set(ROOF_TILE.across / SEAM_TILE, 1);
+  return tex;
+}
+
 const roofNormalCache = new Map<RoofFinish, CanvasTexture | null>();
 
 /** The normal map of a roof finish (the relief does not depend on the colour), made once. */
@@ -1125,10 +1252,12 @@ function roofNormalTexture(finish: RoofFinish): CanvasTexture | null {
   let tex: CanvasTexture | null = null;
   if (tile) {
     const img = tile.ctx.createImageData(TEXTURE_PX, TEXTURE_PX);
-    normalFromHeight(roofHeight(finish), TEXTURE_PX, ROOF_PX_ACROSS, img.data, ROOF_PX_DOWN);
+    if (finish === 'seam') normalFromHeight(roofHeight(finish), TEXTURE_PX, SEAM_PX, img.data, SEAM_PX);
+    else normalFromHeight(roofHeight(finish), TEXTURE_PX, ROOF_PX_ACROSS, img.data, ROOF_PX_DOWN);
     tile.ctx.putImageData(img, 0, 0);
     // Directions, not colours: no colour space conversion.
     tex = tileTexture(tile.canvas, NoColorSpace, 1);
+    if (finish === 'seam') seamRepeat(tex);
   }
   roofNormalCache.set(finish, tex);
   return tex;
@@ -1156,8 +1285,11 @@ export function roofTexture(finish: RoofFinish, color: string, weathering: numbe
     return null;
   }
   if (finish === 'metal') drawMetal(tile.ctx, color, w);
+  else if (finish === 'seam') drawSeam(tile.ctx, color);
   else drawRoofShingle(tile.ctx, color);
-  const out = { map: tileTexture(tile.canvas, SRGBColorSpace, 1), normalMap: roofNormalTexture(finish) };
+  const map = tileTexture(tile.canvas, SRGBColorSpace, 1);
+  if (finish === 'seam') seamRepeat(map);
+  const out = { map, normalMap: roofNormalTexture(finish) };
   roofCache.set(key, out);
   return out;
 }

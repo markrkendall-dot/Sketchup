@@ -18,7 +18,7 @@ export interface Node {
 
 export type WallKind = 'exterior' | 'interior';
 /** How a wall's face is dressed in 3D (DESIGN.md "Exterior appearance"). */
-export type WallFinish = 'clapboard' | 'shingle' | 'board' | 'block' | 'plain' | 'screen';
+export type WallFinish = 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'plain' | 'screen';
 /** How a room dresses the faces of the walls round it (DESIGN.md "Interior finishes"). */
 export type RoomWallFinish = 'paint' | 'boards' | 'pine' | 'check';
 /** How a room's floor is dressed: a flat colour, painted boards, square tiles or parquet. */
@@ -124,7 +124,8 @@ export interface Stairs {
 }
 
 export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';
-export type RoofFinish = 'metal' | 'shingle';
+/** Corrugated metal, asphalt shingle, or standing-seam metal. */
+export type RoofFinish = 'metal' | 'shingle' | 'seam';
 /** How a roof's eaves are finished: a fascia board, or open with the rafter tails showing. */
 export type RoofEave = 'fascia' | 'open';
 
@@ -283,6 +284,26 @@ export interface PlanSettings {
   defaultInteriorThickness: Inches;
 }
 
+/**
+ * How the house looks after the work (DESIGN.md "The proposed look"): shown in the Proposed view
+ * only, over every siding wall, roof and window, so a re-side, re-roof or new windows need no
+ * redrawing. Every field optional; absent, the elements keep their own look.
+ */
+export interface ProposedLook {
+  /** Exterior walls in a siding finish (shingle, shake, clapboard, board). */
+  wallFinish?: WallFinish;
+  wallColor?: string;
+  roofFinish?: RoofFinish;
+  roofColor?: string;
+  /** Fascia, rake boards and rafter tails. */
+  boardColor?: string;
+  /** Window and door trim (casings and sills), and window sashes and door frames. */
+  trimColor?: string;
+  sashColor?: string;
+  /** false takes the shutters off. */
+  shutters?: boolean;
+}
+
 export interface Plan {
   schemaVersion: 3;
   id: Id;
@@ -293,4 +314,5 @@ export interface Plan {
   settings: PlanSettings;
   site: Site;
   modifiedAt: string;
+  proposedLook?: ProposedLook;
 }

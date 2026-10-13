@@ -3,10 +3,11 @@ import type { Column, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish,
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
 
-export const WALL_FINISHES: readonly WallFinish[] = ['shingle', 'clapboard', 'board', 'block', 'plain', 'screen'];
+export const WALL_FINISHES: readonly WallFinish[] = ['shingle', 'shake', 'clapboard', 'board', 'block', 'plain', 'screen'];
 
 export const WALL_FINISH_LABEL: Record<WallFinish, string> = {
   shingle: 'Shingle',
+  shake: 'Painted shakes',
   clapboard: 'Clapboard',
   board: 'Vertical board',
   block: 'Concrete block',
@@ -71,7 +72,14 @@ export function floorLookOf(r: Pick<Room, 'floorFinish' | 'floorColor'>): Interi
 }
 
 /** Roof surface colours by finish: corrugated metal grey-brown, asphalt shingle dark grey. */
-export const ROOF_COLOR: Record<RoofFinish, string> = { metal: '#6e6259', shingle: '#4a4a4a' };
+export const ROOF_COLOR: Record<RoofFinish, string> = { metal: '#6e6259', shingle: '#4a4a4a', seam: '#4f5a52' };
+export const ROOF_FINISHES: readonly RoofFinish[] = ['metal', 'seam', 'shingle'];
+/** Metal roofs (corrugated or standing seam): a ridge cap and a sheen. */
+export const isMetalRoof = (f: RoofFinish): boolean => f !== 'shingle';
+/** Siding finishes: the walls a proposed look re-sides (not block, plain or screen). */
+export const SIDING_FINISHES: readonly WallFinish[] = ['shingle', 'shake', 'clapboard', 'board'];
+/** The window sash (and door frame) colour by default: off-white. */
+export const DEFAULT_SASH_COLOR = '#f4f1ea';
 export const roofColorOf = (r: Pick<Roof, 'finish' | 'color'>): string => r.color ?? ROOF_COLOR[r.finish];
 
 /** Fascia and rake boards, and the trim round openings: tan. */

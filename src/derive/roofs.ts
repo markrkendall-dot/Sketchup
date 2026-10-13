@@ -1,5 +1,5 @@
 import { add, clipHalfPlane, cross, dist, dot, lineIntersection, normalize, pointInPolygon, polygonSignedArea, projectPointToSegment, scale, sub } from '../model/geometry';
-import { rafterOf, roofEaveOf } from '../model/finish';
+import { isMetalRoof, rafterOf, roofEaveOf } from '../model/finish';
 import type { Roof, RoofShape, Vec2 } from '../model/types';
 import { insetPolygon } from './rooms';
 import { directionVector } from './stairs';
@@ -422,7 +422,7 @@ export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
       if (Math.hypot(q.x - p.x, q.y - p.y) > 1e-6 && onPolygonEdge(p, q, over)) segs.push({ p, q, plane: r.plane });
     }
   }
-  const ridge = roof.finish === 'metal' && (roof.shape === 'gable' || roof.shape === 'hip') ? ridgeCap(regions, over, T) : [];
+  const ridge = isMetalRoof(roof.finish) && (roof.shape === 'gable' || roof.shape === 'hip') ? ridgeCap(regions, over, T) : [];
   const boards: number[][] = [];
   const rafters: number[][] = [];
   if (segs.length === 0) return { slab, boards, rafters, ridge };

@@ -3,7 +3,7 @@ import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
 import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
-import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture } from './groundTexture';
 import { brickTextures, interiorTextures, NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures, type InteriorTexture } from './textures';
@@ -204,6 +204,7 @@ const roofFlatColor = (phase: Phase, color: string): string => (phase === 'new' 
  * Without a canvas (node, tests) the flat colour is used.
  */
 export function roofMaterial(finish: RoofFinish, phase: Phase, color: string = ROOF_COLOR[finish], weathering: number = DEFAULT_WEATHERING): MeshStandardMaterial {
+  // Only corrugated metal rusts; standing seam is drawn clean.
   const w = finish === 'metal' && phase !== 'new' ? quantizeWeathering(weathering) : 0;
   const key = phase === 'demo' ? 'demo' : `${finish}|${phase}|${color}|${w}`;
   let m = roofMaterials.get(key);
@@ -221,7 +222,7 @@ export function roofMaterial(finish: RoofFinish, phase: Phase, color: string = R
         }
         m.userData.flatColor = flat;
       }
-      if (finish === 'metal') {
+      if (isMetalRoof(finish)) {
         m.metalness = 0.35;
         m.roughness = 0.55;
       }
@@ -257,7 +258,7 @@ function trimLike(name: string, color: string, phase: Phase): MeshStandardMateri
 /** Window and door parts: tan trim, white sash and muntins, dark green leaf (unless coloured), green shutters. */
 const OPENING_COLOR: Record<Exclude<FillPart, 'glass' | 'screen'>, string> = {
   trim: TRIM_COLOR,
-  sash: '#f4f1ea',
+  sash: DEFAULT_SASH_COLOR,
   leaf: DEFAULT_LEAF_COLOR,
   shutter: '#3f6f5f',
 };
@@ -293,12 +294,13 @@ function screenMaterial(phase: Phase): MeshStandardMaterial {
 }
 
 /**
- * The material of a window or door part. `color` is the door leaf's colour (OpeningMesh.leafColor);
- * the other parts keep theirs.
+ * The material of a window or door part. `color` is that part's colour where it has one of its own
+ * (the door leaf's OpeningMesh.leafColor, the trim's and sash's trimColor and sashColor); the
+ * shutters keep theirs.
  */
 export function openingMaterial(part: FillPart, phase: Phase, color?: string): MeshStandardMaterial {
   if (part === 'screen') return screenMaterial(phase);
-  if (part !== 'glass') return trimLike(part, part === 'leaf' && color ? color : OPENING_COLOR[part], phase);
+  if (part !== 'glass') return trimLike(part, part !== 'shutter' && color ? color : OPENING_COLOR[part], phase);
   const key = `glass|${phase}`;
   let m = partMaterials.get(key);
   if (!m) {

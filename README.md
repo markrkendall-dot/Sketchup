@@ -124,6 +124,11 @@ Once the walls are in, these make the 3D model look like the house.
   wall of the level at once; the Wall panel sets one wall: shingle, clapboard, vertical board,
   concrete block (for a foundation), plain or screen. The siding, brick and roof textures are in
   the 3D view only: the export carries their colours.
+- **The look after the work.** The Level panel's "Proposed ..." fields re-side, re-roof and re-trim
+  the whole house without redrawing it: siding and colour (painted shakes among the finishes),
+  roof and colour (standing seam among them), roof boards, window trim and sash colours, and
+  shutters kept or removed. They show in the Proposed view only; Existing and All keep today's
+  look.
 - **Interior finishes.** Select a room's label: its panel sets "Walls" (paint, painted boards,
   knotty pine or check wallpaper) with "Wall colour", a "Wainscot" (a lower band in another finish,
   with its height and colour) and "Floor" (plain, boards, tile or parquet) with "Floor colour".
@@ -633,6 +638,11 @@ Five changes, all on the First Floor:
    timber posts in the stain and a shed roof high at the house wall. The Living's west window,
    which now looks into the porch, is replaced by the same window without shutters. The foyer
    stands on 8" block walls (a crawl space) like the east addition; the screen porch on its posts.
+
+**After the work** (MK, after his garage across the road), the Proposed view shows the whole house
+re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
+roof (`#2f4a36`) with its rake and fascia boards in the shake brown, with black windows (`#1c1c1c`)
+trimmed in red (`#a8322d`) and the shutters off. Existing and All keep today's look.
 
 The new rooms have **placeholder** finishes until you choose them (off-white paint, wood board
 floors, tile in the baths and the foyer, a wood floor on the screen porch), which also cover the

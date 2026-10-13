@@ -3597,5 +3597,15 @@
       }
     }
   },
-  "modifiedAt": "2026-01-01T00:00:00.000Z"
+  "modifiedAt": "2026-01-01T00:00:00.000Z",
+  "proposedLook": {
+    "wallFinish": "shake",
+    "wallColor": "#4b3a32",
+    "roofFinish": "seam",
+    "roofColor": "#2f4a36",
+    "boardColor": "#4b3a32",
+    "trimColor": "#a8322d",
+    "sashColor": "#1c1c1c",
+    "shutters": false
+  }
 }

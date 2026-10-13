@@ -12,7 +12,7 @@ import { isOpeningVisible, isVisible, shownPhase } from './phase';
 import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, wallSideFaces, type FaceSet } from './rooms';
 import { CHIMNEY_CAP, chimneyPartBoxes, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
-import { boardColorOf, roofColorOf, ROOF_TILE, weatheringOf } from '../model/finish';
+import { boardColorOf, DEFAULT_SASH_COLOR, ROOF_COLOR, roofColorOf, ROOF_TILE, SIDING_FINISHES, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsPoint } from './stairs';
 
@@ -1023,8 +1023,16 @@ export interface OpeningMesh {
   phase: Phase;
   /** The door leaf's colour after the default (model/finish.ts leafColorOf); windows carry the default. */
   leafColor: string;
+  /** The trim (casings, sill) and sash (and door frame) colours: the defaults, or the proposed look's in Proposed. */
+  trimColor: string;
+  sashColor: string;
   /** One merged geometry per material part, level-local like the walls. */
   parts: { part: FillPart; geometry: BufferGeometry }[];
+}
+
+/** The colour of an opening's part where the part has one of its own: the leaf, the trim, the sash. */
+export function openingPartColor(o: Pick<OpeningMesh, 'leafColor' | 'trimColor' | 'sashColor'>, part: FillPart): string | undefined {
+  return part === 'leaf' ? o.leafColor : part === 'trim' ? o.trimColor : part === 'sash' ? o.sashColor : undefined;
 }
 
 export interface LevelMeshes {
@@ -1099,6 +1107,8 @@ interface StairsEntry {
 
 interface RoofEntry {
   roof: Roof;
+  /** The finish it was built for (the proposed look's can differ from the roof's: the ridge cap follows). */
+  finish: Roof['finish'];
   bearing: number;
   geometry: BufferGeometry;
   fascia: BufferGeometry | null;
@@ -1111,6 +1121,8 @@ interface OpeningEntry {
   wall: Wall;
   height: number;
   side: 1 | -1;
+  /** Built without its shutters (the proposed look takes them off). */
+  noShutters: boolean;
   parts: OpeningMesh['parts'];
 }
 
@@ -1121,6 +1133,8 @@ interface LevelEntry {
   /** The neighbours the platform framing reads: walls through the slab above, slab inset by the walls below. */
   above: Level | undefined;
   below: Level | undefined;
+  /** The plan's proposed look, which the Proposed view's meshes follow. */
+  look: Plan['proposedLook'];
   result: LevelMeshes;
 }
 
@@ -1248,12 +1262,14 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const key = `${levelId}|${viewMode}`;
   // Every mesh carries the phase it is drawn in (phase.ts shownPhase): red and green only in All.
   const sp = (p: Phase): Phase => shownPhase(p, viewMode);
+  // The house after the work (types.ts ProposedLook): siding, roofs and windows, in Proposed only.
+  const look = viewMode === 'proposed' ? plan.proposedLook : undefined;
   const idx = plan.levelOrder.indexOf(levelId);
   const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
   const ftf = floorToFloor(plan, levelId);
   const aboveLevel = idx >= 0 ? plan.levels[plan.levelOrder[idx + 1]] : undefined;
   const hit = levelCache.get(key);
-  if (hit && hit.level === level && hit.belowStairs === below?.stairs && hit.ftf === ftf && hit.above === aboveLevel && hit.below === below) return hit.result;
+  if (hit && hit.level === level && hit.belowStairs === below?.stairs && hit.ftf === ftf && hit.above === aboveLevel && hit.below === below && hit.look === plan.proposedLook) return hit.result;
   pruneCaches(plan);
 
   // Walls.
@@ -1387,13 +1403,15 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       const look = part.band === 'wainscot' && s.wainscot ? s.wainscot : (s.look ?? { finish: 'paint' as const, color: DEFAULT_INTERIOR_COLOR });
       return { roomId: s.room.id, side: part.side, band: part.band, geometry: part.geometry, finish: look.finish, color: look.color };
     });
+    // A re-sided wall: an exterior wall in a siding finish takes the proposed look's.
+    const resided = !!look && wall.kind === 'exterior' && SIDING_FINISHES.includes(wallFinishOf(wall));
     walls.push({
       id: wall.id,
       geometry: entry.split ? entry.split.core : entry.geometry,
       phase: sp(wall.phase),
       kind: wall.kind,
-      finish: wallFinishOf(wall),
-      color: wallColorOf(wall),
+      finish: (resided && look.wallFinish) || wallFinishOf(wall),
+      color: (resided && look.wallColor) || wallColorOf(wall),
       ...(dressed ? { faces: dressed } : {}),
     });
   }
@@ -1477,8 +1495,14 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const nextRoofs = new Map<Id, RoofEntry>();
   const roofs: RoofMesh[] = [];
   for (const { roof, bearing } of roofsOnLevel) {
+    // A re-roof: the proposed look's finish and colour, new (no weathering), its board colour.
+    const finish = look?.roofFinish ?? roof.finish;
+    const reroofed = !!look && (look.roofFinish !== undefined || look.roofColor !== undefined);
     const old = prevRoofs?.get(roof.id);
-    const entry: RoofEntry = old && old.roof === roof && old.bearing === bearing ? old : { roof, bearing, ...roofParts(roof, bearing) };
+    const entry: RoofEntry =
+      old && old.roof === roof && old.finish === finish && old.bearing === bearing
+        ? old
+        : { roof, finish, bearing, ...roofParts(finish === roof.finish ? roof : { ...roof, finish }, bearing) };
     nextRoofs.set(roof.id, entry);
     roofs.push({
       id: roof.id,
@@ -1486,10 +1510,10 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       fascia: entry.fascia,
       rafters: entry.rafters,
       phase: sp(roof.phase),
-      finish: roof.finish,
-      color: roofColorOf(roof),
-      boardColor: boardColorOf(roof),
-      weathering: weatheringOf(roof),
+      finish,
+      color: look?.roofColor ?? (look?.roofFinish ? ROOF_COLOR[look.roofFinish] : roofColorOf(roof)),
+      boardColor: look?.boardColor ?? boardColorOf(roof),
+      weathering: reroofed ? 0 : weatheringOf(roof),
     });
   }
   if (prevRoofs) for (const [id, e] of prevRoofs) if (nextRoofs.get(id) !== e) disposeEntry(e);
@@ -1509,13 +1533,24 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       if (o.type === 'passage' || !isOpeningVisible(o, wall, viewMode)) continue;
       side ??= outwardSide(fp, wall, faces, centroid);
       const height = heightOf(wall);
+      const noShutters = look?.shutters === false && !!o.shutters;
       const old = prevFills?.get(o.id);
       const entry: OpeningEntry =
-        old && old.fp === fp && old.opening === o && old.wall === wall && old.height === height && old.side === side
+        old && old.fp === fp && old.opening === o && old.wall === wall && old.height === height && old.side === side && old.noShutters === noShutters
           ? old
-          : { fp, opening: o, wall, height, side, parts: buildOpeningFill(fp, o, height, side) };
+          : { fp, opening: o, wall, height, side, noShutters, parts: buildOpeningFill(fp, noShutters ? { ...o, shutters: false } : o, height, side) };
       nextFills.set(o.id, entry);
-      if (entry.parts.length) openingMeshes.push({ id: o.id, type: o.type, phase: sp(o.phase), leafColor: leafColorOf(o), parts: entry.parts });
+      if (entry.parts.length) {
+        openingMeshes.push({
+          id: o.id,
+          type: o.type,
+          phase: sp(o.phase),
+          leafColor: leafColorOf(o),
+          trimColor: look?.trimColor ?? TRIM_COLOR,
+          sashColor: look?.sashColor ?? DEFAULT_SASH_COLOR,
+          parts: entry.parts,
+        });
+      }
     }
   }
   if (prevFills) for (const [id, e] of prevFills) if (nextFills.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
@@ -1556,7 +1591,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   }
 
   const result: LevelMeshes = { walls, floorFinishes, stairs, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
-  levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, result });
+  levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, look: plan.proposedLook, result });
   return result;
 }
 

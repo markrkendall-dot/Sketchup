@@ -4,10 +4,10 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
 import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
-import { getLevelMeshes, getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
+import { getLevelMeshes, getSiteMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
 import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
-import { COLUMN_COLOR, DEFAULT_LEAF_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import { COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FixtureKind, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
 import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
@@ -43,9 +43,15 @@ const roofMaterialName = (finish: RoofFinish, phase: Phase, color: string) =>
 const boardMaterialName = (part: 'fascia' | 'rafter', phase: Phase, color: string) =>
   phase === 'demo' || color === TRIM_COLOR ? `${part}_${phase}` : `${part}_${phase}_${color.slice(1)}`;
 const OPENING_MATERIAL: Record<FillPart, string> = { trim: 'trim', sash: 'sash', glass: 'glass', screen: 'screen', leaf: 'door_leaf', shutter: 'shutter' };
-/** `door_leaf_<hex>` for a leaf not in the default colour (a demolished one is red whatever its colour), then `_new` / `_demo`. */
-const openingMaterialName = (part: FillPart, phase: Phase, color: string = DEFAULT_LEAF_COLOR) => {
-  const base = part === 'leaf' && phase !== 'demo' && color !== DEFAULT_LEAF_COLOR ? `${OPENING_MATERIAL[part]}_${color.slice(1)}` : OPENING_MATERIAL[part];
+/** The default colour of the parts that can take their own (the leaf, the trim, the sash). */
+const PART_DEFAULT: Partial<Record<FillPart, string>> = { leaf: DEFAULT_LEAF_COLOR, trim: TRIM_COLOR, sash: DEFAULT_SASH_COLOR };
+/**
+ * `door_leaf_<hex>`, `trim_<hex>` or `sash_<hex>` for a part not in its default colour (a demolished
+ * one is red whatever its colour), then `_new` / `_demo`.
+ */
+const openingMaterialName = (part: FillPart, phase: Phase, color?: string) => {
+  const def = PART_DEFAULT[part];
+  const base = def && color && phase !== 'demo' && color !== def ? `${OPENING_MATERIAL[part]}_${color.slice(1)}` : OPENING_MATERIAL[part];
   return phase === 'existing' ? base : `${base}_${phase}`;
 };
 /** `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the kind's default (a demolished one is red whatever its colour). */
@@ -149,7 +155,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     // Windows and doors: one mesh per material part, named Window or Door.
     for (const o of meshes.openings) {
       for (const p of o.parts) {
-        const m = mesh(o.type === 'door' ? 'Door' : 'Window', p.geometry, material(openingMaterialName(p.part, o.phase, o.leafColor), openingMaterial(p.part, o.phase, o.leafColor)));
+        const m = mesh(o.type === 'door' ? 'Door' : 'Window', p.geometry, material(openingMaterialName(p.part, o.phase, openingPartColor(o, p.part)), openingMaterial(p.part, o.phase, openingPartColor(o, p.part))));
         if (o.phase === 'demo' || p.part === 'glass') m.renderOrder = 1;
         group.add(m);
       }

@@ -2,10 +2,10 @@ import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
-import { FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
+import { FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
 import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
-import type { Column, Fixture, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, Roof, RoofEave, RoofShape, Room, RoomWallFinish, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { Column, Fixture, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 3 as const;
@@ -529,7 +529,8 @@ const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 
 const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang'] as const;
 const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'finishes', 'underlay'] as const;
-const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
+const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
 
 function migrateNodes(raw: Json, where: string): Level['nodes'] {
@@ -599,6 +600,17 @@ function migrateOpenings(raw: Json, walls: Level['walls']): Level['openings'] {
     out[oid] = opening as unknown as Opening;
   }
   return out;
+}
+
+/** The proposed look (types.ts ProposedLook): each valid field kept, the rest dropped; undefined when none is left. */
+function migrateProposedLook(raw: unknown): ProposedLook | undefined {
+  if (!isObject(raw)) return undefined;
+  const look = pick(raw, PROPOSED_LOOK_KEYS);
+  put(look, 'wallFinish', typeof raw.wallFinish === 'string' && WALL_FINISHES.includes(raw.wallFinish as WallFinish) ? raw.wallFinish : undefined);
+  put(look, 'roofFinish', typeof raw.roofFinish === 'string' && ROOF_FINISHES.includes(raw.roofFinish as RoofFinish) ? raw.roofFinish : undefined);
+  for (const k of ['wallColor', 'roofColor', 'boardColor', 'trimColor', 'sashColor'] as const) put(look, k, isHexColor(raw[k]) ? (raw[k] as string).toLowerCase() : undefined);
+  put(look, 'shutters', typeof raw.shutters === 'boolean' ? raw.shutters : undefined);
+  return Object.keys(look).length ? (look as ProposedLook) : undefined;
 }
 
 function migrateRooms(raw: Json): Level['rooms'] {
@@ -732,7 +744,7 @@ function migrateRoofs(raw: Json, where: string): Level['roofs'] {
     roof.shape = r.shape as RoofShape;
     roof.outline = (r.outline as Vec2[]).map((p) => ({ x: p.x, y: p.y }));
     roof.phase = phaseOf(r.phase);
-    roof.finish = r.finish === 'shingle' ? 'shingle' : 'metal';
+    roof.finish = typeof r.finish === 'string' && ROOF_FINISHES.includes(r.finish as RoofFinish) ? r.finish : 'metal';
     put(roof, 'color', isHexColor(r.color) ? r.color.toLowerCase() : undefined);
     // Optional eave and appearance fields: kept when valid, dropped otherwise (the defaults apply).
     put(roof, 'eave', typeof r.eave === 'string' && ROOF_EAVES.includes(r.eave as RoofEave) ? r.eave : undefined);
@@ -930,5 +942,6 @@ export function migrate(json: unknown): Plan {
   plan.settings = migrateSettings(record(doc.settings, 'settings'));
   plan.site = migrateSite(doc.site);
   plan.modifiedAt = typeof doc.modifiedAt === 'string' ? doc.modifiedAt : new Date().toISOString();
+  put(plan, 'proposedLook', migrateProposedLook(doc.proposedLook));
   return plan as unknown as Plan;
 }

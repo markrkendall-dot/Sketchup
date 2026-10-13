@@ -21,7 +21,7 @@ import {
   wallOverlapping,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
-import type { Column, Fixture, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Column, Fixture, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
@@ -226,6 +226,11 @@ export interface PlanState {
    */
   copyWallsFromLevel: (fromId: Id, toId: Id) => { copied: number; skipped: number };
   updateSettings: (patch: Partial<PlanSettings>) => void;
+  /**
+   * Set or clear fields of the plan's proposed look (types.ts ProposedLook): undefined clears a
+   * field, colours are stored lower-case, an empty look is removed. One undo step.
+   */
+  updateProposedLook: (patch: Partial<ProposedLook>) => void;
   renameLevel: (levelId: Id, name: string) => void;
   updateLevel: (levelId: Id, patch: LevelPatch) => void;
   setBaseFloorElevation: (elevation: number) => void;
@@ -1103,6 +1108,18 @@ export const usePlanStore = create<PlanState>()(
         updateSettings: (patch) =>
           set((s) => {
             Object.assign(s.plan.settings, patch);
+            touch(s.plan);
+          }),
+
+        updateProposedLook: (patch) =>
+          set((s) => {
+            const look: Record<string, unknown> = { ...(s.plan.proposedLook ?? {}) };
+            for (const [k, v] of Object.entries(patch)) {
+              if (v === undefined) delete look[k];
+              else look[k] = typeof v === 'string' && k.endsWith('Color') ? v.toLowerCase() : v;
+            }
+            if (Object.keys(look).length) s.plan.proposedLook = look as ProposedLook;
+            else delete s.plan.proposedLook;
             touch(s.plan);
           }),
 

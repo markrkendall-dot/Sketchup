@@ -156,6 +156,7 @@ export interface Plan {
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
   settings: PlanSettings; site: Site; modifiedAt: string;
+  proposedLook?: ProposedLook; // the siding, roof and windows after the work (see "The proposed look")
 }
 ```
 
@@ -759,6 +760,22 @@ materials); materials `interior_<finish>_<hex>` and `floor_<finish>_<hex>`, plus
 
 Not done: ceilings (the underside of the slab above, or the roof, shows), crown, baseboards and other trim, finishes on
 window reveals, and a default interior finish for the inside faces of rooms that set none (they still show the siding).
+
+**The proposed look** (`Plan.proposedLook`, types.ts `ProposedLook`): how the house looks after the work, without
+redrawing it. Optional fields: `wallFinish` and `wallColor` for every exterior wall in a siding finish
+(`SIDING_FINISHES`: shingle, shake, clapboard, board; block, plain and screen walls and room-dressed inside faces
+keep theirs), `roofFinish`, `roofColor` and `boardColor` for every roof (a re-roofed roof has no weathering),
+`trimColor` and `sashColor` for every window and door (trim: casings and sills; sash: sashes, muntins and door
+frames; `OpeningMesh.trimColor`/`sashColor`, `openingMaterial` keys by them), and `shutters: false` to build the
+fills without shutters. `getLevelMeshes` applies it in the Proposed view only (the level cache is keyed on it);
+Existing and All keep today's look. `migrate` keeps valid fields and drops the rest (no schema bump);
+`updateProposedLook` sets and clears them as one undo step; the Level panel's "Proposed ..." fields edit it. The
+export follows (`trim_<hex>`, `sash_<hex>`). **Painted shakes** (`shake`, `shakeCourses`): 7 courses to the 48"
+tile, shakes 6" to 12" wide, painted (within 2% of the colour, no warmth, faint embossed grain), keyways and butt
+shadows like shingle, the same relief rule. **Standing seam** (roof finish `seam`): flat pans with two faint pencil
+ribs each and a seam 1" tall every 16" running down the slope (`seamHeight`, `drawSeam`); its texture is 48"
+square, so it repeats every two of the roof's 24" UV tiles across (repeat 0.5); it has the metal sheen and the
+ridge cap but no rust.
 
 **Brick** (a chimney, `textures.ts brickTextures(color)`): the siding's tile (512 px for 48", `repeat` 1/48) of
 modular brick, 2 2/3" courses (three to 8") of 8" bricks in running bond (`brickFaces`: 18 courses of 6 a tile, the

@@ -304,6 +304,28 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(plan.site.northAngle).toBe(0);
   });
 
+  it('has the target exterior in the Proposed view: brown shakes, a green standing-seam roof, black windows trimmed red', () => {
+    expect(plan.proposedLook).toEqual({
+      wallFinish: 'shake',
+      wallColor: '#4b3a32',
+      roofFinish: 'seam',
+      roofColor: '#2f4a36',
+      boardColor: '#4b3a32',
+      trimColor: '#a8322d',
+      sashColor: '#1c1c1c',
+      shutters: false,
+    });
+    const f = plan.levelOrder[1];
+    const proposed = getLevelMeshes(plan, f, 'proposed');
+    expect(new Set(proposed.walls.filter((w) => w.kind === 'exterior').map((w) => w.finish))).toEqual(new Set(['shake']));
+    expect(new Set(proposed.roofs.map((r) => r.finish))).toEqual(new Set(['seam']));
+    expect(proposed.openings.every((o) => o.trimColor === '#a8322d' && o.sashColor === '#1c1c1c' && !o.parts.some((p) => p.part === 'shutter'))).toBe(true);
+    // Today's look in Existing: shingle and clapboard, corrugated metal, shutters on the west window.
+    const existing = getLevelMeshes(plan, f, 'existing');
+    expect(existing.walls.some((w) => w.finish === 'shake')).toBe(false);
+    expect(existing.openings.some((o) => o.parts.some((p) => p.part === 'shutter'))).toBe(true);
+  });
+
   it('dresses the faces as the photos show them', () => {
     const [b, f] = plan.levelOrder.map((id) => plan.levels[id]);
     const at = (level: Level, o: Opening) => {

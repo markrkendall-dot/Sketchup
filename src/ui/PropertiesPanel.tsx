@@ -33,7 +33,7 @@ import { pointInPolygon } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
 import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
-import { DEFAULT_LEAF_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, GLAZINGS, glazingOf, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
+import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import type { Column, Fixture, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
@@ -1331,7 +1331,8 @@ function CaseworkDefaults({ level }: { level: Level }) {
 
 const roofShapeOptions = (['gable', 'shed', 'hip', 'flat'] as const).map((v) => ({ value: v, label: ROOF_SHAPE_LABEL[v] }));
 const roofFinishOptions: { value: RoofFinish; label: string }[] = [
-  { value: 'metal', label: 'Metal' },
+  { value: 'metal', label: 'Corrugated metal' },
+  { value: 'seam', label: 'Standing seam metal' },
   { value: 'shingle', label: 'Shingle' },
 ];
 const roofEaveOptions = ROOF_EAVES.map((e) => ({ value: e, label: ROOF_EAVE_LABEL[e] }));
@@ -2067,6 +2068,44 @@ function ExteriorAppearance({ level }: { level: Level }) {
   );
 }
 
+type SidingChoice = 'default' | WallFinish;
+const sidingOptions: { value: SidingChoice; label: string }[] = [
+  { value: 'default', label: 'As today' },
+  ...SIDING_FINISHES.map((f) => ({ value: f as SidingChoice, label: WALL_FINISH_LABEL[f] })),
+];
+type RoofChoice = 'default' | RoofFinish;
+const proposedRoofOptions: { value: RoofChoice; label: string }[] = [{ value: 'default', label: 'As today' }, ...roofFinishOptions];
+type ShutterChoice = 'keep' | 'remove';
+const shutterOptions: { value: ShutterChoice; label: string }[] = [
+  { value: 'keep', label: 'Keep' },
+  { value: 'remove', label: 'Remove' },
+];
+
+/**
+ * The plan's proposed look (types.ts ProposedLook): the siding, roof and windows after the work,
+ * shown in the Proposed view only. Each field has "As today" or a reset to clear it.
+ */
+function ProposedExterior() {
+  const look = usePlanStore((s) => s.plan.proposedLook);
+  const update = usePlanStore((s) => s.updateProposedLook);
+  const color = (label: string, key: 'wallColor' | 'roofColor' | 'boardColor' | 'trimColor' | 'sashColor', fallback: string, hint?: string) => (
+    <ColorField label={label} value={look?.[key] ?? fallback} onCommit={(c) => update({ [key]: c })} onReset={look?.[key] ? () => update({ [key]: undefined }) : undefined} hint={hint} />
+  );
+  return (
+    <>
+      <SelectField label="Proposed siding" value={look?.wallFinish ?? 'default'} options={sidingOptions} onChange={(v) => update({ wallFinish: v === 'default' ? undefined : v })} />
+      {color('Proposed siding colour', 'wallColor', defaultWallColor('exterior'))}
+      <SelectField label="Proposed roof" value={look?.roofFinish ?? 'default'} options={proposedRoofOptions} onChange={(v) => update({ roofFinish: v === 'default' ? undefined : v })} />
+      {color('Proposed roof colour', 'roofColor', ROOF_COLOR[look?.roofFinish ?? 'metal'])}
+      {color('Proposed roof boards', 'boardColor', TRIM_COLOR, 'Fascia, rake boards and rafter tails.')}
+      {color('Proposed window trim', 'trimColor', TRIM_COLOR)}
+      {color('Proposed window sashes', 'sashColor', DEFAULT_SASH_COLOR, 'Window sashes and door frames.')}
+      <SelectField label="Proposed shutters" value={look?.shutters === false ? 'remove' : 'keep'} options={shutterOptions} onChange={(v) => update({ shutters: v === 'remove' ? false : undefined })} />
+      <p className="panel-note">The whole house after the work, in the Proposed view only; Existing and All keep today's look.</p>
+    </>
+  );
+}
+
 function LevelProps({ level }: { level: Level }) {
   const { updateLevel, setBaseFloorElevation, updateSettings } = usePlanStore.getState();
   const extThickness = usePlanStore((s) => s.plan.settings.defaultExteriorThickness);
@@ -2146,6 +2185,7 @@ function LevelProps({ level }: { level: Level }) {
         hint="For interior walls (X). To change drawn walls, select them."
       />
       <ExteriorAppearance level={level} />
+      <ProposedExterior />
       <CaseworkDefaults level={level} />
       {floorTop !== undefined && ceiling !== undefined && (
         <>

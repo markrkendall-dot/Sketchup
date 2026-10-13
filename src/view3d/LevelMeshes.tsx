@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { getLevelElevations } from '../derive/levels';
-import { getLevelMeshes } from '../derive/meshes';
+import { getLevelMeshes, openingPartColor } from '../derive/meshes';
 import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
@@ -135,7 +135,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
               key={p.part}
               name={`opening:${o.id}:${p.part}`}
               geometry={p.geometry}
-              material={openingMaterial(p.part, o.phase, o.leafColor)}
+              material={openingMaterial(p.part, o.phase, openingPartColor(o, p.part))}
               renderOrder={o.phase === 'demo' || p.part === 'glass' || p.part === 'screen' ? 1 : 0}
               castShadow={o.phase !== 'demo' && p.part !== 'glass' && p.part !== 'screen'}
               receiveShadow

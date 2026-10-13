@@ -83,6 +83,8 @@ const WOOD_FLOOR = '#a87a4c';
  */
 const PLACEHOLDER_ROOM = { wallFinish: 'paint', floorFinish: 'boards', floorColor: WOOD_FLOOR } as const;
 const PLACEHOLDER_WET = { wallFinish: 'paint', floorFinish: 'tile' } as const;
+/** The proposed shakes' brown (and the roof boards'): the dark chocolate of MK's garage. */
+const SHAKE_BROWN = '#4b3a32';
 const FRIDGE_BLUE = '#3a5fa0';
 /**
  * Centre of the Kitchen's east window and the sink under it: the sink base comes right after the
@@ -945,6 +947,21 @@ function proposed(ids: ExistingIds): void {
   label(fId, 'Screen porch (proposed)', { x: -48, y: 236 }, NEW, { floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(bId, 'Crawl space (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 97 }, NEW);
   label(bId, 'Crawl space under the foyer (proposed)', { x: -48, y: 111 }, NEW);
+
+  // ---- The house after the work (MK, after his garage across the road): re-sided in brown painted
+  // engineered shakes (the garage's dark chocolate brown), a dark hunter green standing-seam roof
+  // with its boards in the shake brown, black windows with red trim (the garage's red), and the
+  // shutters off. Shown in the Proposed view only (types.ts ProposedLook).
+  store().updateProposedLook({
+    wallFinish: 'shake',
+    wallColor: SHAKE_BROWN,
+    roofFinish: 'seam',
+    roofColor: '#2f4a36',
+    boardColor: SHAKE_BROWN,
+    trimColor: '#a8322d',
+    sashColor: '#1c1c1c',
+    shutters: false,
+  });
 }
 
 /** The starter plan as the JSON text of docs/examples/146-mick-road.json (stable ids, fixed date). */

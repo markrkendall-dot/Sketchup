@@ -506,7 +506,7 @@ describe('opening fill meshes', () => {
 });
 
 describe('opening materials', () => {
-  it('a leaf colour keys its own material; the other parts keep theirs', () => {
+  it('a leaf, trim or sash colour keys its own material; the shutters keep theirs', () => {
     const def = openingMaterial('leaf', 'existing');
     expect(def.color.getHexString()).toBe(DEFAULT_LEAF_COLOR.slice(1));
     expect(openingMaterial('leaf', 'existing', DEFAULT_LEAF_COLOR)).toBe(def);
@@ -515,7 +515,11 @@ describe('opening materials', () => {
     expect(green.color.getHexString()).toBe('2f4a3a');
     expect(openingMaterial('leaf', 'existing', '#2f4a3a')).toBe(green);
     expect(openingMaterial('leaf', 'new', '#2f4a3a')).not.toBe(green);
-    expect(openingMaterial('sash', 'existing', '#2f4a3a')).toBe(openingMaterial('sash', 'existing'));
+    // The proposed look's black sashes and red trim (types.ts ProposedLook) key their own too.
+    expect(openingMaterial('sash', 'existing', '#1c1c1c').color.getHexString()).toBe('1c1c1c');
+    expect(openingMaterial('trim', 'existing', '#a8322d').color.getHexString()).toBe('a8322d');
+    expect(openingMaterial('sash', 'existing', '#1c1c1c')).not.toBe(openingMaterial('sash', 'existing'));
+    expect(openingMaterial('shutter', 'existing', '#2f4a3a')).toBe(openingMaterial('shutter', 'existing'));
     expect(openingMaterial('leaf', 'demo', '#2f4a3a').color.getHexString()).toBe('e0413a');
   });
 
