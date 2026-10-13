@@ -35,9 +35,10 @@ import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, GLAZINGS, glazingOf, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, trimOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
+import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import type { Column, Fixture, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
-import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor } from '../store/planStore';
+import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor, type RoomPatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { duplicateRoomNotice, showNotice } from './fileActions';
 import { roomNameOf, runWallMove, wallSideNames } from './wallMove';
@@ -540,7 +541,11 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
         value={wallColorOf(wall)}
         onCommit={(color) => updateWalls(levelId, [wall.id], { color })}
         onReset={wall.color || wall.finish ? () => updateWalls(levelId, [wall.id], { color: undefined, finish: undefined }) : undefined}
-        hint={wall.kind === 'exterior' ? 'Both faces of an exterior wall show the siding.' : undefined}
+        hint={
+          wall.kind === 'exterior'
+            ? 'Both faces of an exterior wall show the siding, except a face on the side of a room that sets its own wall finish.'
+            : 'A face on the side of a room that sets its own wall finish shows that instead.'
+        }
       />
       <WallFaceLengths level={level} wall={wall} />
       <MoveWall level={level} wall={wall} />
@@ -927,6 +932,7 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
         options={phaseOptions}
         onChange={(p) => updateRoom(level.id, room.id, { phase: p === 'existing' ? undefined : p })}
       />
+      <RoomFinishes levelId={level.id} room={room} wallHeight={level.wallHeight} />
       {face ? (
         <>
           <ReadOnly label="Net area">{formatArea(face.netArea)}</ReadOnly>
@@ -941,6 +947,81 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
             : 'Not inside an area closed in by walls in this view. Drag the label into a room, or close the walls around it.'}
         </p>
       )}
+    </>
+  );
+}
+
+type RoomWallChoice = 'default' | (typeof ROOM_WALL_FINISHES)[number];
+const roomWallOptions: { value: RoomWallChoice; label: string }[] = [{ value: 'default', label: 'Default (the wall\'s own)' }, ...ROOM_WALL_FINISHES.map((f) => ({ value: f, label: ROOM_WALL_FINISH_LABEL[f] }))];
+type WainscotChoice = 'none' | (typeof ROOM_WALL_FINISHES)[number];
+const wainscotOptions: { value: WainscotChoice; label: string }[] = [{ value: 'none', label: 'None' }, ...ROOM_WALL_FINISHES.map((f) => ({ value: f, label: ROOM_WALL_FINISH_LABEL[f] }))];
+type FloorChoice = 'default' | (typeof FLOOR_FINISHES)[number];
+const floorOptions: { value: FloorChoice; label: string }[] = [{ value: 'default', label: 'Default (the slab)' }, ...FLOOR_FINISHES.map((f) => ({ value: f, label: FLOOR_FINISH_LABEL[f] }))];
+/** A new wainscot's height: a common chair-rail height. */
+const DEFAULT_WAINSCOT = 36;
+
+/**
+ * A room's interior finishes (DESIGN.md "Interior finishes"): its walls' finish and colour, a
+ * wainscot, and its floor. Each is one undo step; "Default" clears it.
+ */
+function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; wallHeight: number }) {
+  const updateRoom = usePlanStore((s) => s.updateRoom);
+  const set = (patch: RoomPatch) => updateRoom(levelId, room.id, patch);
+  const wall = roomWallLookOf(room);
+  const floor = floorLookOf(room);
+  const w = room.wainscot;
+  return (
+    <>
+      <SelectField
+        label="Walls"
+        value={wall?.finish ?? 'default'}
+        options={roomWallOptions}
+        onChange={(v) => set(v === 'default' ? { wallFinish: undefined, wallColor: undefined } : { wallFinish: v })}
+      />
+      {wall && (
+        <ColorField
+          label="Wall colour"
+          value={wall.color}
+          onCommit={(color) => set({ wallColor: color })}
+          onReset={room.wallColor ? () => set({ wallColor: undefined }) : undefined}
+          hint={wall.finish === 'check' ? 'The check, on a white ground.' : undefined}
+        />
+      )}
+      <SelectField
+        label="Wainscot"
+        value={w?.finish ?? 'none'}
+        options={wainscotOptions}
+        onChange={(v) => set({ wainscot: v === 'none' ? undefined : { height: w?.height ?? Math.min(DEFAULT_WAINSCOT, wallHeight / 2), finish: v } })}
+      />
+      {w && (
+        <>
+          <LengthField
+            label="Wainscot height"
+            value={w.height}
+            onCommit={(h) => {
+              if (h === null) return;
+              if (h >= wallHeight) return 'Must be lower than the ceiling.';
+              set({ wainscot: { ...w, height: h } });
+            }}
+          />
+          <ColorField
+            label="Wainscot colour"
+            value={w.color ?? ROOM_WALL_COLOR[w.finish]}
+            onCommit={(color) => set({ wainscot: { ...w, color } })}
+            onReset={w.color ? () => set({ wainscot: { height: w.height, finish: w.finish } }) : undefined}
+          />
+        </>
+      )}
+      <SelectField
+        label="Floor"
+        value={floor?.finish ?? 'default'}
+        options={floorOptions}
+        onChange={(v) => set(v === 'default' ? { floorFinish: undefined, floorColor: undefined } : { floorFinish: v })}
+      />
+      {floor && (
+        <ColorField label="Floor colour" value={floor.color} onCommit={(color) => set({ floorColor: color })} onReset={room.floorColor ? () => set({ floorColor: undefined }) : undefined} />
+      )}
+      {(wall || w || floor) && <p className="panel-note">They dress the faces of the walls round the room, and its floor, in 3D; each wall keeps its own finish on its other side.</p>}
     </>
   );
 }

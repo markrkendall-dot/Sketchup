@@ -59,6 +59,10 @@ export interface Opening {
 export interface Room {
   id: Id; name: string; anchor: Vec2; ceilingOverride?: Inches;
   phase?: Phase;             // default existing: the label shows only in the views that show its phase
+  // Interior finishes (see "Interior finishes"); absent: the walls and slab show as they are.
+  wallFinish?: 'paint' | 'boards' | 'pine' | 'check'; wallColor?: string;
+  wainscot?: { height: Inches; finish: 'paint' | 'boards' | 'pine' | 'check'; color?: string };
+  floorFinish?: 'plain' | 'boards' | 'tile' | 'parquet'; floorColor?: string;
 }
 
 export interface Stairs {
@@ -631,8 +635,8 @@ panel, the casework defaults.
 (`counter_<hex>`), each plus `_new` / `_demo` for other phases.
 
 Not done: cabinet door swings in plan, backsplashes, open shelves, corner cabinets (an L corner is
-two cabinets whose counter is mitred), appliance details beyond a few boxes, interior wall and floor
-finishes (M13), copy and mirror of a run (M14).
+two cabinets whose counter is mitred), appliance details beyond a few boxes, copy and mirror of a run
+(M14). Interior wall and floor finishes (M13) are in "Interior finishes".
 
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
@@ -689,7 +693,58 @@ as the finish washed with light green rather than the stain multiplied into near
 `userData.flatColor`. Demolished walls stay
 translucent red with no texture, plain walls are the colour itself (pulled toward green when new). The wall mesh is one merged
 geometry with one material, so it cannot tell the faces of a wall apart: **both faces of an exterior wall show the
-siding** (the inside of a window reveal shows shingle too); interior walls are plain unless given a finish.
+siding** (the inside of a window reveal shows shingle too); interior walls are plain unless given a finish. The one
+exception is a face on the side of a room that sets interior finishes: it is split off and dressed by the room (see
+"Interior finishes").
+
+## Interior finishes (`model/finish.ts`, `derive/meshes.ts`, `view3d/textures.ts`)
+
+A room (its label) may set how the walls round it and its floor are dressed, all optional data on `Room` (no schema
+bump; `migrateRooms` keeps valid values and drops each malformed one): `wallFinish` (`paint | boards | pine | check`)
+and `wallColor` (a colour alone is paint; a check's colour is the check's, on the pale ground `CHECK_GROUND`), a
+`wainscot` (`{ height, finish, color? }`, a lower band in another finish up to `height`, dropped at or above the
+ceiling) and `floorFinish` (`plain | boards | tile | parquet`) with `floorColor`. Each finish has a default colour
+(`ROOM_WALL_COLOR`, `FLOOR_COLOR`); `roomWallLookOf`, `wainscotOf` and `floorLookOf` resolve them, null when unset.
+The room panel has Walls, Wall colour, Wainscot (finish, height, colour), Floor and Floor colour, each with
+"Default"; `updateRoom` sets and clears them (colours lower-case) as one undo step.
+
+**Walls.** The rooms labelled in the view mode (`getFaces`) give each wall the face on each side (`wallSideFaces`,
+one pass, the same rule as `facesBesideWall`). A side facing a room with a wall finish or a wainscot is split off the
+wall's geometry after it is built (`splitWallFaces`): a triangle whose three vertices lie on the long face (at
++thickness/2 along the normal for the left, -thickness/2 for the right, within 1e-3") and that faces that way goes to
+that side; the rest (jambs, sills, heads, ends, tops, a side with no room or one that sets nothing) stays in the core
+with the wall's own finish. So an exterior wall shows its siding outside and the room's finish inside, a partition
+each room's finish on its own side, and a window reveal still the wall's finish. The face runs up the wall's whole
+height, so it also covers the strip through the slab above (hidden) and a gable's inside under the roof. A wainscot's
+height joins the level's shared band heights (with the sills and heads), so every wall is cut there and neighbours stay
+watertight; a split triangle goes to the wainscot when its centroid is under the cut. Demolished and screen walls
+are never split. The split is cached on the wall's entry by its cuts, so changing a colour or a finish rebuilds nothing
+(the material changes); changing a wainscot height rebuilds the walls. `WallMesh.faces` lists the parts, each with its
+room, side, band (`upper` or `wainscot`), finish and colour; `geometry` is then the core. A face with a wainscot but no
+wall finish above it is painted the default interior colour.
+
+**Floors.** A room with a floor finish gets a surface over its net polygon (inside the wall faces), 1/16" over the
+slab top (`FLOOR_FINISH_LIFT`), facing up, with the stair holes through the slab cut out (each triangle less each
+convex hole, `subtractConvex`, so a hole against a wall face works). UVs are in inches along the room's longer side,
+so boards and parquet run the long way. The live material also has a polygon offset, which keeps it in front of the
+slab from far away. A room's floor follows its label: in the Proposed view a room that grows (the starter's Kitchen
+into the old bath) dresses the new walls and the larger floor too, and a demolished room's label, hidden there,
+dresses nothing.
+
+**Textures** (512 px for 48", like the siding): `check` 1" gingham (`checkTone`: the ground, a stripe at half
+strength, the full colour where two cross); `boards` the siding's 8" V-groove boards; `pine` 6" boards with grain,
+knots and grooves; floor `boards` 3" rows of 16" to 48" boards with staggered joints (`floorBoards`); `tile` 12"
+squares with 1/8" grout (`tileGrid`); `parquet` 6" basket-weave blocks of four slats (`parquetSlats`). Boards, pine,
+floor boards and tile have normal maps (`interiorHeight`). `roomWallMaterial` and `floorFinishMaterial` key by
+surface, phase, finish and colour; new work uses the green-washed variant; the flat colour (`interiorFlatColor`, a
+check's blended a little toward its ground) is kept for the export and node.
+
+**Export**: the dressed faces are their own meshes, `Wall <n> finish (<room>)` and `Wall <n> finish (<room>,
+wainscot)`, and each floor `Floor finish (<room>)` (OBJ ignores geometry groups, so separate meshes keep their
+materials); materials `interior_<finish>_<hex>` and `floor_<finish>_<hex>`, plus `_new`.
+
+Not done: ceilings (the underside of the slab above, or the roof, shows), crown, baseboards and other trim, finishes on
+window reveals, and a default interior finish for the inside faces of rooms that set none (they still show the siding).
 
 **Brick** (a chimney, `textures.ts brickTextures(color)`): the siding's tile (512 px for 48", `repeat` 1/48) of
 modular brick, 2 2/3" courses (three to 8") of 8" bricks in running bond (`brickFaces`: 18 courses of 6 a tile, the
@@ -958,7 +1013,8 @@ r3f `<Canvas frameloop="demand">` (lazy-loaded chunk), invalidate on plan change
 settings the 3D view uses (not on the 2D draft). One `<group>` per level at its floor top; meshes use
 the cached geometry with `dispose={null}`. Shared `MeshStandardMaterial`s, flat shading, FrontSide:
 existing warm grey, demolished translucent red (0.35, no depth write), new light green, exterior walls
-textured by finish and colour (see "Exterior appearance"); floors tan, stairs grey; roofs textured by finish (metal `#6e6259`
+textured by finish and colour (see "Exterior appearance"), the faces and floors rooms dress by their interior finishes
+(see "Interior finishes"); slabs tan, stairs grey; roofs textured by finish (metal `#6e6259`
 corrugated with rust streaks, metalness 0.35, roughness 0.55; shingle `#4a4a4a`), boards and rafter tails in the roof's board
 colour, demolished translucent like walls, new pulled toward green. Fit 3D and the
 walk start count roof overhangs and roof tops in the scene bounds.
@@ -1142,6 +1198,11 @@ stained, capped. The script's `addOpeningAt` throws when the store moves an open
 jamb past a corner or a partition's face), so every number in it is where the opening is, and
 `example.test.ts` checks that no two surrounds (trim, sill, shutters) on one wall line overlap, which
 would z-fight; the porch's openings have no trim, since its posts are only 3.5" wide.
+
+The First Floor's rooms carry their interior finishes from the photos (the Utility's from the owner) through
+`label()`'s finishes: the Kitchen's blue check wallpaper and beige tile, the Living's cream boards and the front
+room's cream paint over red-brown painted boards, the Bath's green paint over a 40" pine wainscot on parquet, and the
+Utility's pine paneling on a wood floor. The Second Floor and the basement have none (no photos).
 
 The proposed kitchen (docs/history/PLAN-v5-kitchen.md) is placed through `fixture()`, which throws
 when the store refuses one; fixture ids are renamed like the rest (`f-c1` ...). `example.test.ts`

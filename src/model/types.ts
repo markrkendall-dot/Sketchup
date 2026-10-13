@@ -19,6 +19,17 @@ export interface Node {
 export type WallKind = 'exterior' | 'interior';
 /** How a wall's face is dressed in 3D (DESIGN.md "Exterior appearance"). */
 export type WallFinish = 'clapboard' | 'shingle' | 'board' | 'block' | 'plain' | 'screen';
+/** How a room dresses the faces of the walls round it (DESIGN.md "Interior finishes"). */
+export type RoomWallFinish = 'paint' | 'boards' | 'pine' | 'check';
+/** How a room's floor is dressed: a flat colour, painted boards, square tiles or parquet. */
+export type FloorFinish = 'plain' | 'boards' | 'tile' | 'parquet';
+/** A lower band of a room's walls in another finish, up to `height` above the floor top. */
+export interface Wainscot {
+  height: Inches;
+  finish: RoomWallFinish;
+  /** Absent: the finish's default colour. */
+  color?: string;
+}
 /** What fills a window's sashes or a door's lites: glass, or insect screen. */
 export type Glazing = 'glass' | 'screen';
 
@@ -77,6 +88,16 @@ export interface Room {
    * isVisible): a new room's name is hidden in the existing view, a demolished room's in the proposed one.
    */
   phase?: Phase;
+  /**
+   * Interior finishes (DESIGN.md "Interior finishes"): the faces of the walls on this room's side and
+   * its floor. Absent: the walls keep their own finish and the floor its slab. A colour without a
+   * finish is paint (walls) or a plain floor; `wallColor` of a check is the check's colour on white.
+   */
+  wallFinish?: RoomWallFinish;
+  wallColor?: string;
+  wainscot?: Wainscot;
+  floorFinish?: FloorFinish;
+  floorColor?: string;
 }
 
 export interface Stairs {

@@ -1,16 +1,16 @@
 import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Uint32BufferAttribute, Vector2 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Column, Fixture, FixtureKind, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, DEFAULT_TRIM, leafColorOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible } from './phase';
 import { slabInsets, wallExtensions } from './platform';
-import { facesBesideWall, getFaces, slabOutlines, type FaceSet } from './rooms';
+import { facesBesideWall, getFaces, slabOutlines, wallSideFaces, type FaceSet } from './rooms';
 import { CHIMNEY_CAP, chimneyPartBoxes, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
 import { boardColorOf, roofColorOf, ROOF_TILE, weatheringOf } from '../model/finish';
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
@@ -585,6 +585,155 @@ export function buildFloorGeometry(
   return g;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Interior finishes (DESIGN.md "Interior finishes")
+
+/**
+ * How one long face of a wall is split off for a room's finish: false, not at all (it stays in the
+ * wall's own finish); null, as one face; a number, as a wainscot below that height and the upper
+ * face above it.
+ */
+export type SideCut = false | null | number;
+
+/** A long face of a wall split off from the rest, in one band. */
+export interface WallFacePart {
+  side: 'left' | 'right';
+  band: 'upper' | 'wainscot';
+  geometry: BufferGeometry;
+}
+
+/** A vertex lies on a long face within this (positions are float32). */
+const FACE_TOL = 1e-3;
+
+/**
+ * Split a wall's geometry (buildWallGeometry, with UVs) into its core and the long faces the cuts
+ * name: a triangle belongs to the left face when its three vertices lie at +thickness/2 along the
+ * wall's normal and it faces that way (likewise right at -thickness/2), and to the wainscot band
+ * when its centroid is below the cut (the cut is one of the level's band heights, so no triangle
+ * crosses it). Everything else (jambs, sills, heads, ends, tops, the faces of uncut sides) is the
+ * core. The input is left as it is.
+ */
+export function splitWallFaces(
+  g: BufferGeometry,
+  fp: Pick<Footprint, 'a' | 'normal' | 'thickness'>,
+  cuts: { left: SideCut; right: SideCut },
+): { core: BufferGeometry; faces: WallFacePart[] } {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  const uv = g.getAttribute('uv');
+  const h = fp.thickness / 2;
+  const buckets = new Map<string, { p: number[]; n: number[]; t: number[] }>();
+  const count = pos?.count ?? 0;
+  for (let i = 0; i + 2 < count; i += 3) {
+    let key = 'core';
+    const facing = nor.getX(i) * fp.normal.x + nor.getZ(i) * fp.normal.y;
+    for (const [side, sign] of [['left', 1], ['right', -1]] as const) {
+      const cut = cuts[side];
+      if (cut === false || facing * sign < 0.5) continue;
+      let on = true;
+      for (let k = i; k < i + 3 && on; k++) {
+        const off = (pos.getX(k) - fp.a.x) * fp.normal.x + (pos.getZ(k) - fp.a.y) * fp.normal.y;
+        if (Math.abs(off - sign * h) > FACE_TOL) on = false;
+      }
+      if (!on) continue;
+      const cy = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3;
+      key = `${side}:${cut !== null && cy < cut ? 'wainscot' : 'upper'}`;
+    }
+    let b = buckets.get(key);
+    if (!b) buckets.set(key, (b = { p: [], n: [], t: [] }));
+    for (let k = i; k < i + 3; k++) {
+      b.p.push(pos.getX(k), pos.getY(k), pos.getZ(k));
+      b.n.push(nor.getX(k), nor.getY(k), nor.getZ(k));
+      if (uv) b.t.push(uv.getX(k), uv.getY(k));
+    }
+  }
+  const make = (b: { p: number[]; n: number[]; t: number[] } | undefined) => {
+    const out = new BufferGeometry();
+    out.setAttribute('position', new Float32BufferAttribute(b?.p ?? [], 3));
+    out.setAttribute('normal', new Float32BufferAttribute(b?.n ?? [], 3));
+    if (uv) out.setAttribute('uv', new Float32BufferAttribute(b?.t ?? [], 2));
+    return out;
+  };
+  const faces: WallFacePart[] = [];
+  for (const side of ['left', 'right'] as const) {
+    for (const band of ['wainscot', 'upper'] as const) {
+      const b = buckets.get(`${side}:${band}`);
+      if (b) faces.push({ side, band, geometry: make(b) });
+    }
+  }
+  return { core: make(buckets.get('core')), faces };
+}
+
+/** A room's floor finish sits this far over the slab top, so the two never share a plane. */
+export const FLOOR_FINISH_LIFT = 1 / 16;
+
+/**
+ * A convex or concave polygon less a convex hole, as convex-or-simple pieces: for each edge of the
+ * hole in turn, the part of what is left outside that edge is kept, the rest carried on (the part
+ * inside every edge, the overlap, is dropped).
+ */
+export function subtractConvex(poly: readonly Vec2[], hole: readonly Vec2[]): Vec2[][] {
+  const ring = polygonSignedArea(hole) > 0 ? hole : [...hole].reverse();
+  const out: Vec2[][] = [];
+  let rest: Vec2[] = [...poly];
+  for (let i = 0; i < ring.length && rest.length >= 3; i++) {
+    const p = ring[i];
+    const q = ring[(i + 1) % ring.length];
+    // Positive area: the hole is on the left of p->q in plan maths, so its outward normal is the
+    // edge turned clockwise.
+    const e = sub(q, p);
+    const n = { x: e.y, y: -e.x };
+    const c = dot(n, p);
+    const outside = clipHalfPlane(rest, scale(n, -1), -c);
+    if (outside.length >= 3 && Math.abs(polygonSignedArea(outside)) > EPS) out.push(outside);
+    rest = clipHalfPlane(rest, n, c);
+  }
+  return out;
+}
+
+/**
+ * The top of a room's floor finish: the room's net polygon less the stair holes through the slab,
+ * one upward-facing surface `lift` over the floor top. UVs in inches along the room's longer side
+ * (u) and across it (v), so boards and parquet rows run the long way. Null when nothing is left.
+ */
+export function buildFloorFinishGeometry(net: readonly Vec2[], holes: readonly (readonly Vec2[])[], lift = FLOOR_FINISH_LIFT): BufferGeometry | null {
+  const outer = cleanRing(net);
+  if (outer.length < 3 || Math.abs(polygonSignedArea(outer)) < EPS) return null;
+  const xs = outer.map((p) => p.x);
+  const ys = outer.map((p) => p.y);
+  const alongX = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+  const tris = ShapeUtils.triangulateShape(
+    outer.map((p) => new Vector2(p.x, p.y)),
+    [],
+  );
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const emit = (a: Vec2, b: Vec2, c: Vec2) => {
+    const area = cross(sub(b, a), sub(c, a));
+    if (Math.abs(area) < 1e-9) return;
+    // A triangle with positive plan area faces -Y (see the file comment): reverse it to face up.
+    const [p, q, r] = area > 0 ? [a, c, b] : [a, b, c];
+    for (const v of [p, q, r]) {
+      pos.push(v.x, lift, v.y);
+      uv.push(alongX ? v.x : v.y, alongX ? v.y : v.x);
+    }
+  };
+  for (const [i, j, k] of tris) {
+    let pieces: Vec2[][] = [[outer[i], outer[j], outer[k]]];
+    for (const h of holes) {
+      if (h.length < 3) continue;
+      pieces = pieces.flatMap((piece) => subtractConvex(piece, h));
+    }
+    for (const piece of pieces) for (let m = 1; m + 1 < piece.length; m++) emit(piece[0], piece[m], piece[m + 1]);
+  }
+  if (!pos.length) return null;
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new Float32BufferAttribute(Array.from({ length: pos.length / 3 }, () => [0, 1, 0]).flat(), 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
+}
+
 /**
  * A flight of stairs: `risers` steps, each a 1/risers slice of the run rising `rise` (the height of
  * one riser) higher than the last, the first one `base` + `rise` above the floor top. The flight is
@@ -819,12 +968,28 @@ export interface CounterMesh {
 
 export interface WallMesh {
   id: Id;
+  /** The wall, less the long faces a room dresses (`faces`) when there are any. */
   geometry: BufferGeometry;
   phase: Phase;
   kind: WallKind;
   /** The wall's finish and colour after defaults (model/finish.ts). */
   finish: WallFinish;
   color: string;
+  /**
+   * The long faces on the side of a room with interior finishes (DESIGN.md "Interior finishes"),
+   * each band in the room's finish and colour; absent when no room dresses the wall.
+   */
+  faces?: { roomId: Id; side: 'left' | 'right'; band: 'upper' | 'wainscot'; geometry: BufferGeometry; finish: RoomWallFinish; color: string }[];
+}
+
+/** A room's floor finish (DESIGN.md "Interior finishes"): a surface just over the slab top. */
+export interface FloorFinishMesh {
+  roomId: Id;
+  /** The room label's phase. */
+  phase: Phase;
+  finish: FloorFinish;
+  color: string;
+  geometry: BufferGeometry;
 }
 
 export interface StairsMesh {
@@ -866,6 +1031,8 @@ export interface LevelMeshes {
   walls: WallMesh[];
   /** The slab under this level (level-local Y from -floorThickness to 0). */
   floor?: BufferGeometry;
+  /** The floor finishes of the rooms labelled in the view mode that set one. */
+  floorFinishes: FloorFinishMesh[];
   stairs: StairsMesh[];
   /** The level's roofs visible in the view mode (level-local, like the walls). */
   roofs: RoofMesh[];
@@ -898,6 +1065,15 @@ interface WallEntry {
   /** WallContext as a string: bands and end heights. */
   ctxKey: string;
   geometry: BufferGeometry;
+  /** The cuts the split was made with, as a string, and the split (null: the wall is not split). */
+  splitKey: string;
+  split: { core: BufferGeometry; faces: WallFacePart[] } | null;
+}
+
+interface FloorFinishEntry {
+  net: Vec2[];
+  holes: Vec2[][];
+  geometry: BufferGeometry | null;
 }
 
 interface FloorEntry {
@@ -955,6 +1131,7 @@ export const isSeeThrough = (phase: Phase): boolean => phase === 'demo';
 // geometry that is not carried into the next result is disposed.
 const wallCache = new Map<string, Map<Id, WallEntry>>();
 const floorCache = new Map<string, FloorEntry>();
+const floorFinishCache = new Map<string, Map<Id, FloorFinishEntry>>();
 const stairsCache = new Map<string, Map<Id, StairsEntry>>();
 const roofCache = new Map<string, Map<Id, RoofEntry>>();
 const openingCache = new Map<string, Map<Id, OpeningEntry>>();
@@ -994,6 +1171,15 @@ export function stairHoles(below: Level | undefined, viewMode: ViewMode, belowFt
   return out;
 }
 
+/** Dispose a wall entry's geometries, except those `keep` (the entry that replaces it) still uses. */
+function disposeWallEntry(e: WallEntry, keep?: WallEntry): void {
+  if (e.geometry !== keep?.geometry) e.geometry.dispose();
+  if (e.split && e.split !== keep?.split) {
+    e.split.core.dispose();
+    for (const f of e.split.faces) f.geometry.dispose();
+  }
+}
+
 function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null; rafters?: BufferGeometry | null }): void {
   e.geometry.dispose();
   e.fascia?.dispose();
@@ -1005,13 +1191,18 @@ function pruneCaches(plan: Plan): void {
   const alive = (key: string) => plan.levels[key.slice(0, key.lastIndexOf('|'))] !== undefined;
   for (const [key, m] of wallCache) {
     if (alive(key)) continue;
-    for (const e of m.values()) e.geometry.dispose();
+    for (const e of m.values()) disposeWallEntry(e);
     wallCache.delete(key);
   }
   for (const [key, e] of floorCache) {
     if (alive(key)) continue;
     e.geometry?.dispose();
     floorCache.delete(key);
+  }
+  for (const [key, m] of floorFinishCache) {
+    if (alive(key)) continue;
+    for (const e of m.values()) e.geometry?.dispose();
+    floorFinishCache.delete(key);
   }
   for (const cache of [stairsCache, roofCache]) {
     for (const [key, m] of cache) {
@@ -1053,7 +1244,7 @@ function counterPhase(members: readonly Fixture[]): Phase {
  */
 export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): LevelMeshes {
   const level = plan.levels[levelId];
-  if (!level) return { walls: [], stairs: [], roofs: [], openings: [], fixtures: [], counters: [] };
+  if (!level) return { walls: [], floorFinishes: [], stairs: [], roofs: [], openings: [], fixtures: [], counters: [] };
   const key = `${levelId}|${viewMode}`;
   const idx = plan.levelOrder.indexOf(levelId);
   const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
@@ -1080,6 +1271,16 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     if (!fps.has(o.wallId) || !isOpeningVisible(o, level.walls[o.wallId], viewMode)) continue;
     bandSet.add(Math.max(0, o.sill));
     bandSet.add(o.sill + o.height);
+  }
+  // Interior finishes: the rooms labelled in the view, the face on each side of each wall, and the
+  // wainscot heights as level-wide bands too (neighbouring walls cut alike stay watertight).
+  const faces = getFaces(level, viewMode);
+  const sideFaces = wallSideFaces(faces, level.walls);
+  const roomOf = (f: { roomId?: Id } | null | undefined): Room | undefined => (f?.roomId ? level.rooms[f.roomId] : undefined);
+  for (const f of faces.faces) {
+    const room = roomOf(f);
+    const w = room && wainscotOf(room, level.wallHeight);
+    if (w) bandSet.add(w.height);
   }
   const bands = [...bandSet].sort((p, q) => p - q);
   const bandsKey = bands.join(',');
@@ -1147,9 +1348,26 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       splitPoints.map((p) => `${p.x},${p.y}`).join(';'),
       roofTop ? `${roofTop.s.join(',')}/${roofTop.h.join(',')}/${raisedJoin.a}/${raisedJoin.b}` : '',
     ].join('|');
+    // The long faces a room on that side dresses (never a demolished or screen wall's).
+    const sides = sideFaces.get(wall.id);
+    const dressable = wall.phase !== 'demo' && wallFinishOf(wall) !== 'screen';
+    const sideLook = (side: 'left' | 'right') => {
+      const room = dressable ? roomOf(sides?.[side]) : undefined;
+      const look = room ? roomWallLookOf(room) : null;
+      const wainscot = room ? wainscotOf(room, level.wallHeight) : null;
+      return room && (look || wainscot) ? { room, look, wainscot } : null;
+    };
+    const looks = { left: sideLook('left'), right: sideLook('right') };
+    const cutOf = (s: ReturnType<typeof sideLook>): SideCut => (s ? (s.wainscot?.height ?? null) : false);
+    const cuts = { left: cutOf(looks.left), right: cutOf(looks.right) };
+    const splitKey = `${cuts.left}|${cuts.right}`;
     const old = prevWalls?.get(wall.id);
-    const entry =
-      old && old.fp === fp && old.wall === wall && old.openings === openings && old.height === height && old.ctxKey === ctxKey
+    const sameGeometry = !!old && old.fp === fp && old.wall === wall && old.openings === openings && old.height === height && old.ctxKey === ctxKey;
+    const geometry = sameGeometry
+      ? old.geometry
+      : buildWallGeometry(fp, wall, openings ?? [], height, viewMode, { bands, endHeights, buttHeights, splitPoints, roofTop, raisedJoin, openingTop });
+    const entry: WallEntry =
+      sameGeometry && old.splitKey === splitKey
         ? old
         : {
             fp,
@@ -1157,16 +1375,30 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
             openings,
             height,
             ctxKey,
-            geometry: buildWallGeometry(fp, wall, openings ?? [], height, viewMode, { bands, endHeights, buttHeights, splitPoints, roofTop, raisedJoin, openingTop }),
+            geometry,
+            splitKey,
+            split: cuts.left === false && cuts.right === false ? null : splitWallFaces(geometry, fp, cuts),
           };
     nextWalls.set(wall.id, entry);
-    walls.push({ id: wall.id, geometry: entry.geometry, phase: wall.phase, kind: wall.kind, finish: wallFinishOf(wall), color: wallColorOf(wall) });
+    const dressed = entry.split?.faces.map((part) => {
+      const s = looks[part.side]!;
+      const look = part.band === 'wainscot' && s.wainscot ? s.wainscot : (s.look ?? { finish: 'paint' as const, color: DEFAULT_INTERIOR_COLOR });
+      return { roomId: s.room.id, side: part.side, band: part.band, geometry: part.geometry, finish: look.finish, color: look.color };
+    });
+    walls.push({
+      id: wall.id,
+      geometry: entry.split ? entry.split.core : entry.geometry,
+      phase: wall.phase,
+      kind: wall.kind,
+      finish: wallFinishOf(wall),
+      color: wallColorOf(wall),
+      ...(dressed ? { faces: dressed } : {}),
+    });
   }
-  if (prevWalls) for (const [id, e] of prevWalls) if (nextWalls.get(id) !== e) e.geometry.dispose();
+  if (prevWalls) for (const [id, e] of prevWalls) if (nextWalls.get(id) !== e) disposeWallEntry(e, nextWalls.get(id));
   wallCache.set(key, nextWalls);
 
   // Floor slab.
-  const faces = getFaces(level, viewMode);
   const belowStairs = below?.stairs;
   const belowFtf = below ? floorToFloor(plan, below.id) : 0;
   const insets = slabInsets(plan, levelId, viewMode);
@@ -1196,6 +1428,27 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     };
     floorCache.set(key, floor);
   }
+
+  // Floor finishes: one surface per room that sets one, rebuilt when its net outline or the stair
+  // holes through the slab change.
+  const finishHoles = stairHoles(below, viewMode, belowFtf);
+  const prevFinishes = floorFinishCache.get(key);
+  const nextFinishes = new Map<Id, FloorFinishEntry>();
+  const floorFinishes: FloorFinishMesh[] = [];
+  for (const f of faces.faces) {
+    const room = roomOf(f);
+    const look = room ? floorLookOf(room) : null;
+    if (!room || !look) continue;
+    const old = prevFinishes?.get(room.id);
+    const entry: FloorFinishEntry =
+      old && sameRings([old.net], [f.netPolygon]) && sameRings(old.holes, finishHoles)
+        ? old
+        : { net: f.netPolygon, holes: finishHoles, geometry: buildFloorFinishGeometry(f.netPolygon, finishHoles) };
+    nextFinishes.set(room.id, entry);
+    if (entry.geometry) floorFinishes.push({ roomId: room.id, phase: room.phase ?? 'existing', finish: look.finish, color: look.color, geometry: entry.geometry });
+  }
+  if (prevFinishes) for (const [id, e] of prevFinishes) if (nextFinishes.get(id) !== e) e.geometry?.dispose();
+  floorFinishCache.set(key, nextFinishes);
 
   // Stairs: each flight its own base, climb and riser count (a short flight, a landing).
   const prevStairs = stairsCache.get(key);
@@ -1300,15 +1553,17 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     counterCache.set(key, { fixtures: counterFixtures, counters });
   }
 
-  const result: LevelMeshes = { walls, stairs, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  const result: LevelMeshes = { walls, floorFinishes, stairs, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
   levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, result });
   return result;
 }
 
 /** Dispose every cached geometry (tests, or when the 3D view is torn down for good). */
 export function clearMeshCache(): void {
-  for (const m of wallCache.values()) for (const e of m.values()) e.geometry.dispose();
+  for (const m of wallCache.values()) for (const e of m.values()) disposeWallEntry(e);
   for (const e of floorCache.values()) e.geometry?.dispose();
+  for (const m of floorFinishCache.values()) for (const e of m.values()) e.geometry?.dispose();
+  floorFinishCache.clear();
   for (const m of stairsCache.values()) for (const e of m.values()) e.geometry.dispose();
   for (const m of roofCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of openingCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();

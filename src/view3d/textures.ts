@@ -1,5 +1,5 @@
 import { CanvasTexture, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, type ColorSpace } from 'three';
-import { DEFAULT_WEATHERING, ROOF_TILE } from '../model/finish';
+import { CHECK_GROUND, DEFAULT_WEATHERING, ROOF_TILE } from '../model/finish';
 import type { RoofFinish, WallFinish } from '../model/types';
 
 // Procedural siding textures (DESIGN.md "Exterior appearance"). One 512 x 512 canvas stands for
@@ -620,6 +620,240 @@ export function brickTextures(color: string): SidingTextures | null {
   }
   const out = { map: tileTexture(tile.canvas, SRGBColorSpace), normalMap: brickNormal };
   brickCache.set(color, out);
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Interior finishes (DESIGN.md "Interior finishes"): the walls and floors rooms dress, on the
+// siding's 48" tile (UVs in inches: a wall face's like the siding's, a floor's along the room's
+// longer side). Paint and a plain floor are flat colours and need none.
+
+/** A check wallpaper's squares, inches: 48 to the tile. */
+export const CHECK_INCHES = 1;
+/** Knotty pine boards, inches wide: 8 to the tile. */
+export const PINE_BOARD = 6;
+/** Floor boards, inches wide: 16 rows to the tile, running along u. */
+export const FLOOR_BOARD = 3;
+/** Floor tiles, inches square (16 to the tile), and the grout between them. */
+export const FLOOR_TILE = 12;
+export const GROUT = 0.125;
+/** Parquet: 6" blocks of 4 slats, each block turned a quarter to its neighbours (basket weave). */
+export const PARQUET_BLOCK = 6;
+export const PARQUET_SLATS = 4;
+
+/**
+ * The tone of a check's square in column i and row j: 0 the ground, 1 a stripe (the colour at half
+ * strength), 2 where two stripes cross (the full colour). Gingham.
+ */
+export const checkTone = (i: number, j: number): 0 | 1 | 2 => ((i & 1) + (j & 1)) as 0 | 1 | 2;
+
+/**
+ * Floor boards over a tile: rows FLOOR_BOARD wide along x, each cut into boards of 16" to 48" that
+ * add up to the tile, the joints staggered from row to row (a board's x1 may pass the tile's right
+ * edge: it wraps).
+ */
+export function floorBoards(rand: () => number = seeded(61)): TileRect[] {
+  const out: TileRect[] = [];
+  const rows = Math.round(TILE_INCHES / FLOOR_BOARD);
+  for (let k = 0; k < rows; k++) {
+    const shift = rand() * TILE_INCHES;
+    let x = 0;
+    while (TILE_INCHES - x > 0) {
+      const left = TILE_INCHES - x;
+      const len = left <= 32 ? left : 16 + rand() * (Math.min(48, left - 16) - 16);
+      out.push({ x0: shift + x, y0: k * FLOOR_BOARD, x1: shift + x + len, y1: (k + 1) * FLOOR_BOARD });
+      x += len;
+    }
+  }
+  return out;
+}
+
+/** The faces of the floor tiles in a tile, each inset by half the grout all round. */
+export function tileGrid(): TileRect[] {
+  const g = GROUT / 2;
+  const n = Math.round(TILE_INCHES / FLOOR_TILE);
+  const out: TileRect[] = [];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out.push({ x0: i * FLOOR_TILE + g, y0: j * FLOOR_TILE + g, x1: (i + 1) * FLOOR_TILE - g, y1: (j + 1) * FLOOR_TILE - g });
+  return out;
+}
+
+/** The parquet's slats over a tile: in each block, PARQUET_SLATS of them along x or along y, alternating like a chequerboard. */
+export function parquetSlats(): (TileRect & { along: 'x' | 'y' })[] {
+  const n = Math.round(TILE_INCHES / PARQUET_BLOCK);
+  const w = PARQUET_BLOCK / PARQUET_SLATS;
+  const out: (TileRect & { along: 'x' | 'y' })[] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const x = i * PARQUET_BLOCK;
+      const y = j * PARQUET_BLOCK;
+      const along = (i + j) % 2 === 0 ? 'x' : 'y';
+      for (let k = 0; k < PARQUET_SLATS; k++) {
+        out.push(along === 'x' ? { x0: x, y0: y + k * w, x1: x + PARQUET_BLOCK, y1: y + (k + 1) * w, along } : { x0: x + k * w, y0: y, x1: x + (k + 1) * w, y1: y + PARQUET_BLOCK, along });
+      }
+    }
+  }
+  return out;
+}
+
+/** Interior finishes with a texture: a room's walls (painted boards, knotty pine, check) and floors (boards, tile, parquet). */
+export type InteriorTexture = 'wall-boards' | 'wall-pine' | 'wall-check' | 'floor-boards' | 'floor-tile' | 'floor-parquet';
+
+/**
+ * The relief of an interior finish over one tile, inches in canvas order like sidingHeight, or
+ * null for one without (a check, parquet). Painted boards are the siding's board; pine the same
+ * V-groove every 6"; floor boards a shallow groove along each row and at each board's end; tile
+ * recessed grout.
+ */
+export function interiorHeight(kind: InteriorTexture): Float32Array | null {
+  if (kind === 'wall-boards') return sidingHeight('board');
+  const f = new Float32Array(TEXTURE_PX * TEXTURE_PX);
+  if (kind === 'wall-pine') {
+    for (const x of courseBoundaries(TILE_INCHES, PINE_BOARD).slice(0, -1)) {
+      heightRect(f, { x0: x - GROOVE_HALF, y0: 0, x1: x + GROOVE_HALF, y1: TILE_INCHES }, (fx) => -RELIEF.groove * (1 - Math.abs(2 * fx - 1)));
+    }
+  } else if (kind === 'floor-boards') {
+    f.fill(-RELIEF.groove / 2);
+    for (const b of floorBoards()) heightRect(f, { x0: b.x0 + 0.06, y0: b.y0 + 0.06, x1: b.x1 - 0.06, y1: b.y1 - 0.06 }, () => 0);
+  } else if (kind === 'floor-tile') {
+    f.fill(-RELIEF.mortar / 2);
+    for (const t of tileGrid()) heightRect(f, t, () => 0);
+  } else return null;
+  return f;
+}
+
+/** `a` blended toward `b` by t, as `#rrggbb`. */
+function mix(a: string, b: string, t: number): string {
+  const p = hexToRgb(a);
+  const q = hexToRgb(b);
+  return `#${p.map((v, i) => byte(v + (q[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+
+function drawCheck(ctx: Ctx, color: string): void {
+  const n = Math.round(TILE_INCHES / CHECK_INCHES);
+  const tones = [CHECK_GROUND, mix(CHECK_GROUND, color, 0.5), color];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) rect(ctx, i * CHECK_INCHES, j * CHECK_INCHES, (i + 1) * CHECK_INCHES, (j + 1) * CHECK_INCHES, tones[checkTone(i, j)]);
+  }
+  // The paper's faint texture.
+  speckle(ctx, seeded(67), { x0: 0, y0: 0, x1: TILE_INCHES, y1: TILE_INCHES }, 1500);
+}
+
+/** Vertical boards with knots: each board a little lighter or darker, grain along it, a few dark knots, a V-groove at each joint. */
+function drawPine(ctx: Ctx, color: string): void {
+  const rand = seeded(71);
+  const b = courseBoundaries(TILE_INCHES, PINE_BOARD);
+  for (let k = 0; k + 1 < b.length; k++) {
+    const board = { x0: b[k], y0: 0, x1: b[k + 1], y1: TILE_INCHES };
+    rect(ctx, board.x0, board.y0, board.x1, board.y1, shade(color, brightness(rand), rand() * 2 - 1));
+    grain(ctx, rand, 'y', board, 70);
+    const knots = Math.floor(rand() * 3);
+    for (let i = 0; i < knots; i++) {
+      const r = (0.3 + rand() * 0.5) * PX_PER_INCH;
+      const cx = colOf(board.x0 + 1 + rand() * (PINE_BOARD - 2));
+      const cy = rowOf(rand() * TILE_INCHES);
+      ctx.fillStyle = shade(color, 0.55);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r, r * 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = shade(color, 0.35);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r * 0.45, r * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  for (let k = 0; k + 1 < b.length; k++) {
+    const c = colOf(b[k]) - Math.floor(GROOVE_SHADOW.length / 2);
+    GROOVE_SHADOW.forEach((a, i) => {
+      ctx.fillStyle = `rgba(0, 0, 0, ${a})`;
+      pixelRect(ctx, c + i, 0, 1, TEXTURE_PX);
+    });
+  }
+}
+
+/** Painted floor boards along x, joints dark at each board's end and along each row. */
+function drawFloorBoards(ctx: Ctx, color: string): void {
+  const rand = seeded(73);
+  for (const bd of floorBoards()) {
+    rect(ctx, bd.x0, bd.y0, bd.x1, bd.y1, shade(color, 0.96 + rand() * 0.08));
+    grain(ctx, rand, 'x', bd, 10);
+  }
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  for (const bd of floorBoards()) {
+    pixelRect(ctx, 0, rowOf(bd.y1), TEXTURE_PX, 1);
+    pixelRect(ctx, colOf(bd.x0), rowOf(bd.y1), 1, rowOf(bd.y0) - rowOf(bd.y1));
+  }
+}
+
+/** Square tiles a shade apart, with pale grout and a mottle like vinyl. */
+function drawTile(ctx: Ctx, color: string): void {
+  const rand = seeded(79);
+  ctx.fillStyle = mix(color, '#9a958c', 0.35);
+  ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
+  for (const t of tileGrid()) {
+    rect(ctx, t.x0, t.y0, t.x1, t.y1, shade(color, 0.97 + rand() * 0.06));
+    speckle(ctx, rand, t, 260);
+  }
+}
+
+/** Basket-weave parquet: each slat a shade, grain along it, a dark line round it. */
+function drawParquet(ctx: Ctx, color: string): void {
+  const rand = seeded(83);
+  for (const sl of parquetSlats()) {
+    rect(ctx, sl.x0, sl.y0, sl.x1, sl.y1, shade(color, brightness(rand), rand() * 2 - 1));
+    grain(ctx, rand, sl.along, sl, 6);
+  }
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  for (const sl of parquetSlats()) {
+    pixelRect(ctx, colOf(sl.x0), rowOf(sl.y1), colOf(sl.x1) - colOf(sl.x0), 1);
+    pixelRect(ctx, colOf(sl.x0), rowOf(sl.y1), 1, rowOf(sl.y0) - rowOf(sl.y1));
+  }
+}
+
+const interiorNormals = new Map<InteriorTexture, CanvasTexture | null>();
+const interiorCache = new Map<string, SidingTextures | null>();
+
+/**
+ * The textures of an interior finish and colour (DESIGN.md "Interior finishes"), made once and
+ * cached like sidingTextures: the drawing, its `new` variant blended toward NEW_WORK_GREEN, and the
+ * normal map of the relief (boards, pine, floor boards, tile). Null wherever there is no DOM canvas.
+ */
+export function interiorTextures(kind: InteriorTexture, color: string, variant: TextureVariant = 'plain'): SidingTextures | null {
+  if (typeof document === 'undefined') return null;
+  const key = `${kind}|${color}|${variant}`;
+  const hit = interiorCache.get(key);
+  if (hit !== undefined) return hit;
+  const tile = tileCanvas();
+  if (!tile) {
+    interiorCache.set(key, null);
+    return null;
+  }
+  const { canvas, ctx } = tile;
+  if (kind === 'wall-boards') drawBoard(ctx, color);
+  else if (kind === 'wall-pine') drawPine(ctx, color);
+  else if (kind === 'wall-check') drawCheck(ctx, color);
+  else if (kind === 'floor-boards') drawFloorBoards(ctx, color);
+  else if (kind === 'floor-tile') drawTile(ctx, color);
+  else drawParquet(ctx, color);
+  if (variant === 'new') {
+    const img = ctx.getImageData(0, 0, TEXTURE_PX, TEXTURE_PX);
+    blendPixels(img.data, hexToRgb(NEW_WORK_GREEN), NEW_WORK_BLEND);
+    ctx.putImageData(img, 0, 0);
+  }
+  let normalMap = interiorNormals.get(kind);
+  if (normalMap === undefined) {
+    const height = interiorHeight(kind);
+    const n = height ? tileCanvas() : null;
+    normalMap = null;
+    if (height && n) {
+      const img = n.ctx.createImageData(TEXTURE_PX, TEXTURE_PX);
+      normalFromHeight(height, TEXTURE_PX, PX_PER_INCH, img.data);
+      n.ctx.putImageData(img, 0, 0);
+      normalMap = tileTexture(n.canvas, NoColorSpace);
+    }
+    interiorNormals.set(kind, normalMap);
+  }
+  const out = { map: tileTexture(canvas, SRGBColorSpace), normalMap };
+  interiorCache.set(key, out);
   return out;
 }
 

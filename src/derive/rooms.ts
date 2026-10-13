@@ -359,6 +359,33 @@ export function facesBesideWall(
   return { left, right };
 }
 
+const sideFacesCache = new WeakMap<FaceSet, WeakMap<Level['walls'], Map<Id, { left: Face | null; right: Face | null }>>>();
+
+/**
+ * facesBesideWall for every wall at once, in one pass over the faces: wall id to the face on its
+ * left (+normal) and right. A wall no closed face touches is absent. Memoized per FaceSet and walls.
+ */
+export function wallSideFaces(set: FaceSet, walls: Level['walls']): Map<Id, { left: Face | null; right: Face | null }> {
+  let byWalls = sideFacesCache.get(set);
+  if (!byWalls) sideFacesCache.set(set, (byWalls = new WeakMap()));
+  let out = byWalls.get(walls);
+  if (out) return out;
+  out = new Map();
+  for (const f of set.faces) {
+    const n = f.nodeIds.length;
+    for (let i = 0; i < n; i++) {
+      const w = walls[f.wallIds[i]];
+      if (!w) continue;
+      let e = out.get(w.id);
+      if (!e) out.set(w.id, (e = { left: null, right: null }));
+      if (f.nodeIds[i] === w.a && f.nodeIds[(i + 1) % n] === w.b) e.right = f;
+      else if (f.nodeIds[i] === w.b && f.nodeIds[(i + 1) % n] === w.a) e.left = f;
+    }
+  }
+  byWalls.set(walls, out);
+  return out;
+}
+
 /** The smallest face containing p. */
 export function faceAt(set: FaceSet, p: Vec2): Face | null {
   let best: Face | null = null;

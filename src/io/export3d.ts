@@ -10,7 +10,7 @@ import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_L
 import { COLUMN_COLOR, DEFAULT_LEAF_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FixtureKind, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, fasciaMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -33,6 +33,9 @@ const wallMaterialName = (phase: Phase, kind: WallKind, finish: WallFinish, colo
   if (phase === 'demo' || (finish === defaultWallFinish(kind) && color === defaultWallColor(kind))) return base;
   return `${base}_${finish}_${color.slice(1)}`;
 };
+/** A room's interior finish (DESIGN.md "Interior finishes"): `interior_<finish>_<hex>` on walls, `floor_<finish>_<hex>` on floors, then `_new`. */
+const interiorMaterialName = (surface: 'interior' | 'floor', phase: Phase, finish: string, color: string) =>
+  `${surface}_${finish}_${color.slice(1)}${phase === 'new' ? '_new' : ''}`;
 const stairsMaterialName = (phase: Phase) => `stairs_${phase}`;
 const roofMaterialName = (finish: RoofFinish, phase: Phase, color: string) =>
   phase === 'demo' || color === ROOF_COLOR[finish] ? `roof_${finish}_${phase}` : `roof_${finish}_${phase}_${color.slice(1)}`;
@@ -104,11 +107,15 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   for (const id of visible3dLevels(plan.levelOrder, levelVisibility)) {
     const level = plan.levels[id];
     const meshes = getLevelMeshes(plan, id, viewMode);
-    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length)) continue;
+    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length)) continue;
     const group = new Group();
     group.name = level.name;
     group.position.set(0, elev[id]?.floorTop ?? 0, 0);
     if (meshes.floor) group.add(mesh('Floor', meshes.floor, material('floor', floorMaterial)));
+    const roomName = (id: string) => level.rooms[id]?.name ?? 'room';
+    for (const f of meshes.floorFinishes) {
+      group.add(mesh(`Floor finish (${roomName(f.roomId)})`, f.geometry, material(interiorMaterialName('floor', f.phase, f.finish, f.color), floorFinishMaterial(f.phase, f.finish, f.color))));
+    }
     meshes.walls.forEach((w, i) => {
       // Colours only: the live material's siding texture is dropped and its flat colour used (material()).
       const mat = material(wallMaterialName(w.phase, w.kind, w.finish, w.color), wallMaterial(w.phase, w.kind, w.finish, w.color));
@@ -116,6 +123,10 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
       // Translucent demolished walls draw after the opaque ones, as in the live view.
       if (w.phase === 'demo') m.renderOrder = 1;
       group.add(m);
+      // The faces a room dresses: separate meshes, so both OBJ and glTF keep their materials.
+      for (const f of w.faces ?? []) {
+        group.add(mesh(`Wall ${i + 1} finish (${roomName(f.roomId)}${f.band === 'wainscot' ? ', wainscot' : ''})`, f.geometry, material(interiorMaterialName('interior', w.phase, f.finish, f.color), roomWallMaterial(w.phase, f.finish, f.color))));
+      }
     });
     for (const s of meshes.stairs) {
       group.add(mesh('Stairs', s.geometry, material(stairsMaterialName(s.phase), stairsMaterial(s.phase))));

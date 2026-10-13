@@ -124,6 +124,12 @@ Once the walls are in, these make the 3D model look like the house.
   wall of the level at once; the Wall panel sets one wall: shingle, clapboard, vertical board,
   concrete block (for a foundation), plain or screen. The siding, brick and roof textures are in
   the 3D view only: the export carries their colours.
+- **Interior finishes.** Select a room's label: its panel sets "Walls" (paint, painted boards,
+  knotty pine or check wallpaper) with "Wall colour", a "Wainscot" (a lower band in another finish,
+  with its height and colour) and "Floor" (plain, boards, tile or parquet) with "Floor colour".
+  The walls round the room show its finish on the room's side only (an exterior wall keeps its
+  siding outside, a partition shows each room's finish on its own side), and the floor covers the
+  room inside the wall faces. "Default" clears each one. Ceilings are not drawn yet.
 - **Windows and doors.** A window's panel sets its "Sashes" (1 to 6 side by side with 2" mullions
   between them; the lites, cols x rows, are per sash), "Fixed centre pane" (at 3 sashes: a picture
   window, one undivided pane between two casements at most 24" wide), "Glazing" (glass, or an
@@ -452,14 +458,18 @@ and the plan's north angle is 0.
 - Not modelled: the deck, the lot, the entry porch floor and steps, the foundation under the wing
   and porches (the ground meets them where the grade points say it does).
 
-### Inside finishes from the photos (not drawn yet)
+### Inside finishes from the photos
 
-The app has no interior finishes yet, so these are recorded here: the Kitchen has blue gingham
-wallpaper, a knotty pine tongue-and-groove ceiling with boards running east-west, pine crown and
-baseboard, and beige vinyl tile; the Living and the front room have cream-painted walls (vertical
-boards in the Living, smooth in the front room), white-painted board or flat ceilings, and a dark
-red-brown painted board floor; the Bath has knotty pine wainscot about 40" high, green paint above,
-a pine ceiling and parquet tile; the Utility is wood panelled (MK). The appliances are white (the app draws them as steel).
+The First Floor's rooms carry their interior finishes (photos 13 to 22; the Utility's from MK):
+the Kitchen has blue check wallpaper (`#2e3f6b` on white) and beige vinyl tile (`#cbbd9c`); the
+Living has cream-painted vertical boards (`#ddd6b4`) and the front room smooth cream paint, both over
+a dark red-brown painted board floor (`#5e2a22`); the Bath has green paint (`#2f7a68`) over a knotty
+pine wainscot 40" high and a parquet floor; the Utility has pine paneling and a wood board floor
+(`#a87a4c`). Not drawn yet: the ceilings (the Kitchen's knotty pine tongue-and-groove with boards
+running east-west, the Bath's pine, white-painted boards or flat in the Living and the front room,
+wood in the Utility), the Kitchen's pine crown and baseboard, and window reveals (they show the
+siding). The appliances are white (the app draws them as steel). In the Proposed view the Kitchen's
+check and tile carry on into the old bath's alcove, which becomes part of the kitchen.
 
 ### Check the sides first
 
@@ -664,21 +674,22 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
 - **Not drawn yet**: decks and railings (a stair opening or an open stair side has no railing),
   exterior steps (an outside stair is a flight on a level, as the starter's wing stair is), fences,
   the lot outline, porch floors and steps, foundations under additions and porches, gutters,
-  interior finishes (wallpaper, paint, ceilings, floors), furniture, and text or dimension notes
+  ceilings, crown and baseboards, furniture, and text or dimension notes
   you place yourself. Bathroom fixtures and a wood stove are labelled boxes. A retaining wall is a
   wall on the lowest level; its free end shows as an open wall end.
 - **Cabinets** are boxes with simple fronts: no door swings on the plan, no backsplash, open
   shelves or corner cabinets (an inside corner is two cabinets whose counter is mitred), and a
   counter is only joined across cabinets turned by a quarter turn (a cabinet at 45° carries its
-  own). Inside faces of walls still show the siding and floors are one colour (interior finishes
-  are next).
+  own).
 - **Walk mode has no collision**: you can walk through walls and the ground.
 - The terrain is the average of your grade points, weighted by distance. Under the lowest level's
   footprint (out to its walls' outside faces) it drops to 2" below that level's slab, so the
   basement is empty; the ground is not shaped any further around the house (no window wells,
   no foundation under a wing or porch that has no basement).
-- A wall has one thickness; layered walls (siding, sheathing, studs, drywall) are not modeled, and
-  both faces of an exterior wall show the siding.
+- A wall has one thickness; layered walls (siding, sheathing, studs, drywall) are not modeled.
+  Both faces of an exterior wall show the siding unless a room on one side sets its own wall
+  finish, and window and door reveals always show the wall's own finish. A room's wall finish runs
+  the full height of the wall (there are no ceilings yet).
 - At most one wall between two corners, and walls are straight (no curved walls). A wall cannot
   be drawn on top of another one: to rebuild a wall, mark the old one *demolish* and draw the new
   one beside it.

@@ -3,10 +3,10 @@ import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
 import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
-import { CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
-import type { Column, Phase, RoofFinish, WallFinish, WallKind } from '../model/types';
+import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture } from './groundTexture';
-import { brickTextures, NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures } from './textures';
+import { brickTextures, interiorTextures, NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures, type InteriorTexture } from './textures';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
@@ -126,6 +126,57 @@ export function wallMaterial(
 }
 
 export const floorMaterial = make('#c9a77c'); // wood-ish tan
+
+/**
+ * The colour an interior finish shows without textures (export, and node): its colour, a check's
+ * the colour blended a third of the way from its pale ground; new work pulled toward green like a
+ * wall's.
+ */
+export function interiorFlatColor(phase: Phase, finish: RoomWallFinish | FloorFinish, color: string): string {
+  const base = finish === 'check' ? `#${new Color(CHECK_GROUND).lerp(new Color(color), 0.4).getHexString()}` : color;
+  if (phase !== 'new') return base;
+  return finish === 'paint' || finish === 'plain' ? pullGreen(base) : newWorkColor(base);
+}
+
+const interiorMaterials = new Map<string, MeshStandardMaterial>();
+
+/** The texture an interior finish draws, or null for a flat one (paint, a plain floor). */
+const interiorTextureOf = (surface: 'wall' | 'floor', finish: RoomWallFinish | FloorFinish): InteriorTexture | null =>
+  finish === 'paint' || finish === 'plain' ? null : (`${surface}-${finish}` as InteriorTexture);
+
+function interiorMaterial(surface: 'wall' | 'floor', phase: Phase, finish: RoomWallFinish | FloorFinish, color: string): MeshStandardMaterial {
+  // A demolished room's floor or a face of a demolished wall is never dressed (meshes.ts), so the
+  // phase here is existing or new.
+  const key = `${surface}|${phase === 'new' ? 'new' : 'existing'}|${finish}|${color}`;
+  let m = interiorMaterials.get(key);
+  if (!m) {
+    const kind = interiorTextureOf(surface, finish);
+    const tex = kind ? interiorTextures(kind, color, phase === 'new' ? 'new' : 'plain') : null;
+    m = make(tex ? '#ffffff' : interiorFlatColor(phase, finish, color));
+    if (tex) {
+      m.map = tex.map;
+      if (tex.normalMap) {
+        m.normalMap = tex.normalMap;
+        m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
+      }
+    }
+    if (surface === 'floor') {
+      // The finish sits 1/16" over the slab top (meshes.ts FLOOR_FINISH_LIFT); the offset keeps it
+      // in front of the slab from far away too, where depth precision is coarser than that.
+      m.polygonOffset = true;
+      m.polygonOffsetFactor = -1;
+      m.polygonOffsetUnits = -4;
+    }
+    m.userData.flatColor = interiorFlatColor(phase, finish, color);
+    interiorMaterials.set(key, m);
+  }
+  return m;
+}
+
+/** The material of the wall faces a room dresses (DESIGN.md "Interior finishes"). */
+export const roomWallMaterial = (phase: Phase, finish: RoomWallFinish, color: string): MeshStandardMaterial => interiorMaterial('wall', phase, finish, color);
+/** The material of a room's floor finish. */
+export const floorFinishMaterial = (phase: Phase, finish: FloorFinish, color: string): MeshStandardMaterial => interiorMaterial('floor', phase, finish, color);
 
 const stairsMaterials = new Map<Phase, MeshStandardMaterial>();
 

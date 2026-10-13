@@ -233,6 +233,23 @@ describe('docs/examples/146-mick-road.json', () => {
     // shelves under its south and east windows, a blue mini fridge; nothing reaches past its faces.
     const inUtility = existing.filter((x) => fixtureOutline(x).every((p) => p.x >= 318 - 1e-6 && p.x <= 456 + 1e-6 && p.y >= 195 - 1e-6 && p.y <= 308 + 1e-6));
     expect(inUtility.map((x) => (x.kind === 'box' ? x.label : x.kind)).sort()).toEqual(['Mini fridge', 'Open shelves', 'Open shelves', 'wall', 'wall', 'wall', 'wall', 'wall']);
+    // The rooms' interior finishes from the photos (the Utility's from MK): the Kitchen's blue check
+    // and beige tile, the Living's cream boards and the front room's cream paint over a red-brown
+    // board floor, the Bath's green over a 40" pine wainscot on parquet, the Utility's pine on wood.
+    const finishOf = (prefix: string) => {
+      const r = Object.values(f.rooms).find((x) => x.name.startsWith(prefix))!;
+      return [r.wallFinish, r.wainscot?.finish ?? null, r.wainscot?.height ?? null, r.floorFinish];
+    };
+    expect(finishOf('Kitchen')).toEqual(['check', null, null, 'tile']);
+    expect(finishOf('Living')).toEqual(['boards', null, null, 'boards']);
+    expect(finishOf('Front room')).toEqual(['paint', null, null, 'boards']);
+    expect(finishOf('Bath')).toEqual(['paint', 'pine', 40, 'parquet']);
+    expect(finishOf('Utility')).toEqual(['pine', null, null, 'boards']);
+    // In the existing view each of those rooms has its floor finish and dresses the walls round it.
+    const meshes = getLevelMeshes(plan, f.id, 'existing');
+    expect(meshes.floorFinishes.length).toBe(5);
+    const dressedRooms = new Set(meshes.walls.flatMap((w) => (w.faces ?? []).map((x) => f.rooms[x.roomId].name.split(' ')[0])));
+    expect([...dressedRooms].sort()).toEqual(['Bath', 'Front', 'Kitchen', 'Living', 'Utility']);
     // The shelves stay under the windows' 30" sills.
     expect(inUtility.filter((x) => x.label === 'Open shelves').every((x) => x.height < 30)).toBe(true);
   });

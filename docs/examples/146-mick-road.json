@@ -1407,6 +1407,10 @@
             "x": 100,
             "y": 52
           },
+          "wallFinish": "paint",
+          "wallColor": "#ddd6b4",
+          "floorFinish": "boards",
+          "floorColor": "#5e2a22",
           "id": "f-r1"
         },
         "f-r2": {
@@ -1415,6 +1419,13 @@
             "x": 254,
             "y": 52
           },
+          "wallFinish": "paint",
+          "wallColor": "#2f7a68",
+          "wainscot": {
+            "height": 40,
+            "finish": "pine"
+          },
+          "floorFinish": "parquet",
           "id": "f-r2",
           "phase": "demo"
         },
@@ -1424,6 +1435,10 @@
             "x": 242,
             "y": 205
           },
+          "wallFinish": "check",
+          "wallColor": "#2e3f6b",
+          "floorFinish": "tile",
+          "floorColor": "#cbbd9c",
           "id": "f-r3"
         },
         "f-r4": {
@@ -1432,6 +1447,10 @@
             "x": 87.5,
             "y": 224
           },
+          "wallFinish": "boards",
+          "wallColor": "#ddd6b4",
+          "floorFinish": "boards",
+          "floorColor": "#5e2a22",
           "id": "f-r4"
         },
         "f-r5": {
@@ -1440,6 +1459,9 @@
             "x": 390.5,
             "y": 251.5
           },
+          "wallFinish": "pine",
+          "floorFinish": "boards",
+          "floorColor": "#a87a4c",
           "id": "f-r5",
           "phase": "demo"
         },

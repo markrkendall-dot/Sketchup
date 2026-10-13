@@ -1,4 +1,4 @@
-import type { Column, Glazing, Opening, Roof, RoofEave, RoofFinish, Wall, WallFinish, WallKind } from './types';
+import type { Column, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
@@ -23,6 +23,52 @@ export const defaultWallColor = (kind: WallKind): string => (kind === 'exterior'
 
 export const wallFinishOf = (w: Pick<Wall, 'kind' | 'finish'>): WallFinish => w.finish ?? defaultWallFinish(w.kind);
 export const wallColorOf = (w: Pick<Wall, 'kind' | 'color'>): string => w.color ?? defaultWallColor(w.kind);
+
+// Interior finishes (DESIGN.md "Interior finishes"): set per room, they dress the wall faces on the
+// room's side and its floor.
+
+export const ROOM_WALL_FINISHES: readonly RoomWallFinish[] = ['paint', 'boards', 'pine', 'check'];
+export const ROOM_WALL_FINISH_LABEL: Record<RoomWallFinish, string> = {
+  paint: 'Paint',
+  boards: 'Painted boards',
+  pine: 'Knotty pine',
+  check: 'Check wallpaper',
+};
+/** Default colours: off-white paint and boards, pine, a navy check. */
+export const ROOM_WALL_COLOR: Record<RoomWallFinish, string> = { paint: DEFAULT_INTERIOR_COLOR, boards: DEFAULT_INTERIOR_COLOR, pine: '#c4884e', check: '#33456e' };
+/** The ground of a check wallpaper. */
+export const CHECK_GROUND = '#f2efe6';
+
+export const FLOOR_FINISHES: readonly FloorFinish[] = ['plain', 'boards', 'tile', 'parquet'];
+export const FLOOR_FINISH_LABEL: Record<FloorFinish, string> = { plain: 'Plain', boards: 'Boards', tile: 'Tile', parquet: 'Parquet' };
+export const FLOOR_COLOR: Record<FloorFinish, string> = { plain: '#c9a77c', boards: '#9a6a40', tile: '#d8cfbb', parquet: '#a8763e' };
+
+/** A resolved interior look: the finish and its colour. */
+export interface InteriorLook<F extends string> {
+  finish: F;
+  color: string;
+}
+
+/** The look of a room's walls, or null when the room sets none. */
+export function roomWallLookOf(r: Pick<Room, 'wallFinish' | 'wallColor'>): InteriorLook<RoomWallFinish> | null {
+  if (!r.wallFinish && !r.wallColor) return null;
+  const finish = r.wallFinish ?? 'paint';
+  return { finish, color: r.wallColor ?? ROOM_WALL_COLOR[finish] };
+}
+
+/** The room's wainscot with its colour resolved, or null when it has none below the ceiling. */
+export function wainscotOf(r: Pick<Room, 'wainscot'>, wallHeight: number): (InteriorLook<RoomWallFinish> & { height: number }) | null {
+  const w = r.wainscot;
+  if (!w || !(w.height > 0) || w.height >= wallHeight) return null;
+  return { height: w.height, finish: w.finish, color: w.color ?? ROOM_WALL_COLOR[w.finish] };
+}
+
+/** The look of a room's floor, or null when the room sets none (the slab shows). */
+export function floorLookOf(r: Pick<Room, 'floorFinish' | 'floorColor'>): InteriorLook<FloorFinish> | null {
+  if (!r.floorFinish && !r.floorColor) return null;
+  const finish = r.floorFinish ?? 'plain';
+  return { finish, color: r.floorColor ?? FLOOR_COLOR[finish] };
+}
 
 /** Roof surface colours by finish: corrugated metal grey-brown, asphalt shingle dark grey. */
 export const ROOF_COLOR: Record<RoofFinish, string> = { metal: '#6e6259', shingle: '#4a4a4a' };

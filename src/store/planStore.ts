@@ -58,6 +58,8 @@ const OPTIONAL_OPENING_KEYS: ReadonlySet<keyof Opening> = new Set<keyof Opening>
   'leafColor',
 ]);
 export type RoomPatch = Partial<Omit<Room, 'id'>>;
+/** Room fields that a patch clears with undefined. */
+const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 export type StairsPatch = Partial<Omit<Stairs, 'id'>>;
 export type NewStairs = Omit<Stairs, 'id'> & { id?: Id };
@@ -144,8 +146,9 @@ export interface PlanState {
   /** Add a room label; returns its id, or null when the name is blank or the anchor is not finite. */
   addRoom: (levelId: Id, room: NewRoom) => Id | null;
   /**
-   * Rename or move a room, or change its phase. A blank name or non-finite anchor is ignored;
-   * `ceilingOverride` and `phase` take undefined to clear them.
+   * Rename or move a room, or change its phase or interior finishes. A blank name or non-finite
+   * anchor is ignored; the optional fields (`ceilingOverride`, `phase` and the finishes) take
+   * undefined to clear them. Colours are stored lower-case.
    */
   updateRoom: (levelId: Id, id: Id, patch: RoomPatch) => void;
   deleteRooms: (levelId: Id, ids: Id[]) => void;
@@ -689,7 +692,8 @@ export const usePlanStore = create<PlanState>()(
             if (patch.name !== undefined) {
               const name = patch.name.trim();
               if (!name) return false;
-              if (name === r.name && patch.anchor === undefined && patch.ceilingOverride === undefined && patch.phase === undefined) return false;
+              const others = Object.keys(patch).some((k) => k !== 'name' && (patch[k as keyof RoomPatch] !== undefined || (OPTIONAL_ROOM_KEYS as readonly string[]).includes(k)));
+              if (name === r.name && !others) return false;
               r.name = name;
             }
             if (patch.anchor !== undefined) {
@@ -704,6 +708,16 @@ export const usePlanStore = create<PlanState>()(
             if ('phase' in patch) {
               if (patch.phase === undefined) delete r.phase;
               else r.phase = patch.phase;
+            }
+            // Interior finishes: undefined clears a field; colours lower-case, the wainscot copied.
+            for (const key of ['wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const) {
+              if (!(key in patch)) continue;
+              const v = patch[key];
+              if (v === undefined) delete r[key];
+              else if (key === 'wainscot') {
+                const w = v as NonNullable<Room['wainscot']>;
+                r.wainscot = { height: w.height, finish: w.finish, ...(w.color ? { color: w.color.toLowerCase() } : {}) };
+              } else (r as unknown as Record<string, string>)[key] = key.endsWith('Color') ? (v as string).toLowerCase() : (v as string);
             }
           }),
 

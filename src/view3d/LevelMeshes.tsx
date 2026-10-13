@@ -5,7 +5,7 @@ import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { counterColorOf } from '../model/casework';
-import { caseworkMaterial, counterMaterial, fasciaMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, stairsMaterial, wallMaterial } from './materials';
+import { caseworkMaterial, counterMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -26,17 +26,33 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   return (
     <group position={[0, floorTop, 0]} name={`level:${levelId}`}>
       {meshes.floor && <mesh name="floor" geometry={meshes.floor} material={floorMaterial} castShadow receiveShadow dispose={null} />}
+      {meshes.floorFinishes.map((f) => (
+        <mesh key={f.roomId} name={`floor-finish:${f.roomId}`} geometry={f.geometry} material={floorFinishMaterial(f.phase, f.finish, f.color)} receiveShadow dispose={null} />
+      ))}
       {meshes.walls.map((w) => (
-        <mesh
-          key={w.id}
-          name={`wall:${w.id}`}
-          geometry={w.geometry}
-          material={wallMaterial(w.phase, w.kind, w.finish, w.color)}
-          renderOrder={w.phase === 'demo' ? 1 : 0}
-          castShadow={w.phase !== 'demo' && w.finish !== 'screen'}
-          receiveShadow
-          dispose={null}
-        />
+        <group key={w.id}>
+          <mesh
+            name={`wall:${w.id}`}
+            geometry={w.geometry}
+            material={wallMaterial(w.phase, w.kind, w.finish, w.color)}
+            renderOrder={w.phase === 'demo' ? 1 : 0}
+            castShadow={w.phase !== 'demo' && w.finish !== 'screen'}
+            receiveShadow
+            dispose={null}
+          />
+          {/* The faces a room dresses (never a demolished or screen wall's): they cast like the wall. */}
+          {w.faces?.map((f) => (
+            <mesh
+              key={`${f.side}:${f.band}`}
+              name={`wall:${w.id}:${f.side}:${f.band}`}
+              geometry={f.geometry}
+              material={roomWallMaterial(w.phase, f.finish, f.color)}
+              castShadow
+              receiveShadow
+              dispose={null}
+            />
+          ))}
+        </group>
       ))}
       {meshes.stairs.map((s) => (
         <mesh

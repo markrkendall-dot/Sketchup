@@ -10,7 +10,7 @@
 import { columnDefaults } from '../src/derive/site';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
-import type { Id, Opening, Phase, Plan, Roof, Vec2 } from '../src/model/types';
+import type { Id, Opening, Phase, Plan, Roof, Room, Vec2 } from '../src/model/types';
 import { getPlan, usePlanStore, type NewFixture, type NewStairs } from '../src/store/planStore';
 
 const ft = (feet: number): number => feet * 12;
@@ -65,8 +65,17 @@ const PINE = '#c4884e';
 const LAMINATE = '#e2dccb';
 const WHITE = '#f1efe8';
 const STOVE_BLACK = '#26241f';
-/** The front room's cream paint (photos 19 and 20) and the Utility's blue mini fridge (MK). */
+/** The front room's and the Living's cream paint (photos 16 to 20) and the Utility's blue mini fridge (MK). */
 const CREAM = '#ddd6b4';
+/** The Kitchen's blue check wallpaper and beige vinyl tile (photos 13 to 15). */
+const CHECK_BLUE = '#2e3f6b';
+const VINYL_BEIGE = '#cbbd9c';
+/** The dark red-brown paint of the Living's and front room's board floors (photos 16 to 20). */
+const FLOOR_RED_BROWN = '#5e2a22';
+/** The Bath's green paint over the pine wainscot (photos 21 and 22). */
+const BATH_GREEN = '#2f7a68';
+/** The Utility's unpainted wood floor (MK). */
+const WOOD_FLOOR = '#a87a4c';
 const FRIDGE_BLUE = '#3a5fa0';
 /**
  * Centre of the Kitchen's east window and the sink under it: the sink base comes right after the
@@ -228,9 +237,12 @@ function fixture(levelId: Id, f: NewFixture): Id {
   return id;
 }
 
-/** Name a room: a label anchored at `at`. A label of a new or demolished room shows only in the views that show its phase. */
-function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE): void {
-  if (!store().addRoom(levelId, { name, anchor: at, ...(phase === 'existing' ? {} : { phase }) })) throw new Error(`room ${name} rejected`);
+/**
+ * Name a room: a label anchored at `at`. A label of a new or demolished room shows only in the views
+ * that show its phase. `finishes`: the room's interior finishes (DESIGN.md "Interior finishes").
+ */
+function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE, finishes: Pick<Room, 'wallFinish' | 'wallColor' | 'wainscot' | 'floorFinish' | 'floorColor'> = {}): void {
+  if (!store().addRoom(levelId, { name, anchor: at, ...(phase === 'existing' ? {} : { phase }), ...finishes })) throw new Error(`room ${name} rejected`);
 }
 
 /** Replace every generated id with a readable, stable one so the JSON is identical from run to run. */
@@ -610,14 +622,24 @@ export function buildExamplePlan(): Plan {
   label(bId, 'Basement (unpartitioned, est.)', mid);
   // The walkout bump under the wing is its own space until it is measured (README).
   label(bId, 'Utility (below)', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 });
-  // First Floor: one label in each face (anchors well inside the faces).
+  // First Floor: one label in each face (anchors well inside the faces), each with its interior
+  // finishes from photos 13 to 22 (the Utility's from MK): the Kitchen's blue check wallpaper and
+  // beige vinyl tile; the Living's cream-painted vertical boards and the front room's smooth cream
+  // paint over the same dark red-brown painted board floor; the Bath's green paint over a knotty
+  // pine wainscot about 40" high and its parquet; the Utility's pine paneling and wood floor. The
+  // ceilings (pine in the Kitchen and the Bath) are not drawn.
   // MK calls the old entry hall the front room (photos 19 and 20).
-  label(fId, 'Front room', { x: 100, y: 52 });
-  label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: 52 });
-  label(fId, 'Kitchen (17\'2" adjusted: re-measure)', { x: (PART.kl + 2.5 + (CL.x1 - HALF)) / 2, y: (PART.line + 2.5 + (CL.y1 - HALF)) / 2 });
-  label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 });
+  label(fId, 'Front room', { x: 100, y: 52 }, PHASE, { wallFinish: 'paint', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN });
+  label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: 52 }, PHASE, { wallFinish: 'paint', wallColor: BATH_GREEN, wainscot: { height: 40, finish: 'pine' }, floorFinish: 'parquet' });
+  label(fId, 'Kitchen (17\'2" adjusted: re-measure)', { x: (PART.kl + 2.5 + (CL.x1 - HALF)) / 2, y: (PART.line + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, {
+    wallFinish: 'check',
+    wallColor: CHECK_BLUE,
+    floorFinish: 'tile',
+    floorColor: VINYL_BEIGE,
+  });
+  label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, { wallFinish: 'boards', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN });
   // The stair strip is part of the Living (no wall on its south side), so it has no label of its own.
-  label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 });
+  label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
   // Second Floor. The Office / hall is one face with the landing and the stair well.
   label(sId, 'Bunk', { x: 90, y: 52 });
