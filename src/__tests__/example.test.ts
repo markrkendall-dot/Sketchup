@@ -93,7 +93,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // the Basement are existing. Today's grey Kitchen to Utility door stays as the bedroom's door
     // (MK), so no new one is cut.
     expect(count(all('walls'))).toEqual({ existing: 57, demo: 7, new: 20 });
-    expect(count(all('openings'))).toEqual({ existing: 21, demo: 11, new: 18 });
+    expect(count(all('openings'))).toEqual({ existing: 19, demo: 13, new: 20 });
     // The demolished stair; the wing's outside stair on the Basement stays.
     expect(count(all('stairs'))).toEqual({ existing: 1, demo: 1, new: 3 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
@@ -106,7 +106,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // and label, the wing's north wall (it has no window) and the wing's roof, the east window into the
     // new bedroom, the hall passage, the Living's west window (replaced without shutters), the old
     // bath's door (inside the powder room; a closet door replaces it) and its north window (raised
-    // over the counter).
+    // over the counter). Upstairs, the two east windows (the wing's shed rises past their sills;
+    // transoms replace them).
     const f = plan.levels[plan.levelOrder[1]];
     expect(Object.values(f.rooms).filter((r) => r.phase === 'demo').map((r) => r.name).sort()).toEqual(['Bath', 'Entry porch (est.)', 'Utility']);
     // A demolished wall's openings are demolished with it.
@@ -472,16 +473,39 @@ describe('docs/examples/146-mick-road.json', () => {
       return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
     };
     expect(roofs.map((r) => [r.shape, box(r), r.ridgeAngle, r.pitch, r.overhang])).toEqual([
-      // One gable over the whole east wing, ridge north-south.
-      ['gable', [318, 463, 0, 315], 90, 7, 18],
-      // The foyer's gable faces west; the porch's shed is high at the house wall. Their outlines
-      // stop 18" short of the wall, so the overhang ends at its outside face.
+      // One shed over the whole east wing, sloping down east from the main block's east wall.
+      ['shed', [336, 463, 0, 315], 0, 5, 18],
+      // The foyer's gable faces west; the porch's shed is high at the house wall. All three
+      // outlines stop 18" short of the wall, so the overhang ends at its outside face.
       ['gable', [-96, -18, 64.25, 158], 0, 8, 18],
       ['shed', [-96, -18, 158, 315], 180, 4, 18],
     ]);
-    // The shed is 128" above the first floor at the house wall and 96" at the porch's outer wall;
+    // The wing's shed is 96" above the first floor at the wing's east wall and 96 + 145 x 5/12 at
+    // the main block's east wall.
+    const [wing, foyer, shed] = roofs;
+    const wingBearing = roofBearing(f.wallHeight, wing);
+    expect(roofHeightAt(wing, wingBearing, { x: 463, y: 150 })).toBeCloseTo(96, 6);
+    expect(roofHeightAt(wing, wingBearing, { x: 318, y: 150 })).toBeCloseTo(96 + (145 * 5) / 12, 6);
+    // Upstairs, the transoms that replace the two east windows sit with their sills at least 8"
+    // over the shed's top at the wall, their heads under the ceiling; the old sills were under it.
+    const s = plan.levels[plan.levelOrder[2]];
+    const up = f.wallHeight + s.floorThickness;
+    const wingTop = roofHeightAt(wing, wingBearing, { x: 318, y: 150 })! + wing.thickness;
+    const transoms = Object.values(s.openings).filter((o) => o.phase === 'new');
+    expect(transoms.map((o) => [o.type, o.width, o.height, o.sill, o.sashes])).toEqual([
+      ['window', 46, 24, 60, 2],
+      ['window', 46, 24, 60, 2],
+    ]);
+    for (const o of transoms) {
+      expect(s.walls[o.wallId]).toBeDefined();
+      expect(up + o.sill - wingTop).toBeGreaterThanOrEqual(8);
+      expect(o.sill + o.height).toBeLessThanOrEqual(s.wallHeight);
+    }
+    const oldEast = Object.values(s.openings).filter((o) => o.phase === 'demo');
+    expect(oldEast).toHaveLength(2);
+    for (const o of oldEast) expect(up + o.sill).toBeLessThan(wingTop);
+    // The porch's shed is 128" above the first floor at the house wall and 96" at its outer wall;
     // the foyer's ridge is under the upstairs west window's sill (156" above the first floor).
-    const [, foyer, shed] = roofs;
     expect(roofHeightAt(shed, roofBearing(f.wallHeight, shed), { x: 0, y: 236 })).toBeCloseTo(128, 6);
     expect(roofHeightAt(shed, roofBearing(f.wallHeight, shed), { x: -96, y: 236 })).toBeCloseTo(96, 6);
     expect(roofExtremes(foyer, roofBearing(f.wallHeight, foyer)).ridge + foyer.thickness).toBeLessThan(156);

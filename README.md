@@ -583,12 +583,16 @@ The starter also holds the owner's proposed design (his brief of 12 Oct 2026), d
 *demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
 `proposed()`; the plans are `docs/history/PLAN-v4-proposed.md` and, for the kitchen,
 `docs/history/PLAN-v5-kitchen.md`, with the places where the built design differs from them).
-Five changes, all on the First Floor:
+Five changes, all on the First Floor apart from the upstairs east windows over the new wing:
 
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
-   one-storey wing down the whole east side, outside 12'1" x 26'3", under one new gable roof with
-   its ridge north-south. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2" inside)
-   from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom is entered
+   one-storey wing down the whole east side, outside 12'1" x 26'3", under one new shed roof (5:12)
+   high at the main block's east wall and sloping down east to the wing's east wall: its top meets
+   the main wall 50.9" above the Second Floor. That is over the sills of the two upstairs east
+   windows (34"), so they are demolished and high transoms replace them on the same centres (the
+   Office / hall's at y 98, the Guest's at y 222): 46" x 24", two sashes of 2 x 2 lites, sill 60"
+   (head 84"), 9" over the roof. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2"
+   inside) from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom is entered
    from the kitchen through today's grey Kitchen to Utility door, which stays (MK chose it over a
    new 32" door further north). The wing's north wall and its roof, and the
    main block's first-floor east window, are demolished. New 8" block walls carry the new part

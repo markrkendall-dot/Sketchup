@@ -525,8 +525,7 @@ export function buildExamplePlan(): Plan {
   // where the wing's ridge meets the wall, and one casement pair set high on the first floor north of
   // the wing, over the Kitchen sink (photos 13 and 15), as far south as the wing's north wall allows
   // (its face at y 188); 2 x 3 lites each.
-  win(sId, { x: east, y: 98 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
-  win(sId, { x: east, y: 222 }, 46, 44, 2, 3, { sashes: 2, sill: 34 });
+  const eastUpstairs = [win(sId, { x: east, y: 98 }, 46, 44, 2, 3, { sashes: 2, sill: 34 }), win(sId, { x: east, y: 222 }, 46, 44, 2, 3, { sashes: 2, sill: 34 })];
   const eastWindow = win(fId, { x: east, y: KITCHEN_WINDOW_Y }, 40, 40, 2, 3, { sashes: 2, sill: 42 });
   // The wing: casement pairs in its east gable end (photo 03), 2 x 3 lites, and in its south face,
   // 2 x 2 lites (photo 23). Its north face has no window (MK).
@@ -668,7 +667,7 @@ export function buildExamplePlan(): Plan {
   label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, PLACEHOLDER_ROOM);
   label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
 
-  proposed({ bId, fId, stair, houseDoor, livingWest, hallPassage, eastWindow, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
+  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
   return getPlan();
 }
 
@@ -676,11 +675,14 @@ export function buildExamplePlan(): Plan {
 interface ExistingIds {
   bId: Id;
   fId: Id;
+  sId: Id;
   stair: Id;
   houseDoor: Id;
   livingWest: Id;
   hallPassage: Id;
   eastWindow: Id;
+  /** The Second Floor's two east windows (the Office / hall's at y 98, the Guest's at y 222). */
+  eastUpstairs: Id[];
   wingRoof: Id;
   porchRoof: Id;
   /** The old bath's door (x 194.5, at the south end of the wall, y 54..84) and its north window (x 234). */
@@ -720,8 +722,9 @@ function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id
 
 /**
  * The proposed design (MK's brief of 12 Oct 2026; docs/history/PLAN-v4-proposed.md), drawn as new
- * and demolished work on the existing house: the east wing grown north into a master suite, the
- * kitchen into the old bath, a new stair from a front door on the west wall up to a landing in the
+ * and demolished work on the existing house: the east wing grown north into a master suite under a
+ * shed roof (transoms upstairs over it in place of the east windows), the kitchen into the old
+ * bath, a new stair from a front door on the west wall up to a landing in the
  * north-west corner and east along the north wall, a powder room in the old hall, and a foyer with a
  * screen porch on the west face in place of the entry porch. Everything is demolished first, so the
  * existing openings are clamped against the proposed walls only once, and none of them moves.
@@ -762,6 +765,9 @@ function proposed(ids: ExistingIds): void {
     fixtures: ids.fixtures,
     rooms: ['Entry porch (est.)', 'Utility', 'Bath'],
   });
+  // Second Floor: the two east windows. The wing's new shed roof rises to the main block's east wall
+  // past their sills (34"), so high transoms replace them (below).
+  demolish(ids.sId, { openings: ids.eastUpstairs });
 
   // ---- 1. East addition: the wing grows north to the road corner at the same depth, one wing down
   // the whole east side, outside x 318..463, y 0..315. Its north wall continues the main block's,
@@ -847,6 +853,13 @@ function proposed(ids: ExistingIds): void {
   // The new strip wall's two openings (above).
   add({ x: 150, y: STAIR_SOUTH }, { type: 'passage', width: 36, height: 80, sill: 0 });
   add({ x: 22, y: STAIR_SOUTH }, { type: 'passage', width: 30, height: 80, sill: 0 });
+  // Upstairs, the transoms in place of the two east windows, on the same centres (the Office / hall's
+  // y 98, the Guest's y 222): 46 x 24, two sashes of 2 x 2 lites, sill 60, so the head is at 84. The
+  // wing's shed (below) meets the wall with its top 50.9" above the Second Floor, so each sill is
+  // 9.1" over the roof and its trim 5.1".
+  for (const y of [98, 222]) {
+    addOpeningAt(ids.sId, { x: CL.x1, y }, { type: 'window', width: 46, height: 24, sill: 60, sashes: 2, lites: { cols: 2, rows: 2 }, phase: NEW });
+  }
 
   // ---- 3. The stair, 36" wide: two risers north from the old hall up to a 14" landing in the
   // north-west corner, then the main flight east along the north wall to the Bunk's east wall face
@@ -860,15 +873,18 @@ function proposed(ids: ExistingIds): void {
   flight({ origin: { x: 25, y: 43 }, direction: 270, width: 36, run: 36, rise: 14, risers: 1, cutsFloorAbove: false });
   flight({ origin: { x: 43, y: 25.25 }, direction: 0, width: 35.5, run: 126, base: 14, rise: 94, cutsFloorAbove: true });
 
-  // ---- Roofs, new sheet (little rust). The wing: one gable over the whole east side, ridge
-  // north-south, the wing roof's pitch and colour. The foyer: a gable facing west over the front door
-  // like the old porch's; the screen porch: a shed high at the house wall (128") and down to 96" at
-  // its outer wall, meeting the gable's eave line. The two overlap at y 158 (no valley). Both
-  // outlines stop 18" short of the house wall (x -18): an overhang is the same on every edge, so
-  // their east edges' overhang ends at the wall's outside face instead of running 18" into the
-  // house (a rake board and rafter tails upstairs). The slopes are the same either way.
+  // ---- Roofs, new sheet (little rust). The wing: one shed over the whole east side, 5:12 in the
+  // wing roof's colour, high at the main block's east wall and down to 96" at the wing's east wall:
+  // its underside is 156.4" above the first floor at the main wall (96 + 145 x 5/12), its top 158.9",
+  // 50.9" above the Second Floor, under the transoms. The foyer: a gable facing west over the front
+  // door like the old porch's; the screen porch: a shed high at the house wall (128") and down to 96"
+  // at its outer wall, meeting the gable's eave line. The two overlap at y 158 (no valley). The
+  // outlines stop 18" short of the house wall (x -18, and x 336 for the wing): an overhang is the
+  // same on every edge, so the overhang on the house side ends at the wall's outside face instead of
+  // running 18" into the house (a board and the roof's high edge upstairs). The slopes are the same
+  // either way.
   const ROOF_EAST = MAIN.x0 - 18;
-  roof(fId, { shape: 'gable', outline: outline({ x0: MAIN.x1, x1: WING.x1, y0: MAIN.y0, y1: MAIN.y1 }), ridgeAngle: 90, pitch: 7, overhang: 18 }, ROOF_WING, 0.1, NEW);
+  roof(fId, { shape: 'shed', outline: outline({ x0: MAIN.x1 + 18, x1: WING.x1, y0: MAIN.y0, y1: MAIN.y1 }), ridgeAngle: 0, pitch: 5, overhang: 18 }, ROOF_WING, 0.1, NEW);
   roof(fId, { shape: 'gable', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y0, y1: FOYER.y1 }), ridgeAngle: 0, pitch: 8, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
