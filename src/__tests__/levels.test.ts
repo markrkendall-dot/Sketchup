@@ -118,6 +118,8 @@ describe('visibility in snapping and hit testing', () => {
     decks: {},
     floorOpenings: {},
     staircases: {},
+    joistZones: {},
+    members: {},
   };
   const ctx = { level, k: 1, snapGrid: 1, orthoLock: true, shift: false } as const;
 

@@ -27,7 +27,8 @@ import {
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import { planRenovation } from '../model/renovate';
-import type { Column, Deck, Fixture, FloorOpening, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from '../model/structure';
+import type { Beam, Column, Deck, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
@@ -88,6 +89,11 @@ export type DeckPatch = Partial<Omit<Deck, 'id'>>;
 /** A new floor opening; its railings default to one per edge, all on (normalizeRailings). */
 export type NewFloorOpening = Omit<FloorOpening, 'id' | 'railings'> & { id?: Id; railings?: boolean[] };
 export type FloorOpeningPatch = Partial<Omit<FloorOpening, 'id'>>;
+export type NewMember = (Omit<Beam, 'id'> | Omit<Post, 'id'>) & { id?: Id };
+/** A beam's or post's fields (its kind stays); undefined clears `label` or `footing`. */
+export type MemberPatch = Partial<Omit<Beam, 'id' | 'kind'>> | Partial<Omit<Post, 'id' | 'kind'>>;
+export type NewJoistZone = Omit<JoistZone, 'id'> & { id?: Id };
+export type JoistZonePatch = Partial<Omit<JoistZone, 'id'>>;
 export type FixturePatch = Partial<Omit<Fixture, 'id'>>;
 export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
 /** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
@@ -111,6 +117,8 @@ export interface EntitySelection {
   floorOpenings?: Id[];
   /** Staircases: deleting one deletes its pieces; a phase goes to its pieces. */
   staircases?: Id[];
+  members?: Id[];
+  joistZones?: Id[];
   /** Site elements (plan.site); the level id the action is given only scopes the other kinds. */
   gradePoints?: Id[];
   columns?: Id[];
@@ -229,6 +237,15 @@ export interface PlanState {
   /** Patch a floor opening; an unusable outline is rejected. A new outline refits the railings (normalizeRailings). */
   updateFloorOpening: (levelId: Id, id: Id, patch: FloorOpeningPatch) => void;
   deleteFloorOpenings: (levelId: Id, ids: Id[]) => void;
+  /** Add a beam or a post (DESIGN.md "Structure"); null when it cannot be used (memberProblem). */
+  addMember: (levelId: Id, member: NewMember) => Id | null;
+  updateMember: (levelId: Id, id: Id, patch: MemberPatch) => void;
+  /** Put members at new places in one undo step (a drag): a beam's ends, a post's point. */
+  placeMembers: (levelId: Id, places: Record<Id, { a?: Vec2; b?: Vec2; at?: Vec2 }>) => void;
+  addJoistZone: (levelId: Id, zone: NewJoistZone) => Id | null;
+  updateJoistZone: (levelId: Id, id: Id, patch: JoistZonePatch) => void;
+  /** The joists over a level; undefined clears them (not set). */
+  setLevelFraming: (levelId: Id, framing: LevelFraming | undefined) => void;
   /** Add a cabinet, appliance or sink (DESIGN.md "Casework"); returns the id, or null when it is not usable (fixtureProblem). */
   addFixture: (levelId: Id, fixture: NewFixture) => Id | null;
   /**
@@ -275,7 +292,7 @@ export interface PlanState {
    */
   setPhase: (
     levelId: Id,
-    sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; floorOpenings?: Id[]; staircases?: Id[]; columns?: Id[]; rooms?: Id[] },
+    sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; floorOpenings?: Id[]; staircases?: Id[]; members?: Id[]; joistZones?: Id[]; columns?: Id[]; rooms?: Id[] },
     phase: Phase,
   ) => void;
   /**
@@ -330,6 +347,25 @@ function moveNodesInPlace(level: Level, positions: Record<Id, Vec2>): void {
     const delta = wallLength(level, level.walls[o.wallId]) - old;
     if (delta !== 0) o.offset += delta;
   }
+}
+
+/** A member's stored form: points copied, a label trimmed (empty: none). */
+function cleanMember(m: Member): Member {
+  const out = { ...m } as Member;
+  if (out.kind === 'beam') {
+    out.a = { x: out.a.x, y: out.a.y };
+    out.b = { x: out.b.x, y: out.b.y };
+  } else {
+    out.at = { x: out.at.x, y: out.at.y };
+    if (out.footing) out.footing = { width: out.footing.width, thickness: out.footing.thickness };
+    else delete out.footing;
+  }
+  if (typeof out.label === 'string') {
+    const t = out.label.trim();
+    if (t) out.label = t;
+    else delete out.label;
+  } else delete out.label;
+  return out;
 }
 
 /** Drop the staircases no piece of stairs belongs to any more. */
@@ -667,6 +703,8 @@ export const usePlanStore = create<PlanState>()(
             const staircases = new Set(sel.staircases ?? []);
             const stairs = [...(sel.stairs ?? []), ...Object.values(level.stairs).flatMap((st) => (st.staircaseId && staircases.has(st.staircaseId) ? [st.id] : []))];
             deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, stairs, sel.roofs, sel.fixtures, sel.decks, sel.floorOpenings);
+            for (const id of sel.members ?? []) delete level.members[id];
+            for (const id of sel.joistZones ?? []) delete level.joistZones[id];
             for (const id of sel.gradePoints ?? []) delete plan.site.gradePoints[id];
             for (const id of sel.columns ?? []) delete plan.site.columns[id];
             // Removing walls changes the corner joins of their neighbours.
@@ -691,7 +729,7 @@ export const usePlanStore = create<PlanState>()(
               for (const [key, value] of Object.entries(patch) as [keyof Wall, unknown][]) {
                 // undefined clears an optional field; required fields are never removed.
                 if (value === undefined) {
-                  if (key === 'heightOverride' || key === 'finish' || key === 'color') delete w[key];
+                  if (key === 'heightOverride' || key === 'finish' || key === 'color' || key === 'bearing') delete w[key];
                 } else if (w[key] !== value) (w as unknown as Record<string, unknown>)[key] = value;
               }
             }
@@ -1070,6 +1108,76 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete level.floorOpenings[id];
           }),
 
+        addMember: (levelId, input) => {
+          let id: Id | null = null;
+          editLevel(levelId, (level, plan) => {
+            const m = cleanMember({ ...input, id: input.id ?? newId() } as Member);
+            if (memberProblem(m, plan.levelOrder[0] === levelId)) return false;
+            level.members[m.id] = m;
+            id = m.id;
+          });
+          return id;
+        },
+
+        updateMember: (levelId, id, patch) =>
+          editLevel(levelId, (level, plan) => {
+            const m = level.members[id];
+            if (!m) return false;
+            const merged = { ...m, ...patch, id, kind: m.kind } as Member;
+            for (const k of ['label', 'footing'] as const) if (k in patch && (patch as Record<string, unknown>)[k] === undefined) delete (merged as unknown as Record<string, unknown>)[k];
+            const next = cleanMember(merged);
+            if (memberProblem(next, plan.levelOrder[0] === levelId)) return false;
+            if (JSON.stringify(next) === JSON.stringify(m)) return false;
+            level.members[id] = next;
+          }),
+
+        placeMembers: (levelId, places) =>
+          editLevel(levelId, (level) => {
+            let changed = false;
+            for (const [id, p] of Object.entries(places)) {
+              const m = level.members[id];
+              if (!m) continue;
+              if (m.kind === 'beam') {
+                if (p.a && isPoint(p.a) && (p.a.x !== m.a.x || p.a.y !== m.a.y)) (m.a = { x: p.a.x, y: p.a.y }), (changed = true);
+                if (p.b && isPoint(p.b) && (p.b.x !== m.b.x || p.b.y !== m.b.y)) (m.b = { x: p.b.x, y: p.b.y }), (changed = true);
+              } else if (p.at && isPoint(p.at) && (p.at.x !== m.at.x || p.at.y !== m.at.y)) (m.at = { x: p.at.x, y: p.at.y }), (changed = true);
+            }
+            if (!changed) return false;
+          }),
+
+        addJoistZone: (levelId, input) => {
+          let id: Id | null = null;
+          editLevel(levelId, (level) => {
+            const z: JoistZone = { ...input, id: input.id ?? newId(), outline: input.outline.map((p) => ({ x: p.x, y: p.y })), joists: normalizeJoists(input.joists) };
+            if (joistZoneProblem(z)) return false;
+            level.joistZones[z.id] = z;
+            id = z.id;
+          });
+          return id;
+        },
+
+        updateJoistZone: (levelId, id, patch) =>
+          editLevel(levelId, (level) => {
+            const z = level.joistZones[id];
+            if (!z) return false;
+            const next: JoistZone = { ...z, ...patch, id, outline: (patch.outline ?? z.outline).map((p) => ({ x: p.x, y: p.y })), joists: normalizeJoists(patch.joists ?? z.joists) };
+            if (joistZoneProblem(next) || JSON.stringify(next) === JSON.stringify(z)) return false;
+            level.joistZones[id] = next;
+          }),
+
+        setLevelFraming: (levelId, framing) =>
+          editLevel(levelId, (level) => {
+            if (framing === undefined) {
+              if (!level.framing) return false;
+              delete level.framing;
+              return;
+            }
+            if (framingProblem(framing)) return false;
+            const next: LevelFraming = { joists: normalizeJoists(framing.joists), ...(framing.depth !== undefined ? { depth: framing.depth } : {}) };
+            if (JSON.stringify(next) === JSON.stringify(level.framing)) return false;
+            level.framing = next;
+          }),
+
         addFixture: (levelId, input) => {
           let id: Id | null = null;
           editLevel(levelId, (level) => {
@@ -1296,6 +1404,14 @@ export const usePlanStore = create<PlanState>()(
               const d = level.decks[id];
               if (d && d.phase !== phase) d.phase = phase;
             }
+            for (const id of sel.members ?? []) {
+              const m = level.members[id];
+              if (m && m.phase !== phase) m.phase = phase;
+            }
+            for (const id of sel.joistZones ?? []) {
+              const z = level.joistZones[id];
+              if (z && z.phase !== phase) z.phase = phase;
+            }
             for (const id of sel.floorOpenings ?? []) {
               const o = level.floorOpenings[id];
               if (o && o.phase !== phase) o.phase = phase;
@@ -1351,6 +1467,8 @@ export const usePlanStore = create<PlanState>()(
               const b = nodeFor(w.b);
               if (!a || !b) continue;
               const copy: Wall = { ...w, id: newId(), a, b };
+              // Whether a wall carries load is the source level's business.
+              delete copy.bearing;
               // Height overrides belong to the source level's storey.
               delete copy.heightOverride;
               to.walls[copy.id] = copy;

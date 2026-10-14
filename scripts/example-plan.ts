@@ -300,6 +300,8 @@ function stableIds(plan: Plan): string {
       ['d', lvl.decks],
       ['h', lvl.floorOpenings],
       ['x', lvl.staircases],
+      ['z', lvl.joistZones],
+      ['m', lvl.members],
     ];
     for (const [k, rec] of kinds) Object.keys(rec).forEach((id, i) => add(id, `${pre}-${k}${i + 1}`));
   });

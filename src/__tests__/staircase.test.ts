@@ -99,7 +99,7 @@ describe('staircase store actions', () => {
 
 describe('staircases in the file', () => {
   it('schema 6 adds staircases to every level; a v5 file gains empty records', () => {
-    expect(SCHEMA_VERSION).toBe(6);
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(6);
     const v5 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 5 }));
     for (const l of Object.values(v5.levels) as Record<string, unknown>[]) delete l.staircases;
     expect(MIGRATIONS[5](v5).schemaVersion).toBe(6);

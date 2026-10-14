@@ -45,6 +45,8 @@ export interface Wall {
   finish?: WallFinish;
   /** Hex colour `#rrggbb`. Absent: the house's red-brown for exterior walls, off-white for interior ones. */
   color?: string;
+  /** Carries load (schema version 7): true or false as marked; absent, inferred (derive/structure.ts). */
+  bearing?: boolean;
 }
 
 export interface Opening {
@@ -347,6 +349,59 @@ export interface Underlay {
   locked: boolean;
 }
 
+/**
+ * The framing over a level (schema version 7, DESIGN.md "Structure"): the joists of the floor above
+ * it (or, on the top level, of the ceiling under the roof). `joists` is the joists' axis in degrees
+ * (0..180, plan angles: 0 east-west, 90 north-south); `depth` overrides the depth derived from the
+ * floor above's thickness.
+ */
+export interface LevelFraming {
+  joists: Degrees;
+  depth?: Inches;
+}
+
+/** An area over a level framed another way (a part built in another stage): its joists' axis. */
+export interface JoistZone {
+  id: Id;
+  outline: Vec2[];
+  joists: Degrees;
+  phase: Phase;
+}
+
+/**
+ * A beam (schema version 7): from a to b in plan, `width` across, `depth` deep, in the framing over
+ * its level: flush (its top at the joists' top, inside the floor above) or dropped (under the
+ * ceiling, its top at the level's wall height).
+ */
+export interface Beam {
+  id: Id;
+  kind: 'beam';
+  a: Vec2;
+  b: Vec2;
+  width: Inches;
+  depth: Inches;
+  mount: 'flush' | 'dropped';
+  phase: Phase;
+  /** What it is, e.g. "(2) 1 3/4 x 11 7/8 LVL"; placeholder sizes are for the engineer to set. */
+  label?: string;
+}
+
+/** A post (schema version 7): from its level's floor up to the beam over it (else the ceiling). */
+export interface Post {
+  id: Id;
+  kind: 'post';
+  at: Vec2;
+  width: Inches;
+  depth: Inches;
+  rotation: Degrees;
+  phase: Phase;
+  label?: string;
+  /** A concrete pad under it, on the lowest level only. */
+  footing?: { width: Inches; thickness: Inches };
+}
+
+export type Member = Beam | Post;
+
 export interface Level {
   id: Id;
   name: string;
@@ -366,6 +421,12 @@ export interface Level {
   floorOpenings: Record<Id, FloorOpening>;
   /** Staircases, groups of this level's stairs styled together (schema version 6). */
   staircases: Record<Id, Staircase>;
+  /** The joists over this level (schema version 7); absent: not set. */
+  framing?: LevelFraming;
+  /** Areas over this level framed another way (schema version 7). */
+  joistZones: Record<Id, JoistZone>;
+  /** Beams in the framing over this level and posts standing on its floor (schema version 7). */
+  members: Record<Id, Member>;
   finishes?: LevelFinishes;
   underlay?: Underlay;
 }
@@ -401,7 +462,7 @@ export interface ProposedLook {
 }
 
 export interface Plan {
-  schemaVersion: 6;
+  schemaVersion: 7;
   id: Id;
   name: string;
   levelOrder: Id[]; // bottom to top
