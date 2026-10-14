@@ -146,3 +146,21 @@ Tests:
   - the laundry and kitchen ducts in 3D;
   - the retaining wall in 3D from the south-west;
   - sent to MK.
+
+## Built differently from the plan
+
+- **1**: the laundry closet's north wall stays at y 51.5 (it no longer follows the band), so the
+  washer and dryer keep their places; the band at y 57.5 meets the main block's east wall at its
+  own point. The kitchen's east run moved 6" south (the range to y 159), which shortens the work
+  triangle to about 22'.
+- **2**: a timber's `depth` is square to its slope (the plumb depth is depth / cos). The gable
+  timbers sit at x -99 with the tie's top at 94"; corner posts stand from the floor to the tie's
+  underside, so the knee braces have something to start from (photo 08 shows posts).
+- **3**: the merged hall and Living take the Living's label and finishes. The dryer vent is about
+  13' (a 4'8" riser behind the dryer and 8'6" north), not 8'4". Alarms: smoke in the master
+  bedroom, the upstairs Master and Guest, and the basement; smoke/CO by the master bedroom's door
+  in the kitchen, on the upstairs balcony and in the Living.
+- **4**: the new wall's angled piece runs to (-660, 519), about 22'10" rather than "about 20'", so
+  the 27' straight piece ends at the property line (x -984); the sketch is not to scale. Rather than
+  accept a coarser sun shadow (the lighting test) and a smaller house in Fit 3D and the elevations,
+  `planBox` now takes in only walls that close a room, so a free-standing wall does not widen it.

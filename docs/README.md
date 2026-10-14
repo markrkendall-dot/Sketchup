@@ -28,5 +28,9 @@
     Residential Code of New York State checklist it was laid out to.
   - `PLAN-v8-stair-structure.md`: the plan for the grand staircase in detail, the NY stair checks,
     walk mode on stairs, renovation wall moves, and beams, posts, footings and load-path checks.
+  - `PLAN-v9-still-open.md`: the plan for the README's remaining open items (the 4' north band with
+    new walls no longer splitting demolished ones, the foyer gable's timbers, the hall open to the
+    Living, the coats bench, the vents, the alarms, the retaining wall carried west), and where the
+    built work differs.
   - `QA-FINDINGS.md`: the first hands-on QA pass and the second review's status.
   - `REVIEW-2.md`: the second review of the house and the tools, with the fixes made.

@@ -796,43 +796,45 @@ Which view to use:
   rooms keep their labels in the All view and the new labels sit beside them (the Utility and the
   master bedroom's new north part are two areas there).
 
-Still open:
+Still open, by who answers it (the design decisions are made; what follows is for MK's pictures,
+the engineer, the trades and the tape measure):
 
-- **The stove and its chimney**: the stove's listing and the chimney maker's instructions set the
+**MK**
+- The porch's size and roofline wait on MK's reference pictures (estimated 8' out; the foyer's
+  gable and the porch's shed overlap with no valley, which the tool cannot draw).
+- The garage (24' x 26', 55' west of the house, 20' from the road, 3' off the west property line)
+  is not drawn; the retaining wall carried west sets its south side. To draw it: on the First
+  Floor, **Draw as: new**, the Box tool (`B`, `24' x 26'`, Enter).
+
+**The engineer** (the tool draws and checks the load path; it sizes nothing)
+- Size the balcony header (y 92.75), the kitchen beam (y 99.5), the studs in the partition under
+  their ends, the basement post (two 6x6s) and its 24" x 12" footing. The checks find nothing
+  missing in that load path.
+- Confirm the y 99.5 wall was the bearing wall (the tool infers it: the joists would span 25'-8"
+  without it) and that the Bunk's south wall upstairs carried no more than itself (the attic joists
+  span 11'-2" without it). Survey the basement under the post.
+- The headers noted HDR on the structure overlay: the cased opening in the partition, the two
+  First Floor north windows and the stair hall's upper north window.
+- How the foyer gable's timbers are fixed to the wall and the roof (they are drawn, not designed).
+
+**The trades and the makers' instructions**
+- The stove and its chimney: the stove's listing and the chimney maker's instructions set the
   clearances (to the west window's trim, to the surround), the thimble, the supports and the top,
-  and win over the plan's numbers. The chimney's 7' over the rake needs a roof brace; where it
-  passes the porch roof 6" from the house wall, the flashing has to be worked into the wall's.
-  CO alarms are required with a fuel-burning appliance. See `docs/history/PLAN-v7-exterior-flue.md`.
-- **The dryer's vent**: up through the wing's ceiling and roof, or along the ceiling to an outside
-  wall.
-- **The structure** (estimates): the joists are taken as north-south on every level (MK), but
-  east-west in the wing's ceiling under its shed roof; the wing's floor over the crawl space is
-  unknown (left north-south). Verify them on site. The y 99.5 wall's removal is carried by a flush
-  balcony header (y 92.75, from the west wall to the x 170.5 partition) and a flush kitchen beam on
-  the old wall's line (to the east wall); both land on the partition, with a post of two 6x6s
-  under both ends in the basement on a 24" x 12" footing. The checks find nothing missing in that
-  load path. For the engineer: size the header, the beam, the post and the footing (and the squash
-  blocks or studs in the partition under each end); confirm the y 99.5 wall was the bearing wall
-  (the tool infers it: the joists would span 25'-8" without it); confirm the Bunk's south wall
-  upstairs (taken out) carried no more than its own weight (the tool finds the attic joists span
-  11'-2" without it); survey the basement under the post. Headers are noted (HDR on the overlay)
-  for the new openings cut into bearing walls: the cased opening in the partition, the two First
-  Floor north windows and the stair hall's upper north window.
-- **Coats**: the closet under the stair is narrow (2'3" inside, the old window's span sets its west
-  wall); hooks or a bench in the foyer would add room.
-- The pipes of the upstairs bath come down through the powder room under it (the old pipe chase
-  in the front room is gone with the stove); their route is for the plumber.
-- The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the
-  foyer's gable and the porch's shed overlap with no valley).
-- **The wall between the stair strip and the Living** is new work (there is none today); delete it
-  to leave the new front door opening straight into the Living.
-- How the bedroom is reached: through today's grey door from the kitchen, the only room beside it
-  (settled: MK kept it rather than cut a new door); a hall can still be added later.
-- The kitchen: the stools stand clear of the ledge rather than under it; the hood's duct route (out
-  through the wing's ceiling, or a recirculating hood) is worth a second look.
-- Every new size is from the plan, not measured: check them on site before ordering anything.
-- The garage from the site sketch (24' x 26', 55' west of the house and 20' from the road) is not
-  drawn: on the First Floor, **Draw as: new**, the Box tool (`B`, `24' x 26'`, Enter).
+  and win over the plan's numbers; the chimney's 7' over the rake needs a roof brace, and where it
+  passes the porch roof 6" from the house wall the flashing has to be worked into the wall's. See
+  `docs/history/PLAN-v7-exterior-flue.md`.
+- The alarms: hard-wired and interconnected or not (exceptions in alterations), for the electrician
+  and the inspector.
+- The upstairs bath's pipes come down through the powder room under it (the old chase in the front
+  room is gone with the stove): their route is for the plumber.
+- The dryer vent's and the hood duct's products (a 4" rigid duct and a vent hood with a damper; an
+  8" duct, the hood maker's size, and a wall cap) and the soffit over the master bedroom.
+
+**The tape measure** (before ordering anything)
+- Every new size is from the plan, not measured.
+- The joists: taken as north-south on every level (MK), east-west in the wing's ceiling under its
+  shed; the wing's floor over the crawl space is unknown.
+- The retaining wall's line (the site sketch is not to scale) and the ground either side of it.
 
 To change the design, edit it in the app (select, move, **Mark demolish**, draw with **Draw as:
 new**) or edit `proposed()` in the script and run `npm run build:example`.
