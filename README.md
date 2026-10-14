@@ -221,6 +221,14 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
    it will be). Rooms are found per view, so in Proposed two rooms whose dividing wall is
    demolished become one, with its new net area. Roofs and posts follow the view too, and walls
    rise to a roof only in the views where that roof is shown.
+5. Watch the status bar's **to check** count. The tool checks the proposed design against the 2025
+   Residential Code of New York State as it goes: today, a deck edge more than 30" above the ground
+   with no railing and a floor opening's edge with no guard (stairs and structure come next, see
+   `docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show** selects the
+   element, centres the plan on it and outlines it, and the plan marks each issue with a red
+   (error) or orange (to check) disc in the Proposed and All views. The element's properties
+   repeat its issues with their code sections. The code numbers live in `src/model/codeLimits.ts`:
+   verify them against the code text before relying on them.
 
 ## Editing walls
 

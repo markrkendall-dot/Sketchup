@@ -1152,6 +1152,39 @@ zundo `temporal` on planStore only, `partialize: s => ({plan: s.plan})`, limit 2
 tracked. Drag grouping: the first set of a drag is tracked, then `temporal.getState().pause()`,
 moves are untracked, `resume()` on pointerup. One undo reverts the whole drag.
 
+## Checks (`derive/checks.ts`, `model/codeLimits.ts`, `ui/checks.ts`, `ui/ChecksPanel.tsx`)
+
+The code checks judge the proposed design (the proposed view, whatever view is showing: the
+existing house is recorded, not designed) and return `Issue`s: a stable `id` (code, level and
+sorted target ids, `issueId`), a `code` (`guard.deck-edge`, ...), a `severity` (`error`, `warning`
+shown as "Check", `info` shown as "Note"), a `category`, the `levelId`, a plan point `at` and an
+optional `outline` to draw when the issue is picked, the `message`, the code section `ref`, and
+the `target` ids by selection kind. `getIssues(plan)` gathers every family (one file each:
+`guardChecks.ts` so far) and orders them by level, severity, category and message; it is memoized
+per plan object (`WeakMap`), so the panels, the list and the tests share one array per plan.
+`issuesFor(issues, levelId, target)` picks an element's issues; `issueCounts` splits what to check
+from notes.
+
+The code's numbers are in one table, `model/codeLimits.ts` `CODE`, each with its value, its section
+in the 2024 IRC numbering the 2025 Residential Code of New York State is built on, the older
+section (`codeRef` quotes both: "R321.1 (was R312.1.1)") and a few words. New York's 8 1/4" riser
+and 9" tread are its amendments; every entry is to be verified against the code text.
+
+Guards (`guardChecks.ts`, from the layouts the 3D uses, in the proposed view): a deck edge with no
+railing, no wall behind it and more than `CODE.guardDrop` (30") over the ground (`edgeDrops`) is a
+warning; a floor opening's edge with no guard and no wall along it is an error.
+
+The UI keeps a copy: `ui/checks.ts startChecks()` (main.tsx) sets `uiStore.issues` at start and
+`CHECKS_DELAY_MS` (150 ms) after the plan stops changing, so a drag does not re-run the checks at
+every step. The status bar counts errors and warnings ("2 to check", or notes when there are only
+notes) as a button that opens `ChecksPanel` over the plan (`uiStore.checksOpen`): issues by level,
+notes behind a checkbox, and **Show** (`showIssue`): out of the 3D-only layout and the existing
+view, onto the level, the target selected, the plan centred at the same zoom, and the issue picked
+(`pickedIssueId`). `editor2d/ChecksLayer.tsx` (rendered by PlanCanvas, not by PlanLayers, so the
+plan export never draws it) marks the active level's issues with a disc of constant screen size and
+outlines the picked one. The properties panel's `IssueNotes` lists an element's issues under its
+fields (the deck and floor opening panels' old hand-written warnings are these now).
+
 ## Derivation and memoization
 
 `derive/*` are pure functions of plan objects. `getGraph(level)`, `getFootprints(level, viewMode)`,

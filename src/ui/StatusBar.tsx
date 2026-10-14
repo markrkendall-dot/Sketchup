@@ -1,3 +1,5 @@
+import { useShallow } from 'zustand/react/shallow';
+import { issueCounts } from '../derive/checks';
 import { isOpeningVisible, isVisible, PHASE_LABEL, VIEW_MODE_LABEL } from '../derive/phase';
 import { getFaces } from '../derive/rooms';
 import { wallPreviewText } from '../editor2d/previewLabel';
@@ -317,6 +319,8 @@ export function StatusBar() {
   const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
   const underlayMode = useUiStore((s) => s.underlayMode);
   const notice = useUiStore((s) => s.notice);
+  const checks = useUiStore(useShallow((s) => issueCounts(s.issues)));
+  const checksOpen = useUiStore((s) => s.checksOpen);
   const layout = useUiStore((s) => s.layout);
   const walking = useUiStore((s) => s.cameraMode === 'walk');
   // One opening selected (and nothing else): a second click on it selects its wall.
@@ -359,6 +363,16 @@ export function StatusBar() {
         <span className={`status-notice${notice.error ? ' error' : ''}`} role={notice.error ? 'alert' : 'status'} title={notice.text}>
           {notice.text}
         </span>
+      )}
+      {checks.toCheck + checks.notes > 0 && (
+        <button
+          className={`status-checks${checks.toCheck ? ' to-check' : ''}`}
+          aria-pressed={checksOpen}
+          title="The proposed design's code checks: open the list"
+          onClick={() => useUiStore.getState().setChecksOpen(!checksOpen)}
+        >
+          {checks.toCheck ? `${checks.toCheck} to check` : `${checks.notes} ${checks.notes === 1 ? 'note' : 'notes'}`}
+        </button>
       )}
       {openEnds > 0 && (
         <span className="status-open-ends" title="Wall ends that join nothing (red dots). Rooms are only found where walls close a loop.">

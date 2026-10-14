@@ -12,6 +12,7 @@ import { loadAutosave, startAutosave } from './io/file';
 import { defaultLevelId } from './model/plan';
 import { clearHistory, usePlanStore } from './store/planStore';
 import { clearNoticeOnEdit, useUiStore } from './store/uiStore';
+import { startChecks } from './ui/checks';
 import { showNotice } from './ui/fileActions';
 import './index.css';
 import { PLAN_STYLES } from './editor2d/planStyles';
@@ -70,6 +71,7 @@ async function boot(): Promise<void> {
     // Any edit clears the status bar's notice (REVIEW-2 C3).
     clearNoticeOnEdit(s.plan, prev.plan);
   });
+  startChecks();
   startAutosave(usePlanStore, {
     // A failure stays in the status bar until a later save works.
     onStatus: (error) => {

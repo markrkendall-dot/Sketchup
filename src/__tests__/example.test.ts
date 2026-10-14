@@ -2,6 +2,7 @@ import { Box3, type BufferGeometry, type Mesh, type MeshStandardMaterial } from 
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildExampleJson } from '../../scripts/example-plan';
 import example from '../../docs/examples/146-mick-road.json';
+import { getIssues } from '../derive/checks';
 import { getDeckLayout } from '../derive/decks';
 import { floorOpeningHole, getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getLevelElevations } from '../derive/levels';
@@ -407,6 +408,10 @@ describe('docs/examples/146-mick-road.json', () => {
         }
       }
     }
+  });
+
+  it('passes the code checks: no deck edge or floor opening without its guard', () => {
+    expect(getIssues(plan).map((i) => `${i.code}: ${i.message}`)).toEqual([]);
   });
 
   it('has no open wall ends but the retaining wall\'s free west end, and no orphan labels, in any view', () => {

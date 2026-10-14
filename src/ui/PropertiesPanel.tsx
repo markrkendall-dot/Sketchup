@@ -1,3 +1,5 @@
+import { useShallow } from 'zustand/react/shallow';
+import { issuesFor, type IssueTarget } from '../derive/checks';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { getFootprints } from '../derive/footprint';
 import { compassName, deckTopWords, edgeOutward, getDeckLayout } from '../derive/decks';
@@ -1565,6 +1567,23 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * way it faces, with its length and how high it stands over the ground, or that a wall backs it), a
  * warning for an open edge more than 30" up, the colour and phase, and what it comes to.
  */
+/**
+ * The code checks about an element (derive/checks.ts, judged in the proposed view), as warnings
+ * under its fields; each one's code section beside it.
+ */
+function IssueNotes({ levelId, target }: { levelId: Id; target: IssueTarget }) {
+  const issues = useUiStore(useShallow((s) => issuesFor(s.issues, levelId, target)));
+  return (
+    <>
+      {issues.map((i) => (
+        <p key={i.id} className={`panel-note warning severity-${i.severity}`}>
+          {i.message} <span className="check-ref">{i.ref}</span>
+        </p>
+      ))}
+    </>
+  );
+}
+
 function DeckProps({ level, deck }: { level: Level; deck: Deck }) {
   const updateDeck = usePlanStore((s) => s.updateDeck);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
@@ -1577,7 +1596,6 @@ function DeckProps({ level, deck }: { level: Level; deck: Deck }) {
   const lens = deck.outline.map((p, i) => dist(p, deck.outline[(i + 1) % n]));
   const names = deck.outline.map((_, i) => compassName(edgeOutward(deck.outline, i), northAngle));
   const b = boundsOf(deck.outline);
-  const open = deck.outline.map((_, i) => !deck.railings[i] && !!layout && !layout.supported[i] && layout.edgeDrops[i] > GUARD_HEIGHT);
   return (
     <>
       <h3>Deck</h3>
@@ -1611,11 +1629,7 @@ function DeckProps({ level, deck }: { level: Level; deck: Deck }) {
           {layout && (layout.supported[i] ? ', against a wall' : `, ${formatLength(Math.max(0, layout.edgeDrops[i]), denom)} above the ground`)}
         </label>
       ))}
-      {open.some(Boolean) && (
-        <p className="panel-note warning">
-          {capitalize(names.filter((_, i) => open[i]).join(' and '))} {open.filter(Boolean).length === 1 ? 'edge is' : 'edges are'} more than 30" above the ground with no railing.
-        </p>
-      )}
+      <IssueNotes levelId={level.id} target={{ decks: [deck.id] }} />
       {layout && (
         <div className="panel-buttons">
           <button onClick={() => set({ railings: layout.supported.map((s) => !s) })} title="A railing on every edge that no wall backs">
@@ -1653,7 +1667,6 @@ function FloorOpeningProps({ level, opening }: { level: Level; opening: FloorOpe
   const lens = opening.outline.map((p, i) => dist(p, opening.outline[(i + 1) % n]));
   const names = opening.outline.map((_, i) => compassName(edgeOutward(opening.outline, i), northAngle));
   const b = boundsOf(opening.outline);
-  const open = opening.outline.map((_, i) => !opening.railings[i] && !!layout && !layout.supported[i]);
   return (
     <>
       <h3>Floor opening</h3>
@@ -1677,11 +1690,7 @@ function FloorOpeningProps({ level, opening }: { level: Level; opening: FloorOpe
           {layout?.supported[i] ? ', along a wall' : ''}
         </label>
       ))}
-      {open.some(Boolean) && (
-        <p className="panel-note warning">
-          {capitalize(names.filter((_, i) => open[i]).join(' and '))} {open.filter(Boolean).length === 1 ? 'edge has' : 'edges have'} no guard: a fall to the level below.
-        </p>
-      )}
+      <IssueNotes levelId={level.id} target={{ floorOpenings: [opening.id] }} />
       {layout && (
         <div className="panel-buttons">
           <button onClick={() => set({ railings: layout.supported.map((s) => !s) })} title="A guard on every edge that no wall runs along">
@@ -1706,9 +1715,6 @@ function FloorOpeningProps({ level, opening }: { level: Level; opening: FloorOpe
     </>
   );
 }
-
-/** A deck edge higher than this over the ground needs a railing. */
-const GUARD_HEIGHT = 30;
 
 const columnKindOptions: { value: Column['kind']; label: string }[] = [
   { value: 'chimney', label: 'Chimney' },

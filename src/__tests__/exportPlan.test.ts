@@ -51,8 +51,15 @@ describe('planSvg', () => {
 
   it('is a stand-alone drawing with the room names, a title and the title block', () => {
     // Whatever is selected or hovered on screen is not drawn.
-    useUiStore.setState({ selection: { ...EMPTY_SELECTION, walls: ['f-w16'] }, hover: { nodeId: null, wallId: 'f-w1', openingId: null } });
+    // Nor are the code checks' markers, open list or not.
+    useUiStore.setState({
+      selection: { ...EMPTY_SELECTION, walls: ['f-w16'] },
+      hover: { nodeId: null, wallId: 'f-w1', openingId: null },
+      checksOpen: true,
+      issues: [{ id: 'x', code: 'x', severity: 'error', category: 'guard', levelId: first, at: { x: 10, y: 10 }, message: 'x', ref: 'R1', target: {} }],
+    });
     const svg = planSvg(plan, first, 'all', { date });
+    expect(svg).not.toContain('check-mark');
     expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true);
     expect(svg).toContain('<title>146 Mick Road (starter, estimates flagged) - First Floor</title>');
     for (const name of ['Kitchen', 'Living', 'Front room', 'Utility']) expect(svg).toContain(name);
@@ -68,7 +75,7 @@ describe('planSvg', () => {
     expect(svg).toContain('--wall-exterior');
     // Dimension labels are drawn.
     expect(svg).toMatch(/class="dim-label"[^>]*>12&#x27;/);
-    useUiStore.setState({ selection: EMPTY_SELECTION, hover: { nodeId: null, wallId: null, openingId: null } });
+    useUiStore.setState({ selection: EMPTY_SELECTION, hover: { nodeId: null, wallId: null, openingId: null }, checksOpen: false, issues: [] });
   });
 
   it('follows the view mode and the north angle', () => {

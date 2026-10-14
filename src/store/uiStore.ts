@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Issue } from '../derive/checks';
 import type { WallGeom } from '../derive/openings';
 import type { Column, FixtureKind, Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
@@ -348,6 +349,12 @@ export interface UiState {
   walkFrom: WalkFrom | null;
   /** The open 2D context menu, if any. */
   contextMenu: ContextMenu | null;
+  /** The plan's code checks (derive/checks.ts), kept up to date by ui/checks.ts after edits settle. */
+  issues: readonly Issue[];
+  /** The checks list over the plan is open. */
+  checksOpen: boolean;
+  /** The issue picked in the checks list: the plan outlines its element. */
+  pickedIssueId: string | null;
   toggleLevelBar: () => void;
   toggleProperties: () => void;
   setOrthoLock: (on: boolean) => void;
@@ -397,6 +404,9 @@ export interface UiState {
   setNotice: (notice: Notice | null) => void;
   setWalkFrom: (walkFrom: WalkFrom | null) => void;
   setContextMenu: (menu: ContextMenu | null) => void;
+  setIssues: (issues: readonly Issue[]) => void;
+  setChecksOpen: (open: boolean) => void;
+  setPickedIssue: (id: string | null) => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -480,6 +490,9 @@ export const useUiStore = create<UiState>()((set) => ({
   notice: null,
   walkFrom: null,
   contextMenu: null,
+  issues: [],
+  checksOpen: false,
+  pickedIssueId: null,
   toggleLevelBar: () => set((s) => ({ levelBarOpen: !s.levelBarOpen })),
   toggleProperties: () => set((s) => ({ propertiesOpen: !s.propertiesOpen })),
   setOrthoLock: (orthoLock) => {
@@ -611,6 +624,10 @@ export const useUiStore = create<UiState>()((set) => ({
   },
   setWalkFrom: (walkFrom) => set({ walkFrom }),
   setContextMenu: (contextMenu) => set((s) => (s.contextMenu === contextMenu ? s : { contextMenu })),
+  setIssues: (issues) =>
+    set((s) => ({ issues, pickedIssueId: s.pickedIssueId && issues.some((i) => i.id === s.pickedIssueId) ? s.pickedIssueId : null })),
+  setChecksOpen: (checksOpen) => set((s) => (s.checksOpen === checksOpen ? s : { checksOpen, pickedIssueId: checksOpen ? s.pickedIssueId : null })),
+  setPickedIssue: (pickedIssueId) => set((s) => (s.pickedIssueId === pickedIssueId ? s : { pickedIssueId })),
 }));
 
 let noticeTimer: ReturnType<typeof setTimeout> | null = null;

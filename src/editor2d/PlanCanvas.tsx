@@ -10,6 +10,7 @@ import {
 import { getPlan, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { Overlay } from './Overlay';
+import { ChecksLayer } from './ChecksLayer';
 import { GhostLevel, PlanLayers, SiteView } from './PlanLayers';
 import { dispatchPointer, type ToolPointerEvent } from './tools';
 import { fitLevel, initialViewport, screenToWorld, visibleBounds, zoomAt, type Size } from './viewport';
@@ -239,6 +240,7 @@ export function PlanCanvas() {
             {levelId && <PlanLayers levelId={levelId} />}
           </>
         )}
+        <ChecksLayer />
       </g>
       {siteMode && <NorthArrow />}
       <Overlay />
