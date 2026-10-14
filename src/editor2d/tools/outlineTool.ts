@@ -29,7 +29,7 @@ export interface OutlineToolSpec {
   /** "roof", "deck", "floor opening": in the tool's messages. */
   noun: string;
   /** The selection kind the new element is selected as, and Delete removes. */
-  selectionKey: 'roofs' | 'decks' | 'floorOpenings';
+  selectionKey: 'roofs' | 'decks' | 'floorOpenings' | 'joistZones';
   /** Add the element over the closed outline; its id, or null when the store refuses it. */
   create(ctx: ToolContext, outline: Vec2[]): Id | null;
   /** The status line once it is added. */

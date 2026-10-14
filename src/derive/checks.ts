@@ -20,6 +20,8 @@ export interface IssueTarget {
   stairs?: Id[];
   decks?: Id[];
   floorOpenings?: Id[];
+  members?: Id[];
+  joistZones?: Id[];
 }
 
 export interface Issue {

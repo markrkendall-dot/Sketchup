@@ -619,6 +619,30 @@ describe('docs/examples/146-mick-road.json', () => {
     }
   });
 
+  it('has the structure the proposed design needs: joists, the balcony header, the kitchen beam, a post on a footing', () => {
+    const [bId, fId, sId] = plan.levelOrder;
+    for (const id of [bId, fId, sId]) expect(plan.levels[id].framing).toEqual({ joists: 90 });
+    // East-west zones under the wing's shed roof only: over the utility today, and north of it.
+    const zones = Object.values(plan.levels[fId].joistZones);
+    expect(zones.map((z) => [z.joists, z.phase])).toEqual([
+      [0, 'existing'],
+      [0, 'new'],
+    ]);
+    expect(pointInPolygon({ x: 400, y: 250 }, zones[0].outline)).toBe(true);
+    expect(pointInPolygon({ x: 400, y: 100 }, zones[1].outline)).toBe(true);
+    expect([plan.levels[bId].joistZones, plan.levels[sId].joistZones]).toEqual([{}, {}]);
+    const beams = Object.values(plan.levels[fId].members);
+    expect(beams.map((m) => m.kind === 'beam' && [m.a, m.b, m.mount, m.phase, m.label])).toEqual([
+      [{ x: 3.5, y: 92.75 }, { x: 170.5, y: 92.75 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL'],
+      [{ x: 170.5, y: 99.5 }, { x: 314.5, y: 99.5 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL'],
+    ]);
+    const posts = Object.values(plan.levels[bId].members);
+    expect(posts).toEqual([expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 96.125 }, width: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' })]);
+    // The stair hall's new south wall is not bearing; nothing else is marked.
+    const marked = Object.values(plan.levels[fId].walls).filter((w) => w.bearing !== undefined);
+    expect(marked.map((w) => [plan.levels[fId].nodes[w.a].y, plan.levels[fId].nodes[w.b].y, w.bearing])).toEqual([[137.5, 137.5, false]]);
+  });
+
   it('swings each new door into the room the design names', () => {
     const f = plan.levels[plan.levelOrder[1]];
     const set = getFaces(f, 'proposed');

@@ -23,6 +23,8 @@ export function showIssue(issue: Issue): void {
     stairs: t.stairs ?? [],
     decks: t.decks ?? [],
     floorOpenings: t.floorOpenings ?? [],
+    members: t.members ?? [],
+    joistZones: t.joistZones ?? [],
   };
   const now = useUiStore.getState();
   now.setSelection(selection);

@@ -22,6 +22,8 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
   { name: 'roof', label: 'Roof', key: 'K' },
   { name: 'deck', label: 'Deck', key: 'J' },
   { name: 'floorOpening', label: 'Floor opening', short: 'Hole', key: 'H' },
+  { name: 'beam', label: 'Beam', key: 'I' },
+  { name: 'post', label: 'Post', key: 'L' },
   { name: 'fixture', label: 'Cabinet', key: 'C' },
   { name: 'measure', label: 'Measure', short: 'Tape', key: 'M' },
   { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
@@ -39,6 +41,8 @@ const TOOL_TITLE: Partial<Record<ToolName, string>> = {
   roof: 'Roof (K): click the outline corners on the outside wall faces, close on the first corner or Enter',
   deck: 'Deck (J): click the outline corners (they snap to the outside wall faces), close on the first corner or Enter; set its height and railings in the properties panel',
   floorOpening: 'Floor opening (H): a hole in this floor, open to the level below; click its corners (they snap to the wall faces), close on the first corner or Enter; its guards are set in the properties panel',
+  beam: 'Beam (I): click one end, then the other; a flush (2) 1 3/4" x 11 7/8" LVL in the floor framing over this level, a placeholder for the engineer to size',
+  post: 'Post (L): click to place a 6x6 post up to the beam over it; on the lowest level it stands on a 24" x 12" footing',
   fixture: 'Cabinet (C): a cabinet, appliance or sink follows the cursor along the nearest wall; click to place it, type a width first to change it; pick the kind in the properties panel',
   underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
 };

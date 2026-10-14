@@ -1,11 +1,11 @@
 import { memo } from 'react';
 import { getLevelElevations } from '../derive/levels';
-import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, openingPartColor } from '../derive/meshes';
 import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { counterColorOf } from '../model/casework';
-import { caseworkMaterial, counterMaterial, deckMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { caseworkMaterial, counterMaterial, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -25,6 +25,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const decks = usePlanStore((s) => getDeckMeshes(s.plan, levelId, viewMode));
   // So do the guards round floor openings (the level's walls and the stairs below).
   const guards = usePlanStore((s) => getFloorOpeningMeshes(s.plan, levelId, viewMode));
+  // And beams and posts (a post runs up to the beam over it).
+  const members = usePlanStore((s) => getMemberMeshes(s.plan, levelId, viewMode));
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
   const counterColor = usePlanStore((s) => counterColorOf(s.plan.levels[levelId]?.finishes));
   return (
@@ -135,6 +137,29 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
               receiveShadow
               dispose={null}
             />
+          )}
+        </group>
+      ))}
+      {members.map((m) => (
+        <group key={m.id} name={`member:${m.id}`}>
+          {(
+            [
+              [m.kind, m.body],
+              ['footing', m.footing],
+            ] as const
+          ).map(([part, geometry]) =>
+            geometry ? (
+              <mesh
+                key={part}
+                name={`member:${m.id}:${part}`}
+                geometry={geometry}
+                material={memberMaterial(part, m.phase)}
+                renderOrder={m.phase === 'demo' ? 1 : 0}
+                castShadow={m.phase !== 'demo'}
+                receiveShadow
+                dispose={null}
+              />
+            ) : null,
           )}
         </group>
       ))}

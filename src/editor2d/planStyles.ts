@@ -696,6 +696,92 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-width: 1.5;
 }
 
+/* Structure (DESIGN.md "Structure"): beams overhead dashed, posts boxed with an X, the joist overlay (Y). */
+.member .member-body {
+  fill: rgba(146, 64, 14, 0.08);
+  stroke: #92400e;
+  stroke-width: 1.2;
+}
+
+.member-beam .member-body {
+  fill: none;
+  stroke-dasharray: 8 4;
+}
+
+.member .member-cross {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 0.8;
+}
+
+.member .member-footing {
+  fill: none;
+  stroke: #78716c;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.member.phase-new .member-body,
+.member.phase-new .member-cross {
+  stroke: var(--new-edge);
+}
+
+.member.phase-demo .member-body,
+.member.phase-demo .member-cross {
+  stroke: var(--demo);
+}
+
+.member.is-selected .member-body {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.member-label text,
+.joist-label text {
+  font-size: 10px;
+  font-weight: 600;
+  fill: #92400e;
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.joist-lines {
+  fill: none;
+  stroke: rgba(146, 64, 14, 0.28);
+  stroke-width: 0.8;
+}
+
+.joist-arrow {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 1.4;
+}
+
+.joist-zone .joist-zone-outline {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 1.2;
+  stroke-dasharray: 10 3 2 3;
+}
+
+.joist-zone.is-selected .joist-zone-outline {
+  stroke: var(--accent);
+  stroke-width: 1.8;
+}
+
+.joist-unset text {
+  fill: #a16207;
+}
+
+.bearing-wall {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 2.5;
+  stroke-dasharray: 12 4 3 4;
+}
+
 /* Site (grade points, columns, north) --------------------------------------------------------- */
 
 /* The first floor under the site layer: clearer than the level-below ghost. */

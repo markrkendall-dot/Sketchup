@@ -84,6 +84,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   tool('k', 'roof', 'Draw a roof: click the outline corners (they snap to the outside wall faces), click the first corner or press Enter to close; set the shape, ridge and slope in the properties panel'),
   tool('j', 'deck', 'Draw a deck: click the outline corners (they snap to the outside wall faces), click the first corner or press Enter to close; its top starts 6" below the floor; set the height and railings in the properties panel'),
   tool('h', 'floorOpening', 'Draw a floor opening (open to below): click the corners of the hole in this floor (they snap to the wall faces), click the first corner or press Enter to close; a 36" guard runs along every edge not against a wall'),
+  tool('i', 'beam', 'Draw a beam: click one end, then the other (they snap like wall corners); a flush (2) LVL placeholder in the floor framing over this level, sized by the engineer'),
+  tool('l', 'post', 'Place a post: click; it runs from this floor up to the beam over it (else the ceiling), snaps to beam ends, and on the lowest level stands on a footing'),
   siteTool('e', 'gradePoint', 'Site only: place a grade point: click a spot on the ground, type its elevation (-4, -6\'4), Enter'),
   {
     keys: 'C',
@@ -135,6 +137,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     },
   },
   { keys: 'G', label: 'Grid on or off', group: 'View', combos: ['g'], run: () => useUiStore.getState().toggleGrid() },
+  { keys: 'Y', label: 'Structure overlay on or off: the joists over each level, beams, posts and bearing walls', group: 'View', combos: ['y'], run: () => useUiStore.getState().toggleStructure() },
   {
     keys: '[',
     label: 'Narrow window (under 900 px): show or hide the level bar',

@@ -13,7 +13,9 @@ import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, typ
 import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, groundAt } from '../derive/site';
 import { directionVector, flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
-import { activateUnderlayTool, makeToolContext } from '../editor2d/tools';
+import { activateUnderlayTool, makeToolContext, switchTool } from '../editor2d/tools';
+import { beamHeights, joistDepth, memberBoxes } from '../derive/members';
+import { joistWords, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
 import { COLUMN_KIND_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
@@ -43,9 +45,9 @@ import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
-import type { Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Beam, Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
-import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type LengthAnchor, type RoomPatch, type StaircasePatch } from '../store/planStore';
+import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { duplicateRoomNotice, showNotice } from './fileActions';
 import { requestWallMove, roomNameOf, wallSideNames } from './wallMove';
@@ -355,6 +357,8 @@ function SelectionActions({
   fixtures,
   decks,
   floorOpenings,
+  members,
+  joistZones,
   columns,
   rooms,
 }: {
@@ -366,13 +370,15 @@ function SelectionActions({
   fixtures: Fixture[];
   decks: Deck[];
   floorOpenings: FloorOpening[];
+  members: Member[];
+  joistZones: JoistZone[];
   columns: Column[];
   rooms: Room[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...columns, ...rooms]);
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...members, ...joistZones, ...columns, ...rooms]);
   if (phases.length === 0 && selectionSize(selection) === 0) return null;
   const allDemo = phases.length > 0 && phases.every((p) => p === 'demo');
   const ids = {
@@ -383,6 +389,8 @@ function SelectionActions({
     fixtures: fixtures.map((f) => f.id),
     decks: decks.map((d) => d.id),
     floorOpenings: floorOpenings.map((o) => o.id),
+    members: members.map((m) => m.id),
+    joistZones: joistZones.map((z) => z.id),
     columns: columns.map((c) => c.id),
     rooms: rooms.map((r) => r.id),
   };
@@ -544,6 +552,12 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
       />
       <SelectField label="Kind" value={wall.kind} options={kindOptions} onChange={(k) => setWallKind(levelId, [wall.id], k)} />
       <SelectField label="Phase" value={wall.phase} options={phaseOptions} onChange={(p) => updateWalls(levelId, [wall.id], { phase: p })} />
+      <SelectField
+        label="Bearing"
+        value={wall.bearing === undefined ? 'auto' : wall.bearing ? 'yes' : 'no'}
+        options={bearingOptions}
+        onChange={(v) => updateWalls(levelId, [wall.id], { bearing: v === 'auto' ? undefined : v === 'yes' })}
+      />
       <LengthField
         label="Height"
         value={wall.heightOverride}
@@ -1897,6 +1911,187 @@ function FloorOpeningProps({ level, opening }: { level: Level; opening: FloorOpe
   );
 }
 
+const mountOptions: { value: Beam['mount']; label: string }[] = [
+  { value: 'flush', label: 'Flush (in the floor framing)' },
+  { value: 'dropped', label: 'Dropped (under the ceiling)' },
+];
+
+/** A member's or zone's label: commits on blur or Enter; blank clears it. */
+function LabelField({ id, value, placeholder, onCommit }: { id: string; value: string | undefined; placeholder: string; onCommit: (v: string | undefined) => void }) {
+  return (
+    <div className="field">
+      <label htmlFor={`label-${id}`}>Label</label>
+      <input
+        id={`label-${id}`}
+        key={value ?? ''}
+        aria-label="Label"
+        defaultValue={value ?? ''}
+        placeholder={placeholder}
+        onBlur={(e) => onCommit(e.target.value.trim() || undefined)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') releaseFocus(e.currentTarget);
+        }}
+      />
+    </div>
+  );
+}
+
+/** A beam or a post (DESIGN.md "Structure"): sizes are placeholders for the engineer. */
+function MemberProps({ level, member }: { level: Level; member: Member }) {
+  const updateMember = usePlanStore((s) => s.updateMember);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const plan = usePlanStore((s) => s.plan);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const lowest = plan.levelOrder[0] === level.id;
+  const set = (patch: MemberPatch) => updateMember(level.id, member.id, patch);
+  const boxes = memberBoxes(plan, level.id, member, viewMode);
+  const size = (key: 'width' | 'depth', label: string, hint: string) => (
+    <LengthField label={label} value={member[key]} onCommit={(v) => void (v !== null && set({ [key]: v }))} hint={hint} />
+  );
+  if (member.kind === 'beam') {
+    const h = beamHeights(plan, level.id, member);
+    return (
+      <>
+        <h3>Beam</h3>
+        <LabelField id={member.id} value={member.label} placeholder={MEMBER_DEFAULTS.beam.label} onCommit={(label) => set({ label })} />
+        {size('width', 'Width', 'Across the beam: 3 1/2" for two 1 3/4" LVLs.')}
+        {size('depth', 'Depth', 'Top to bottom.')}
+        <SelectField label="Mount" value={member.mount} options={mountOptions} onChange={(mount) => set({ mount })} />
+        <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+        <ReadOnly label="Length">{formatLength(dist(member.a, member.b), denom)}</ReadOnly>
+        <ReadOnly label="Over the floor">
+          {formatLength(h.bottom, denom)} to {formatLength(h.top, denom)}
+          {member.mount === 'flush' && h.bottom < level.wallHeight ? `, ${formatLength(level.wallHeight - h.bottom, denom)} below the ceiling` : ''}
+        </ReadOnly>
+        <IssueNotes levelId={level.id} target={{ members: [member.id] }} />
+        <p className="panel-note">
+          A placeholder size for the engineer to set. A flush beam sits in the floor framing over this level, its top at the joists' top; a dropped one hangs under the ceiling. Drag an end with the select tool to move it.
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <h3>Post</h3>
+      <LabelField id={member.id} value={member.label} placeholder={MEMBER_DEFAULTS.post.label} onCommit={(label) => set({ label })} />
+      {size('width', 'Width', 'Along the plan x axis before rotation.')}
+      {size('depth', 'Depth', 'Along the plan y axis before rotation.')}
+      <NumberField label="Rotation" value={member.rotation} onCommit={(v) => set({ rotation: v })} hint="Degrees, clockwise on the plan." />
+      <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      {lowest && (
+        <>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              aria-label="Footing"
+              checked={!!member.footing}
+              onChange={(e) => {
+                set({ footing: e.target.checked ? { ...MEMBER_DEFAULTS.footing } : undefined });
+                releaseFocus(e.currentTarget);
+              }}
+            />
+            On a concrete footing under the slab
+          </label>
+          {member.footing && (
+            <>
+              <LengthField label="Footing width" value={member.footing.width} onCommit={(v) => void (v !== null && set({ footing: { ...member.footing!, width: v } }))} hint="A square pad." />
+              <LengthField label="Footing thickness" value={member.footing.thickness} onCommit={(v) => void (v !== null && set({ footing: { ...member.footing!, thickness: v } }))} />
+            </>
+          )}
+        </>
+      )}
+      <ReadOnly label="Height">{formatLength(boxes.body.top - boxes.body.bottom, denom)}, up to {boxes.body.top < level.wallHeight ? 'the beam over it' : 'the ceiling'}</ReadOnly>
+      <ReadOnly label="Position">
+        x {formatLength(member.at.x, denom)}, y {formatLength(member.at.y, denom)}
+      </ReadOnly>
+      <IssueNotes levelId={level.id} target={{ members: [member.id] }} />
+      <p className="panel-note">A placeholder size for the engineer to set. Drag it with the select tool to move it.</p>
+    </>
+  );
+}
+
+/** The joist axis as a choice: north-south, east-west or another angle (plan degrees). */
+function joistOptions(current: number | null, northAngle: number): { value: string; label: string }[] {
+  const ns = String(normalizeJoists(90 + northAngle));
+  const ew = String(normalizeJoists(northAngle));
+  const out = [
+    { value: ns, label: 'North-south' },
+    { value: ew, label: 'East-west' },
+  ];
+  if (current !== null && String(current) !== ns && String(current) !== ew) out.push({ value: String(current), label: `${joistWords(current, northAngle)} on the plan` });
+  return out;
+}
+
+function JoistZoneProps({ level, zone }: { level: Level; zone: JoistZone }) {
+  const updateJoistZone = usePlanStore((s) => s.updateJoistZone);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
+  const set = (patch: JoistZonePatch) => updateJoistZone(level.id, zone.id, patch);
+  const b = boundsOf(zone.outline);
+  return (
+    <>
+      <h3>Joist zone</h3>
+      <p className="panel-note">An area over this level whose joists run another way than the level's (a part built in another stage).</p>
+      <SelectField label="Joists" value={String(zone.joists)} options={joistOptions(zone.joists, northAngle)} onChange={(v) => set({ joists: Number(v) })} />
+      <NumberField label="Joist angle" value={zone.joists} onCommit={(v) => set({ joists: v })} hint="Degrees on the plan, 0 along x." />
+      <SelectField label="Phase" value={zone.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      {b && (
+        <ReadOnly label="Outline">
+          {zone.outline.length} corners, {formatLength(b.maxX - b.minX, denom)} x {formatLength(b.maxY - b.minY, denom)}
+        </ReadOnly>
+      )}
+      <IssueNotes levelId={level.id} target={{ joistZones: [zone.id] }} />
+      <p className="panel-note">Drag a corner with the select tool to move it. Y shows the joists on the plan.</p>
+    </>
+  );
+}
+
+/** The Level panel's framing: the joists over this level, their depth, and joist zones. */
+function LevelFramingFields({ level }: { level: Level }) {
+  const setLevelFraming = usePlanStore((s) => s.setLevelFraming);
+  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const derivedDepth = usePlanStore((s) => {
+    const l = s.plan.levels[level.id];
+    return l ? joistDepth({ ...s.plan, levels: { ...s.plan.levels, [level.id]: { ...l, framing: undefined } } }, level.id) : 0;
+  });
+  const f = level.framing;
+  const zones = Object.keys(level.joistZones ?? {}).length;
+  const options = [{ value: '', label: 'Not set' }, ...joistOptions(f ? f.joists : null, northAngle)];
+  return (
+    <>
+      <SelectField
+        label="Joists over this level"
+        value={f ? String(f.joists) : ''}
+        options={options}
+        onChange={(v) => setLevelFraming(level.id, v === '' ? undefined : { joists: Number(v), ...(f?.depth !== undefined ? { depth: f.depth } : {}) })}
+      />
+      {f && (
+        <LengthField
+          label="Joist depth"
+          value={f.depth}
+          allowEmpty
+          placeholder={`from the floor above (${formatLength(derivedDepth, denom)})`}
+          onCommit={(v) => setLevelFraming(level.id, { joists: f.joists, ...(v !== null ? { depth: v } : {}) })}
+          hint={'Blank: the floor thickness above less the 3/4" subfloor (an attic: 5 1/2").'}
+        />
+      )}
+      <div className="panel-buttons">
+        <button onClick={() => switchTool('joistZone')} title="Click the corners of an area over this level framed another way">
+          Draw a joist zone
+        </button>
+      </div>
+      {zones > 0 && <ReadOnly label="Joist zones">{zones}</ReadOnly>}
+    </>
+  );
+}
+
+const bearingOptions: { value: 'auto' | 'yes' | 'no'; label: string }[] = [
+  { value: 'auto', label: 'Auto (inferred)' },
+  { value: 'yes', label: 'Bearing' },
+  { value: 'no', label: 'Not bearing' },
+];
+
 const columnKindOptions: { value: Column['kind']; label: string }[] = [
   { value: 'chimney', label: 'Chimney' },
   { value: 'post', label: 'Post' },
@@ -2073,6 +2268,8 @@ function MixedProps({
   fixtures,
   decks,
   floorOpenings,
+  members,
+  joistZones,
   columns,
   rooms,
 }: {
@@ -2085,6 +2282,8 @@ function MixedProps({
   fixtures: Fixture[];
   decks: Deck[];
   floorOpenings: FloorOpening[];
+  members: Member[];
+  joistZones: JoistZone[];
   columns: Column[];
   rooms: Room[];
 }) {
@@ -2100,11 +2299,15 @@ function MixedProps({
   if (fixtures.length) parts.push(`${fixtures.length} ${fixtures.length === 1 ? 'fixture' : 'fixtures'}`);
   if (decks.length) parts.push(`${decks.length} ${decks.length === 1 ? 'deck' : 'decks'}`);
   if (floorOpenings.length) parts.push(`${floorOpenings.length} ${floorOpenings.length === 1 ? 'floor opening' : 'floor openings'}`);
+  const beams = members.filter((m) => m.kind === 'beam').length;
+  if (beams) parts.push(`${beams} ${beams === 1 ? 'beam' : 'beams'}`);
+  if (members.length - beams) parts.push(`${members.length - beams} ${members.length - beams === 1 ? 'post' : 'posts'}`);
+  if (joistZones.length) parts.push(`${joistZones.length} joist ${joistZones.length === 1 ? 'zone' : 'zones'}`);
   if (columns.length) parts.push(`${columns.length} ${columns.length === 1 ? 'column' : 'columns'}`);
   if (sel.gradePoints.length) parts.push(`${sel.gradePoints.length} grade ${sel.gradePoints.length === 1 ? 'point' : 'points'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...columns, ...rooms]);
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...members, ...joistZones, ...columns, ...rooms]);
   const onlyFixtures = fixtures.length > 0 && phases.length === fixtures.length;
   const groupStairs = usePlanStore((s) => s.groupStairs);
   return (
@@ -2139,6 +2342,8 @@ function MixedProps({
                 fixtures: fixtures.map((f) => f.id),
                 decks: decks.map((d) => d.id),
                 floorOpenings: floorOpenings.map((o) => o.id),
+                members: members.map((m) => m.id),
+                joistZones: joistZones.map((z) => z.id),
                 columns: columns.map((c) => c.id),
                 rooms: rooms.map((r) => r.id),
               },
@@ -2640,6 +2845,7 @@ function LevelProps({ level }: { level: Level }) {
         onCommit={(v) => void (v !== null && updateSettings({ defaultInteriorThickness: v }))}
         hint="For interior walls (X). To change drawn walls, select them."
       />
+      <LevelFramingFields level={level} />
       <ExteriorAppearance level={level} />
       <ProposedExterior />
       <CaseworkDefaults level={level} />
@@ -2658,7 +2864,7 @@ function LevelProps({ level }: { level: Level }) {
           only found where walls close a loop.
         </p>
       )}
-      <p className="panel-note">Select walls, openings, room labels, roofs, decks, floor openings or cabinets to edit them. R names a room, K draws a roof, J a deck, H a floor opening, C places cabinets.</p>
+      <p className="panel-note">Select walls, openings, room labels, roofs, decks, floor openings, beams, posts or cabinets to edit them. R names a room, K draws a roof, J a deck, H a floor opening, I a beam, L a post, C places cabinets; Y shows the structure.</p>
     </>
   );
 }
@@ -2688,6 +2894,8 @@ export function PropertiesPanel() {
   const withPieces = [...stairs, ...Object.values(level.stairs).filter((st) => st.staircaseId && scIds.has(st.staircaseId) && !sel.stairs.includes(st.id))];
   const gradePoints = sel.gradePoints.map((id) => site.gradePoints[id]).filter(Boolean);
   const columns = sel.columns.map((id) => site.columns[id]).filter(Boolean);
+  const members = sel.members.map((id) => level.members?.[id]).filter(Boolean);
+  const joistZones = sel.joistZones.map((id) => level.joistZones?.[id]).filter(Boolean);
   const live: Selection = {
     nodes,
     walls: walls.map((w) => w.id),
@@ -2699,6 +2907,8 @@ export function PropertiesPanel() {
     decks: decks.map((d) => d.id),
     floorOpenings: floorOpenings.map((o) => o.id),
     staircases: staircases.map((sc) => sc.id),
+    members: members.map((m) => m.id),
+    joistZones: joistZones.map((z) => z.id),
     gradePoints: gradePoints.map((g) => g.id),
     columns: columns.map((c) => c.id),
   };
@@ -2718,18 +2928,20 @@ export function PropertiesPanel() {
   else if (total === 1 && roofs.length === 1) body = <RoofProps key={roofs[0].id} level={level} roof={roofs[0]} />;
   else if (total === 1 && decks.length === 1) body = <DeckProps key={decks[0].id} level={level} deck={decks[0]} />;
   else if (total === 1 && floorOpenings.length === 1) body = <FloorOpeningProps key={floorOpenings[0].id} level={level} opening={floorOpenings[0]} />;
+  else if (total === 1 && members.length === 1) body = <MemberProps key={members[0].id} level={level} member={members[0]} />;
+  else if (total === 1 && joistZones.length === 1) body = <JoistZoneProps key={joistZones[0].id} level={level} zone={joistZones[0]} />;
   else if (total === 1 && fixtures.length === 1) body = <FixtureProps key={fixtures[0].id} level={level} fixture={fixtures[0]} />;
   else if (total === 1 && gradePoints.length === 1) body = <GradePointProps key={gradePoints[0].id} point={gradePoints[0]} />;
   else if (total === 1 && columns.length === 1) body = <ColumnProps key={columns[0].id} column={columns[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} columns={columns} rooms={rooms} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} members={members} joistZones={joistZones} columns={columns} rooms={rooms} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} columns={columns} rooms={rooms} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} members={members} joistZones={joistZones} columns={columns} rooms={rooms} />}
       </div>
     </aside>
   );

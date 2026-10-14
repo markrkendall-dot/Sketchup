@@ -14,6 +14,7 @@ import { getStaircaseLayout, heightAt } from '../src/derive/staircase';
 import { COLUMN_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
+import { MEMBER_DEFAULTS } from '../src/model/structure';
 import type { Id, Opening, Phase, Plan, Roof, Room, Vec2 } from '../src/model/types';
 import { getPlan, usePlanStore, type NewDeck, type NewFixture, type NewStairs } from '../src/store/planStore';
 
@@ -1163,6 +1164,36 @@ function proposed(ids: ExistingIds): void {
   upstairs({ kind: 'sink', origin: { x: UP_BATH.west, y: 34 }, direction: 0, width: 48, depth: 21, height: 34.5 });
   upstairs({ ...WC, origin: { x: 248, y: CL.y0 + HALF }, direction: 90 });
   upstairs({ kind: 'box', label: 'Shower', origin: { x: KITCHEN_EAST, y: 31 }, direction: 180, width: 48, depth: 36, height: 78, frontColor: WHITE });
+
+  // ---- Structure (docs/history/PLAN-v8-stair-structure.md; estimates for MK and the engineer).
+  // MK, 14 Oct 2026: the house was built in stages and its joists run north-south generally, so
+  // every level's framing is north-south. The one known exception is the wing's ceiling: its shed
+  // roof slopes east-west, so its rafters and ceiling joists run that way, over the utility today
+  // and over the whole east side under the new shed (two zones: existing, and new north of the
+  // utility). Its floor over the crawl space is left north-south (unknown). The proposed design takes
+  // out the First Floor's y 99.5 wall, the only full-width east-west partition and so likely bearing
+  // for north-south joists, and opens the hall north of y 91 through the Second Floor. Two flush
+  // beams in the Second Floor's framing pick that up (placeholders for the engineer to size): the
+  // balcony header along the floor opening's edge, centred y 92.75 (faces 91..94.5) so it clears the
+  // top tread, from the west wall to the x 170.5 partition; and the kitchen beam on the old wall's
+  // line, from that partition to the east wall. Both land on the partition, so a post under the
+  // landing point (between the two ends, y 96.125) carries it down through the basement to a
+  // 24" x 12" footing. The new y 137.5 wall (the stair hall's south side) is not bearing.
+  for (const lid of [bId, fId, sId]) store().setLevelFraming(lid, { joists: 90 });
+  const wingZones: [Rect, Phase][] = [
+    [{ x0: WING.x0, x1: WING.x1, y0: WING.y0, y1: WING.y1 }, 'existing'],
+    [{ x0: WING.x0, x1: WING.x1, y0: MAIN.y0, y1: WING.y0 }, NEW],
+  ];
+  for (const [r, phase] of wingZones) if (!store().addJoistZone(fId, { outline: outline(r), joists: 0, phase })) throw new Error('joist zone rejected');
+  const BEAM = MEMBER_DEFAULTS.beam;
+  const beam = (a: Vec2, b: Vec2) => {
+    if (!store().addMember(fId, { kind: 'beam', a, b, width: BEAM.width, depth: BEAM.depth, mount: 'flush', label: BEAM.label, phase: NEW })) throw new Error('beam rejected');
+  };
+  beam({ x: CL.x0, y: 92.75 }, { x: PART_KL, y: 92.75 });
+  beam({ x: PART_KL, y: FRONT_LINE }, { x: CL.x1, y: FRONT_LINE });
+  const POST = MEMBER_DEFAULTS.post;
+  if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: (92.75 + FRONT_LINE) / 2 }, width: POST.width, depth: POST.depth, rotation: 0, label: POST.label, phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post rejected');
+  store().updateWalls(fId, [wallAt(fId, { x: 100, y: STAIR_SOUTH }).wallId], { bearing: false });
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two
   // never share a face there. Placeholder finishes (MK), which also dress the faces of the old

@@ -387,7 +387,28 @@
       "floorOpenings": {},
       "staircases": {},
       "joistZones": {},
-      "members": {}
+      "members": {
+        "b-m1": {
+          "kind": "post",
+          "at": {
+            "x": 170.5,
+            "y": 96.125
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "rotation": 0,
+          "label": "6x6",
+          "phase": "new",
+          "footing": {
+            "width": 24,
+            "thickness": 12
+          },
+          "id": "b-m1"
+        }
+      },
+      "framing": {
+        "joists": 90
+      }
     },
     "level-f": {
       "id": "level-f",
@@ -1017,7 +1038,8 @@
           "b": "f-n33",
           "thickness": 5,
           "kind": "interior",
-          "phase": "new"
+          "phase": "new",
+          "bearing": false
         },
         "f-w47": {
           "id": "f-w47",
@@ -3130,12 +3152,97 @@
           "id": "f-x1"
         }
       },
-      "joistZones": {},
-      "members": {},
+      "joistZones": {
+        "f-z1": {
+          "outline": [
+            {
+              "x": 318,
+              "y": 188
+            },
+            {
+              "x": 463,
+              "y": 188
+            },
+            {
+              "x": 463,
+              "y": 315
+            },
+            {
+              "x": 318,
+              "y": 315
+            }
+          ],
+          "joists": 0,
+          "phase": "existing",
+          "id": "f-z1"
+        },
+        "f-z2": {
+          "outline": [
+            {
+              "x": 318,
+              "y": 0
+            },
+            {
+              "x": 463,
+              "y": 0
+            },
+            {
+              "x": 463,
+              "y": 188
+            },
+            {
+              "x": 318,
+              "y": 188
+            }
+          ],
+          "joists": 0,
+          "phase": "new",
+          "id": "f-z2"
+        }
+      },
+      "members": {
+        "f-m1": {
+          "kind": "beam",
+          "a": {
+            "x": 3.5,
+            "y": 92.75
+          },
+          "b": {
+            "x": 170.5,
+            "y": 92.75
+          },
+          "width": 3.5,
+          "depth": 11.875,
+          "mount": "flush",
+          "label": "(2) 1 3/4 x 11 7/8 LVL",
+          "phase": "new",
+          "id": "f-m1"
+        },
+        "f-m2": {
+          "kind": "beam",
+          "a": {
+            "x": 170.5,
+            "y": 99.5
+          },
+          "b": {
+            "x": 314.5,
+            "y": 99.5
+          },
+          "width": 3.5,
+          "depth": 11.875,
+          "mount": "flush",
+          "label": "(2) 1 3/4 x 11 7/8 LVL",
+          "phase": "new",
+          "id": "f-m2"
+        }
+      },
       "finishes": {
         "cabinetColor": "#c4884e",
         "counterColor": "#e2dccb",
         "frontStyle": "slab"
+      },
+      "framing": {
+        "joists": 90
       }
     },
     "level-s": {
@@ -3896,7 +4003,10 @@
       },
       "staircases": {},
       "joistZones": {},
-      "members": {}
+      "members": {},
+      "framing": {
+        "joists": 90
+      }
     }
   },
   "baseFloorElevation": -100,

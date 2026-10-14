@@ -4,7 +4,7 @@ import type { WallGeom } from '../derive/openings';
 import type { Column, FixtureKind, Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | 'beam' | 'post' | 'joistZone' | OpeningToolName;
 /** Tools that work on the site (E, C); the others edit a level and are off in site mode. */
 export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column'];
 /** Tools allowed in site mode: select, measure, the site tools. */
@@ -192,6 +192,9 @@ export interface Selection {
   floorOpenings: Id[];
   /** Staircases (Level.staircases): a click on one of a staircase's pieces selects the staircase. */
   staircases: Id[];
+  /** Beams and posts (Level.members) and joist zones (Level.joistZones). */
+  members: Id[];
+  joistZones: Id[];
   /** Site elements (plan.site), selectable in site mode. */
   gradePoints: Id[];
   columns: Id[];
@@ -328,6 +331,8 @@ export interface UiState {
   drawPhase: DrawPhase;
   /** Draw the level below the active one as a faint ghost. */
   showLevelBelow: boolean;
+  /** The Structure overlay on the plan (Y): joists, beam labels, bearing walls. */
+  showStructure: boolean;
   spaceHeld: boolean;
   /** Size of the plan canvas in px, kept by PlanCanvas. */
   canvasSize: { width: number; height: number };
@@ -400,6 +405,7 @@ export interface UiState {
   setRoomEdit: (edit: RoomEdit | null) => void;
   resetDraft: () => void;
   toggleGrid: () => void;
+  toggleStructure: () => void;
   toggleWallKind: () => void;
   setSpaceHeld: (held: boolean) => void;
   setCanvasSize: (size: { width: number; height: number }) => void;
@@ -471,11 +477,11 @@ export const emptyDraft = (): Draft => ({
   dragReadout: null,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], floorOpenings: [], staircases: [], gradePoints: [], columns: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], floorOpenings: [], staircases: [], members: [], joistZones: [], gradePoints: [], columns: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.decks.length + s.floorOpenings.length + s.staircases.length + s.gradePoints.length + s.columns.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.decks.length + s.floorOpenings.length + s.staircases.length + s.members.length + s.joistZones.length + s.gradePoints.length + s.columns.length;
 
 /** Split ratio bounds, so neither view collapses. */
 export const MIN_SPLIT = 0.2;
@@ -499,6 +505,7 @@ export const useUiStore = create<UiState>()((set) => ({
   viewMode: 'all',
   drawPhase: 'existing',
   showLevelBelow: false,
+  showStructure: false,
   spaceHeld: false,
   canvasSize: { width: 0, height: 0 },
   layout: '2d',
@@ -593,6 +600,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setRoomEdit: (roomEdit) => set({ roomEdit }),
   resetDraft: () => set((s) => ({ draft: { ...emptyDraft(), cursor: s.draft.cursor } })),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
+  toggleStructure: () => set((s) => ({ showStructure: !s.showStructure })),
   toggleWallKind: () =>
     set((s) => ({ nextWallKind: s.nextWallKind === 'exterior' ? 'interior' : 'exterior' })),
   setSpaceHeld: (spaceHeld) => set((s) => (s.spaceHeld === spaceHeld ? s : { spaceHeld })),

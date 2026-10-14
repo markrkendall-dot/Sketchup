@@ -4,11 +4,13 @@ import { roofOutlineWithOverhang } from '../../derive/roofs';
 import { selfIntersects } from '../../derive/rooms';
 import { hitOpeningRect, hitOpeningSwing } from '../../derive/openings';
 import { hitStairs } from '../../derive/stairs';
+import { postOutline } from '../../derive/members';
+import { memberPoints } from '../../model/structure';
 import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase';
 import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../../model/geometry';
 import { WALL_OVERLAP_MESSAGE } from '../../model/plan';
 import { nudgeShifts } from '../../model/offset';
-import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
+import type { Id, Level, Member, Plan, Vec2, ViewMode } from '../../model/types';
 import { formatLength } from '../../model/units';
 import { needsRenovationChoice, perpendicularShift, requestWallMove } from '../../ui/wallMove';
 import { pauseHistory, resumeHistory, usePlanStore } from '../../store/planStore';
@@ -41,9 +43,11 @@ export type Hit =
   | { kind: 'deck'; id: Id }
   | { kind: 'floorOpening'; id: Id }
   | { kind: 'staircase'; id: Id }
+  | { kind: 'member'; id: Id }
+  | { kind: 'joistZone'; id: Id }
   | null;
 
-const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', fixture: 'fixtures', roof: 'roofs', deck: 'decks', floorOpening: 'floorOpenings', staircase: 'staircases' } as const;
+const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', fixture: 'fixtures', roof: 'roofs', deck: 'decks', floorOpening: 'floorOpenings', staircase: 'staircases', member: 'members', joistZone: 'joistZones' } as const;
 
 /**
  * A click on a piece of a staircase picks the staircase, unless that staircase is open (a
@@ -99,6 +103,32 @@ export const hitFloorOpeningHandle = (level: Level, openingIds: readonly Id[], p
     k,
   );
 
+/** The outline corner of one of the selected joist zones under p. */
+export const hitJoistZoneHandle = (level: Level, zoneIds: readonly Id[], p: Vec2, k: number): { id: Id; index: number } | null =>
+  hitOutlineHandle(
+    zoneIds.map((id) => level.joistZones?.[id]),
+    p,
+    k,
+  );
+
+/** An end of one of the selected beams under p. */
+export function hitBeamEnd(level: Level, memberIds: readonly Id[], p: Vec2, k: number): { id: Id; end: 'a' | 'b' } | null {
+  let best: { id: Id; end: 'a' | 'b' } | null = null;
+  let bestD = OUTLINE_HANDLE_PX / k;
+  for (const id of memberIds) {
+    const m = level.members?.[id];
+    if (m?.kind !== 'beam') continue;
+    for (const end of ['a', 'b'] as const) {
+      const d = dist(m[end], p);
+      if (d <= bestD) {
+        bestD = d;
+        best = { id, end };
+      }
+    }
+  }
+  return best;
+}
+
 /** Inside a plan outline, or within `tol` of one of its edges. */
 const nearOutline = (outline: readonly Vec2[], p: Vec2, tol: number): boolean =>
   pointInPolygon(p, outline) || outline.some((q, i) => projectPointToSegment(p, q, outline[(i + 1) % outline.length]).distance <= tol);
@@ -110,7 +140,7 @@ const nearOutline = (outline: readonly Vec2[], p: Vec2, tol: number): boolean =>
  * or within 2 px of it), then floor openings (the same), then roofs (inside the outline grown by the overhang); the most recently
  * added on top. Elements hidden in `viewMode` are never hit.
  */
-export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all'): Hit {
+export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all', opts: { structure?: boolean } = {}): Hit {
   let best: Hit = null;
   let bestD = SNAP_RADIUS_PX.node / k;
   const shownNodes = visibleNodeIds(level, viewMode);
@@ -123,6 +153,13 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
     }
   }
   if (best) return best;
+
+  // Posts (topmost first): inside, or within 2 px.
+  const members = Object.values(level.members ?? {})
+    .reverse()
+    .filter((m) => isVisible(m.phase, viewMode));
+  const post = members.find((m) => m.kind === 'post' && nearOutline(postOutline(m, m.width, m.depth), p, 2 / k));
+  if (post) return { kind: 'member', id: post.id };
 
   const fps = getFootprints(level, viewMode);
   const openings = Object.values(level.openings).filter((o) => isOpeningVisible(o, level.walls[o.wallId], viewMode));
@@ -145,6 +182,9 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
     }
   }
   if (best) return best;
+  // Beams: within half their width, at least 4 px.
+  const beam = members.find((m) => m.kind === 'beam' && projectPointToSegment(p, m.a, m.b).distance <= Math.max(m.width / 2, WALL_PICK_PX / k));
+  if (beam) return { kind: 'member', id: beam.id };
   for (const o of openings) {
     const fp = fps.get(o.wallId);
     if (fp && hitOpeningSwing(fp, o, p, OPENING_PICK_PX / k)) return { kind: 'opening', id: o.id };
@@ -168,6 +208,13 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
     .reverse()
     .find((o) => isVisible(o.phase, viewMode) && nearOutline(o.outline, p, 2 / k));
   if (fo) return { kind: 'floorOpening', id: fo.id };
+  // Joist zones, while the structure overlay shows them: near an edge only (a click inside is the room).
+  if (opts.structure) {
+    const zone = Object.values(level.joistZones ?? {})
+      .reverse()
+      .find((z) => isVisible(z.phase, viewMode) && z.outline.some((q, i) => projectPointToSegment(p, q, z.outline[(i + 1) % z.outline.length]).distance <= WALL_PICK_PX / k));
+    if (zone) return { kind: 'joistZone', id: zone.id };
+  }
   const roof = Object.values(level.roofs ?? {})
     .reverse()
     .find((r) => isVisible(r.phase, viewMode) && pointInPolygon(p, roofOutlineWithOverhang(r)));
@@ -210,8 +257,12 @@ type DragState =
   | { kind: 'staircase'; grab: Vec2; origins: Record<Id, Vec2>; startScreen: Vec2; started: boolean }
   /** The selected fixtures, moved together. */
   | { kind: 'fixtures'; grab: Vec2; origins: Record<Id, Vec2>; startScreen: Vec2; started: boolean }
-  /** An outline corner of a selected roof, deck or floor opening. */
-  | { kind: 'outline-vertex'; target: 'roofs' | 'decks' | 'floorOpenings'; id: Id; index: number; startScreen: Vec2; started: boolean }
+  /** An outline corner of a selected roof, deck, floor opening or joist zone. */
+  | { kind: 'outline-vertex'; target: 'roofs' | 'decks' | 'floorOpenings' | 'joistZones'; id: Id; index: number; startScreen: Vec2; started: boolean }
+  /** The selected beams and posts, moved together. */
+  | { kind: 'members'; grab: Vec2; origins: Record<Id, Member>; startScreen: Vec2; started: boolean }
+  /** One end of a selected beam (snapping like a wall corner). */
+  | { kind: 'beam-end'; id: Id; end: 'a' | 'b'; startScreen: Vec2; started: boolean }
   | { kind: 'box'; a: Vec2; additive: boolean }
   /** Moving the image underlay (state kept by underlayTool.ts). */
   | { kind: 'underlay' };
@@ -250,8 +301,10 @@ function pruneSelection(ctx: ToolContext): void {
   const decks = sel.decks.filter((id) => level.decks?.[id]);
   const floorOpenings = sel.floorOpenings.filter((id) => level.floorOpenings?.[id]);
   const staircases = sel.staircases.filter((id) => level.staircases?.[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases });
+  const members = sel.members.filter((id) => level.members?.[id]);
+  const joistZones = sel.joistZones.filter((id) => level.joistZones?.[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + members.length + joistZones.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases, members, joistZones });
   }
 }
 
@@ -324,7 +377,7 @@ function finishDrag(ctx: ToolContext): void {
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
     resumeHistory();
     pruneSelection(ctx);
-  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs' || drag?.kind === 'staircase' || drag?.kind === 'fixtures' || drag?.kind === 'outline-vertex') && drag.started) {
+  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs' || drag?.kind === 'staircase' || drag?.kind === 'fixtures' || drag?.kind === 'outline-vertex' || drag?.kind === 'members' || drag?.kind === 'beam-end') && drag.started) {
     resumeHistory();
   } else if (drag?.kind === 'room') {
     endRoomDrag(drag);
@@ -350,7 +403,7 @@ export const selectTool: Tool = {
   onPointerDown(e, ctx) {
     // Right-click: the canvas menu ("Walk from here", "Split wall here", PlanContextMenu.tsx) at the clicked point.
     if (e.button === 2) {
-      const under = hitTest(ctx.level(), e.world, ctx.ui().viewport.k, ctx.ui().viewMode);
+      const under = hitTest(ctx.level(), e.world, ctx.ui().viewport.k, ctx.ui().viewMode, { structure: ctx.ui().showStructure });
       ctx.ui().setContextMenu({ screen: e.screen, world: e.world, levelId: ctx.levelId, ...(under?.kind === 'wall' ? { wallId: under.id } : {}) });
       return;
     }
@@ -364,12 +417,18 @@ export const selectTool: Tool = {
     const roofHandle = e.shiftKey ? null : hitRoofHandle(level, sel.roofs, e.world, ui.viewport.k);
     const deckHandle = e.shiftKey || roofHandle ? null : hitDeckHandle(level, sel.decks, e.world, ui.viewport.k);
     const foHandle = e.shiftKey || roofHandle || deckHandle ? null : hitFloorOpeningHandle(level, sel.floorOpenings, e.world, ui.viewport.k);
-    const handle = roofHandle ?? deckHandle ?? foHandle;
+    const zoneHandle = e.shiftKey || roofHandle || deckHandle || foHandle ? null : hitJoistZoneHandle(level, sel.joistZones, e.world, ui.viewport.k);
+    const handle = roofHandle ?? deckHandle ?? foHandle ?? zoneHandle;
     if (handle) {
-      drag = { kind: 'outline-vertex', target: roofHandle ? 'roofs' : deckHandle ? 'decks' : 'floorOpenings', id: handle.id, index: handle.index, startScreen: e.screen, started: false };
+      drag = { kind: 'outline-vertex', target: roofHandle ? 'roofs' : deckHandle ? 'decks' : foHandle ? 'floorOpenings' : 'joistZones', id: handle.id, index: handle.index, startScreen: e.screen, started: false };
       return;
     }
-    const hit = liftToStaircase(level, hitTest(level, e.world, ui.viewport.k, ui.viewMode), ui.openStaircaseId);
+    const beamEnd = e.shiftKey ? null : hitBeamEnd(level, sel.members, e.world, ui.viewport.k);
+    if (beamEnd) {
+      drag = { kind: 'beam-end', ...beamEnd, startScreen: e.screen, started: false };
+      return;
+    }
+    const hit = liftToStaircase(level, hitTest(level, e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure }), ui.openStaircaseId);
     // A click off the open staircase's pieces closes it.
     if (ui.openStaircaseId && !(hit?.kind === 'stairs' && level.stairs[hit.id]?.staircaseId === ui.openStaircaseId)) ui.setOpenStaircase(null);
 
@@ -396,7 +455,14 @@ export const selectTool: Tool = {
       drag = rd ? { kind: 'room', ...rd } : null;
       return;
     }
-    if (hit.kind === 'roof' || hit.kind === 'deck' || hit.kind === 'floorOpening') {
+    if (hit.kind === 'member') {
+      // Every selected beam and post moves with the one grabbed.
+      const origins: Record<Id, Member> = {};
+      for (const id of next.members) if (level.members[id]) origins[id] = level.members[id];
+      drag = { kind: 'members', grab: e.world, origins, startScreen: e.screen, started: false };
+      return;
+    }
+    if (hit.kind === 'roof' || hit.kind === 'deck' || hit.kind === 'floorOpening' || hit.kind === 'joistZone') {
       drag = null;
       return;
     }
@@ -451,7 +517,7 @@ export const selectTool: Tool = {
   onPointerMove(e, ctx) {
     const ui = ctx.ui();
     if (!drag) {
-      const hit = hitTest(ctx.level(), e.world, ui.viewport.k, ui.viewMode);
+      const hit = hitTest(ctx.level(), e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure });
       ui.setHover({
         nodeId: hit?.kind === 'node' ? hit.id : null,
         wallId: hit?.kind === 'wall' ? hit.id : null,
@@ -521,9 +587,42 @@ export const selectTool: Tool = {
       return;
     }
 
+    if (drag.kind === 'members') {
+      const grid = ctx.plan().settings.snapGrid;
+      const round = (v: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
+      const d = sub(e.world, drag.grab);
+      const step = { x: round(d.x), y: round(d.y) };
+      const places: Record<Id, { a?: Vec2; b?: Vec2; at?: Vec2 }> = {};
+      for (const [id, m] of Object.entries(drag.origins)) places[id] = m.kind === 'beam' ? { a: add(m.a, step), b: add(m.b, step) } : { at: add(m.at, step) };
+      ui.patchDraft({ cursor: e.world, snap: null, dragReadout: displacementText(step, ctx.plan().settings.precisionDenominator) });
+      const before = ctx.plan();
+      ctx.actions.placeMembers(ctx.levelId, places);
+      if (!drag.started && ctx.plan() !== before) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
+
+    if (drag.kind === 'beam-end') {
+      const m = ctx.level().members?.[drag.id];
+      if (m?.kind !== 'beam') return;
+      const other = drag.end === 'a' ? m.b : m.a;
+      const snap = ctx.snap(e.world, { from: other, shift: e.shiftKey });
+      ui.patchDraft({ cursor: e.world, snap });
+      if (dist(snap.point, other) < 1) return;
+      const before = ctx.plan();
+      ctx.actions.placeMembers(ctx.levelId, { [drag.id]: { [drag.end]: snap.point } });
+      if (!drag.started && ctx.plan() !== before) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
+
     if (drag.kind === 'outline-vertex') {
       const lv = ctx.level();
-      const item = drag.target === 'roofs' ? lv.roofs[drag.id] : drag.target === 'decks' ? lv.decks?.[drag.id] : lv.floorOpenings?.[drag.id];
+      const item = drag.target === 'roofs' ? lv.roofs[drag.id] : drag.target === 'decks' ? lv.decks?.[drag.id] : drag.target === 'joistZones' ? lv.joistZones?.[drag.id] : lv.floorOpenings?.[drag.id];
       if (!item) return;
       const n = item.outline.length;
       // Ortho from the previous corner, like drawing it.
@@ -537,6 +636,7 @@ export const selectTool: Tool = {
       else if (selfIntersects(outline)) {
         // Refused: the corner stays where it was.
       } else if (drag.target === 'decks') ctx.actions.updateDeck(ctx.levelId, drag.id, { outline });
+      else if (drag.target === 'joistZones') ctx.actions.updateJoistZone(ctx.levelId, drag.id, { outline });
       else ctx.actions.updateFloorOpening(ctx.levelId, drag.id, { outline });
       // The first step that changes the outline is the tracked one (the corner snap can hold the
       // first few moves in place; pausing before a change would leave the drag out of the history).
@@ -622,12 +722,15 @@ export const selectTool: Tool = {
       const walls = Object.values(level.walls)
         .filter((w) => isVisible(w.phase, ui.viewMode) && inside(level.nodes[w.a]) && inside(level.nodes[w.b]))
         .map((w) => w.id);
+      const members = Object.values(level.members ?? {})
+        .filter((m) => isVisible(m.phase, ui.viewMode) && memberPoints(m).every(inside))
+        .map((m) => m.id);
       const sel = ui.selection;
       if (Math.max(maxX - minX, maxY - minY) * ui.viewport.k > DRAG_THRESHOLD_PX) {
         ui.setSelection(
           drag.additive
-            ? { ...sel, walls: [...new Set([...sel.walls, ...walls])] }
-            : { ...EMPTY_SELECTION, walls },
+            ? { ...sel, walls: [...new Set([...sel.walls, ...walls])], members: [...new Set([...sel.members, ...members])] }
+            : { ...EMPTY_SELECTION, walls, members },
         );
       }
       ui.patchDraft({ box: null });
@@ -638,7 +741,7 @@ export const selectTool: Tool = {
   onDoubleClick(e, ctx) {
     const ui = ctx.ui();
     const level = ctx.level();
-    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode);
+    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure });
     if (hit?.kind === 'room') startRename(ctx, hit.id);
     // A piece of a staircase: open the staircase and select the piece alone.
     if (hit?.kind === 'stairs') {

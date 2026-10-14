@@ -5,6 +5,7 @@ import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishe
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { DECK, getDeckLayout, type DeckBox, type DeckLayout } from './decks';
+import { memberBoxes } from './members';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
 import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
@@ -1215,6 +1216,71 @@ export function getDeckMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Deck
   return result;
 }
 
+/** A beam's or post's mesh (level-local), and a post's footing under the slab. */
+export interface MemberMesh {
+  id: Id;
+  kind: 'beam' | 'post';
+  /** The phase as shown in the view mode (shownPhase). */
+  phase: Phase;
+  /** Null for a flush beam no deeper than the joists (all of it hidden in the floor). */
+  body: BufferGeometry | null;
+  footing: BufferGeometry | null;
+}
+
+/** How far a member stops short of a slab face it would otherwise share (no coplanar faces). */
+export const MEMBER_INSET = 1 / 16;
+
+/**
+ * The visible beams and posts of a level in a view mode, memoized per level and view like the decks
+ * (a post's height depends on the beams over it): a flush beam is drawn only where it hangs below the
+ * ceiling (the rest is inside the floor above), so nothing shares a face with a slab.
+ */
+export function getMemberMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): MemberMesh[] {
+  const key = `${levelId}|${viewMode}`;
+  const prev = memberResult.get(key);
+  if (prev && prev.plan === plan) return prev.result;
+  pruneCaches(plan);
+  const level = plan.levels[levelId];
+  let entries = memberCache.get(key);
+  if (!entries) memberCache.set(key, (entries = new Map()));
+  const out: MemberMesh[] = [];
+  const seen = new Set<Id>();
+  const ceiling = (level?.wallHeight ?? 0) - MEMBER_INSET;
+  for (const m of Object.values(level?.members ?? {})) {
+    if (!isVisible(m.phase, viewMode)) continue;
+    const boxes = memberBoxes(plan, levelId, m, viewMode);
+    const top = Math.min(boxes.body.top, ceiling);
+    const sig = JSON.stringify([boxes.body.poly, boxes.body.bottom, top, boxes.footing]);
+    let e = entries.get(m.id);
+    if (!e || e.sig !== sig) {
+      e?.body?.dispose();
+      e?.footing?.dispose();
+      const f = boxes.footing;
+      e = {
+        sig,
+        body: top - boxes.body.bottom > 0.01 ? deckBoxesGeometry([{ ...boxes.body, top }]) : null,
+        footing: f ? deckBoxesGeometry([{ ...f, top: f.top - MEMBER_INSET }]) : null,
+      };
+      entries.set(m.id, e);
+    }
+    seen.add(m.id);
+    out.push({ id: m.id, kind: m.kind, phase: shownPhase(m.phase, viewMode), body: e.body, footing: e.footing });
+  }
+  for (const [id, e] of entries) {
+    if (seen.has(id)) continue;
+    e.body?.dispose();
+    e.footing?.dispose();
+    entries.delete(id);
+  }
+  const same =
+    !!prev &&
+    prev.result.length === out.length &&
+    prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.body === out[i].body && m.footing === out[i].footing);
+  const result = same ? prev.result : out;
+  memberResult.set(key, { plan, result });
+  return result;
+}
+
 /** A floor opening's guard (level-local, standing on the floor round the hole). */
 export interface FloorOpeningMesh {
   id: Id;
@@ -1447,6 +1513,9 @@ const deckResult = new Map<string, { plan: Plan; result: DeckMesh[] }>();
 /** Floor openings' guards, cached like the decks. */
 const guardCache = new Map<string, Map<Id, { layout: FloorOpeningLayout; railing: BufferGeometry; rail?: BufferGeometry }>>();
 const guardResult = new Map<string, { plan: Plan; result: FloorOpeningMesh[] }>();
+/** Beams and posts, cached like the decks (by their boxes). */
+const memberCache = new Map<string, Map<Id, { sig: string; body: BufferGeometry | null; footing: BufferGeometry | null }>>();
+const memberResult = new Map<string, { plan: Plan; result: MemberMesh[] }>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
 function sameRings<T extends Vec2 | number>(p: readonly (readonly T[])[], q: readonly (readonly T[])[]): boolean {
@@ -1554,6 +1623,15 @@ function pruneCaches(plan: Plan): void {
     guardCache.delete(key);
   }
   for (const key of guardResult.keys()) if (!alive(key)) guardResult.delete(key);
+  for (const [key, m] of memberCache) {
+    if (alive(key)) continue;
+    for (const e of m.values()) {
+      e.body?.dispose();
+      e.footing?.dispose();
+    }
+    memberCache.delete(key);
+  }
+  for (const key of memberResult.keys()) if (!alive(key)) memberResult.delete(key);
 }
 
 function disposeDeckEntry(e: DeckEntry): void {

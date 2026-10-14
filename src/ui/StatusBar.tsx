@@ -91,6 +91,18 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: 'Click to place; Tab switches chimney, post and flue.',
     busy: 'Click to place; Tab switches chimney, post and flue.',
   },
+  beam: {
+    idle: "Click one end of the beam; it snaps like a wall.",
+    busy: "Click the beam's other end. Esc cancels.",
+  },
+  post: {
+    idle: 'Click to place a post; it snaps to beam ends and corners.',
+    busy: 'Click to place a post; it snaps to beam ends and corners.',
+  },
+  joistZone: {
+    idle: 'Click the corners of an area framed the other way.',
+    busy: 'Click the next corner; the first one or Enter closes. Esc cancels.',
+  },
 };
 
 /** Site mode's select tool. */
@@ -161,6 +173,18 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   column: {
     idle: 'Click to place a column. Tab steps through a chimney (24" x 40"), a post (6" x 6") and a flue (a round 8" metal pipe, a stove\'s chimney); set the size and heights in the properties panel.',
     busy: 'Click to place a column. Tab steps through a chimney, a post and a flue.',
+  },
+  beam: {
+    idle: 'Click one end of a beam, then the other; the ends snap like wall corners. A new beam is a flush (2) 1 3/4" x 11 7/8" LVL in the floor framing over this level: a placeholder for the engineer to size. Set it in the properties panel.',
+    busy: "Click the beam's other end (Shift frees the angle). Esc drops the first end.",
+  },
+  post: {
+    idle: 'Click to place a 6x6 post from this floor up to the beam over it (else the ceiling); it snaps to beam ends on this level and the one above. On the lowest level it stands on a 24" x 12" footing.',
+    busy: 'Click to place a 6x6 post from this floor up to the beam over it (else the ceiling); it snaps to beam ends on this level and the one above.',
+  },
+  joistZone: {
+    idle: "Click the corners of an area over this level whose joists run another way (a part built in another stage); they start square to the level's joists.",
+    busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
   },
 };
 

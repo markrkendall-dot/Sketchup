@@ -228,12 +228,21 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
    Residential Code of New York State as it goes: a deck edge more than 30" above the ground with no
    railing, a floor opening's edge with no guard, and new stairs (risers at most 8 1/4", treads at
    least 9", 36" wide, 6'8" of headroom from the nosings, a graspable handrail on four risers or
-   more, guards on open sides more than 30" up, matching risers and big enough landings). Structure
-   comes next (`docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show**
+   more, guards on open sides more than 30" up, matching risers and big enough landings). Load
+   path checks come next (`docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show**
    selects the element, centres the plan on it and outlines it, and the plan marks each issue with a red
    (error) or orange (to check) disc in the Proposed and All views. The element's properties
    repeat its issues with their code sections. The code numbers live in `src/model/codeLimits.ts`:
    verify them against the code text before relying on them.
+
+6. Draw what carries a wall you take out. Set **Joists over this level** in the Level panel (the
+   floor or ceiling framing above it: north-south or east-west) and, where part of the house was
+   framed another way, **Draw a joist zone**. `I` draws a beam (two clicks; it starts as a flush
+   pair of 1 3/4" x 11 7/8" LVLs in the floor framing, a placeholder for the engineer to size),
+   `L` places a post that runs up to the beam over it (on the lowest level it stands on a 24" x 12"
+   footing). A wall's **Bearing** field marks it bearing or not (Auto leaves it to the tool). `Y`
+   shows the structure overlay: the joists, their direction, beam labels and bearing walls; export
+   the plan with it on for a framing plan. Nothing is sized: the sizes are for the engineer.
 
 ## Editing walls
 
@@ -344,6 +353,8 @@ keyboard back to the plan.
 | `C` | Cabinet: the chosen kind follows the cursor along the nearest wall; click to place, type a width first to change it (Site tab: Column) |
 | `B` | Box: four walls; click a corner, type `12' x 10'` (or `12'` Tab `10'`), Enter |
 | `M` | Measure between two points; Esc clears |
+| `I` / `L` | Beam (two clicks) / post (one click) |
+| `Y` | Structure overlay: joists, beams, bearing walls |
 | `E` `C` (Site tab only) | Grade point, Column (chimney; Tab before the click for a post, again for a flue) |
 | digits, `'`, `"`, space, `/`, then Enter | Type a length or a distance while drawing |
 | `Enter` or click | Walls: with nothing typed, commit the wall at the cursor; roof or deck: close the outline |
@@ -770,6 +781,13 @@ Still open:
   CO alarms are required with a fuel-burning appliance. See `docs/history/PLAN-v7-exterior-flue.md`.
 - **The dryer's vent**: up through the wing's ceiling and roof, or along the ceiling to an outside
   wall.
+- **The structure** (estimates): the joists are taken as north-south on every level (MK), but
+  east-west in the wing's ceiling under its shed roof; the wing's floor over the crawl space is
+  unknown (left north-south). Verify them on site. The y 99.5 wall's removal is carried by a flush
+  balcony header (y 92.75, from the west wall to the x 170.5 partition) and a flush kitchen beam on
+  the old wall's line (to the east wall); both land on the partition, with a 6x6 post under that
+  point in the basement on a 24" x 12" footing. The engineer sizes the header, the beam, the post
+  and the footing; the basement under it is not surveyed.
 - **Coats**: the closet under the stair is narrow (2'3" inside, the old window's span sets its west
   wall); hooks or a bench in the foyer would add room.
 - **The pantry** is small (3'11" x 3'6"); the north band is 3'6" deep rather than the 4' asked

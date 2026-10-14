@@ -1,12 +1,14 @@
 import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
-import { deckTopWords, getDeckLayout } from '../derive/decks';
+import { deckTopWords, getDeckLayout, scanSegments } from '../derive/decks';
+import { beamOutline, postOutline } from '../derive/members';
+import { joistWords } from '../model/structure';
 import { getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
-import { faceAt, getFaces, interiorPoint, type Face, type FaceSet } from '../derive/rooms';
+import { faceAt, getFaces, interiorPoint, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
 import { siteGhostLevelId } from '../derive/site';
 import { getStaircaseLayout } from '../derive/staircase';
@@ -427,7 +429,7 @@ const NO_RECORD: Readonly<Record<Id, unknown>> = {};
  * layer of per-entity components does not re-render (and re-create every child) when an entity
  * only changes, e.g. on every step of a corner drag. The children select their own entity.
  */
-function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures' | 'decks' | 'floorOpenings' | 'staircases'): Id[] {
+function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures' | 'decks' | 'floorOpenings' | 'staircases' | 'members'): Id[] {
   return useLayerPlan(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
 }
 
@@ -684,6 +686,163 @@ const FloorOpeningsLayer = memo(function FloorOpeningsLayer({ levelId }: { level
       {ids.map((id) => (
         <FloorOpeningShape key={id} levelId={levelId} openingId={id} />
       ))}
+    </g>
+  );
+});
+
+/** Joist hatching spacing on the structure overlay (16" on centre, as framed). */
+const JOIST_SPACING = 16;
+
+/**
+ * A beam or post on the plan (DESIGN.md "Structure"): a beam as its dashed outline (it is overhead,
+ * in the framing over this level) with its label along it while the structure overlay is on; a post
+ * as a box with an X, its footing as a dashed square on the lowest level.
+ */
+const MemberShape = memo(function MemberShape({ levelId, memberId }: { levelId: Id; memberId: Id }) {
+  const m = useLayerPlan((s) => s.plan.levels[levelId]?.members?.[memberId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => s.selection.members.includes(memberId));
+  const structure = useLayerUi((s) => s.showStructure);
+  const k = useLayerUi(viewportScale);
+  const paths = useMemo(() => {
+    if (!m) return null;
+    if (m.kind === 'beam') {
+      const o = beamOutline(m);
+      const mid = scale(add(m.a, m.b), 0.5);
+      let deg = (Math.atan2(m.b.y - m.a.y, m.b.x - m.a.x) * 180) / Math.PI;
+      if (deg > 90) deg -= 180;
+      if (deg <= -90) deg += 180;
+      return { body: polyPath(o), cross: '', footing: '', mid, deg, ends: [m.a, m.b] };
+    }
+    const o = postOutline(m, m.width, m.depth);
+    return {
+      body: polyPath(o),
+      cross: segPath([
+        [o[0], o[2]],
+        [o[1], o[3]],
+      ]),
+      footing: m.footing ? polyPath(postOutline(m, m.footing.width, m.footing.width)) : '',
+      mid: m.at,
+      deg: 0,
+      ends: [] as Vec2[],
+    };
+  }, [m]);
+  if (!m || !paths || !isVisible(m.phase, viewMode)) return null;
+  const label = m.label;
+  return (
+    <g className={`member member-${m.kind} phase-${shownPhase(m.phase, viewMode)}${selected ? ' is-selected' : ''}`} data-member-id={memberId}>
+      {paths.footing && <path className="member-footing" d={paths.footing} vectorEffect="non-scaling-stroke" />}
+      <path className="member-body" d={paths.body} vectorEffect="non-scaling-stroke" />
+      {paths.cross && <path className="member-cross" d={paths.cross} vectorEffect="non-scaling-stroke" />}
+      {structure && label && m.kind === 'beam' && (
+        <g transform={`translate(${paths.mid.x} ${paths.mid.y}) rotate(${paths.deg}) scale(${1 / k})`} className="member-label">
+          <text textAnchor="middle" y={-(m.width / 2) * k - 6}>
+            {label}
+          </text>
+        </g>
+      )}
+      {selected && paths.ends.length > 0 && <OutlineHandles outline={paths.ends} className="deck-handle" />}
+    </g>
+  );
+});
+
+/** The level's beams and posts, over the walls (a post often stands in one). Picking is done by selectTool hitTest. */
+const MembersLayer = memo(function MembersLayer({ levelId }: { levelId: Id }) {
+  const ids = useEntityIds(levelId, 'members');
+  if (ids.length === 0) return null;
+  return (
+    <g className="layer-members" pointerEvents="none">
+      {ids.map((id) => (
+        <MemberShape key={id} levelId={levelId} memberId={id} />
+      ))}
+    </g>
+  );
+});
+
+/** "Joists N-S" at a point, constant on screen. */
+function JoistLabel({ at, joists, northAngle, k }: { at: Vec2; joists: number; northAngle: number; k: number }) {
+  const words = joistWords(joists, northAngle);
+  const short = words === 'north-south' ? 'N-S' : words === 'east-west' ? 'E-W' : words;
+  const r = (joists * Math.PI) / 180;
+  const u = { x: Math.cos(r), y: Math.sin(r) };
+  const n = { x: -u.y, y: u.x };
+  // A double-headed arrow along the joists, 44 px long, heads 6 px.
+  const tip = (sgn: number) => {
+    const t = { x: sgn * u.x * 22, y: sgn * u.y * 22 };
+    const back = { x: t.x - sgn * u.x * 6, y: t.y - sgn * u.y * 6 };
+    return `M${back.x + n.x * 4},${back.y + n.y * 4}L${t.x},${t.y}L${back.x - n.x * 4},${back.y - n.y * 4}`;
+  };
+  return (
+    <g transform={`translate(${at.x} ${at.y}) scale(${1 / k})`} className="joist-label">
+      <path className="joist-arrow" d={`M${-u.x * 22},${-u.y * 22}L${u.x * 22},${u.y * 22}${tip(1)}${tip(-1)}`} />
+      <text textAnchor="middle" y={-12}>
+        Joists {short}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * The structure overlay (Y, DESIGN.md "Structure"): the joists over this level hatched 16" apart
+ * (the level's direction outside its joist zones, each zone's inside it) with their direction, the
+ * walls marked bearing. Off by default; an export shows it when it is on (a framing plan).
+ */
+const StructureLayer = memo(function StructureLayer({ levelId }: { levelId: Id }) {
+  const on = useLayerUi((s) => s.showStructure);
+  const level = useLayerPlan((s) => s.plan.levels[levelId]);
+  const northAngle = useLayerPlan((s) => s.plan.site.northAngle);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selectedZones = useLayerUi((s) => s.selection.joistZones);
+  const k = useLayerUi(viewportScale);
+  const data = useMemo(() => {
+    if (!on || !level) return null;
+    const slabs = slabOutlines(getFaces(level, viewMode), true, true);
+    const zones = Object.values(level.joistZones ?? {}).filter((z) => isVisible(z.phase, viewMode));
+    const dir = (deg: number) => ({ x: Math.cos((deg * Math.PI) / 180), y: Math.sin((deg * Math.PI) / 180) });
+    const main = level.framing ? segPath(slabs.flatMap((p) => scanSegments(p, dir(level.framing!.joists), JOIST_SPACING))) : '';
+    const largest = slabs.reduce<Vec2[] | null>((best, p) => (!best || Math.abs(polygonSignedArea(p)) > Math.abs(polygonSignedArea(best)) ? p : best), null);
+    const bearing: [Vec2, Vec2][] = [];
+    for (const w of Object.values(level.walls)) {
+      if (!w.bearing || !isVisible(w.phase, viewMode)) continue;
+      const a = level.nodes[w.a];
+      const b = level.nodes[w.b];
+      if (a && b) bearing.push([a, b]);
+    }
+    return {
+      main,
+      mainAt: largest ? interiorPoint(largest) : null,
+      zones: zones.map((z) => ({ id: z.id, outline: polyPath(z.outline), lines: segPath(scanSegments(z.outline, dir(z.joists), JOIST_SPACING)), at: interiorPoint(z.outline), joists: z.joists, raw: z.outline })),
+      bearing: segPath(bearing),
+    };
+  }, [on, level, viewMode]);
+  if (!data || !level) return null;
+  const maskId = `hp-joist-mask-${levelId}`;
+  return (
+    <g className="layer-structure" pointerEvents="none">
+      {data.zones.length > 0 && (
+        <mask id={maskId} maskUnits="userSpaceOnUse" x={-1e5} y={-1e5} width={2e5} height={2e5}>
+          <rect x={-1e5} y={-1e5} width={2e5} height={2e5} fill="#fff" />
+          {data.zones.map((z) => (
+            <path key={z.id} d={z.outline} fill="#000" />
+          ))}
+        </mask>
+      )}
+      {data.main && <path className="joist-lines" d={data.main} mask={data.zones.length ? `url(#${maskId})` : undefined} vectorEffect="non-scaling-stroke" />}
+      {data.zones.map((z) => (
+        <g key={z.id} className={`joist-zone${selectedZones.includes(z.id) ? ' is-selected' : ''}`} data-joist-zone-id={z.id}>
+          <path className="joist-zone-outline" d={z.outline} vectorEffect="non-scaling-stroke" />
+          {z.lines && <path className="joist-lines" d={z.lines} vectorEffect="non-scaling-stroke" />}
+          <JoistLabel at={z.at} joists={z.joists} northAngle={northAngle} k={k} />
+          {selectedZones.includes(z.id) && <OutlineHandles outline={z.raw} className="deck-handle" />}
+        </g>
+      ))}
+      {data.bearing && <path className="bearing-wall" d={data.bearing} vectorEffect="non-scaling-stroke" />}
+      {level.framing && data.mainAt && <JoistLabel at={data.mainAt} joists={level.framing.joists} northAngle={northAngle} k={k} />}
+      {!level.framing && data.mainAt && (
+        <g transform={`translate(${data.mainAt.x} ${data.mainAt.y}) scale(${1 / k})`} className="joist-label joist-unset">
+          <text textAnchor="middle">Joists not set (Level panel)</text>
+        </g>
+      )}
     </g>
   );
 });
@@ -1303,10 +1462,12 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
       <DecksLayer levelId={levelId} />
       <RoofGhostLayer levelId={levelId} />
       <RoofsLayer levelId={levelId} />
+      <StructureLayer levelId={levelId} />
       <StairsLayer levelId={levelId} />
       <FixturesLayer levelId={levelId} />
       <WallsLayer levelId={levelId} />
       <OpeningsLayer levelId={levelId} />
+      <MembersLayer levelId={levelId} />
       <RoomLabelsLayer levelId={levelId} />
       <LabelsLayer levelId={levelId} />
       <OpenEndsLayer levelId={levelId} />

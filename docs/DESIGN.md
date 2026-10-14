@@ -43,6 +43,7 @@ export interface Wall {
   phase: Phase;
   heightOverride?: Inches;   // defaults to level.wallHeight
   finish?: 'clapboard' | 'shingle' | 'board' | 'block' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
+  bearing?: boolean;         // marked bearing or not; undefined = inferred (see "Structure")
 }
 
 export interface Opening {
@@ -185,7 +186,7 @@ export interface PlanSettings {
 // undo. migrate() ignores them in older files.
 
 export interface Plan {
-  schemaVersion: 5; id: Id; name: string;
+  schemaVersion: 7; id: Id; name: string;
   levelOrder: Id[];          // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
@@ -1283,6 +1284,52 @@ are heavy lines, the newels squares and the bullnose an outline; the pieces leav
 lines out. The export names the parts `Stairs`, `Stair framing` and `Stair railing` (materials
 `stair_tread_<phase>_<hex>`, `stair_paint_<phase>_<hex>`), and the styled guard `Guard` in the same
 materials.
+
+## Structure (`model/structure.ts`, `derive/members.ts`, `editor2d/tools/structureTools.ts`)
+
+Schema 7 (docs/history/PLAN-v8-stair-structure.md M5). The tool draws and checks the load path; it
+does not size anything, and every size it starts with is a placeholder for the engineer.
+
+```ts
+interface LevelFraming { joists: Degrees; depth?: Inches }          // Level.framing?
+interface JoistZone { id; outline: Vec2[]; joists: Degrees; phase }  // Level.joistZones
+interface Beam { id; kind: 'beam'; a; b; width; depth; mount: 'flush' | 'dropped'; phase; label? }
+interface Post { id; kind: 'post'; at; width; depth; rotation; phase; label?;
+  footing?: { width; thickness } }                                   // Level.members: Beam | Post
+```
+
+A level's framing is the floor above it (on the top level, the ceiling under the roof), so a beam,
+the walls it bears on and the joists it carries belong to one level, as framing plans are drawn.
+`joists` is the joists' axis in plan degrees, normalized to [0, 180) (`joistWords` names it against
+the north angle). A joist zone overrides it over its outline (a part built in another stage); the
+last zone shown at a point wins (`joistsAt`). The joist depth is the framing's, else the level
+above's `floorThickness` less the 3/4" subfloor (`SUBFLOOR`), else 5 1/2" for an attic
+(`ATTIC_JOIST_DEPTH`); their top is `wallHeight + depth` over the floor (`joistTop`). A flush beam's
+top is the joists' top, a dropped one's the wall height (`beamHeights`). A post runs from the floor
+up to the underside of the lowest beam over it that can be seen with it, else the wall height; its
+footing (lowest level only, `memberProblem`) sits under the slab (`memberBoxes`). Defaults
+(`MEMBER_DEFAULTS`): a flush beam of two 1 3/4" x 11 7/8" LVLs, a 6x6 post, a 24" x 12" footing.
+
+Tools: the beam (I) takes two clicks that snap like wall corners (the draft's `measure` holds the
+first, so the overlay draws the line); the post (L) snaps to beam ends on its level and the one
+above; the joist zone is an outline tool started from the Level panel, its joists square to the
+level's. The select tool picks posts before walls (a post often stands in one) and beams after
+them, drags the selected members together (`placeMembers`, one undo step), drags a selected beam's
+end with the wall snap, and picks a joist zone only near its edge while the overlay is on (a click
+inside is the room). Box-select takes members with every point inside.
+
+2D: `MembersLayer` (over the walls) draws a beam as its dashed outline (it is overhead) and a post as
+a box with an X over its dashed footing. `StructureLayer` (Y, `uiStore.showStructure`, under the
+stairs) hatches the joists 16" apart over the level's inside slab outline, masked out of the joist
+zones, which hatch their own way; arrows say "Joists N-S"; walls marked bearing get a dash-dot
+line; beam labels show. The plan export takes the UI's `showStructure`, so a framing plan is an
+export with the overlay on.
+
+3D: `getMemberMeshes` (cached per level and view like the decks, by each member's boxes) clips
+every member 1/16" under the ceiling (`MEMBER_INSET`): a flush beam is drawn only where it hangs
+below the ceiling (none when it is no deeper than the joists), and nothing shares a slab's face; a
+footing stops 1/16" under the slab. Materials `memberMaterial` (pale wood, concrete); the export
+names the meshes `Beam`, `Post` and `Footing` (materials `member_<part>_<phase>`).
 
 ## Renovation moves (`model/renovate.ts`, `ui/wallMove.ts`, `editor2d/WallMovePrompt.tsx`)
 

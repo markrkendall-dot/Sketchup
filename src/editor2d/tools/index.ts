@@ -24,6 +24,7 @@ import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
 import { columnTool, gradePointTool, siteSelectTool } from './siteTools';
 import { stairsTool } from './stairsTool';
+import { beamTool, joistZoneTool, postTool } from './structureTools';
 import { requestUnderlayImage, underlayTool } from './underlayTool';
 import { wallTool } from './wallTool';
 
@@ -84,6 +85,9 @@ const tools: Record<ToolName, Tool> = {
   fixture: fixtureTool,
   gradePoint: gradePointTool,
   column: columnTool,
+  beam: beamTool,
+  post: postTool,
+  joistZone: joistZoneTool,
 };
 
 /** The tool object for a name; in site mode the select tool is the site one (grade points and columns). */
@@ -235,11 +239,13 @@ export function pruneSelection(): void {
   const floorOpenings = sel.floorOpenings.filter((id) => level.floorOpenings?.[id] && isVisible(level.floorOpenings[id].phase, vm));
   // A staircase stays selected while one of its pieces is shown.
   const staircases = sel.staircases.filter((id) => level.staircases?.[id] && Object.values(level.stairs).some((st) => st.staircaseId === id && isVisible(st.phase, vm)));
+  const members = sel.members.filter((id) => level.members?.[id] && isVisible(level.members[id].phase, vm));
+  const joistZones = sel.joistZones.filter((id) => level.joistZones?.[id] && isVisible(level.joistZones[id].phase, vm));
   const site = getPlan().site;
   const gradePoints = sel.gradePoints.filter((id) => site.gradePoints[id]);
   const columns = sel.columns.filter((id) => site.columns[id] && isVisible(site.columns[id].phase, vm));
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + gradePoints.length + columns.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases, gradePoints, columns });
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + members.length + joistZones.length + gradePoints.length + columns.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases, members, joistZones, gradePoints, columns });
   }
   // An inline rename of a room that undo removed has nothing left to edit.
   const edit = ui.roomEdit;

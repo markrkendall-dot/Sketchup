@@ -457,7 +457,7 @@ export const Overlay = memo(function Overlay() {
     <g className="overlay" pointerEvents="none">
       {draft.wallPreview && <RubberBand preview={draft.wallPreview} v={v} denom={denom} />}
       {tool === 'rect' && draft.rectStart && draft.rectPreview && <RectGhost preview={draft.rectPreview} v={v} />}
-      {tool === 'measure' && draft.measure && (draft.measure.b ?? draft.snap?.point) && (
+      {(tool === 'measure' || tool === 'beam') && draft.measure && (draft.measure.b ?? draft.snap?.point) && (
         <MeasureOverlay a={draft.measure.a} b={(draft.measure.b ?? draft.snap?.point)!} v={v} denom={denom} />
       )}
       {draft.openingPreview && <OpeningGhost preview={draft.openingPreview} v={v} denom={denom} />}
