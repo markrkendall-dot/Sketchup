@@ -12,7 +12,7 @@ import { shutterWidth, SILL_THICKNESS } from '../derive/openings3d';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { roofBearing, roofExtremes, roofHeightAt } from '../derive/roofs';
 import { faceAt, getFaces } from '../derive/rooms';
-import { columnDefaults, groundAt } from '../derive/site';
+import { groundAt } from '../derive/site';
 import { flightSteps, floorToFloor, stairsBase, stairsRise } from '../derive/stairs';
 import { normalize, perpLeft, pointInPolygon, polygonSignedArea, sub } from '../model/geometry';
 import { counterRuns, fixtureOutline } from '../derive/casework';
@@ -116,9 +116,10 @@ describe('docs/examples/146-mick-road.json', () => {
     // laundry fixtures, the foyer's bench and hooks, the dryer's vent and the range hood's duct, and
     // seven alarms, all new.
     expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 46 });
-    // The masonry chimney is demolished; the porch's three posts, the stove's connector and its
-    // flue are new.
-    expect(count(Object.values(plan.site.columns))).toEqual({ existing: 0, demo: 1, new: 5 });
+    // The masonry chimney is demolished; the stove's connector and its flue are new, and six
+    // fieldstone piers: two under the entry canopy's log posts, its stoop, and one under each of the
+    // screen porch's three log posts.
+    expect(count(Object.values(plan.site.columns))).toEqual({ existing: 0, demo: 1, new: 8 });
     // Demolished: the stair, the house door, the entry porch with its five screen openings, its roof
     // and label, the wing's north wall (it has no window), the wing's roof and its south window (a
     // sliding door replaces it), the east window into the new bedroom, the front room's walls with
@@ -374,13 +375,16 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([plain('existing'), plain('proposed')]).toEqual([3, 5]);
     const retaining = walls.filter((w) => w.finish === 'plain');
     expect(retaining.map((w) => [w.thickness, w.color, w.heightOverride])).toEqual(Array(5).fill([10, '#b3b0a8', 96]));
-    expect(walls.filter((w) => w.finish === 'block' && w.color === '#8f8a84')).toHaveLength(walls.length - 1 - retaining.length);
+    // The foyer's foundation is faced in fieldstone (the Adirondack entry's stone base).
+    const stone = walls.filter((w) => w.finish === 'stone');
+    expect(stone.map((w) => [w.phase, w.thickness, w.color])).toEqual(Array(3).fill(['new', 8, '#8e8579']));
+    expect(walls.filter((w) => w.finish === 'block' && w.color === '#8f8a84')).toHaveLength(walls.length - 1 - retaining.length - stone.length);
     const boards = walls.find((w) => w.finish === 'board')!;
     expect(boards.color).toBe('#5a3a35');
     const walkout = Object.values(b.openings);
     expect(walkout).toHaveLength(1);
-    // The block under the proposed addition is block too.
-    expect(walls.filter((w) => w.phase === 'new' && w.finish !== 'plain').every((w) => w.finish === 'block' && w.thickness === 8)).toBe(true);
+    // The foundation under the proposed addition is block too; the foyer's is stone.
+    expect(walls.filter((w) => w.phase === 'new' && w.finish !== 'plain' && w.finish !== 'stone').every((w) => w.finish === 'block' && w.thickness === 8)).toBe(true);
     expect(walkout[0]).toMatchObject({ type: 'door', wallId: boards.id, width: 72, height: 80, sashes: 2, leafColor: '#5a3a35', trim: 0 });
   });
 
@@ -603,9 +607,10 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(roofs.map((r) => [r.shape, box(r), r.ridgeAngle, r.pitch, r.overhang])).toEqual([
       // One shed over the whole east wing, sloping down east from the main block's east wall.
       ['shed', [336, 463, 0, 315], 0, 5, 18],
-      // The foyer's gable faces west; the porch's shed is high at the house wall. All three
-      // outlines stop 18" short of the wall, so the overhang ends at its outside face.
-      ['gable', [-96, -18, 64.25, 158], 0, 8, 18],
+      // The foyer's gable faces west and runs on 60" past the foyer (x -96) as the open log canopy
+      // over the front door; the porch's shed is high at the house wall. All three outlines stop
+      // 18" short of the wall, so the overhang ends at its outside face.
+      ['gable', [-156, -18, 64.25, 158], 0, 8, 18],
       ['shed', [-96, -18, 158, 315], 180, 4, 18],
     ]);
     // The wing's shed is 96" above the first floor at the wing's east wall and 96 + 145 x 5/12 at
@@ -641,13 +646,75 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(roofHeightAt(shed, roofBearing(f.wallHeight, shed), { x: 0, y: 236 })).toBeCloseTo(128, 6);
     expect(roofHeightAt(shed, roofBearing(f.wallHeight, shed), { x: -96, y: 236 })).toBeCloseTo(96, 6);
     expect(roofExtremes(foyer, roofBearing(f.wallHeight, foyer)).ridge + foyer.thickness).toBeLessThan(156);
-    // Posts in the stain from the porch floor to the roof over each.
-    const posts = Object.values(plan.site.columns).filter((c) => c.kind === 'post');
-    expect(posts).toHaveLength(3);
-    for (const p of posts) {
-      expect(p).toMatchObject({ phase: 'new', width: 8, depth: 8, base: 2, color: '#5a3a35' });
-      expect(p.top).toBeCloseTo(columnDefaults(plan, 'post', p.at, 'new').top, 2);
+    // No square posts: the porch and the canopy stand on log posts (members) on fieldstone piers.
+    expect(Object.values(plan.site.columns).filter((c) => c.kind === 'post')).toEqual([]);
+  });
+
+  it('has the Adirondack entry: an open log canopy on stone piers, and log posts, a plate and twig work on the screen porch', () => {
+    const f = plan.levels[plan.levelOrder[1]];
+    const floorTop = getLevelElevations(plan)[f.id].floorTop;
+    expect(floorTop).toBe(2);
+    const piers = Object.values(plan.site.columns).filter((c) => c.kind === 'pier');
+    // Fieldstone, new: 18" square to +20 under the canopy's posts, 16" square to +12 under the
+    // porch's, and the stoop, 60" x 72" in front of the door, 1/2" under its threshold.
+    expect(piers.map((c) => [c.at, c.width, c.depth, c.top, c.color, c.phase])).toEqual([
+      [{ x: -150, y: 69.25 }, 18, 18, 20, '#8e8579', 'new'],
+      [{ x: -150, y: 153 }, 18, 18, 20, '#8e8579', 'new'],
+      [{ x: -126, y: 118.5 }, 60, 72, 1.5, '#8e8579', 'new'],
+      [{ x: -97, y: 164 }, 16, 16, 12, '#8e8579', 'new'],
+      [{ x: -97, y: 236 }, 16, 16, 12, '#8e8579', 'new'],
+      [{ x: -97, y: 310 }, 16, 16, 12, '#8e8579', 'new'],
+    ]);
+    // Each stands from under the ground at every corner, so none floats on the sloping ground, and
+    // the stoop is a step up from the ground all round.
+    for (const c of piers) {
+      for (const sx of [-1, 1]) {
+        for (const sy of [-1, 1]) {
+          const g = groundAt(plan, { x: c.at.x + (sx * c.width) / 2, y: c.at.y + (sy * c.depth) / 2 });
+          expect(c.base).toBeLessThan(g);
+          expect(c.top - g).toBeGreaterThan(1);
+        }
+      }
     }
+    // The logs: peeled, round, timbers at set heights (the structure checks ignore them).
+    const logs = Object.values(f.members).filter((m) => m.profile === 'log');
+    expect(logs.every((m) => isTimber(m) && m.color === '#c79a5b' && m.phase === 'new' && m.width === m.depth)).toBe(true);
+    const named = (label: string) => logs.filter((m) => m.label === label);
+    // Every log post stands on a pier's top.
+    const logPosts = logs.filter((m) => m.kind === 'post' && m.width === 10);
+    expect(logPosts).toHaveLength(5);
+    for (const m of logPosts) {
+      if (m.kind !== 'post') continue;
+      const p = piers.find((c) => c.at.x === m.at.x && c.at.y === m.at.y)!;
+      expect(m.base! + floorTop).toBe(p.top);
+    }
+    // The canopy's tie runs 8" past each post's outer face; the ridge log and the purlins run from
+    // the foyer's gable wall to x -182, 8" past the rake (x -174), so their ends show.
+    const [tie] = named('10" log tie');
+    expect(tie.kind === 'beam' && [tie.a.y, tie.b.y]).toEqual([69.25 - 5 - 8, 153 + 5 + 8]);
+    for (const m of [...named('10" ridge log'), ...named('8" log purlin')]) {
+      expect(m.kind === 'beam' && [m.a.x, m.b.x]).toEqual([-94, -182]);
+    }
+    expect([named('10" ridge log'), named('8" log purlin'), named('8" log rafter'), named('8" log king post'), named('6" log brace'), named('3" twig')].map((x) => x.length)).toEqual([1, 2, 2, 1, 6, 6]);
+    // The porch's plate runs 12" past its south corner (y 315), under the shed's rake.
+    const [plate] = named('10" log plate');
+    expect(plate.kind === 'beam' && plate.b.y).toBe(327);
+    expect(named('2.5" twig')).toHaveLength(4);
+    // No log reaches the roof over it: the top of each beam at its ends, and each post's top, is
+    // 1/4" or more under the underside of every roof over that point.
+    const roofs = Object.values(f.roofs).filter((r) => r.phase === 'new');
+    const lowestUnder = (p: Vec2) => Math.min(...roofs.map((r) => roofHeightAt(r, roofBearing(f.wallHeight, r), p) ?? Infinity));
+    for (const m of logs) {
+      if (m.kind === 'beam') {
+        for (const [p, z] of [[m.a, m.za!], [m.b, m.zb!]] as const) expect(lowestUnder(p) - z, `${m.label} at ${JSON.stringify(p)}`).toBeGreaterThanOrEqual(0.25 - 1e-6);
+      } else expect(lowestUnder(m.at) - m.top!, m.label).toBeGreaterThanOrEqual(0.25 - 1e-6);
+    }
+    // The porch's west and south walls are bark-on half-log up to the screens' sills (36"), with
+    // the shakes above; the foyer's walls have no band.
+    const banded = Object.values(f.walls).filter((w) => w.band);
+    expect(banded.map((w) => [w.phase, w.band])).toEqual(Array(2).fill(['new', { finish: 'halflog', color: '#5b4632', height: 36 }]));
+    const screens = Object.values(f.openings).filter((o) => o.phase === 'new' && o.glazing === 'screen' && o.type === 'window');
+    expect(screens.every((o) => banded.some((w) => w.id === o.wallId) && o.sill === 36)).toBe(true);
   });
 
   it('has the structure the proposed design needs: joists, the balcony header, the kitchen beam, a post on a footing', () => {
@@ -673,10 +740,25 @@ describe('docs/examples/146-mick-road.json', () => {
       [{ x: 170.5, y: 92.75 }, 3.5, '(2) 2x4'],
       [{ x: 170.5, y: 99.5 }, 3.5, '(2) 2x4'],
     ]);
-    // The foyer's gable timbers, in the stain on the gable face: tie, king post, two corner posts, two braces, two rafters.
+    // The Adirondack entry's logs, all timbers: the canopy's two posts, tie, two knee braces, king
+    // post, two rafters, ridge log, two purlins and six twigs of its sunburst; the screen porch's
+    // three posts, plate, four knee braces and the four twigs of its two X panels.
     const timbers = members.filter(isTimber);
-    expect(timbers.map((m) => m.label).sort()).toEqual(['4x4 brace', '4x4 brace', '6x6', '6x6', '6x6', '6x6 rafter', '6x6 rafter', '6x6 tie']);
-    expect(timbers.every((m) => m.color === '#5a3a35' && m.phase === 'new')).toBe(true);
+    const tally: Record<string, number> = {};
+    for (const m of timbers) tally[m.label ?? ''] = (tally[m.label ?? ''] ?? 0) + 1;
+    expect(tally).toEqual({
+      '10" log post': 5,
+      '10" log tie': 1,
+      '6" log brace': 6,
+      '8" log king post': 1,
+      '8" log rafter': 2,
+      '10" ridge log': 1,
+      '8" log purlin': 2,
+      '3" twig': 6,
+      '10" log plate': 1,
+      '2.5" twig': 4,
+    });
+    expect(timbers.every((m) => m.profile === 'log' && m.color === '#c79a5b' && m.phase === 'new')).toBe(true);
     const posts = Object.values(plan.levels[bId].members);
     expect(posts).toEqual([expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 96.125 }, width: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' })]);
     // No wall is marked: the tool infers them all.

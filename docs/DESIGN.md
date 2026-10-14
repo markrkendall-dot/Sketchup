@@ -1525,7 +1525,8 @@ with a warning), map 2048 x 2048, bias -0.0002, normal bias 1.5". Its orthograph
 to `planBox(plan)` (every level) on each plan change by `bounds.ts sunShadowFit`: target the box centre,
 the light twice the box's radius r toward the sun, a square frustum 1.1r either side of the axis, depth from
 r/2 to past the far side of the box plus twice r over the sine of the sun's elevation, so the house's
-shadow on lower ground is kept; a texel is under half an inch on the starter house. r3f applies props to
+shadow on lower ground is kept; a texel is about half an inch on the starter house (just over, since its
+entry canopy). r3f applies props to
 the light, never to its shadow camera, so an effect sets the frustum and calls
 `shadow.camera.updateProjectionMatrix()`; the light's `target` is rendered as a `<primitive>` so its world
 matrix follows its position. The shadow map does not depend on the camera, so `shadow.autoUpdate` is off

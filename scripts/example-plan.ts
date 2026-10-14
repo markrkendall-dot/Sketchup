@@ -9,7 +9,7 @@
 // First Floor interior is the owner's tape measurements (face to face), set out from the inside faces.
 import { getLevelElevations } from '../src/derive/levels';
 import { roofBearing, roofHeightAt } from '../src/derive/roofs';
-import { columnDefaults } from '../src/derive/site';
+import { columnDefaults, groundAt } from '../src/derive/site';
 import { getStaircaseLayout, heightAt } from '../src/derive/staircase';
 import { COLUMN_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
@@ -114,6 +114,14 @@ const PLACEHOLDER_ROOM = { wallFinish: 'paint', floorFinish: 'boards', floorColo
 const PLACEHOLDER_WET = { wallFinish: 'paint', floorFinish: 'tile' } as const;
 /** The proposed shakes' brown (and the roof boards'): the dark chocolate of MK's garage. */
 const SHAKE_BROWN = '#4b3a32';
+/**
+ * The Adirondack entry and screen porch (docs/history/PLAN-v10-adirondack.md): peeled golden logs
+ * (their end grain is the tool's lighter tint, model/structure.ts logEndColor), bark-on half-log
+ * knee walls and grey-brown fieldstone.
+ */
+const PEELED_LOG = '#c79a5b';
+const BARK = '#5b4632';
+const FIELDSTONE = '#8e8579';
 const FRIDGE_BLUE = '#3a5fa0';
 /**
  * Centre of the Kitchen's east window and the sink under it: the sink base comes right after the
@@ -871,10 +879,14 @@ function proposed(ids: ExistingIds): void {
   const foyer = drawWalls(fId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], T, false, NEW);
   const porch = drawWalls(fId, [{ x: fy.west, y: fy.south }, { x: fy.west, y: CL.y1 }, { x: CL.x0, y: CL.y1 }], T, false, NEW);
   store().updateWalls(fId, [...foyer, ...porch], { finish: 'shingle', color: FINISH_COLOR });
-  // The foyer is a closed, heated room: 8" block under its three walls, like the east addition's
-  // (a crawl space). The screen porch stands on its posts (porch floors and piers are not drawn).
+  // The foyer is a closed, heated room: 8" under its three walls, like the east addition's (a crawl
+  // space), faced in fieldstone (the Adirondack stone base; about 1" to 10" of it shows above the
+  // ground, more on the south). The screen porch stands on its log posts and their stone piers
+  // (below; the porch's floor is not drawn). Its west and south walls are bark-on half-log knee
+  // walls, a 36" band up to the screens' sills, with the shakes above.
   const foyerFooting = drawWalls(bId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], TB, false, NEW);
-  store().updateWalls(bId, foyerFooting, { finish: 'block', color: BLOCK_COLOR });
+  store().updateWalls(bId, foyerFooting, { finish: 'stone', color: FIELDSTONE });
+  store().updateWalls(fId, porch, { band: { finish: 'halflog', color: BARK, height: 36 } });
 
   // ---- 4. The north band (MK, 14 Oct 2026: the kitchen stops short of the north wall): a powder
   // room and, in the north-east corner, a walk-in pantry, x 173..311, y 7..55 inside (4', as MK
@@ -1040,37 +1052,10 @@ function proposed(ids: ExistingIds): void {
   // either way.
   const ROOF_EAST = MAIN.x0 - 18;
   roof(fId, { shape: 'shed', outline: outline({ x0: MAIN.x1 + 18, x1: WING.x1, y0: MAIN.y0, y1: MAIN.y1 }), ridgeAngle: 0, pitch: 5, overhang: 18 }, ROOF_WING, 0.1, NEW);
-  roof(fId, { shape: 'gable', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y0, y1: FOYER.y1 }), ridgeAngle: 0, pitch: 8, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
-  // The foyer's gable timbers (MK; after the old porch's in photo 08): stained 6x6s (5 1/2") on the
-  // gable face, just off the siding (x -99, under the rake's 18" overhang): a corner post at each end
-  // up to a tie beam across the eave line, a 4x4 knee brace at 45 degrees from each post to the tie,
-  // a king post from the tie to the ridge, and two principal rafters 1/4" under the roof from the
-  // tie's ends to the ridge. Timbers at set heights (the structure checks do not follow them);
-  // their fixing is for the engineer.
-  const gable = Object.values(level(fId).roofs).find((r) => r.phase === NEW && r.shape === 'gable')!;
-  const gableUnder = (y: number) => roofHeightAt(gable, roofBearing(level(fId).wallHeight, gable), { x: FOYER.x0 - 3, y })!;
-  const GX = FOYER.x0 - 3;
-  const SIX = 5.5;
-  const TIE = 94;
-  const ridgeY = (FOYER.y0 + FOYER.y1) / 2;
-  const timber = (a: Vec2, za: number, b: Vec2, zb: number, size = SIX, label = '6x6') => {
-    if (!store().addMember(fId, { kind: 'beam', a, b, width: size, depth: size, mount: 'dropped', za, zb, color: FINISH_COLOR, label, phase: NEW })) throw new Error('timber rejected');
-  };
-  const timberPost = (y: number, base: number, top: number) => {
-    if (!store().addMember(fId, { kind: 'post', at: { x: GX, y }, width: SIX, depth: SIX, rotation: 0, base, top, color: FINISH_COLOR, label: '6x6', phase: NEW })) throw new Error('timber post rejected');
-  };
-  const ends = [FOYER.y0 + SIX / 2, FOYER.y1 - SIX / 2];
-  timber({ x: GX, y: FOYER.y0 }, TIE, { x: GX, y: FOYER.y1 }, TIE, SIX, '6x6 tie');
-  timberPost(ridgeY, TIE, round2(gableUnder(ridgeY) - 0.25));
-  for (const [i, y] of ends.entries()) {
-    const inward = i === 0 ? 1 : -1;
-    timberPost(y, 0, TIE - SIX);
-    // The brace's top meets the tie's underside 18" in from the post's face.
-    const from = y + (inward * SIX) / 2;
-    timber({ x: GX, y: from }, TIE - SIX - 18, { x: GX, y: from + inward * 18 }, TIE - SIX, 3.5, '4x4 brace');
-    const eave = i === 0 ? FOYER.y0 : FOYER.y1;
-    timber({ x: GX, y: eave }, round2(gableUnder(eave) - 0.25), { x: GX, y: ridgeY }, round2(gableUnder(ridgeY) - 0.25), SIX, '6x6 rafter');
-  }
+  // The foyer's gable runs on 60" west of the foyer (CANOPY_X0) as an open log canopy over the front
+  // door (below). Its heights depend only on y, so the foyer's gable wall and its door stay as they are.
+  const CANOPY_X0 = FOYER.x0 - 60;
+  roof(fId, { shape: 'gable', outline: outline({ x0: CANOPY_X0, x1: ROOF_EAST, y0: FOYER.y0, y1: FOYER.y1 }), ridgeAngle: 0, pitch: 8, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
   // Coats in the foyer (MK, 14 Oct 2026; the closet under the stair is narrow): a 48" bench 16" deep
   // and 18" high under the north window (sill 36), clear of the front door's swing, and a 24" rail
   // of hooks at 60" either side of the window. Stained like the trim.
@@ -1079,13 +1064,125 @@ function proposed(ids: ExistingIds): void {
   for (const x of [FOYER.x0 + T + 12, -12]) fixture(fId, { kind: 'box', label: 'Hooks', origin: { x, y: foyerNorth }, direction: 90, width: 24, depth: 2, height: 4, elevation: 60, frontColor: FINISH_COLOR, phase: NEW });
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
-  // ---- The porch's posts: 8" x 8" in the stain, flush with the outside face of its west wall, at
-  // its north corner, between the two screen bays and at its south-west corner, from the porch floor
-  // to the roof's underside over each (columnDefaults).
-  for (const y of [162, 236, 311]) {
-    const at = { x: -92, y };
-    const d = columnDefaults(getPlan(), 'post', at, NEW);
-    if (!store().addColumn({ at, kind: 'post', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP, top: round2(d.top), color: FINISH_COLOR })) throw new Error(`post at y ${y} rejected`);
+  // ---- The Adirondack entry and screen porch (MK; docs/history/PLAN-v10-adirondack.md; sizes are
+  // estimates for MK, the engineer and the builder). Peeled logs and twigs, drawn as round timbers
+  // at set heights (the structure checks do not follow them), on fieldstone piers that keep them off
+  // the ground. Heights below are over the First Floor (its floor top is +2); the piers' are absolute.
+  // `logBetween` takes a log's centreline from p to q (z over the floor) and sets its tops (za, zb)
+  // half its plumb depth above it.
+  type AxisPt = { x: number; y: number; z: number };
+  const logBetween = (p: AxisPt, q: AxisPt, d: number, label: string) => {
+    const run = Math.hypot(q.x - p.x, q.y - p.y);
+    const half = (d * Math.hypot(run, q.z - p.z)) / run / 2;
+    const a = { x: round2(p.x), y: round2(p.y) };
+    const b = { x: round2(q.x), y: round2(q.y) };
+    if (!store().addMember(fId, { kind: 'beam', a, b, width: d, depth: d, mount: 'dropped', za: round2(p.z + half), zb: round2(q.z + half), color: PEELED_LOG, profile: 'log', label, phase: NEW })) throw new Error(`${label} rejected`);
+  };
+  const logPost = (at: Vec2, base: number, top: number, d: number, label: string) => {
+    if (!store().addMember(fId, { kind: 'post', at, width: d, depth: d, rotation: 0, base: round2(base), top: round2(top), color: PEELED_LOG, profile: 'log', label, phase: NEW })) throw new Error(`${label} rejected`);
+  };
+  /**
+   * A fieldstone pier (or a stoop) centred at `at`, `w` x `d`, up to `top` (absolute), from 2" under
+   * the ground at its lowest corner (groundAt), so it never stands clear of a sloping ground.
+   */
+  const pier = (at: Vec2, w: number, d: number, top: number) => {
+    const corners = [-1, 1].flatMap((sx) => [-1, 1].map((sy) => groundAt(getPlan(), { x: at.x + (sx * w) / 2, y: at.y + (sy * d) / 2 })));
+    const base = Math.floor(Math.min(...corners)) - 2;
+    if (!(base < top)) throw new Error(`pier at ${JSON.stringify(at)} would be buried`);
+    if (!store().addColumn({ at, kind: 'pier', phase: NEW, width: w, depth: d, rotation: 0, base, top, color: FIELDSTONE })) throw new Error(`pier at ${JSON.stringify(at)} rejected`);
+  };
+  /** A log's centre this far under a plane sloping `k` in 1 (its radius plus a gap, square to it). */
+  const offsetUnder = (k: number, perp: number) => perp * Math.hypot(1, k);
+  const CLEAR = 0.25;
+
+  // The open log canopy over the front door: a log truss on the canopy's outer end (x -150, 6" in
+  // from the outline; the rake is at x -174) and logs under the roof whose ends show past the rake.
+  //   - Two fieldstone piers, 18" square, from the ground to +20, at the gable's eave lines.
+  //   - A 10" log post on each, its outer face on the eave line, up to a 10" log tie across them that
+  //     runs 8" past each post's outer face, so its round ends show under the eaves. The tie is as
+  //     high as its ends allow, 1/4" or more under the overhang (the eaves' rafter tails, every 24",
+  //     miss it).
+  //   - 6" log knee braces at 45 degrees from each post to the tie, 24" each way.
+  //   - A 10" ridge log and two 8" purlins (one midway up each slope), 1/4" under the roof, square
+  //     to it, from the foyer's gable wall west to x -182, 8" past the rake, through the rake boards.
+  //   - Two 8" principal rafter logs under the purlins (touching them), from the tie over the posts
+  //     up to the ridge log, which sits in their crotch, and an 8" king post from the tie to the
+  //     ridge log.
+  //   - Twig work in the gable over the tie: a sunburst of 3" branches from the tie's centre to the
+  //     rafters, three a side.
+  //   - A fieldstone stoop under it, 60" x 72" (x -156..-96, centred on the door), its top at +1.5,
+  //     1/2" under the threshold (the exterior landing rule is to be checked against the 2025 RCNYS).
+  //     The south pier stands on its corner.
+  const gable = Object.values(level(fId).roofs).find((r) => r.phase === NEW && r.shape === 'gable')!;
+  const CX = CANOPY_X0 + 6;
+  const gableUnder = (y: number) => roofHeightAt(gable, roofBearing(level(fId).wallHeight, gable), { x: CX, y })!;
+  const K = gable.pitch / 12;
+  const ridgeY = (FOYER.y0 + FOYER.y1) / 2;
+  const LOG = 10;
+  const LOG8 = 8;
+  const BRACE = 6;
+  const canopyPosts = [FOYER.y0 + LOG / 2, FOYER.y1 - LOG / 2];
+  const tieEnds = [canopyPosts[0] - LOG / 2 - 8, canopyPosts[1] + LOG / 2 + 8];
+  const TIE = Math.floor(Math.min(...tieEnds.map(gableUnder)) - CLEAR - LOG / 2);
+  for (const y of canopyPosts) pier({ x: CX, y }, 18, 18, 20);
+  for (const y of canopyPosts) logPost({ x: CX, y }, 20 - FLOOR_TOP, TIE, LOG, '10" log post');
+  logBetween({ x: CX, y: tieEnds[0], z: TIE }, { x: CX, y: tieEnds[1], z: TIE }, LOG, '10" log tie');
+  for (const [i, y] of canopyPosts.entries()) {
+    const inward = i === 0 ? 1 : -1;
+    logBetween({ x: CX, y, z: TIE - 24 }, { x: CX, y: y + inward * 24, z: TIE }, BRACE, '6" log brace');
+  }
+  const RAKE_PAST = CANOPY_X0 - gable.overhang - 8;
+  const WALL_IN = FOYER.x0 + 2;
+  const RIDGE = gableUnder(ridgeY) - offsetUnder(K, LOG / 2 + CLEAR);
+  logBetween({ x: WALL_IN, y: ridgeY, z: RIDGE }, { x: RAKE_PAST, y: ridgeY, z: RIDGE }, LOG, '10" ridge log');
+  for (const y of [(FOYER.y0 + ridgeY) / 2, (ridgeY + FOYER.y1) / 2]) {
+    const z = gableUnder(y) - offsetUnder(K, LOG8 / 2 + CLEAR);
+    logBetween({ x: WALL_IN, y, z }, { x: RAKE_PAST, y, z }, LOG8, '8" log purlin');
+  }
+  // The rafters' centrelines: under the purlins (their radius, the purlins' diameter and the gap).
+  const RAFTER_OFF = offsetUnder(K, LOG8 + LOG8 / 2 + CLEAR);
+  const apex = { x: CX, y: ridgeY, z: gableUnder(ridgeY) - RAFTER_OFF };
+  for (const [i, eave] of [FOYER.y0, FOYER.y1].entries()) {
+    const inward = i === 0 ? 1 : -1;
+    const heel = { x: CX, y: eave + (inward * (TIE + RAFTER_OFF - gableUnder(eave))) / K, z: TIE };
+    logBetween(heel, apex, LOG8, '8" log rafter');
+    for (const t of [0.3, 0.55, 0.8]) {
+      logBetween({ x: CX, y: ridgeY, z: TIE }, { x: CX, y: heel.y + (apex.y - heel.y) * t, z: heel.z + (apex.z - heel.z) * t }, 3, '3" twig');
+    }
+  }
+  logPost({ x: CX, y: ridgeY }, TIE, RIDGE, LOG8, '8" log king post');
+  pier({ x: (CANOPY_X0 + FOYER.x0) / 2, y: 118.5 }, FOYER.x0 - CANOPY_X0, 72, 1.5);
+
+  // The screen porch: three 10" log posts on the line of its west wall's outside face (x -97, 6"
+  // proud of it, the rest in the wall), at its north end (y 164, between the foyer and the north
+  // screen), between the two screen bays (y 236) and at its south-west corner (y 310, flush with the
+  // south face), each on a 16" fieldstone pier from the ground to +12. A 10" log plate along the eave
+  // line rests on the middle and south posts, as high as the shed's rafter tails allow (they bear on
+  // it), from the foyer gable's south eave (y 177; the gable's overhang comes down lower than the
+  // plate north of that) to 12" past the porch's south corner, so its end shows under the shed's
+  // rake. The north post stops under the gable's eave, its top inside the roof's thickness. 6" log
+  // knee braces at 45 degrees from the posts to the plate, 18" each way (the north post's, 21",
+  // passes under the gable's eave). Twig work: crossed 2.5" branches (an X) on the half-log knee wall
+  // in each of the two west bays, just off its face.
+  const shed = Object.values(level(fId).roofs).find((r) => r.phase === NEW && r.shape === 'shed' && r.ridgeAngle === 180)!;
+  const PX = FOYER.x0 - 1;
+  const porchPosts = [164, 236, 310];
+  const tailBottom = roofHeightAt(shed, roofBearing(level(fId).wallHeight, shed), { x: PX, y: 236 })! - shed.rafter!.depth;
+  const PLATE = Math.floor((tailBottom - offsetUnder(shed.pitch / 12, LOG / 2)) * 4) / 4;
+  const plateNorth = FOYER.y1 + gable.overhang + 1;
+  for (const y of porchPosts) pier({ x: PX, y }, 16, 16, 12);
+  const northTop = Math.floor(roofHeightAt(gable, roofBearing(level(fId).wallHeight, gable), { x: PX, y: porchPosts[0] + LOG / 2 })! + gable.thickness - CLEAR);
+  for (const [i, y] of porchPosts.entries()) logPost({ x: PX, y }, 12 - FLOOR_TOP, i === 0 ? northTop : PLATE, LOG, '10" log post');
+  logBetween({ x: PX, y: plateNorth, z: PLATE }, { x: PX, y: CL.y1 + HALF + 12, z: PLATE }, LOG, '10" log plate');
+  logBetween({ x: PX, y: porchPosts[0], z: PLATE - 21 }, { x: PX, y: porchPosts[0] + 21, z: PLATE }, BRACE, '6" log brace');
+  for (const [y, dir] of [[porchPosts[1], -1], [porchPosts[1], 1], [porchPosts[2], -1]]) {
+    logBetween({ x: PX, y, z: PLATE - 18 }, { x: PX, y: y + dir * 18, z: PLATE }, BRACE, '6" log brace');
+  }
+  const TWIG = 2.5;
+  const TX = FOYER.x0 - TWIG / 2 - CLEAR;
+  for (const [y0, y1] of [[porchPosts[0] + LOG / 2, porchPosts[1] - LOG / 2], [porchPosts[1] + LOG / 2, porchPosts[2] - LOG / 2]]) {
+    logBetween({ x: TX, y: y0 + 3, z: 4 }, { x: TX, y: y1 - 3, z: 32 }, TWIG, '2.5" twig');
+    logBetween({ x: TX, y: y0 + 3, z: 32 }, { x: TX, y: y1 - 3, z: 4 }, TWIG, '2.5" twig');
   }
 
   // ---- The retaining wall carried on west to the property line (MK, after the site sketch, photo

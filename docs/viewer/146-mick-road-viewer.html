@@ -249,8 +249,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "new",
-          "finish": "block",
-          "color": "#8f8a84"
+          "finish": "stone",
+          "color": "#8e8579"
         },
         "b-w15": {
           "id": "b-w15",
@@ -269,8 +269,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "new",
-          "finish": "block",
-          "color": "#8f8a84"
+          "finish": "stone",
+          "color": "#8e8579"
         },
         "b-w17": {
           "id": "b-w17",
@@ -279,8 +279,8 @@
           "thickness": 8,
           "kind": "exterior",
           "phase": "new",
-          "finish": "block",
-          "color": "#8f8a84"
+          "finish": "stone",
+          "color": "#8e8579"
         },
         "b-w18": {
           "id": "b-w18",
@@ -972,7 +972,12 @@
           "kind": "exterior",
           "phase": "new",
           "finish": "shingle",
-          "color": "#5a3a35"
+          "color": "#5a3a35",
+          "band": {
+            "finish": "halflog",
+            "color": "#5b4632",
+            "height": 36
+          }
         },
         "f-w33": {
           "id": "f-w33",
@@ -982,7 +987,12 @@
           "kind": "exterior",
           "phase": "new",
           "finish": "shingle",
-          "color": "#5a3a35"
+          "color": "#5a3a35",
+          "band": {
+            "finish": "halflog",
+            "color": "#5b4632",
+            "height": 36
+          }
         },
         "f-w34": {
           "id": "f-w34",
@@ -2083,7 +2093,7 @@
           "shape": "gable",
           "outline": [
             {
-              "x": -96,
+              "x": -156,
               "y": 64.25
             },
             {
@@ -2095,7 +2105,7 @@
               "y": 158
             },
             {
-              "x": -96,
+              "x": -156,
               "y": 158
             }
           ],
@@ -3351,154 +3361,591 @@
       },
       "members": {
         "f-m1": {
-          "kind": "beam",
-          "a": {
-            "x": -99,
-            "y": 64.25
+          "kind": "post",
+          "at": {
+            "x": -150,
+            "y": 69.25
           },
-          "b": {
-            "x": -99,
-            "y": 158
-          },
-          "width": 5.5,
-          "depth": 5.5,
-          "mount": "dropped",
-          "za": 94,
-          "zb": 94,
-          "color": "#5a3a35",
-          "label": "6x6 tie",
+          "width": 10,
+          "depth": 10,
+          "rotation": 0,
+          "base": 18,
+          "top": 85,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" log post",
           "phase": "new",
           "id": "f-m1"
         },
         "f-m2": {
           "kind": "post",
           "at": {
-            "x": -99,
-            "y": 111.125
+            "x": -150,
+            "y": 153
           },
-          "width": 5.5,
-          "depth": 5.5,
+          "width": 10,
+          "depth": 10,
           "rotation": 0,
-          "base": 94,
-          "top": 127,
-          "color": "#5a3a35",
-          "label": "6x6",
+          "base": 18,
+          "top": 85,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" log post",
           "phase": "new",
           "id": "f-m2"
         },
         "f-m3": {
-          "kind": "post",
-          "at": {
-            "x": -99,
-            "y": 67
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 56.25
           },
-          "width": 5.5,
-          "depth": 5.5,
-          "rotation": 0,
-          "base": 0,
-          "top": 88.5,
-          "color": "#5a3a35",
-          "label": "6x6",
+          "b": {
+            "x": -150,
+            "y": 166
+          },
+          "width": 10,
+          "depth": 10,
+          "mount": "dropped",
+          "za": 90,
+          "zb": 90,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" log tie",
           "phase": "new",
           "id": "f-m3"
         },
         "f-m4": {
           "kind": "beam",
           "a": {
-            "x": -99,
-            "y": 69.75
+            "x": -150,
+            "y": 69.25
           },
           "b": {
-            "x": -99,
-            "y": 87.75
+            "x": -150,
+            "y": 93.25
           },
-          "width": 3.5,
-          "depth": 3.5,
+          "width": 6,
+          "depth": 6,
           "mount": "dropped",
-          "za": 70.5,
-          "zb": 88.5,
-          "color": "#5a3a35",
-          "label": "4x4 brace",
+          "za": 65.24,
+          "zb": 89.24,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "6\" log brace",
           "phase": "new",
           "id": "f-m4"
         },
         "f-m5": {
           "kind": "beam",
           "a": {
-            "x": -99,
-            "y": 64.25
+            "x": -150,
+            "y": 153
           },
           "b": {
-            "x": -99,
-            "y": 111.125
+            "x": -150,
+            "y": 129
           },
-          "width": 5.5,
-          "depth": 5.5,
+          "width": 6,
+          "depth": 6,
           "mount": "dropped",
-          "za": 95.75,
-          "zb": 127,
-          "color": "#5a3a35",
-          "label": "6x6 rafter",
+          "za": 65.24,
+          "zb": 89.24,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "6\" log brace",
           "phase": "new",
           "id": "f-m5"
         },
         "f-m6": {
-          "kind": "post",
-          "at": {
-            "x": -99,
-            "y": 155.25
+          "kind": "beam",
+          "a": {
+            "x": -94,
+            "y": 111.13
           },
-          "width": 5.5,
-          "depth": 5.5,
-          "rotation": 0,
-          "base": 0,
-          "top": 88.5,
-          "color": "#5a3a35",
-          "label": "6x6",
+          "b": {
+            "x": -182,
+            "y": 111.13
+          },
+          "width": 10,
+          "depth": 10,
+          "mount": "dropped",
+          "za": 125.94,
+          "zb": 125.94,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" ridge log",
           "phase": "new",
           "id": "f-m6"
         },
         "f-m7": {
           "kind": "beam",
           "a": {
-            "x": -99,
-            "y": 152.5
+            "x": -94,
+            "y": 87.69
           },
           "b": {
-            "x": -99,
-            "y": 134.5
+            "x": -182,
+            "y": 87.69
           },
-          "width": 3.5,
-          "depth": 3.5,
+          "width": 8,
+          "depth": 8,
           "mount": "dropped",
-          "za": 70.5,
-          "zb": 88.5,
-          "color": "#5a3a35",
-          "label": "4x4 brace",
+          "za": 110.52,
+          "zb": 110.52,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "8\" log purlin",
           "phase": "new",
           "id": "f-m7"
         },
         "f-m8": {
           "kind": "beam",
           "a": {
-            "x": -99,
-            "y": 158
+            "x": -94,
+            "y": 134.56
           },
           "b": {
-            "x": -99,
-            "y": 111.125
+            "x": -182,
+            "y": 134.56
           },
-          "width": 5.5,
-          "depth": 5.5,
+          "width": 8,
+          "depth": 8,
           "mount": "dropped",
-          "za": 95.75,
-          "zb": 127,
-          "color": "#5a3a35",
-          "label": "6x6 rafter",
+          "za": 110.52,
+          "zb": 110.52,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "8\" log purlin",
           "phase": "new",
           "id": "f-m8"
         },
         "f-m9": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 69.83
+          },
+          "b": {
+            "x": -150,
+            "y": 111.13
+          },
+          "width": 8,
+          "depth": 8,
+          "mount": "dropped",
+          "za": 89.81,
+          "zb": 117.33,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "8\" log rafter",
+          "phase": "new",
+          "id": "f-m9"
+        },
+        "f-m10": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 111.13
+          },
+          "b": {
+            "x": -150,
+            "y": 82.22
+          },
+          "width": 3,
+          "depth": 3,
+          "mount": "dropped",
+          "za": 86.56,
+          "zb": 94.82,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "3\" twig",
+          "phase": "new",
+          "id": "f-m10"
+        },
+        "f-m11": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 111.13
+          },
+          "b": {
+            "x": -150,
+            "y": 92.54
+          },
+          "width": 3,
+          "depth": 3,
+          "mount": "dropped",
+          "za": 86.93,
+          "zb": 102.07,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "3\" twig",
+          "phase": "new",
+          "id": "f-m11"
+        },
+        "f-m12": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 111.13
+          },
+          "b": {
+            "x": -150,
+            "y": 102.87
+          },
+          "width": 3,
+          "depth": 3,
+          "mount": "dropped",
+          "za": 89.27,
+          "zb": 111.29,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "3\" twig",
+          "phase": "new",
+          "id": "f-m12"
+        },
+        "f-m13": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 152.42
+          },
+          "b": {
+            "x": -150,
+            "y": 111.13
+          },
+          "width": 8,
+          "depth": 8,
+          "mount": "dropped",
+          "za": 89.81,
+          "zb": 117.33,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "8\" log rafter",
+          "phase": "new",
+          "id": "f-m13"
+        },
+        "f-m14": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 111.13
+          },
+          "b": {
+            "x": -150,
+            "y": 140.03
+          },
+          "width": 3,
+          "depth": 3,
+          "mount": "dropped",
+          "za": 86.56,
+          "zb": 94.82,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "3\" twig",
+          "phase": "new",
+          "id": "f-m14"
+        },
+        "f-m15": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 111.13
+          },
+          "b": {
+            "x": -150,
+            "y": 129.71
+          },
+          "width": 3,
+          "depth": 3,
+          "mount": "dropped",
+          "za": 86.93,
+          "zb": 102.07,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "3\" twig",
+          "phase": "new",
+          "id": "f-m15"
+        },
+        "f-m16": {
+          "kind": "beam",
+          "a": {
+            "x": -150,
+            "y": 111.13
+          },
+          "b": {
+            "x": -150,
+            "y": 119.38
+          },
+          "width": 3,
+          "depth": 3,
+          "mount": "dropped",
+          "za": 89.27,
+          "zb": 111.29,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "3\" twig",
+          "phase": "new",
+          "id": "f-m16"
+        },
+        "f-m17": {
+          "kind": "post",
+          "at": {
+            "x": -150,
+            "y": 111.125
+          },
+          "width": 8,
+          "depth": 8,
+          "rotation": 0,
+          "base": 85,
+          "top": 120.94,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "8\" log king post",
+          "phase": "new",
+          "id": "f-m17"
+        },
+        "f-m18": {
+          "kind": "post",
+          "at": {
+            "x": -97,
+            "y": 164
+          },
+          "width": 10,
+          "depth": 10,
+          "rotation": 0,
+          "base": 10,
+          "top": 90,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" log post",
+          "phase": "new",
+          "id": "f-m18"
+        },
+        "f-m19": {
+          "kind": "post",
+          "at": {
+            "x": -97,
+            "y": 236
+          },
+          "width": 10,
+          "depth": 10,
+          "rotation": 0,
+          "base": 10,
+          "top": 84.75,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" log post",
+          "phase": "new",
+          "id": "f-m19"
+        },
+        "f-m20": {
+          "kind": "post",
+          "at": {
+            "x": -97,
+            "y": 310
+          },
+          "width": 10,
+          "depth": 10,
+          "rotation": 0,
+          "base": 10,
+          "top": 84.75,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" log post",
+          "phase": "new",
+          "id": "f-m20"
+        },
+        "f-m21": {
+          "kind": "beam",
+          "a": {
+            "x": -97,
+            "y": 177
+          },
+          "b": {
+            "x": -97,
+            "y": 327
+          },
+          "width": 10,
+          "depth": 10,
+          "mount": "dropped",
+          "za": 89.75,
+          "zb": 89.75,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "10\" log plate",
+          "phase": "new",
+          "id": "f-m21"
+        },
+        "f-m22": {
+          "kind": "beam",
+          "a": {
+            "x": -97,
+            "y": 164
+          },
+          "b": {
+            "x": -97,
+            "y": 185
+          },
+          "width": 6,
+          "depth": 6,
+          "mount": "dropped",
+          "za": 67.99,
+          "zb": 88.99,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "6\" log brace",
+          "phase": "new",
+          "id": "f-m22"
+        },
+        "f-m23": {
+          "kind": "beam",
+          "a": {
+            "x": -97,
+            "y": 236
+          },
+          "b": {
+            "x": -97,
+            "y": 218
+          },
+          "width": 6,
+          "depth": 6,
+          "mount": "dropped",
+          "za": 70.99,
+          "zb": 88.99,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "6\" log brace",
+          "phase": "new",
+          "id": "f-m23"
+        },
+        "f-m24": {
+          "kind": "beam",
+          "a": {
+            "x": -97,
+            "y": 236
+          },
+          "b": {
+            "x": -97,
+            "y": 254
+          },
+          "width": 6,
+          "depth": 6,
+          "mount": "dropped",
+          "za": 70.99,
+          "zb": 88.99,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "6\" log brace",
+          "phase": "new",
+          "id": "f-m24"
+        },
+        "f-m25": {
+          "kind": "beam",
+          "a": {
+            "x": -97,
+            "y": 310
+          },
+          "b": {
+            "x": -97,
+            "y": 292
+          },
+          "width": 6,
+          "depth": 6,
+          "mount": "dropped",
+          "za": 70.99,
+          "zb": 88.99,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "6\" log brace",
+          "phase": "new",
+          "id": "f-m25"
+        },
+        "f-m26": {
+          "kind": "beam",
+          "a": {
+            "x": -97.5,
+            "y": 172
+          },
+          "b": {
+            "x": -97.5,
+            "y": 228
+          },
+          "width": 2.5,
+          "depth": 2.5,
+          "mount": "dropped",
+          "za": 5.4,
+          "zb": 33.4,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "2.5\" twig",
+          "phase": "new",
+          "id": "f-m26"
+        },
+        "f-m27": {
+          "kind": "beam",
+          "a": {
+            "x": -97.5,
+            "y": 172
+          },
+          "b": {
+            "x": -97.5,
+            "y": 228
+          },
+          "width": 2.5,
+          "depth": 2.5,
+          "mount": "dropped",
+          "za": 33.4,
+          "zb": 5.4,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "2.5\" twig",
+          "phase": "new",
+          "id": "f-m27"
+        },
+        "f-m28": {
+          "kind": "beam",
+          "a": {
+            "x": -97.5,
+            "y": 244
+          },
+          "b": {
+            "x": -97.5,
+            "y": 302
+          },
+          "width": 2.5,
+          "depth": 2.5,
+          "mount": "dropped",
+          "za": 5.39,
+          "zb": 33.39,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "2.5\" twig",
+          "phase": "new",
+          "id": "f-m28"
+        },
+        "f-m29": {
+          "kind": "beam",
+          "a": {
+            "x": -97.5,
+            "y": 244
+          },
+          "b": {
+            "x": -97.5,
+            "y": 302
+          },
+          "width": 2.5,
+          "depth": 2.5,
+          "mount": "dropped",
+          "za": 33.39,
+          "zb": 5.39,
+          "color": "#c79a5b",
+          "profile": "log",
+          "label": "2.5\" twig",
+          "phase": "new",
+          "id": "f-m29"
+        },
+        "f-m30": {
           "kind": "beam",
           "a": {
             "x": 3.5,
@@ -3513,9 +3960,9 @@
           "mount": "flush",
           "label": "(2) 1 3/4 x 11 7/8 LVL",
           "phase": "new",
-          "id": "f-m9"
+          "id": "f-m30"
         },
-        "f-m10": {
+        "f-m31": {
           "kind": "beam",
           "a": {
             "x": 170.5,
@@ -3530,9 +3977,9 @@
           "mount": "flush",
           "label": "(2) 1 3/4 x 11 7/8 LVL",
           "phase": "new",
-          "id": "f-m10"
+          "id": "f-m31"
         },
-        "f-m11": {
+        "f-m32": {
           "kind": "post",
           "at": {
             "x": 170.5,
@@ -3543,9 +3990,9 @@
           "rotation": 0,
           "label": "(2) 2x4",
           "phase": "new",
-          "id": "f-m11"
+          "id": "f-m32"
         },
-        "f-m12": {
+        "f-m33": {
           "kind": "post",
           "at": {
             "x": 170.5,
@@ -3556,7 +4003,7 @@
           "rotation": 0,
           "label": "(2) 2x4",
           "phase": "new",
-          "id": "f-m12"
+          "id": "f-m33"
         }
       },
       "finishes": {
@@ -4795,50 +5242,95 @@
       },
       "column-2": {
         "at": {
-          "x": -92,
-          "y": 162
+          "x": -150,
+          "y": 69.25
         },
-        "kind": "post",
+        "kind": "pier",
         "phase": "new",
-        "width": 8,
-        "depth": 8,
+        "width": 18,
+        "depth": 18,
         "rotation": 0,
-        "base": 2,
-        "top": 95.33,
-        "color": "#5a3a35",
+        "base": -3,
+        "top": 20,
+        "color": "#8e8579",
         "id": "column-2"
       },
       "column-3": {
         "at": {
-          "x": -92,
-          "y": 236
+          "x": -150,
+          "y": 153
         },
-        "kind": "post",
+        "kind": "pier",
         "phase": "new",
-        "width": 8,
-        "depth": 8,
+        "width": 18,
+        "depth": 18,
         "rotation": 0,
-        "base": 2,
-        "top": 99.33,
-        "color": "#5a3a35",
+        "base": -4,
+        "top": 20,
+        "color": "#8e8579",
         "id": "column-3"
       },
       "column-4": {
         "at": {
-          "x": -92,
-          "y": 311
+          "x": -126,
+          "y": 118.5
         },
-        "kind": "post",
+        "kind": "pier",
         "phase": "new",
-        "width": 8,
-        "depth": 8,
+        "width": 60,
+        "depth": 72,
         "rotation": 0,
-        "base": 2,
-        "top": 99.33,
-        "color": "#5a3a35",
+        "base": -3,
+        "top": 1.5,
+        "color": "#8e8579",
         "id": "column-4"
       },
       "column-5": {
+        "at": {
+          "x": -97,
+          "y": 164
+        },
+        "kind": "pier",
+        "phase": "new",
+        "width": 16,
+        "depth": 16,
+        "rotation": 0,
+        "base": -4,
+        "top": 12,
+        "color": "#8e8579",
+        "id": "column-5"
+      },
+      "column-6": {
+        "at": {
+          "x": -97,
+          "y": 236
+        },
+        "kind": "pier",
+        "phase": "new",
+        "width": 16,
+        "depth": 16,
+        "rotation": 0,
+        "base": -7,
+        "top": 12,
+        "color": "#8e8579",
+        "id": "column-6"
+      },
+      "column-7": {
+        "at": {
+          "x": -97,
+          "y": 310
+        },
+        "kind": "pier",
+        "phase": "new",
+        "width": 16,
+        "depth": 16,
+        "rotation": 0,
+        "base": -9,
+        "top": 12,
+        "color": "#8e8579",
+        "id": "column-7"
+      },
+      "column-8": {
         "at": {
           "x": 19,
           "y": 280
@@ -4851,9 +5343,9 @@
         "base": 33,
         "top": 72,
         "color": "#26241f",
-        "id": "column-5"
+        "id": "column-8"
       },
-      "column-6": {
+      "column-9": {
         "at": {
           "x": -6,
           "y": 280
@@ -4866,7 +5358,7 @@
         "base": 58,
         "top": 310,
         "cap": true,
-        "id": "column-6"
+        "id": "column-9"
       }
     }
   },

@@ -146,3 +146,23 @@ Logs are timbers at set heights (the structure checks ignore them), `profile: 'l
   - the entry canopy from the west and south-west, showing the log ends, truss, twig sunburst, piers and stoop;
   - the screen porch with its log posts, braces, plate end, half-log knee walls and X panels;
   - a close view of the log ends.
+
+## Built differently from the plan
+
+- **3, the canopy:** the posts' outer faces are on the gable's eave lines (posts at y 69.25 and
+  153, x -150), so the tie's ends, 8" past them, reach into the eaves' overhang; the tie's top is at
+  90" (the highest that clears the overhang by 1/4" at its ends) rather than on the eave line. The
+  ridge log and the purlins are 1/4" under the roof square to its slope, and the principal rafters
+  sit under the purlins (touching them), from the tie over each post up to the ridge log, which
+  rests in their crotch; the purlins and the ridge log run through the rake boards. The stoop is
+  centred on the door (y 82.5 to 154.5), so the south pier stands on its corner. Every pier stands
+  from 2" under the ground at its lowest corner, so none floats on the slope.
+- **3, the screen porch:** the posts are at x -97 (6" proud of the west wall, the rest in it) and
+  y 164, 236 and 310 (the south one flush with the south face). The foyer gable's south overhang
+  comes down lower than the plate over the porch's north end, so the plate starts at y 177, just
+  south of that eave, and rests on the middle and south posts; the north post stops under the
+  gable's eave, and its knee brace (21", passing under that eave) reaches the plate. The plate's top
+  is 89.75", as high as the shed's rafter tails allow. The twigs are peeled like the logs, so they
+  stand out against the dark half-log.
+- **Tests:** the starter's sun shadow texel is now just over 1/2" (0.51"), since the canopy carries
+  the foyer's roof 5' further west; the lighting test's bound is 0.52".

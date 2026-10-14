@@ -229,10 +229,11 @@ describe('sun shadow camera', () => {
     expect(sunShadowFit(box, [1, 0.001, 0]).far).toBeLessThan(20 * 300);
   });
 
-  it('fits the starter house with a texel under half an inch at 2048', () => {
+  it('fits the starter house with a texel of about half an inch at 2048', () => {
     const plan = migrate(example);
     const fit = sunShadowFit(planBox(plan), sunPosition(plan.site.northAngle));
-    expect((2 * fit.half) / 2048).toBeLessThan(0.5);
+    // Just over 1/2" since the proposed entry canopy carried the foyer's roof 5' further west.
+    expect((2 * fit.half) / 2048).toBeLessThan(0.52);
   });
 });
 

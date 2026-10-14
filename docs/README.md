@@ -32,5 +32,9 @@
     new walls no longer splitting demolished ones, the foyer gable's timbers, the hall open to the
     Living, the coats bench, the vents, the alarms, the retaining wall carried west), and where the
     built work differs.
+  - `PLAN-v10-adirondack.md`: the plan for an Adirondack entry and screen porch (stone and
+    half-log wall finishes, a lower band on a wall's outside face, round logs and fieldstone piers,
+    then the starter's open log canopy, log porch, twig work and stone base), with the research and
+    its sources, and where the built work differs.
   - `QA-FINDINGS.md`: the first hands-on QA pass and the second review's status.
   - `REVIEW-2.md`: the second review of the house and the tools, with the fixes made.

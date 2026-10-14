@@ -744,16 +744,43 @@ with the places where the built design differs from them):
    east across the Office's north end, 11'5" x 5'3" (6'2" at the old bath's end): a 48" vanity on its west wall, the WC under
    the north window and a 36" x 48" stall shower in the north-east corner (placeholders). It keeps
    the old bath's door; the Office keeps 7'4" x 6'3" south of it, with its transom.
-8. **Foyer and screen porch** on the west face in place of the entry porch: an enclosed foyer
-   (7'10" x 8') with the 36" front door in line with the house door and a gable facing west, and
-   south of it a screen porch (13'1" x 8') with screens above knee walls, two screen doors, three 8"
-   timber posts in the stain and a shed roof high at the house wall. The Living's west window,
-   which now looks into the porch, is replaced by the same window without shutters. The foyer
-   stands on 8" block walls (a crawl space) like the east addition; the screen porch on its posts.
-   The foyer's gable carries stained timbers on its face, after the old porch's (photo 08): a
-   corner post at each end, 45° knee braces up to a tie beam on the eave line, a king post and two
-   rafters under the roof (6x6s, the braces 4x4). For coats (the closet under the stair is narrow),
-   a 48" bench under the foyer's north window and a rail of hooks either side of it.
+8. **The Adirondack entry: foyer and screen porch** on the west face in place of the entry porch
+   (MK: "thoroughly Adirondack", with the ends of exposed beams showing at the entry;
+   `docs/history/PLAN-v10-adirondack.md`). An enclosed foyer (7'10" x 8') with the 36" front door
+   in line with the house door, under a gable facing west, and south of it a screen porch (13'1" x
+   8') with screens above knee walls, two screen doors and a shed roof high at the house wall. The
+   Living's west window, which now looks into the porch, is replaced by the same window without
+   shutters. For coats (the closet under the stair is narrow), a 48" bench under the foyer's north
+   window and a rail of hooks either side of it. All sizes are estimates.
+   - **The style, from the research** (web search summaries; the full pages could not be fetched):
+     native materials throughout (whole, split or peeled logs, bark and fieldstone); rough log
+     posts with twig and branch work on railings and gables; the structure left showing, with log
+     ends carried past corners and gables and crossed poles as ornament; logs set on stone to keep
+     them off the damp ground; bark-on half-log siding; broad shingled or metal roofs; browns and
+     greens. Knee braces are a Craftsman detail, but common on rustic porches. Sources:
+     [Wikipedia, Adirondack Architecture](https://en.wikipedia.org/wiki/Adirondack_Architecture),
+     [The Plan Collection](https://www.theplancollection.com/blog/adirondack-architecture-style-a-model-for-rustic-elegance-and-flair),
+     [Isaac Kremer glossary](https://isaackremer.com/glossary/adirondack/),
+     [NPS, McClelland on rustic design](https://www.nps.gov/parkhistory/online_books/mcclelland/mcclelland2d1.htm),
+     [Adirondack Life, the roots of rustic style](https://www.adirondacklife.com/2022/09/29/the-roots-of-rustic-style/),
+     [Middlebury, Adirondack architecture](https://sites.middlebury.edu/adirondack/?p=577),
+     [Houzz, a Vermont porch](https://www.houzz.com.sg/magazine/porch-of-the-week-perched-like-a-nest-in-the-vermont-mountains-stsetivw-vs~173124881).
+   - **Materials:** peeled golden logs (`#c79a5b`, the end grain a lighter tint), bark-on half-log
+     (`#5b4632`) and grey-brown fieldstone (`#8e8579`). The logs are timbers at set heights, so the
+     structure checks leave them to the engineer.
+   - **An open log canopy over the front door:** the foyer's gable runs on 5' west of the foyer
+     (its rake at x -174), so the door has about 6'6" of cover. At its outer end two 18" fieldstone
+     piers to +20 carry 10" log posts up to a 10" log tie whose round ends show 8" past the posts;
+     6" log knee braces, an 8" king post and two 8" principal rafter logs under the roof. A 10"
+     ridge log and two 8" purlins run from the foyer wall out past the rake, their ends showing 8"
+     beyond it. A sunburst of 3" twigs fills the gable over the tie, and a fieldstone stoop
+     (60" x 72") sits under it, its top 1/2" under the threshold.
+   - **The screen porch:** three 10" log posts on 16" fieldstone piers (to +12), a 10" log plate
+     along the eave line whose end shows 12" past the south corner, log knee braces, and crossed
+     2.5" twigs (an X) over the knee wall in each west bay. The porch's west and south walls are
+     bark-on half-log up to the screens' sills (36"), with the shakes above.
+   - **Stone base:** the foyer stands on 8" walls (a crawl space) like the east addition, faced in
+     fieldstone; the screen porch stands on its log posts and piers.
 9. **Deck off the master bedroom** (MK, 14 Oct 2026), about 8' deep: the wing's width from the
    retaining wall's east face to the wing's east face (x 319.5 to 463, y 315 to 411, 11'11 1/2" x
    8'). Its top is 6" below the bedroom floor (elevation -4), flush with the retaining wall's top,
@@ -815,7 +842,10 @@ the engineer, the trades and the tape measure):
   span 11'-2" without it). Survey the basement under the post.
 - The headers noted HDR on the structure overlay: the cased opening in the partition, the two
   First Floor north windows and the stair hall's upper north window.
-- How the foyer gable's timbers are fixed to the wall and the roof (they are drawn, not designed).
+
+**MK, the engineer and the builder** (the Adirondack entry)
+- The logs' sizes and species (cedar or spruce), the stone, and how the canopy's log posts are
+  anchored to their piers (and the porch's to theirs); the logs are drawn, not designed.
 
 **The trades and the makers' instructions**
 - The stove and its chimney: the stove's listing and the chimney maker's instructions set the
