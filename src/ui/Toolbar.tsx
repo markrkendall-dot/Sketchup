@@ -21,6 +21,7 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
   { name: 'stairs', label: 'Stairs', key: 'T' },
   { name: 'roof', label: 'Roof', key: 'K' },
   { name: 'deck', label: 'Deck', key: 'J' },
+  { name: 'floorOpening', label: 'Floor opening', short: 'Hole', key: 'H' },
   { name: 'fixture', label: 'Cabinet', key: 'C' },
   { name: 'measure', label: 'Measure', short: 'Tape', key: 'M' },
   { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
@@ -37,6 +38,7 @@ const TOOL_TITLE: Partial<Record<ToolName, string>> = {
   measure: 'Measure (M): click two points; the distance stays in the status bar until Esc',
   roof: 'Roof (K): click the outline corners on the outside wall faces, close on the first corner or Enter',
   deck: 'Deck (J): click the outline corners (they snap to the outside wall faces), close on the first corner or Enter; set its height and railings in the properties panel',
+  floorOpening: 'Floor opening (H): a hole in this floor, open to the level below; click its corners (they snap to the wall faces), close on the first corner or Enter; its guards are set in the properties panel',
   fixture: 'Cabinet (C): a cabinet, appliance or sink follows the cursor along the nearest wall; click to place it, type a width first to change it; pick the kind in the properties panel',
   underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
 };

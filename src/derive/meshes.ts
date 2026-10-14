@@ -5,6 +5,7 @@ import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishe
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { getDeckLayout, type DeckBox, type DeckLayout } from './decks';
+import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
 import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
@@ -1111,6 +1112,54 @@ export function getDeckMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Deck
   return result;
 }
 
+/** A floor opening's guard (level-local, standing on the floor round the hole). */
+export interface FloorOpeningMesh {
+  id: Id;
+  /** The phase as shown in the view mode (shownPhase). */
+  phase: Phase;
+  railing: BufferGeometry;
+}
+
+/**
+ * The guards round the visible floor openings of a level in a view mode, memoized like the decks
+ * (they depend on the level's walls and on the stairs below): an opening's geometry is rebuilt only
+ * when its layout object changes (getFloorOpeningLayout), and the same array comes back while every
+ * guard and phase is the same. An opening with no guard (every edge against a wall) has no mesh.
+ */
+export function getFloorOpeningMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): FloorOpeningMesh[] {
+  const key = `${levelId}|${viewMode}`;
+  const prev = guardResult.get(key);
+  if (prev && prev.plan === plan) return prev.result;
+  pruneCaches(plan);
+  const level = plan.levels[levelId];
+  let entries = guardCache.get(key);
+  if (!entries) guardCache.set(key, (entries = new Map()));
+  const out: FloorOpeningMesh[] = [];
+  const seen = new Set<Id>();
+  for (const o of Object.values(level?.floorOpenings ?? {})) {
+    if (!isVisible(o.phase, viewMode)) continue;
+    const layout = getFloorOpeningLayout(plan, levelId, o.id, viewMode);
+    if (!layout || layout.railing.length === 0) continue;
+    let e = entries.get(o.id);
+    if (!e || e.layout !== layout) {
+      e?.railing.dispose();
+      e = { layout, railing: deckBoxesGeometry(layout.railing) };
+      entries.set(o.id, e);
+    }
+    seen.add(o.id);
+    out.push({ id: o.id, phase: shownPhase(o.phase, viewMode), railing: e.railing });
+  }
+  for (const [id, e] of entries) {
+    if (seen.has(id)) continue;
+    e.railing.dispose();
+    entries.delete(id);
+  }
+  const same = !!prev && prev.result.length === out.length && prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.railing === out[i].railing);
+  const result = same ? prev.result : out;
+  guardResult.set(key, { plan, result });
+  return result;
+}
+
 export interface RoofMesh {
   id: Id;
   /** The roof slab, with the ridge cap of a metal gable or hip roof. */
@@ -1203,6 +1252,8 @@ interface FloorEntry {
   /** Per outer-face edge, the inside distance of the wall below that runs up through the slab (slabInsets). */
   insets: number[][] | null;
   belowStairs: Level['stairs'] | undefined;
+  /** The level's own floor openings (their holes go through this slab). */
+  floorOpenings: Level['floorOpenings'] | undefined;
   /** Floor to floor of the level below: where its stairs' holes start depends on it. */
   belowFtf: number;
   thickness: number;
@@ -1274,6 +1325,9 @@ interface DeckEntry {
 }
 const deckCache = new Map<string, Map<Id, DeckEntry>>();
 const deckResult = new Map<string, { plan: Plan; result: DeckMesh[] }>();
+/** Floor openings' guards, cached like the decks. */
+const guardCache = new Map<string, Map<Id, { layout: FloorOpeningLayout; railing: BufferGeometry }>>();
+const guardResult = new Map<string, { plan: Plan; result: FloorOpeningMesh[] }>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
 function sameRings<T extends Vec2 | number>(p: readonly (readonly T[])[], q: readonly (readonly T[])[]): boolean {
@@ -1369,6 +1423,12 @@ function pruneCaches(plan: Plan): void {
     deckCache.delete(key);
   }
   for (const key of deckResult.keys()) if (!alive(key)) deckResult.delete(key);
+  for (const [key, m] of guardCache) {
+    if (alive(key)) continue;
+    for (const e of m.values()) e.railing.dispose();
+    guardCache.delete(key);
+  }
+  for (const key of guardResult.keys()) if (!alive(key)) guardResult.delete(key);
 }
 
 function disposeDeckEntry(e: DeckEntry): void {
@@ -1564,18 +1624,21 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     sameRings(prevFloor.outerFaceThickness, faces.outerFaceThickness) &&
     sameRings(prevFloor.insets ?? [], insets ?? []) &&
     prevFloor.belowStairs === belowStairs &&
+    prevFloor.floorOpenings === level.floorOpenings &&
     prevFloor.belowFtf === belowFtf &&
     prevFloor.thickness === level.floorThickness
   ) {
     floor = prevFloor;
   } else {
     prevFloor?.geometry?.dispose();
-    const holes = stairHoles(below, viewMode, belowFtf);
+    // Floor openings first: a stair hole inside one is dropped (holeFits), the opening covers it.
+    const holes = [...floorOpeningHoles(plan, levelId, viewMode), ...stairHoles(below, viewMode, belowFtf)];
     floor = {
       outerFaces: faces.outerFaces,
       outerFaceThickness: faces.outerFaceThickness,
       insets,
       belowStairs,
+      floorOpenings: level.floorOpenings,
       belowFtf,
       thickness: level.floorThickness,
       geometry: buildFloorGeometry(faces, holes, level.floorThickness, insets ?? false),
@@ -1585,7 +1648,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
 
   // Floor finishes: one surface per room that sets one, rebuilt when its net outline or the stair
   // holes through the slab change.
-  const finishHoles = stairHoles(below, viewMode, belowFtf);
+  const finishHoles = [...floorOpeningHoles(plan, levelId, viewMode), ...stairHoles(below, viewMode, belowFtf)];
   const prevFinishes = floorFinishCache.get(key);
   const nextFinishes = new Map<Id, FloorFinishEntry>();
   const floorFinishes: FloorFinishMesh[] = [];
@@ -1743,6 +1806,9 @@ export function clearMeshCache(): void {
   for (const m of deckCache.values()) for (const e of m.values()) disposeDeckEntry(e);
   deckCache.clear();
   deckResult.clear();
+  for (const m of guardCache.values()) for (const e of m.values()) e.railing.dispose();
+  guardCache.clear();
+  guardResult.clear();
   roofCache.clear();
   openingCache.clear();
   fixtureCache.clear();

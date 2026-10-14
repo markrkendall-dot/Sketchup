@@ -129,13 +129,22 @@ export interface Deck {
   phase: Phase; color?: string;
 }
 
+// Floor openings (schema version 5, see "Floor openings"): a hole in the level's own floor.
+export interface FloorOpening {
+  id: Id;
+  outline: Vec2[];           // the hole (snaps to the wall faces)
+  railings: boolean[];       // one guard flag per outline edge (outline[i] -> outline[i + 1])
+  phase: Phase;
+}
+
 export interface Level {
   id: Id; name: string;
   wallHeight: Inches;        // floor top to underside of next floor; 96 or 108
   floorThickness: Inches;    // the slab/framing under THIS level (~12 framed, 4 slab)
   nodes: Record<Id, Node>; walls: Record<Id, Wall>; openings: Record<Id, Opening>;
   rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; roofs: Record<Id, Roof>;
-  fixtures: Record<Id, Fixture>; decks: Record<Id, Deck>; finishes?: LevelFinishes; underlay?: Underlay;
+  fixtures: Record<Id, Fixture>; decks: Record<Id, Deck>; floorOpenings: Record<Id, FloorOpening>;
+  finishes?: LevelFinishes; underlay?: Underlay;
 }
 
 // The site (see "Site and terrain"; the file carries it from schema version 2).
@@ -162,7 +171,7 @@ export interface PlanSettings {
 // undo. migrate() ignores them in older files.
 
 export interface Plan {
-  schemaVersion: 4; id: Id; name: string;
+  schemaVersion: 5; id: Id; name: string;
   levelOrder: Id[];          // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
@@ -459,6 +468,39 @@ cache does not watch the site or other levels) gives per deck the boards, the fr
 and the railing, each one buffer of concatenated prisms, rebuilt only when the deck's layout object
 changes and the same array while nothing changed; `deckMaterial` paints them in the deck's colour
 (framing 20% darker; demolished translucent red, new pulled toward green).
+
+## Floor openings (`derive/floorOpenings.ts`, `tools/floorOpeningTool.ts`)
+
+A floor opening belongs to the level whose floor it cuts (a double-height hall over the level below,
+a stair well drawn by hand) and is a plan outline with one guard flag per edge. It shares the deck's
+code (`derive/decks.ts`): `getFloorOpeningLayout(plan, levelId, openingId, viewMode)` gives, level-local:
+
+- **Supported edges** (`floorOpeningSupportedEdges`): the point 1" outside an edge's middle (on the
+  floor side) lies in the footprint of a wall on the opening's own level, visible and able to be
+  seen with it. A wall is the guard there.
+- **Stair arrivals**: `deckStairOpenings` with the floor's top as the boards' top, so a flight from
+  the level below whose top is up to 8" under the floor and whose top corners lie on an edge opens
+  the guard over its width; the floor's edge is then its last riser.
+- **The guard**: `railingParts(outline, runs, 0, -1)`, the deck's railing (36", posts at most 72"
+  apart, cap, bottom rail, balusters with at most 4" clear) standing on the floor just outside the
+  hole, on the flagged edges that no wall runs along, less the stair arrivals.
+
+The hole in the slab is the outline moved in by 1/4" (`FLOOR_OPENING_HOLE_INSET`, `floorOpeningHole`),
+so an opening drawn flush to the inside faces of the walls below still lies strictly inside the
+slab outline (`holeFits` refuses a hole that touches it). `getLevelMeshes` passes the level's own
+floor openings to `buildFloorGeometry` before the stair holes from the level below, so a stair
+hole inside an opening is dropped (the opening covers it); the floor finishes subtract the same
+holes, and the floor cache watches `level.floorOpenings`. `getFloorOpeningMeshes` gives the guards,
+cached like the decks (they depend on the level's walls and the stairs below), painted with
+`railingMaterial` (stained wood `#8a5a34`, `RAILING_COLOR`). On the plan (`FloorOpeningsLayer`,
+over the room fills, under the decks) an opening is its dashed outline with an X, the usual "open to
+below" mark, the guard's caps as bands and an "Open to below" label, in phase colours. The tool (H)
+is the outline tool (`makeOutlineTool`) with a guard on every edge no wall runs along; the select
+tool picks an opening after decks and before roofs and drags its corners like a deck's; the panel
+(`FloorOpeningProps`) has one guard checkbox per edge (disabled along a wall), Reset guards, the
+phase, the outline's size and the stair arrivals. The store's `addFloorOpening`/`updateFloorOpening`
+refuse what `floorOpeningProblem` refuses (under 3 points or no area, railings not one per edge).
+A room's area does not subtract the opening, as it does not subtract a stair hole.
 
 ## Platform framing (`derive/platform.ts`)
 
@@ -1272,11 +1314,12 @@ JSON download/upload with `schemaVersion` and `migrate()`. `MIGRATIONS[n]` upgra
 document to n + 1 and they run in order (0 -> 1: entity arrays become records keyed by id, a
 missing `levelOrder` comes from the levels array, settings are filled; 1 -> 2: every level gets an
 empty `roofs` record and the plan a default `site`; 2 -> 3: every level gets an empty `fixtures`
-record; 3 -> 4: every level gets an empty `decks` record). The upgraded document is
+record; 3 -> 4: every level gets an empty `decks` record; 4 -> 5: every level gets an empty
+`floorOpenings` record). The upgraded document is
 then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
 file's order so a current file round-trips byte for byte), with defaults for missing optional
-values and broken openings, rooms, stairs and underlays dropped (a broken roof or deck is dropped with a
-console warning naming it; a deck's railings are fitted to its outline). New and Open replace the plan and
+values and broken openings, rooms, stairs and underlays dropped (a broken roof, deck or floor opening is dropped
+with a console warning naming it; railings are fitted to the outline). New and Open replace the plan and
 clear the undo history (New confirms when the plan has walls, rooms, stairs, roofs, fixtures, decks, site elements or an image). Autosave
 to IndexedDB (idb-keyval) on every plan change (debounced), restored on load; a failed save
 (storage full, IndexedDB unavailable) shows "Autosave failed: ..." in the status bar until a later

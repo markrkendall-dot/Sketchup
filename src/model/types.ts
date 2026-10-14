@@ -261,6 +261,21 @@ export interface Deck {
   color?: string;
 }
 
+/**
+ * A floor opening on a level (DESIGN.md "Floor openings"): a hole in the level's own floor, open to
+ * the level below (a double-height hall, a stair well), with a 36" guard along the edges that have
+ * one. Edges against a wall on the level need none, and the guard opens where a flight from the
+ * level below arrives.
+ */
+export interface FloorOpening {
+  id: Id;
+  /** Plan polygon of the hole (snaps to the inside wall faces). */
+  outline: Vec2[];
+  /** One per outline edge (edge i runs from outline[i] to outline[i + 1]): a guard along it. */
+  railings: boolean[];
+  phase: Phase;
+}
+
 /** A spot elevation of the ground (M9). */
 export interface GradePoint {
   id: Id;
@@ -301,6 +316,8 @@ export interface Level {
   fixtures: Record<Id, Fixture>;
   /** Decks (schema version 4). */
   decks: Record<Id, Deck>;
+  /** Floor openings, holes in this level's floor (schema version 5). */
+  floorOpenings: Record<Id, FloorOpening>;
   finishes?: LevelFinishes;
   underlay?: Underlay;
 }
@@ -336,7 +353,7 @@ export interface ProposedLook {
 }
 
 export interface Plan {
-  schemaVersion: 4;
+  schemaVersion: 5;
   id: Id;
   name: string;
   levelOrder: Id[]; // bottom to top

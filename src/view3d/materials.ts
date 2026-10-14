@@ -3,7 +3,7 @@ import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
 import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
-import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DECK_COLOR, DEFAULT_WEATHERING, defaultWallColor, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DECK_COLOR, DEFAULT_WEATHERING, defaultWallColor, RAILING_COLOR, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture } from './groundTexture';
 import { brickTextures, interiorTextures, NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures, type InteriorTexture } from './textures';
@@ -248,6 +248,11 @@ export function rafterMaterial(phase: Phase, color: string = TRIM_COLOR): MeshSt
  */
 export function deckMaterial(part: 'boards' | 'frame', phase: Phase, color: string = DECK_COLOR): MeshStandardMaterial {
   return trimLike(`deck-${part}`, part === 'frame' ? `#${new Color(color).multiplyScalar(0.8).getHexString()}` : color, phase);
+}
+
+/** A floor opening's guard and a stair's railings: stained wood (demolished: red, new: pulled toward green, like trim). */
+export function railingMaterial(phase: Phase): MeshStandardMaterial {
+  return trimLike('railing', RAILING_COLOR, phase);
 }
 
 const partMaterials = new Map<string, MeshStandardMaterial>();

@@ -71,6 +71,10 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: 'Click the deck outline corners; they snap to the outside wall faces.',
     busy: 'Click the next corner; the first one or Enter closes. Esc cancels.',
   },
+  floorOpening: {
+    idle: 'Click the corners of the hole in this floor; they snap to the wall faces.',
+    busy: 'Click the next corner; the first one or Enter closes. Esc cancels.',
+  },
   // Replaced by underlayHint(); kept for the Record type.
   underlay: { idle: '', busy: '' },
   fixture: {
@@ -137,6 +141,10 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   },
   deck: {
     idle: "Click the corners of the deck; they snap to the outside corners and faces of the walls. Its top starts 6\" below the floor, with a railing on every edge not against a wall; set both in the properties panel. A flight of stairs drawn up to an edge opens the railing there.",
+    busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
+  },
+  floorOpening: {
+    idle: 'Click the corners of the opening in this floor (a double-height hall, a stair well); they snap to the corners and faces of the walls. Every edge not along a wall gets a 36" guard; a flight from the level below drawn up to an edge opens it there.',
     busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
   },
   underlay: { idle: '', busy: '' },
@@ -289,6 +297,11 @@ export function StatusBar() {
     for (const d of Object.values(s.plan.levels[levelId]?.decks ?? {})) if (isVisible(d.phase, viewMode)) n++;
     return n;
   });
+  const floorOpeningCount = usePlanStore((s) => {
+    let n = 0;
+    for (const o of Object.values(s.plan.levels[levelId]?.floorOpenings ?? {})) if (isVisible(o.phase, viewMode)) n++;
+    return n;
+  });
   const fixtureCount = usePlanStore((s) => {
     let n = 0;
     for (const f of Object.values(s.plan.levels[levelId]?.fixtures ?? {})) if (isVisible(f.phase, viewMode)) n++;
@@ -365,7 +378,7 @@ export function StatusBar() {
       <span className="status-view" title="View mode (V)">
         View: {VIEW_MODE_LABEL[viewMode]}
       </span>
-      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs, decks and columns">
+      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs, decks, floor openings and columns">
         Drawing: {PHASE_LABEL[drawPhase].toLowerCase()}
       </span>
       <span className="status-counts">
@@ -384,6 +397,11 @@ export function StatusBar() {
             {deckCount > 0 && (
               <>
                 , {deckCount} {deckCount === 1 ? 'deck' : 'decks'}
+              </>
+            )}
+            {floorOpeningCount > 0 && (
+              <>
+                , {floorOpeningCount} {floorOpeningCount === 1 ? 'floor opening' : 'floor openings'}
               </>
             )}
             {fixtureCount > 0 && (

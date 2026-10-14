@@ -39,9 +39,10 @@ export type Hit =
   | { kind: 'fixture'; id: Id }
   | { kind: 'roof'; id: Id }
   | { kind: 'deck'; id: Id }
+  | { kind: 'floorOpening'; id: Id }
   | null;
 
-const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', fixture: 'fixtures', roof: 'roofs', deck: 'decks' } as const;
+const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', fixture: 'fixtures', roof: 'roofs', deck: 'decks', floorOpening: 'floorOpenings' } as const;
 
 /** Pick radius of a selected roof's or deck's outline corner handles, in screen px. */
 const OUTLINE_HANDLE_PX = 8;
@@ -79,11 +80,23 @@ export const hitDeckHandle = (level: Level, deckIds: readonly Id[], p: Vec2, k: 
     k,
   );
 
+/** The outline corner of one of the selected floor openings under p. */
+export const hitFloorOpeningHandle = (level: Level, openingIds: readonly Id[], p: Vec2, k: number): { id: Id; index: number } | null =>
+  hitOutlineHandle(
+    openingIds.map((id) => level.floorOpenings?.[id]),
+    p,
+    k,
+  );
+
+/** Inside a plan outline, or within `tol` of one of its edges. */
+const nearOutline = (outline: readonly Vec2[], p: Vec2, tol: number): boolean =>
+  pointInPolygon(p, outline) || outline.some((q, i) => projectPointToSegment(p, q, outline[(i + 1) % outline.length]).distance <= tol);
+
 /**
  * Priority: nodes within 10px, then an opening's own rectangle (the hole between its jambs across
  * the wall, plus 2 px), then walls (so the wall either side of a window is the wall), then door
  * leaves and swings, then room labels, then fixtures, then stairs, then decks (inside the outline
- * or within 2 px of it), then roofs (inside the outline grown by the overhang); the most recently
+ * or within 2 px of it), then floor openings (the same), then roofs (inside the outline grown by the overhang); the most recently
  * added on top. Elements hidden in `viewMode` are never hit.
  */
 export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all'): Hit {
@@ -138,8 +151,12 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   if (st) return { kind: 'stairs', id: st.id };
   const deck = Object.values(level.decks ?? {})
     .reverse()
-    .find((d) => isVisible(d.phase, viewMode) && (pointInPolygon(p, d.outline) || d.outline.some((q, i) => projectPointToSegment(p, q, d.outline[(i + 1) % d.outline.length]).distance <= 2 / k)));
+    .find((d) => isVisible(d.phase, viewMode) && nearOutline(d.outline, p, 2 / k));
   if (deck) return { kind: 'deck', id: deck.id };
+  const fo = Object.values(level.floorOpenings ?? {})
+    .reverse()
+    .find((o) => isVisible(o.phase, viewMode) && nearOutline(o.outline, p, 2 / k));
+  if (fo) return { kind: 'floorOpening', id: fo.id };
   const roof = Object.values(level.roofs ?? {})
     .reverse()
     .find((r) => isVisible(r.phase, viewMode) && pointInPolygon(p, roofOutlineWithOverhang(r)));
@@ -170,8 +187,8 @@ type DragState =
   | { kind: 'stairs'; id: Id; grab: Vec2; origin: Vec2; startScreen: Vec2; started: boolean }
   /** The selected fixtures, moved together. */
   | { kind: 'fixtures'; grab: Vec2; origins: Record<Id, Vec2>; startScreen: Vec2; started: boolean }
-  /** An outline corner of a selected roof or deck. */
-  | { kind: 'outline-vertex'; target: 'roofs' | 'decks'; id: Id; index: number; startScreen: Vec2; started: boolean }
+  /** An outline corner of a selected roof, deck or floor opening. */
+  | { kind: 'outline-vertex'; target: 'roofs' | 'decks' | 'floorOpenings'; id: Id; index: number; startScreen: Vec2; started: boolean }
   | { kind: 'box'; a: Vec2; additive: boolean }
   /** Moving the image underlay (state kept by underlayTool.ts). */
   | { kind: 'underlay' };
@@ -208,8 +225,9 @@ function pruneSelection(ctx: ToolContext): void {
   const roofs = sel.roofs.filter((id) => level.roofs[id]);
   const fixtures = sel.fixtures.filter((id) => level.fixtures[id]);
   const decks = sel.decks.filter((id) => level.decks?.[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures, decks });
+  const floorOpenings = sel.floorOpenings.filter((id) => level.floorOpenings?.[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings });
   }
 }
 
@@ -290,12 +308,13 @@ export const selectTool: Tool = {
     const sel = ui.selection;
     // Messages from the last action (a refused drag, a wall move) last until the next click.
     if (ui.draft.message) ui.patchDraft({ message: null, error: false });
-    // A selected roof's or deck's corner handle: drag it (snapping like the tool that drew it).
+    // A selected roof's, deck's or floor opening's corner handle: drag it (snapping like the tool that drew it).
     const roofHandle = e.shiftKey ? null : hitRoofHandle(level, sel.roofs, e.world, ui.viewport.k);
     const deckHandle = e.shiftKey || roofHandle ? null : hitDeckHandle(level, sel.decks, e.world, ui.viewport.k);
-    const handle = roofHandle ?? deckHandle;
+    const foHandle = e.shiftKey || roofHandle || deckHandle ? null : hitFloorOpeningHandle(level, sel.floorOpenings, e.world, ui.viewport.k);
+    const handle = roofHandle ?? deckHandle ?? foHandle;
     if (handle) {
-      drag = { kind: 'outline-vertex', target: roofHandle ? 'roofs' : 'decks', id: handle.id, index: handle.index, startScreen: e.screen, started: false };
+      drag = { kind: 'outline-vertex', target: roofHandle ? 'roofs' : deckHandle ? 'decks' : 'floorOpenings', id: handle.id, index: handle.index, startScreen: e.screen, started: false };
       return;
     }
     const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode);
@@ -323,7 +342,7 @@ export const selectTool: Tool = {
       drag = rd ? { kind: 'room', ...rd } : null;
       return;
     }
-    if (hit.kind === 'roof' || hit.kind === 'deck') {
+    if (hit.kind === 'roof' || hit.kind === 'deck' || hit.kind === 'floorOpening') {
       drag = null;
       return;
     }
@@ -425,7 +444,8 @@ export const selectTool: Tool = {
     }
 
     if (drag.kind === 'outline-vertex') {
-      const item = drag.target === 'roofs' ? ctx.level().roofs[drag.id] : ctx.level().decks?.[drag.id];
+      const lv = ctx.level();
+      const item = drag.target === 'roofs' ? lv.roofs[drag.id] : drag.target === 'decks' ? lv.decks?.[drag.id] : lv.floorOpenings?.[drag.id];
       if (!item) return;
       const n = item.outline.length;
       // Ortho from the previous corner, like drawing it.
@@ -435,8 +455,11 @@ export const selectTool: Tool = {
       const outline = item.outline.map((p, i) => (i === index ? snap.point : p));
       const before = ctx.plan();
       if (drag.target === 'roofs') ctx.actions.updateRoof(ctx.levelId, drag.id, { outline });
-      // A deck's outline may not cross itself (its railings and posts follow its edges).
-      else if (!selfIntersects(outline)) ctx.actions.updateDeck(ctx.levelId, drag.id, { outline });
+      // A deck's or floor opening's outline may not cross itself (its railings follow its edges).
+      else if (selfIntersects(outline)) {
+        // Refused: the corner stays where it was.
+      } else if (drag.target === 'decks') ctx.actions.updateDeck(ctx.levelId, drag.id, { outline });
+      else ctx.actions.updateFloorOpening(ctx.levelId, drag.id, { outline });
       // The first step that changes the outline is the tracked one (the corner snap can hold the
       // first few moves in place; pausing before a change would leave the drag out of the history).
       if (!drag.started && ctx.plan() !== before) {

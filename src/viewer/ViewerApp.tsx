@@ -22,7 +22,7 @@ export function ViewerApp() {
     s.plan.levelOrder.some((id) => {
       const l = s.plan.levels[id];
       const any = (items: Record<string, { phase: string }>) => Object.values(items).some((x) => x.phase !== 'existing');
-      return !!l && (any(l.walls) || any(l.openings) || any(l.stairs) || any(l.roofs) || any(l.fixtures ?? {}) || any(l.decks ?? {}));
+      return !!l && (any(l.walls) || any(l.openings) || any(l.stairs) || any(l.roofs) || any(l.fixtures ?? {}) || any(l.decks ?? {}) || any(l.floorOpenings ?? {}));
     }),
   );
   return (

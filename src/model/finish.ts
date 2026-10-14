@@ -140,6 +140,9 @@ export const isSlidingDoor = (o: Pick<Opening, 'type' | 'sliding'>): boolean => 
 /** How far a sliding door's two panels overlap at the middle (where they meet in their tracks). */
 export const SLIDING_LAP = 2;
 
+/** The guard round a floor opening and a stair's railings: stained wood. */
+export const RAILING_COLOR = '#8a5a34';
+
 /** A deck's boards, framing and railing: weathered wood. */
 export const DECK_COLOR = '#9c7650';
 export const deckColorOf = (d: Pick<Deck, 'color'>): string => d.color ?? DECK_COLOR;

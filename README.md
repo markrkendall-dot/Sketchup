@@ -16,6 +16,8 @@ What it draws:
 - **Roofs** (gable, shed, hip, flat) with overhangs, fascia and rake boards or open eaves with
   rafter tails; walls under a roof rise to meet it, so a gable end is a triangle.
 - **Decks** on posts down to the ground, with railings that open where a flight of stairs arrives.
+- **Floor openings**: a hole in a floor, open to the level below (a double-height hall, a stair
+  well), with a 36" guard round it that opens where a flight from below arrives.
 - **The site**: spot elevations of the ground (grade points) become a terrain surface, so a walkout
   basement shows on the downhill side and is buried on the uphill side; **chimneys and posts**
   stand on it, a chimney with its cap and spark arrestor if it has them.
@@ -117,6 +119,11 @@ Once the walls are in, these make the 3D model look like the house.
   ground, and warns about an edge more than 30" up without a railing (Reset railings puts them
   back). Draw the deck's stair as a flight on the level below whose top reaches the deck's edge
   (within 8" below the boards): the railing opens there. Drag a corner with the select tool.
+- **Floor openings (`H`).** On the level whose floor is cut (the Second Floor over a double-height
+  hall), click the corners of the hole; they snap to the wall faces, so it can run right up to the
+  walls. The floor is cut through in 3D and the plan shows it "open to below". Every edge not along
+  a wall gets a 36" guard (untick it in the properties panel); a flight from the level below whose
+  top is one riser under the floor at an edge opens the guard there.
 - **Eaves, boards and rust.** "Eaves" is a fascia board along the eaves, or open with the rafter
   tails showing under the overhang (set their depth and spacing; 5 1/2" every 24" by default); the
   rake boards up the gables stay either way. "Board colour" paints the fascia, the rake boards and
@@ -735,8 +742,9 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
   edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
-- **Not drawn yet**: stair railings (a stair opening or an open stair side has none; a deck's
-  railing is drawn),
+- **Not drawn yet**: stair railings (an open stair side has none, nor the hole a flight cuts in the
+  floor above; a deck's railing and a floor opening's guard are drawn, so draw a floor opening
+  round a stair well for its guard),
   exterior steps other than a flight (an outside stair is a flight on the lowest level, open and,
   down a slope, starting below its floor, as the starter's are), fences,
   the lot outline, porch floors and steps, foundations under additions and porches, gutters,

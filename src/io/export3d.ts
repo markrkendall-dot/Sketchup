@@ -4,13 +4,13 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
 import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
-import { getDeckMeshes, getLevelMeshes, getSiteMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, getSiteMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
 import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
 import { COLUMN_COLOR, DECK_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FixtureKind, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -81,7 +81,7 @@ const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sin
  * `Floor`, `Stairs`, `Roof` (with its `Fascia` boards and, under open eaves, its `Rafters`, materials
  * `fascia_<phase>` and `rafter_<phase>`, plus `_<hex>` in a board colour other than tan), `Deck`, `Deck framing` (with the
  * posts) and `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour other than
- * the default wood), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
+ * the default wood), `Guard` (the guard round a floor opening, material `railing_<phase>`), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
  * elevation 0, absolute heights) follows with the `Chimney` and `Post` meshes the view mode shows
  * (materials `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the default; a capped
  * chimney's cap and spark arrestor are more `Chimney` meshes, `chimney_cap_<phase>` and
@@ -121,7 +121,8 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     const level = plan.levels[id];
     const meshes = getLevelMeshes(plan, id, viewMode);
     const decks = getDeckMeshes(plan, id, viewMode);
-    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length)) continue;
+    const guards = getFloorOpeningMeshes(plan, id, viewMode);
+    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length)) continue;
     const group = new Group();
     group.name = level.name;
     group.position.set(0, elev[id]?.floorTop ?? 0, 0);
@@ -172,6 +173,12 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         if (d.phase === 'demo') m.renderOrder = 1;
         group.add(m);
       }
+    }
+    // The guards round floor openings.
+    for (const g of guards) {
+      const m = mesh('Guard', g.railing, material(`railing_${g.phase}`, railingMaterial(g.phase)));
+      if (g.phase === 'demo') m.renderOrder = 1;
+      group.add(m);
     }
     // Windows and doors: one mesh per material part, named Window or Door.
     for (const o of meshes.openings) {

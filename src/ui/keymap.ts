@@ -83,6 +83,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   tool('t', 'stairs', 'Place stairs: move the mouse the way they go up, click to place the bottom step; edit the size in the properties panel'),
   tool('k', 'roof', 'Draw a roof: click the outline corners (they snap to the outside wall faces), click the first corner or press Enter to close; set the shape, ridge and slope in the properties panel'),
   tool('j', 'deck', 'Draw a deck: click the outline corners (they snap to the outside wall faces), click the first corner or press Enter to close; its top starts 6" below the floor; set the height and railings in the properties panel'),
+  tool('h', 'floorOpening', 'Draw a floor opening (open to below): click the corners of the hole in this floor (they snap to the wall faces), click the first corner or press Enter to close; a 36" guard runs along every edge not against a wall'),
   siteTool('e', 'gradePoint', 'Site only: place a grade point: click a spot on the ground, type its elevation (-4, -6\'4), Enter'),
   {
     keys: 'C',
@@ -96,8 +97,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
 
   { keys: "12'6  150  6 1/2\"", label: "Type a length (walls), or the distance from the nearer corner's inside face to the near edge (doors, windows, passages); Enter commits", group: 'While drawing' },
   { keys: 'Enter or click', label: 'Walls: with nothing typed, commit the wall at the cursor', group: 'While drawing' },
-  { keys: 'Backspace', label: 'Edit the typed length; roof or deck: remove the last corner', group: 'While drawing' },
-  { keys: 'Esc', label: 'Clear the typed length, then finish the wall chain; roof or deck: cancel the outline; with Select, clear the selection', group: 'While drawing' },
+  { keys: 'Backspace', label: 'Edit the typed length; roof, deck or floor opening: remove the last corner', group: 'While drawing' },
+  { keys: 'Esc', label: 'Clear the typed length, then finish the wall chain; roof, deck or floor opening: cancel the outline; with Select, clear the selection', group: 'While drawing' },
   {
     keys: 'X',
     label: 'Next wall: exterior or interior',

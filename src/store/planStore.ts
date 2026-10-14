@@ -9,6 +9,7 @@ import {
   columnProblem,
   createEmptyPlan,
   deckProblem,
+  floorOpeningProblem,
   fixtureProblem,
   roofOptionProblem,
   roofProblem,
@@ -23,7 +24,7 @@ import {
   wallOverlapping,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
-import type { Column, Deck, Fixture, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Column, Deck, Fixture, FloorOpening, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
@@ -75,6 +76,9 @@ export type NewColumn = Omit<Column, 'id'> & { id?: Id };
 /** A new deck; its railings default to one per edge, all on (normalizeRailings). */
 export type NewDeck = Omit<Deck, 'id' | 'railings'> & { id?: Id; railings?: boolean[] };
 export type DeckPatch = Partial<Omit<Deck, 'id'>>;
+/** A new floor opening; its railings default to one per edge, all on (normalizeRailings). */
+export type NewFloorOpening = Omit<FloorOpening, 'id' | 'railings'> & { id?: Id; railings?: boolean[] };
+export type FloorOpeningPatch = Partial<Omit<FloorOpening, 'id'>>;
 export type FixturePatch = Partial<Omit<Fixture, 'id'>>;
 export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
 /** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
@@ -95,6 +99,7 @@ export interface EntitySelection {
   roofs?: Id[];
   fixtures?: Id[];
   decks?: Id[];
+  floorOpenings?: Id[];
   /** Site elements (plan.site); the level id the action is given only scopes the other kinds. */
   gradePoints?: Id[];
   columns?: Id[];
@@ -191,6 +196,11 @@ export interface PlanState {
    */
   updateDeck: (levelId: Id, id: Id, patch: DeckPatch) => void;
   deleteDecks: (levelId: Id, ids: Id[]) => void;
+  /** Add a floor opening; returns the id, or null when its outline or railings are not usable (floorOpeningProblem). */
+  addFloorOpening: (levelId: Id, opening: NewFloorOpening) => Id | null;
+  /** Patch a floor opening; an unusable outline is rejected. A new outline refits the railings (normalizeRailings). */
+  updateFloorOpening: (levelId: Id, id: Id, patch: FloorOpeningPatch) => void;
+  deleteFloorOpenings: (levelId: Id, ids: Id[]) => void;
   /** Add a cabinet, appliance or sink (DESIGN.md "Casework"); returns the id, or null when it is not usable (fixtureProblem). */
   addFixture: (levelId: Id, fixture: NewFixture) => Id | null;
   /**
@@ -232,10 +242,14 @@ export interface PlanState {
   /** Delete every grade point (the terrain goes flat again) in one undo step. */
   clearGradePoints: () => void;
   /**
-   * Set the phase of walls, openings, stairs, roofs, fixtures, decks, columns and room labels
-   * together (e.g. "Mark demolish"). A room set to existing stores no phase.
+   * Set the phase of walls, openings, stairs, roofs, fixtures, decks, floor openings, columns and
+   * room labels together (e.g. "Mark demolish"). A room set to existing stores no phase.
    */
-  setPhase: (levelId: Id, sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; columns?: Id[]; rooms?: Id[] }, phase: Phase) => void;
+  setPhase: (
+    levelId: Id,
+    sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; floorOpenings?: Id[]; columns?: Id[]; rooms?: Id[] },
+    phase: Phase,
+  ) => void;
   /**
    * Copy the nodes and walls (not openings) of one level into another, merged with whatever is
    * there, in one undo step. Walls that would lie on top of a wall already on the target level
@@ -300,10 +314,12 @@ function deleteInPlace(
   roofIds: Id[] = [],
   fixtureIds: Id[] = [],
   deckIds: Id[] = [],
+  floorOpeningIds: Id[] = [],
 ): void {
   for (const id of roofIds) delete level.roofs[id];
   for (const id of fixtureIds) delete level.fixtures[id];
   for (const id of deckIds) delete level.decks[id];
+  for (const id of floorOpeningIds) delete level.floorOpenings[id];
   for (const id of openingIds) delete level.openings[id];
   for (const id of roomIds) delete level.rooms[id];
   for (const id of stairsIds) delete level.stairs[id];
@@ -358,6 +374,11 @@ function cleanRoof(r: Roof): Roof {
   if (typeof r.color === 'string') out.color = r.color.toLowerCase();
   if (typeof r.boardColor === 'string') out.boardColor = r.boardColor.toLowerCase();
   return out;
+}
+
+/** A floor opening's stored form: outline points copied, railings fitted to the outline. */
+function cleanFloorOpening(o: Omit<FloorOpening, 'railings'> & { railings?: boolean[] }): FloorOpening {
+  return { id: o.id, outline: o.outline.map((p) => ({ x: p.x, y: p.y })), railings: normalizeRailings(o.railings, o.outline.length), phase: o.phase };
 }
 
 /** A deck's stored form: outline points copied, railings fitted to the outline, colour lower-cased. */
@@ -579,7 +600,7 @@ export const usePlanStore = create<PlanState>()(
 
         deleteEntities: (levelId, sel) =>
           editLevel(levelId, (level, plan) => {
-            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs, sel.roofs, sel.fixtures, sel.decks);
+            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs, sel.roofs, sel.fixtures, sel.decks, sel.floorOpenings);
             for (const id of sel.gradePoints ?? []) delete plan.site.gradePoints[id];
             for (const id of sel.columns ?? []) delete plan.site.columns[id];
             // Removing walls changes the corner joins of their neighbours.
@@ -890,6 +911,35 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete level.decks[id];
           }),
 
+        addFloorOpening: (levelId, input) => {
+          let id: Id | null = null;
+          editLevel(levelId, (level) => {
+            const fo = cleanFloorOpening({ ...input, id: input.id ?? newId() });
+            if (floorOpeningProblem(fo)) return false;
+            level.floorOpenings[fo.id] = fo;
+            id = fo.id;
+          });
+          return id;
+        },
+
+        updateFloorOpening: (levelId, id, patch) =>
+          editLevel(levelId, (level) => {
+            const o = level.floorOpenings[id];
+            if (!o) return false;
+            const next = cleanFloorOpening({ ...o, ...patch, railings: patch.railings ?? o.railings, id });
+            if (floorOpeningProblem(next)) return false;
+            const samePoints = next.outline.length === o.outline.length && next.outline.every((p, i) => p.x === o.outline[i].x && p.y === o.outline[i].y);
+            const sameRails = next.railings.length === o.railings.length && next.railings.every((r, i) => r === o.railings[i]);
+            if (samePoints && sameRails && next.phase === o.phase) return false;
+            level.floorOpenings[id] = next;
+          }),
+
+        deleteFloorOpenings: (levelId, ids) =>
+          editLevel(levelId, (level) => {
+            if (!ids.some((id) => level.floorOpenings[id])) return false;
+            for (const id of ids) delete level.floorOpenings[id];
+          }),
+
         addFixture: (levelId, input) => {
           let id: Id | null = null;
           editLevel(levelId, (level) => {
@@ -1115,6 +1165,10 @@ export const usePlanStore = create<PlanState>()(
             for (const id of sel.decks ?? []) {
               const d = level.decks[id];
               if (d && d.phase !== phase) d.phase = phase;
+            }
+            for (const id of sel.floorOpenings ?? []) {
+              const o = level.floorOpenings[id];
+              if (o && o.phase !== phase) o.phase = phase;
             }
             // A room label's phase is optional: existing is stored as no phase at all.
             for (const id of sel.rooms ?? []) {

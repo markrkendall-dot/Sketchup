@@ -347,6 +347,53 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-width: 0.7;
 }
 
+/* A floor opening on its own level: "open to below" like a stair hole, with the guard's caps. */
+.floor-opening .floor-opening-body {
+  fill: rgba(31, 35, 41, 0.06);
+  stroke: #52525b;
+  stroke-width: 1.2;
+  stroke-dasharray: 6 4;
+}
+
+.floor-opening .floor-opening-cross {
+  fill: none;
+  stroke: #71717a;
+  stroke-width: 0.8;
+  stroke-dasharray: 6 4;
+}
+
+.floor-opening .floor-opening-rail {
+  fill: rgba(138, 90, 52, 0.5);
+  stroke: #5c4434;
+  stroke-width: 1;
+}
+
+.floor-opening .floor-opening-label text {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #52525b;
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.floor-opening.phase-new .floor-opening-body,
+.floor-opening.phase-new .floor-opening-rail {
+  stroke: var(--new-edge);
+}
+
+.floor-opening.phase-demo .floor-opening-body,
+.floor-opening.phase-demo .floor-opening-rail {
+  stroke: var(--demo);
+}
+
+.floor-opening.is-selected .floor-opening-body,
+.floor-opening.is-selected .floor-opening-rail {
+  stroke: var(--accent);
+  stroke-width: 1.8;
+}
+
 /* Casework ------------------------------------------------------------------------------------ */
 
 /* Cabinets and appliances: a thin outline, the front edge heavier, ticks where doors meet. What

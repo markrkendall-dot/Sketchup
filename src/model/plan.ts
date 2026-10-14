@@ -5,10 +5,10 @@ import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './
 import { FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
 import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
-import type { Column, Deck, Fixture, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { Column, Deck, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
-export const SCHEMA_VERSION = 4 as const;
+export const SCHEMA_VERSION = 5 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
 export const MERGE_EPS = 0.5;
 
@@ -36,6 +36,7 @@ export function createLevel(name: string, wallHeight: number, floorThickness: nu
     roofs: {},
     fixtures: {},
     decks: {},
+    floorOpenings: {},
   };
 }
 
@@ -521,6 +522,17 @@ export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
     next.schemaVersion = 4;
     return next;
   },
+  /** Version 4: levels have no floor openings; add an empty `floorOpenings` record to each. */
+  4: (doc) => {
+    const next: Json = { ...doc };
+    if (isObject(doc.levels)) {
+      const upgraded: Json = {};
+      for (const [id, raw] of Object.entries(doc.levels)) upgraded[id] = isObject(raw) ? { ...raw, floorOpenings: {} } : raw;
+      next.levels = upgraded;
+    }
+    next.schemaVersion = 5;
+    return next;
+  },
 };
 
 const PHASES = new Set(['existing', 'demo', 'new']);
@@ -541,7 +553,8 @@ const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 
 const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang'] as const;
 const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle'] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
-const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'finishes', 'underlay'] as const;
+const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
+const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'finishes', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
@@ -784,20 +797,36 @@ export function normalizeRailings(v: unknown, n: number): boolean[] {
   return Array.from({ length: Math.max(0, n) }, (_, i) => (typeof given[i] === 'boolean' ? (given[i] as boolean) : true));
 }
 
-/** Why a deck cannot be used, or null when it can (the store and migrate both check it). */
-export function deckProblem(d: Pick<Deck, 'outline' | 'elevation' | 'railings' | 'color'>): string | null {
-  if (!Array.isArray(d.outline) || d.outline.length < 3 || !d.outline.every(isPoint)) return 'needs an outline of at least 3 points';
+/** Why a plan outline (a deck's, a floor opening's) cannot be used, or null: at least 3 points enclosing some area. */
+function outlineProblem(outline: unknown): string | null {
+  if (!Array.isArray(outline) || outline.length < 3 || !outline.every(isPoint)) return 'needs an outline of at least 3 points';
   let area = 0;
-  for (let i = 0; i < d.outline.length; i++) {
-    const p = d.outline[i];
-    const q = d.outline[(i + 1) % d.outline.length];
+  for (let i = 0; i < outline.length; i++) {
+    const p = outline[i];
+    const q = outline[(i + 1) % outline.length];
     area += p.x * q.y - q.x * p.y;
   }
-  if (!(Math.abs(area / 2) >= 1)) return 'outline encloses no area';
+  return Math.abs(area / 2) >= 1 ? null : 'outline encloses no area';
+}
+
+/** Why railing flags cannot go with an outline of `n` points (one boolean per edge), or null. */
+const railingsProblem = (railings: unknown, n: number): string | null =>
+  Array.isArray(railings) && railings.length === n && railings.every((r) => typeof r === 'boolean') ? null : 'needs one railing flag per edge';
+
+/** Why a deck cannot be used, or null when it can (the store and migrate both check it). */
+export function deckProblem(d: Pick<Deck, 'outline' | 'elevation' | 'railings' | 'color'>): string | null {
+  const shape = outlineProblem(d.outline);
+  if (shape) return shape;
   if (!isNum(d.elevation) || Math.abs(d.elevation) > MAX_DECK_ELEVATION) return `the top must be within ${MAX_DECK_ELEVATION}" of the floor`;
-  if (!Array.isArray(d.railings) || d.railings.length !== d.outline.length || !d.railings.every((r) => typeof r === 'boolean')) return 'needs one railing flag per edge';
+  const rails = railingsProblem(d.railings, d.outline.length);
+  if (rails) return rails;
   if (d.color !== undefined && !isHexColor(d.color)) return 'the colour must be a hex colour';
   return null;
+}
+
+/** Why a floor opening cannot be used, or null when it can (the store and migrate both check it). */
+export function floorOpeningProblem(o: Pick<FloorOpening, 'outline' | 'railings'>): string | null {
+  return outlineProblem(o.outline) ?? railingsProblem(o.railings, o.outline.length);
 }
 
 /**
@@ -826,6 +855,34 @@ function migrateDecks(raw: Json, where: string): Level['decks'] {
     deck.phase = phaseOf(d.phase);
     put(deck, 'color', isHexColor(d.color) ? d.color.toLowerCase() : undefined);
     out[did] = deck as unknown as Deck;
+  }
+  return out;
+}
+
+/**
+ * Floor openings read field by field, like decks: an unusable outline drops the opening (with a
+ * console warning naming it); railings are fitted to the outline (normalizeRailings).
+ */
+function migrateFloorOpenings(raw: Json, where: string): Level['floorOpenings'] {
+  const out: Level['floorOpenings'] = {};
+  for (const [oid, o] of Object.entries(raw)) {
+    const drop = (why: string) => console.warn(`HomePlan: ${where}: dropped floor opening ${oid}: ${why}`);
+    if (!isObject(o)) {
+      drop('not an object');
+      continue;
+    }
+    const railings = normalizeRailings(o.railings, Array.isArray(o.outline) ? o.outline.length : 0);
+    const problem = floorOpeningProblem({ outline: o.outline as Vec2[], railings });
+    if (problem) {
+      drop(problem);
+      continue;
+    }
+    const fo = pick(o, FLOOR_OPENING_KEYS);
+    fo.id = oid;
+    fo.outline = (o.outline as Vec2[]).map((p) => ({ x: p.x, y: p.y }));
+    fo.railings = railings;
+    fo.phase = phaseOf(o.phase);
+    out[oid] = fo as unknown as FloorOpening;
   }
   return out;
 }
@@ -961,6 +1018,7 @@ function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   level.roofs = migrateRoofs(record(raw.roofs, `${where} roofs`), where);
   level.fixtures = migrateFixtures(record(raw.fixtures, `${where} fixtures`), where);
   level.decks = migrateDecks(record(raw.decks, `${where} decks`), where);
+  level.floorOpenings = migrateFloorOpenings(record(raw.floorOpenings, `${where} floor openings`), where);
   put(level, 'finishes', migrateFinishes(raw.finishes));
   put(level, 'underlay', migrateUnderlay(raw.underlay));
   return level as unknown as Level;

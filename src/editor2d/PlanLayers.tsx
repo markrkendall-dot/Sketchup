@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
 import { deckTopWords, getDeckLayout } from '../derive/decks';
+import { getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
@@ -425,7 +426,7 @@ const NO_RECORD: Readonly<Record<Id, unknown>> = {};
  * layer of per-entity components does not re-render (and re-create every child) when an entity
  * only changes, e.g. on every step of a corner drag. The children select their own entity.
  */
-function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures' | 'decks'): Id[] {
+function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures' | 'decks' | 'floorOpenings'): Id[] {
   return useLayerPlan(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
 }
 
@@ -587,6 +588,55 @@ const StairHolesLayer = memo(function StairHolesLayer({ levelId }: { levelId: Id
           {h.treads && <path className="stair-hole-tread" d={h.treads} vectorEffect="non-scaling-stroke" />}
           <path className="stair-hole-cross" d={h.cross} vectorEffect="non-scaling-stroke" />
         </g>
+      ))}
+    </g>
+  );
+});
+
+/**
+ * A floor opening on its level (DESIGN.md "Floor openings"): the outline dashed with an X, the usual
+ * "open to below" mark, the guard's caps as bands on the floor round it (open where a flight from
+ * below arrives), and an "Open to below" label; demolished red, new green. A selected opening shows
+ * handles on its corners.
+ */
+const FloorOpeningShape = memo(function FloorOpeningShape({ levelId, openingId }: { levelId: Id; openingId: Id }) {
+  const opening = useLayerPlan((s) => s.plan.levels[levelId]?.floorOpenings?.[openingId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const layout = useLayerPlan((s) => getFloorOpeningLayout(s.plan, levelId, openingId, viewMode));
+  const selected = useLayerUi((s) => s.selection.floorOpenings.includes(openingId));
+  const k = useLayerUi(viewportScale);
+  const paths = useMemo(() => {
+    if (!opening || !layout) return null;
+    const o = opening.outline;
+    // The X joins opposite corners of a four-sided opening; any other outline gets its diagonals from the first corner.
+    const cross: [Vec2, Vec2][] = o.length === 4 ? [[o[0], o[2]], [o[1], o[3]]] : o.slice(2, -1).map((p) => [o[0], p]);
+    return { outline: polyPath(o), cross: segPath(cross), caps: layout.caps.map(polyPath).join(''), at: interiorPoint(o) };
+  }, [opening, layout]);
+  if (!opening || !paths || !isVisible(opening.phase, viewMode)) return null;
+  return (
+    <g className={`floor-opening phase-${shownPhase(opening.phase, viewMode)}${selected ? ' is-selected' : ''}`} data-floor-opening-id={openingId}>
+      <path className="floor-opening-body" d={paths.outline} vectorEffect="non-scaling-stroke" />
+      {paths.cross && <path className="floor-opening-cross" d={paths.cross} vectorEffect="non-scaling-stroke" />}
+      {paths.caps && <path className="floor-opening-rail" d={paths.caps} vectorEffect="non-scaling-stroke" />}
+      <g transform={`translate(${paths.at.x} ${paths.at.y}) scale(${1 / k})`} className="floor-opening-label">
+        <text textAnchor="middle" dominantBaseline="central">
+          Open to below
+        </text>
+      </g>
+      {selected && <OutlineHandles outline={opening.outline} className="deck-handle" />}
+    </g>
+  );
+});
+
+/** The level's floor openings, over the room fills and under the decks and roofs. Picking is done by the tools (selectTool hitTest). */
+const FloorOpeningsLayer = memo(function FloorOpeningsLayer({ levelId }: { levelId: Id }) {
+  const ids = useEntityIds(levelId, 'floorOpenings');
+  const tool = useLayerUi((s) => s.activeTool);
+  if (ids.length === 0) return null;
+  return (
+    <g className="layer-floor-openings" pointerEvents={tool === 'select' || tool === 'floorOpening' ? 'auto' : 'none'}>
+      {ids.map((id) => (
+        <FloorOpeningShape key={id} levelId={levelId} openingId={id} />
       ))}
     </g>
   );
@@ -1199,6 +1249,7 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
       <UnderlayLayer levelId={levelId} />
       <RoomFillsLayer levelId={levelId} />
       <StairHolesLayer levelId={levelId} />
+      <FloorOpeningsLayer levelId={levelId} />
       <DecksLayer levelId={levelId} />
       <RoofGhostLayer levelId={levelId} />
       <RoofsLayer levelId={levelId} />

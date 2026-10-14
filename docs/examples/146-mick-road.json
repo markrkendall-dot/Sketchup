@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "id": "plan-146-mick-road",
   "name": "146 Mick Road (starter, estimates flagged)",
   "levelOrder": [
@@ -383,7 +383,8 @@
           "phase": "existing",
           "id": "b-d1"
         }
-      }
+      },
+      "floorOpenings": {}
     },
     "level-f": {
       "id": "level-f",
@@ -2771,6 +2772,7 @@
           "id": "f-d1"
         }
       },
+      "floorOpenings": {},
       "finishes": {
         "cabinetColor": "#c4884e",
         "counterColor": "#e2dccb",
@@ -3384,7 +3386,8 @@
         }
       },
       "fixtures": {},
-      "decks": {}
+      "decks": {},
+      "floorOpenings": {}
     }
   },
   "baseFloorElevation": -100,

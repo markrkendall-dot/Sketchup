@@ -346,7 +346,7 @@ function signature(deck: Deck, inp: LayoutInputs): string {
 }
 
 /** Railing runs per edge: the railed edge minus its stair openings, runs shorter than DECK.minRun left out. */
-function railingRuns(deck: Deck, openings: readonly DeckOpening[]): [number, number][][] {
+export function railingRuns(deck: Pick<Deck, 'outline' | 'railings'>, openings: readonly DeckOpening[]): [number, number][][] {
   const lens = edgeLengths(deck.outline);
   return deck.outline.map((_, i) => {
     if (!deck.railings[i]) return [];
@@ -361,10 +361,78 @@ function railingRuns(deck: Deck, openings: readonly DeckOpening[]): [number, num
   });
 }
 
-function buildLayout(deck: Deck, inp: LayoutInputs, sig: string): DeckLayout {
-  const outline = deck.outline;
+/**
+ * A 36" railing along runs of an outline's edges (DECK rail sizes), standing on `top`: posts at most
+ * DECK.railPostSpacing apart, a bottom rail, balusters with at most DECK.balusterGap between them and
+ * a cap, mitred where the runs of two edges meet at a corner. `side` 1 puts it just inside the
+ * outline (a deck's edge), -1 just outside it (the floor round a floor opening). `runs[i]`: the
+ * stretches of edge i, as distances from its start.
+ */
+export function railingParts(outline: readonly Vec2[], runs: readonly (readonly [number, number])[][], top: number, side: 1 | -1 = 1): { railing: DeckBox[]; caps: Vec2[][] } {
   const n = outline.length;
   const lens = edgeLengths(outline);
+  const railing: DeckBox[] = [];
+  const caps: Vec2[][] = [];
+  const c = DECK.railPost / 2;
+  const capBottom = top + DECK.railHeight - DECK.capThick;
+  const capTop = top + DECK.railHeight;
+  const railBottom = top + DECK.bottomRailUp;
+  const railTop = railBottom + DECK.bottomRailHeight;
+  for (let i = 0; i < n; i++) {
+    const prev = (i - 1 + n) % n;
+    const next = (i + 1) % n;
+    const d = edgeDir(outline, i);
+    const inward = scale(edgeOutward(outline, i), -side);
+    const pointAt = (s: number, off: number) => add(add(outline[i], scale(d, s)), scale(inward, off));
+    for (const [s0, s1] of runs[i] ?? []) {
+      // A corner shared with the previous or next edge's railing: one post there, the caps mitred.
+      const cornerStart = s0 <= EPS && (runs[prev] ?? []).some(([, e]) => e >= lens[prev] - EPS);
+      const cornerEnd = s1 >= lens[i] - EPS && (runs[next] ?? []).some(([b]) => b <= EPS);
+      const capPoly = [
+        pointAt(s0, 0),
+        pointAt(s1, 0),
+        cornerEnd ? insetCorner(outline, next, DECK.cap * side) : pointAt(s1, DECK.cap),
+        cornerStart ? insetCorner(outline, i, DECK.cap * side) : pointAt(s0, DECK.cap),
+      ];
+      caps.push(capPoly);
+      railing.push({ poly: capPoly, bottom: capBottom, top: capTop });
+      // Posts along the run: at its ends (a shared corner's post is placed by the edge it starts)
+      // and evenly between, at most DECK.railPostSpacing apart.
+      const a = s0 + c;
+      const b = s1 - c;
+      const stations: number[] = [];
+      if (b - a < EPS) stations.push((s0 + s1) / 2);
+      else {
+        const spans = Math.max(1, Math.ceil((b - a) / DECK.railPostSpacing - EPS));
+        for (let k = 0; k <= spans; k++) stations.push(a + ((b - a) * k) / spans);
+      }
+      stations.forEach((s, k) => {
+        if (k === stations.length - 1 && cornerEnd && stations.length > 1) return;
+        const at = k === 0 && cornerStart ? insetCorner(outline, i, c * side) : pointAt(s, c);
+        railing.push({ poly: square(at, d, DECK.railPost), bottom: top, top: capBottom });
+      });
+      // Bottom rail and balusters between neighbouring posts' faces.
+      for (let k = 0; k + 1 < stations.length; k++) {
+        const g0 = stations[k] + c;
+        const g1 = stations[k + 1] - c;
+        if (g1 - g0 < EPS) continue;
+        const t = DECK.bottomRailThick / 2;
+        railing.push({ poly: band(outline, i, g0, g1, (c - t) * side, (c + t) * side), bottom: railBottom, top: railTop });
+        const w = DECK.baluster;
+        const count = Math.max(0, Math.ceil((g1 - g0 - DECK.balusterGap) / (DECK.balusterGap + w) - EPS));
+        const gap = (g1 - g0 - count * w) / (count + 1);
+        for (let m = 0; m < count; m++) {
+          const s = g0 + gap * (m + 1) + w * m + w / 2;
+          railing.push({ poly: square(pointAt(s, c), d, w), bottom: railTop, top: capBottom });
+        }
+      }
+    }
+  }
+  return { railing, caps };
+}
+
+function buildLayout(deck: Deck, inp: LayoutInputs, sig: string): DeckLayout {
+  const outline = deck.outline;
   const top = inp.top;
   const boardBottom = top - DECK.board;
   const frameBottom = boardBottom - DECK.joist;
@@ -395,64 +463,7 @@ function buildLayout(deck: Deck, inp: LayoutInputs, sig: string): DeckLayout {
   });
 
   // Railings.
-  const runs = railingRuns(deck, inp.openings);
-  const railing: DeckBox[] = [];
-  const caps: Vec2[][] = [];
-  const c = DECK.railPost / 2;
-  const capBottom = top + DECK.railHeight - DECK.capThick;
-  const capTop = top + DECK.railHeight;
-  const railBottom = top + DECK.bottomRailUp;
-  const railTop = railBottom + DECK.bottomRailHeight;
-  for (let i = 0; i < n; i++) {
-    const prev = (i - 1 + n) % n;
-    const next = (i + 1) % n;
-    const d = edgeDir(outline, i);
-    const inward = scale(edgeOutward(outline, i), -1);
-    const pointAt = (s: number, off: number) => add(add(outline[i], scale(d, s)), scale(inward, off));
-    for (const [s0, s1] of runs[i]) {
-      // A corner shared with the previous or next edge's railing: one post there, the caps mitred.
-      const cornerStart = s0 <= EPS && runs[prev].some(([, e]) => e >= lens[prev] - EPS);
-      const cornerEnd = s1 >= lens[i] - EPS && runs[next].some(([b]) => b <= EPS);
-      const capPoly = [
-        pointAt(s0, 0),
-        pointAt(s1, 0),
-        cornerEnd ? insetCorner(outline, next, DECK.cap) : pointAt(s1, DECK.cap),
-        cornerStart ? insetCorner(outline, i, DECK.cap) : pointAt(s0, DECK.cap),
-      ];
-      caps.push(capPoly);
-      railing.push({ poly: capPoly, bottom: capBottom, top: capTop });
-      // Posts along the run: at its ends (a shared corner's post is placed by the edge it starts)
-      // and evenly between, at most DECK.railPostSpacing apart.
-      const a = s0 + c;
-      const b = s1 - c;
-      const stations: number[] = [];
-      if (b - a < EPS) stations.push((s0 + s1) / 2);
-      else {
-        const spans = Math.max(1, Math.ceil((b - a) / DECK.railPostSpacing - EPS));
-        for (let k = 0; k <= spans; k++) stations.push(a + ((b - a) * k) / spans);
-      }
-      stations.forEach((s, k) => {
-        if (k === stations.length - 1 && cornerEnd && stations.length > 1) return;
-        const at = k === 0 && cornerStart ? insetCorner(outline, i, c) : pointAt(s, c);
-        railing.push({ poly: square(at, d, DECK.railPost), bottom: top, top: capBottom });
-      });
-      // Bottom rail and balusters between neighbouring posts' faces.
-      for (let k = 0; k + 1 < stations.length; k++) {
-        const g0 = stations[k] + c;
-        const g1 = stations[k + 1] - c;
-        if (g1 - g0 < EPS) continue;
-        const t = DECK.bottomRailThick / 2;
-        railing.push({ poly: band(outline, i, g0, g1, c - t, c + t), bottom: railBottom, top: railTop });
-        const w = DECK.baluster;
-        const count = Math.max(0, Math.ceil((g1 - g0 - DECK.balusterGap) / (DECK.balusterGap + w) - EPS));
-        const gap = (g1 - g0 - count * w) / (count + 1);
-        for (let m = 0; m < count; m++) {
-          const s = g0 + gap * (m + 1) + w * m + w / 2;
-          railing.push({ poly: square(pointAt(s, c), d, w), bottom: railTop, top: capBottom });
-        }
-      }
-    }
-  }
+  const { railing, caps } = railingParts(outline, railingRuns(deck, inp.openings), top);
 
   return { sig, top, supported: inp.supported, openings: inp.openings, edgeDrops: inp.edgeDrops, boards, frame, posts, railing, caps, boardLines };
 }

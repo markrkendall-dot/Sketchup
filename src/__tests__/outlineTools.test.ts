@@ -157,3 +157,49 @@ describe('deck tool', () => {
     expect(level().decks[id].outline[2]).toEqual({ x: 144, y: 99 });
   });
 });
+
+describe('floor opening tool', () => {
+  beforeEach(() => switchTool('floorOpening'));
+
+  /** An exterior wall along y 0 (inside face y 3), then an opening drawn south of it against its face. */
+  const drawOpening = () => {
+    store().addWall(lid, { x: -60, y: 0 }, { x: 204, y: 0 }, { kind: 'exterior', thickness: 6, phase: 'existing' });
+    for (const [x, y] of [
+      [0, 3],
+      [120, 3],
+      [120, 99],
+      [0, 99],
+      [0, 3],
+    ])
+      click(x, y);
+  };
+
+  it('adds an opening with no guard along the wall, in the drawing phase, selected; Delete removes it', () => {
+    ui().setDrawPhase('new');
+    drawOpening();
+    const openings = Object.values(level().floorOpenings);
+    expect(openings).toHaveLength(1);
+    expect(openings[0]).toMatchObject({ railings: [false, true, true, true], phase: 'new' });
+    expect(ui().selection.floorOpenings).toEqual([openings[0].id]);
+    expect(ui().draft.message).toMatch(/Floor opening added, 10' x 8', open to the level below/);
+    press('Delete');
+    expect(level().floorOpenings).toEqual({});
+  });
+
+  it('is picked with the select tool, and its corners drag in one undo step', () => {
+    drawOpening();
+    const id = Object.keys(level().floorOpenings)[0];
+    switchTool('select');
+    ui().clearSelection();
+    click(60, 50);
+    expect(ui().selection.floorOpenings).toEqual([id]);
+    dispatchPointer('move', ptr(120, 99));
+    dispatchPointer('down', ptr(120, 99));
+    dispatchPointer('move', ptr(120, 110));
+    dispatchPointer('move', ptr(120, 123));
+    dispatchPointer('up', ptr(120, 123));
+    expect(level().floorOpenings[id].outline[2]).toEqual({ x: 120, y: 123 });
+    undo();
+    expect(level().floorOpenings[id].outline[2]).toEqual({ x: 120, y: 99 });
+  });
+});

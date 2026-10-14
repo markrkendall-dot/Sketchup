@@ -1,11 +1,11 @@
 import { memo } from 'react';
 import { getLevelElevations } from '../derive/levels';
-import { getDeckMeshes, getLevelMeshes, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, openingPartColor } from '../derive/meshes';
 import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { counterColorOf } from '../model/casework';
-import { caseworkMaterial, counterMaterial, deckMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { caseworkMaterial, counterMaterial, deckMaterial, fasciaMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -23,6 +23,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const meshes = usePlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
   // Decks have their own memo: they depend on the ground and other levels (derive/meshes.ts getDeckMeshes).
   const decks = usePlanStore((s) => getDeckMeshes(s.plan, levelId, viewMode));
+  // So do the guards round floor openings (the level's walls and the stairs below).
+  const guards = usePlanStore((s) => getFloorOpeningMeshes(s.plan, levelId, viewMode));
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
   const counterColor = usePlanStore((s) => counterColorOf(s.plan.levels[levelId]?.finishes));
   return (
@@ -90,6 +92,18 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
             ) : null,
           )}
         </group>
+      ))}
+      {guards.map((g) => (
+        <mesh
+          key={g.id}
+          name={`floor-opening:${g.id}:railing`}
+          geometry={g.railing}
+          material={railingMaterial(g.phase)}
+          renderOrder={g.phase === 'demo' ? 1 : 0}
+          castShadow={g.phase !== 'demo'}
+          receiveShadow
+          dispose={null}
+        />
       ))}
       {showRoofs && meshes.roofs.map((r) => (
         <group key={r.id}>

@@ -7,7 +7,7 @@ import { faceSnapSources, snapFaceCorner, snapFaceEdge, SNAP_RADIUS_PX } from '.
 import type { Tool, ToolContext, ToolPointerEvent } from './index';
 
 /**
- * Snap for drawn outlines (roofs, decks): wall-outline corners (the footprint fill points, so the
+ * Snap for drawn outlines (roofs, decks, floor openings): wall-outline corners (the footprint fill points, so the
  * outside corners of exterior walls) first, then this level's nodes, then points on the wall faces,
  * then the usual snaps (midpoints, centerlines, level below, guides, grid) with the ortho lock from
  * `from`.
@@ -26,10 +26,10 @@ export function outlineSnap(ctx: ToolContext, raw: Vec2, shift: boolean, from: V
 
 /** What an outline tool adds and how it talks about it. */
 export interface OutlineToolSpec {
-  /** "roof", "deck": in the tool's messages. */
+  /** "roof", "deck", "floor opening": in the tool's messages. */
   noun: string;
   /** The selection kind the new element is selected as, and Delete removes. */
-  selectionKey: 'roofs' | 'decks';
+  selectionKey: 'roofs' | 'decks' | 'floorOpenings';
   /** Add the element over the closed outline; its id, or null when the store refuses it. */
   create(ctx: ToolContext, outline: Vec2[]): Id | null;
   /** The status line once it is added. */
