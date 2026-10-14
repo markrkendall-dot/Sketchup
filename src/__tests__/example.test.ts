@@ -109,10 +109,12 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
     expect(count(all('rooms'))).toEqual({ existing: 9, demo: 5, new: 10 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen,
-    // the pantry's shelves, the stove and the placeholder bath and laundry fixtures, all new.
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 30 });
-    // The masonry chimney is demolished; the porch's three posts and the stove's flue are new.
-    expect(count(Object.values(plan.site.columns))).toEqual({ existing: 0, demo: 1, new: 4 });
+    // the pantry's shelves, the stove with its stovepipe and tee, and the placeholder bath and
+    // laundry fixtures, all new.
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 31 });
+    // The masonry chimney is demolished; the porch's three posts, the stove's connector and its
+    // flue are new.
+    expect(count(Object.values(plan.site.columns))).toEqual({ existing: 0, demo: 1, new: 5 });
     // Demolished: the stair, the house door, the entry porch with its five screen openings, its roof
     // and label, the wing's north wall (it has no window), the wing's roof and its south window (a
     // sliding door replaces it), the east window into the new bedroom, the front room's walls with
@@ -680,12 +682,14 @@ describe('docs/examples/146-mick-road.json', () => {
     const fixtures = allNew.filter((x) => roomOf(x) === 'Kitchen');
     // The placeholder bath fixtures (MK): a WC and a small vanity in the powder room, a shower, a
     // vanity and a WC in the master bath, the washer and dryer in its laundry closet; the pantry's
-    // shelves; the wood stove on its hearth before its stone surround in the Living.
+    // shelves; the wood stove on its hearth before its stone surround in the Living, with its
+    // stovepipe into the wall, and the flue's tee outside in the screen porch.
     expect(allNew.filter((x) => roomOf(x) !== 'Kitchen').map((x) => `${roomOf(x)}: ${x.label ?? x.kind}`).sort()).toEqual([
       'Laundry: Dryer',
       'Laundry: Washer',
       'Living: Hearth',
       'Living: Stone',
+      'Living: Stovepipe',
       'Living: Wood stove',
       'Master bath: Shower',
       'Master bath: WC',
@@ -694,6 +698,7 @@ describe('docs/examples/146-mick-road.json', () => {
       'Pantry: Shelves',
       'Powder room: WC',
       'Powder room: sink',
+      'Screen porch: Tee',
     ]);
     const kinds: Record<string, number> = {};
     for (const x of fixtures) kinds[x.kind] = (kinds[x.kind] ?? 0) + 1;
@@ -783,12 +788,12 @@ describe('docs/examples/146-mick-road.json', () => {
     const existing = getLevelMeshes(plan, f.id, 'existing');
     expect([existing.fixtures.length, existing.counters.length]).toEqual([34, 5]);
     const proposedMeshes = getLevelMeshes(plan, f.id, 'proposed');
-    // The kitchen's 14 and its four counters, the pantry's two shelves, the stove's three parts, and
+    // The kitchen's 14 and its four counters, the pantry's two shelves, the stove's five parts, and
     // the seven placeholder bath and laundry fixtures, whose two vanities carry a counter each.
-    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([26, 6]);
+    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([28, 6]);
   });
 
-  it('has the wood stove in the Living\'s south-west corner on a stainless flue that clears the roof by the 3-2-10 rule, and no chimney', () => {
+  it('has the wood stove in the Living\'s south-west corner on a stainless flue outside the house that clears the roof by the 3-2-10 rule, and no chimney', () => {
     const [f, s] = [plan.levels[plan.levelOrder[1]], plan.levels[plan.levelOrder[2]]];
     const named = (lvl: Level, label: string) => Object.values(lvl.fixtures).find((x) => x.label === label && x.phase === 'new')!;
     const bounds = (poly: Vec2[]) => {
@@ -808,18 +813,29 @@ describe('docs/examples/146-mick-road.json', () => {
     const wa = f.nodes[ww.a];
     const southJamb = wa.y + normalize(sub(f.nodes[ww.b], wa)).y * west.offset + west.width / 2;
     expect(268 - (southJamb + trimOf(west))).toBeGreaterThanOrEqual(12);
-    // The flue: a round stainless pipe from the stove's top, capped, in a chase upstairs.
+    // Inside, a black connector from the stove's top up to an elbow, and the stovepipe west into the
+    // wall thimble over the stone (centre 66" up): it goes through no floor or ceiling.
     const flues = Object.values(plan.site.columns).filter((c) => c.kind === 'flue');
-    expect(flues).toHaveLength(1);
-    const [flue] = flues;
-    expect(flue).toMatchObject({ at: { x: 19, y: 280 }, width: 8, phase: 'new', cap: true, base: 2 + 31 });
-    expect(bounds(fixtureOutline(named(s, 'Flue chase')))).toEqual([7, 31, 270, 290]);
-    expect(s.rooms[faceAt(getFaces(s, 'proposed'), { x: 20, y: 280 })!.roomId!].name).toBe('Master');
-    // 3-2-10: 3' above where it leaves the roof, 2' above the roof 10' up the slope (toward the ridge).
+    expect(flues).toHaveLength(2);
+    const connector = flues.find((c) => !c.cap)!;
+    expect(connector).toMatchObject({ at: { x: 19, y: 280 }, width: 8, phase: 'new', color: '#26241f', base: 2 + 31, top: 2 + 70 });
+    expect(connector.top).toBeLessThan(getLevelElevations(plan)[f.id].ceiling);
+    expect(bounds(fixtureOutline(named(f, 'Stovepipe')))).toEqual([7, 19, 276, 284]);
+    expect(named(f, 'Stovepipe')).toMatchObject({ elevation: 62, height: 8 });
+    // Outside, the chimney: a round stainless pipe 2" clear of the siding (the wall's outside face is
+    // x 0), straight up from its tee in the screen porch, capped; no chase upstairs.
+    const flue = flues.find((c) => c.cap)!;
+    expect(flue).toMatchObject({ at: { x: -6, y: 280 }, width: 8, phase: 'new', cap: true, base: 2 + 56 });
+    expect(-(flue.at.x + flue.width / 2)).toBe(2);
+    expect(bounds(fixtureOutline(named(f, 'Tee')))).toEqual([-6, 0, 276, 284]);
+    expect(f.rooms[faceAt(getFaces(f, 'proposed'), { x: -6, y: 280 })!.roomId!].name).toBe('Screen porch (proposed)');
+    expect(Object.values(s.fixtures).filter((x) => x.phase === 'new' && /chase/i.test(x.label ?? ''))).toEqual([]);
+    // 3-2-10: 3' above where it leaves the roof (the rake overhang), 2' above the roof 10' up the
+    // slope (toward the ridge).
     const main = Object.values(s.roofs)[0];
     const top = (p: Vec2) => getLevelElevations(plan)[s.id].floorTop + roofHeightAt(main, roofBearing(s.wallHeight, main), p)! + main.thickness;
     expect(flue.top - top(flue.at)).toBeGreaterThanOrEqual(36);
-    expect(flue.top - top({ x: 19, y: 280 - 120 })).toBeGreaterThanOrEqual(24 - 0.01);
+    expect(flue.top - top({ x: flue.at.x, y: 280 - 120 })).toBeGreaterThanOrEqual(24 - 0.01);
     // The masonry chimney is demolished.
     expect(Object.values(plan.site.columns).filter((c) => c.kind === 'chimney').map((c) => c.phase)).toEqual(['demo']);
   });
@@ -854,11 +870,12 @@ describe('docs/examples/146-mick-road.json', () => {
     const names = new Set<string>();
     root.traverse((o) => names.add(o.name.replace(/ \d+.*$/, '')));
     for (const n of ['Roof', 'Rafters', 'Fascia', 'Chimney', 'Flue', 'Terrain', 'Window', 'Door', 'Floor', 'Deck', 'Deck framing', 'Deck railing', 'Stair railing', 'Guard']) expect(names, n).toContain(n);
-    // The masonry chimney's shaft, cap and spark arrestor, demolished; the stove's flue and its rain cap, new.
+    // The masonry chimney's shaft, cap and spark arrestor, demolished; the stove's black connector, and
+    // its flue with its rain cap, new.
     const site = root.children.find((c) => c.name === 'Site')!;
     const materials = (name: string) => site.children.filter((c) => c.name === name).map((c) => ((c as Mesh).material as MeshStandardMaterial).name);
     expect(materials('Chimney')).toEqual(['column_chimney_demo', 'chimney_cap_demo', 'chimney_arrestor_demo']);
-    expect(materials('Flue')).toEqual(['column_flue_new', 'flue_stem_new', 'flue_hood_new']);
+    expect(materials('Flue')).toEqual(['column_flue_new_26241f', 'column_flue_new', 'flue_stem_new', 'flue_hood_new']);
     const box = new Box3().setFromObject(root);
     // The chimney, the flue and the main ridge are the tallest things: well above the second floor.
     expect(box.max.y / 0.0254).toBeGreaterThan(plan.baseFloorElevation + 2 * 96 + 100);

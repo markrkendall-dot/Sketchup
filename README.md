@@ -616,8 +616,9 @@ with a level and a tape or a laser, and edit them in the Site tab.
 The starter also holds the owner's proposed design (his briefs of 12 and 14 Oct 2026), drawn as
 *new* and *demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
 `proposed()`; the plans are `docs/history/PLAN-v4-proposed.md`, `docs/history/PLAN-v5-kitchen.md`
-for the island and `docs/history/PLAN-v6-layout.md` for the stair hall, the north band, the stove
-and the upstairs bath, with the places where the built design differs from them):
+for the island, `docs/history/PLAN-v6-layout.md` for the stair hall, the north band, the stove
+and the upstairs bath, and `docs/history/PLAN-v7-exterior-flue.md` for the stove's flue outside,
+with the places where the built design differs from them):
 
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
    one-storey wing down the whole east side, outside 12'1" x 26'3", under one new shed roof (5:12)
@@ -681,11 +682,16 @@ and the upstairs bath, with the places where the built design differs from them)
    casework defaults: change them in the Level panel, or per cabinet in its panel.
 6. **Wood stove** (MK) in the Living's **south-west corner**, its back to the west wall, facing east
    into the room: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it,
-   clear of the west window and beside the lake window's west end. Its flue is a **stainless pipe**
-   (8", an insulated 6" chimney) straight up through the bedroom upstairs, in a 2' x 1'8" chase on
-   that room's west wall, and out through the main roof near the lake eave with a rain cap; it
-   stands 7' over the roof there, 2' higher than the roof 10' up the slope (the 3-2-10 rule). The
-   **masonry chimney** on the north wall is demolished.
+   clear of the west window and beside the lake window's west end. Its flue runs **outside the
+   house** (MK), to the 2025 Residential Code of New York State: a black double-wall stovepipe
+   rises from the stove and turns west into a listed wall thimble over the stone; outside, an
+   insulated **stainless chimney** (8", an insulated 6" chimney, UL 103 Type HT) rises straight from
+   a tee with a cleanout, 2" off the siding, in the screen porch's south-east corner, through the
+   porch roof, up the gable wall and through the main roof's rake overhang, with a rain cap. It
+   stands 7' over the rake, 2' higher than the roof 10' up the slope (the 3-2-10 rule). Nothing
+   passes through the bedroom upstairs. The code checklist is in
+   `docs/history/PLAN-v7-exterior-flue.md`. The **masonry chimney** on the north wall is
+   demolished.
 7. **Upstairs bath** (MK: a full bath with a stall shower in the north-east): the old bath opened
    east across the Office's north end, 11'5" x 5'3" (6'2" at the old bath's end): a 48" vanity on its west wall, the WC under
    the north window and a 36" x 48" stall shower in the north-east corner (placeholders). It keeps
@@ -729,9 +735,11 @@ Which view to use:
 
 Still open:
 
-- **The stove**: its listed clearances (to the west window's trim, to the surround) set its final
-  place; the flue's 7' above the roof needs a roof brace (it leaves the roof 35" in from the lake
-  wall's face).
+- **The stove and its chimney**: the stove's listing and the chimney maker's instructions set the
+  clearances (to the west window's trim, to the surround), the thimble, the supports and the top,
+  and win over the plan's numbers. The chimney's 7' over the rake needs a roof brace; where it
+  passes the porch roof 6" from the house wall, the flashing has to be worked into the wall's.
+  CO alarms are required with a fuel-burning appliance. See `docs/history/PLAN-v7-exterior-flue.md`.
 - **The dryer's vent**: up through the wing's ceiling and roof, or along the ceiling to an outside
   wall.
 - **Coats** at the front door: there is no closet in the new layout; hooks or a bench in the foyer,

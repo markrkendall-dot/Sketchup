@@ -1403,15 +1403,19 @@ their open sides, cutting nothing) under the Second Floor's floor opening (floor
 ...), its guard opening where the last flight arrives; the north band's walls, placed where they
 meet the old walls outside the old openings (the band's wall at y 51.5 touches the old bath door's
 jamb, its divider at x 261.5 clears the old bath window), so nothing of the existing house moves;
-the laundry closet in the master bath; the stove's boxes on the First Floor, its chase on the Second
-and its flue column (`kind: 'flue'`, capped), whose top the script sets by the 3-2-10 rule from the
-main roof (`roofHeightAt`: 3' over the roof where it leaves it, 2' over the roof 10' up the slope);
+the laundry closet in the master bath; the stove's boxes on the First Floor; and, routed outside
+the house (PLAN-v7-exterior-flue.md), its black connector (an uncapped flue column from the stove's
+top, and a box into the west wall), the tee (a box in the screen porch) and its flue column outside
+the west wall (`kind: 'flue'`, capped, 2" off the siding), whose top the script sets by the 3-2-10
+rule from the main roof (`roofHeightAt`: 3' over the rake where it passes, 2' over the roof 10' up
+the slope);
 the chimney column demolished (`setPhase` with `columns`); and the upstairs bath, whose new wall is
 drawn before the old bath's east wall is demolished, so the stub of that wall south of it stays.
 `example.test.ts` checks the stair's risers, treads and landings against the floor to floor, the
-opening's outline, supported edges and guard, the slab hole, the stove's place, the flue's top
-against the roof, the bath's and laundry's fixtures, and that no level has an open wall end or an
-orphan label in any view.
+opening's outline, supported edges and guard, the slab hole, the stove's place, the connector
+(under the ceiling) and the flue (outside, no chase upstairs) and its top against the roof, the
+bath's and laundry's fixtures, and that no level has an open wall end or an orphan label in any
+view.
 
 The proposed deck off the master bedroom is added through `deck()` (deck ids `f-d1` ...), from the
 retaining wall's east face to the wing's east face, its top at the retaining wall's (absolute -4).

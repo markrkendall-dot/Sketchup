@@ -10,7 +10,7 @@
 import { getLevelElevations } from '../src/derive/levels';
 import { roofBearing, roofHeightAt } from '../src/derive/roofs';
 import { columnDefaults } from '../src/derive/site';
-import { DEFAULT_INTERIOR_COLOR } from '../src/model/finish';
+import { COLUMN_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import type { Id, Opening, Phase, Plan, Roof, Room, Vec2 } from '../src/model/types';
@@ -1088,12 +1088,22 @@ function proposed(ids: ExistingIds): void {
   kitchen({ kind: 'box', label: 'Hearth', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 40, depth: 50, height: 1, frontColor: STONE });
   kitchen({ kind: 'box', label: 'Stone', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 46, depth: 3, height: 59, elevation: 1, frontColor: STONE });
   kitchen({ kind: 'box', label: 'Wood stove', origin: { x: CL.x0 + HALF + 6, y: STOVE.y }, direction: 0, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
-  // Its flue: a stainless pipe, 8" outside (an insulated 6" chimney), straight up from the stove's
-  // collar (x 19, 6" in from its back) through the bedroom upstairs, in a 24 x 20 chase on that
-  // room's west wall (y 270..290, clear of its west window at y 176..224), and out through the main
-  // roof 35" up the slope from the lake eave, with a rain cap. Its top follows the 3-2-10 rule: 3'
-  // over where it leaves the roof, and 2' over any roof within 10' (the roof 10' up the slope).
-  const FLUE = { x: CL.x0 + HALF + 12, y: STOVE.y };
+  // Its flue runs outside the house (MK, 14 Oct 2026), to the 2025 Residential Code of New York State
+  // (docs/history/PLAN-v7-exterior-flue.md). Inside, a 6" double-wall black connector, 8" outside,
+  // rises from the stove's collar (x 19, 6" in from its back) to an elbow and turns west into a listed
+  // wall thimble over the stone (centre 66" up): it passes through no floor or ceiling, and the
+  // bedroom upstairs needs no chase. Outside, an insulated 6" chimney (UL 103 HT, 8" outside) starts
+  // at a tee with a cleanout below the thimble, 2" clear of the siding (x -10..-2), and rises
+  // straight (no offsets) in the screen porch's south-east corner, through the porch's shed roof by
+  // the house wall, up the gable wall and through the main roof's 24" rake overhang, with a rain cap.
+  // Its top follows the 3-2-10 rule: 3' over where it leaves the roof, and 2' over any roof within
+  // 10' (the roof 10' up the slope); that leaves 7' over the rake, braced to the roof.
+  const THIMBLE = 66;
+  const COLLAR = { x: CL.x0 + HALF + 12, y: STOVE.y };
+  const FLUE = { x: MAIN.x0 - 2 - 4, y: STOVE.y };
+  if (!store().addColumn({ at: COLLAR, kind: 'flue', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP + 31, top: FLOOR_TOP + THIMBLE + 4, color: STOVE_BLACK })) throw new Error('connector rejected');
+  kitchen({ kind: 'box', label: 'Stovepipe', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 8, depth: COLLAR.x - (CL.x0 + HALF), height: 8, elevation: THIMBLE - 4, frontColor: STOVE_BLACK });
+  kitchen({ kind: 'box', label: 'Tee', origin: { x: MAIN.x0, y: STOVE.y }, direction: 180, width: 8, depth: MAIN.x0 - FLUE.x, height: 8, elevation: THIMBLE - 4, frontColor: COLUMN_COLOR.flue });
   const mainRoof = Object.values(level(sId).roofs)[0];
   const secondTop = getLevelElevations(getPlan())[sId].floorTop;
   const roofTop = (p: Vec2) => {
@@ -1102,8 +1112,7 @@ function proposed(ids: ExistingIds): void {
     return secondTop + under + mainRoof.thickness;
   };
   const flueTop = round2(Math.max(roofTop(FLUE) + 36, roofTop({ x: FLUE.x, y: FLUE.y - ft(10) }) + 24));
-  if (!store().addColumn({ at: FLUE, kind: 'flue', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP + 31, top: flueTop, cap: true })) throw new Error('flue rejected');
-  fixture(sId, { kind: 'box', label: 'Flue chase', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 20, depth: 24, height: 96, elevation: 0, frontColor: DEFAULT_INTERIOR_COLOR, phase: NEW });
+  if (!store().addColumn({ at: FLUE, kind: 'flue', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP + THIMBLE - 10, top: flueTop, cap: true })) throw new Error('flue rejected');
 
   // ---- 9. The second floor's full bath (MK, 14 Oct 2026), across the north-east: the old bath
   // (x 174..218, y 7..81) opened east across the old Office's north end, x 174..311, y 7..70 inside

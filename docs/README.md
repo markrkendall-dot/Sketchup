@@ -22,5 +22,9 @@
     and dishwasher facing the lake, two stools, the refrigerator between pantries, the range wall
     and counter in the old bath's alcove, the closet and the moved bedroom door), and where the
     built kitchen differs.
+  - `PLAN-v6-layout.md`: the plan for the stair hall open through both floors, the north band
+    (powder room and pantry), the wood stove, the laundry and the upstairs bath.
+  - `PLAN-v7-exterior-flue.md`: the stove's flue routed outside the house, with the 2025
+    Residential Code of New York State checklist it was laid out to.
   - `QA-FINDINGS.md`: the first hands-on QA pass and the second review's status.
   - `REVIEW-2.md`: the second review of the house and the tools, with the fixes made.
