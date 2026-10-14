@@ -132,6 +132,11 @@ export interface Stairs {
   risers?: number;
   /** Open stairs (outdoor steps): treads on two stringers, nothing under them. Absent: solid down to the floor. */
   open?: boolean;
+  /**
+   * Railings on the open sides, left and right as you climb (DESIGN.md "Stair railings"): a 36"
+   * handrail over the nosings with newels and balusters. Absent (or no side true): none.
+   */
+  railings?: { left?: boolean; right?: boolean };
 }
 
 export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';

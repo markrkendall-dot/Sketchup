@@ -1177,6 +1177,20 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         />
         Open (treads on stringers, for outdoor steps)
       </label>
+      {(['left', 'right'] as const).map((side) => (
+        <label key={side} className="check-row">
+          <input
+            type="checkbox"
+            aria-label={`Railing on the ${side}`}
+            checked={!!stairs.railings?.[side]}
+            onChange={(e) => {
+              updateStairs(level.id, stairs.id, { railings: { ...stairs.railings, [side]: e.target.checked } });
+              releaseFocus(e.currentTarget);
+            }}
+          />
+          Railing on the {side} (as you climb)
+        </label>
+      ))}
       {stairs.cutsFloorAbove && <StairsOpeningFields level={level} stairs={stairs} ftf={ftf} />}
       <ReadOnly label="Step depth">{formatLength(tread, denom)}</ReadOnly>
       <p className="panel-note">

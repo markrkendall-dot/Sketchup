@@ -81,7 +81,7 @@ const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sin
  * `Floor`, `Stairs`, `Roof` (with its `Fascia` boards and, under open eaves, its `Rafters`, materials
  * `fascia_<phase>` and `rafter_<phase>`, plus `_<hex>` in a board colour other than tan), `Deck`, `Deck framing` (with the
  * posts) and `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour other than
- * the default wood), `Guard` (the guard round a floor opening, material `railing_<phase>`), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
+ * the default wood), `Stair railing` and `Guard` (a flight's railings and the guard round a floor opening, material `railing_<phase>`), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
  * elevation 0, absolute heights) follows with the `Chimney` and `Post` meshes the view mode shows
  * (materials `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the default; a capped
  * chimney's cap and spark arrestor are more `Chimney` meshes, `chimney_cap_<phase>` and
@@ -145,6 +145,11 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     });
     for (const s of meshes.stairs) {
       group.add(mesh('Stairs', s.geometry, material(stairsMaterialName(s.phase), stairsMaterial(s.phase))));
+      if (s.railing) {
+        const r = mesh('Stair railing', s.railing, material(`railing_${s.phase}`, railingMaterial(s.phase)));
+        if (s.phase === 'demo') r.renderOrder = 1;
+        group.add(r);
+      }
     }
     for (const r of meshes.roofs) {
       const m = mesh('Roof', r.geometry, material(roofMaterialName(r.finish, r.phase, r.color), roofMaterial(r.finish, r.phase, r.color, r.weathering)));

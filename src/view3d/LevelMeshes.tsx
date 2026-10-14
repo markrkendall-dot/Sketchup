@@ -59,15 +59,20 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
         </group>
       ))}
       {meshes.stairs.map((s) => (
-        <mesh
-          key={s.id}
-          name={`stairs:${s.id}`}
-          geometry={s.geometry}
-          material={stairsMaterial(s.phase)}
-          castShadow={s.phase !== 'demo'}
-          receiveShadow
-          dispose={null}
-        />
+        <group key={s.id}>
+          <mesh name={`stairs:${s.id}`} geometry={s.geometry} material={stairsMaterial(s.phase)} castShadow={s.phase !== 'demo'} receiveShadow dispose={null} />
+          {s.railing && (
+            <mesh
+              name={`stairs:${s.id}:railing`}
+              geometry={s.railing}
+              material={railingMaterial(s.phase)}
+              renderOrder={s.phase === 'demo' ? 1 : 0}
+              castShadow={s.phase !== 'demo'}
+              receiveShadow
+              dispose={null}
+            />
+          )}
+        </group>
       ))}
       {decks.map((d) => (
         <group key={d.id} name={`deck:${d.id}`}>

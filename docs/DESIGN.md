@@ -81,6 +81,7 @@ export interface Stairs {
   rise?: Inches;             // height it climbs; default floorToFloor - base (a short flight to a landing)
   risers?: number;           // step count; default round(rise / 7.5"), at least 1 (a landing is 1)
   open?: boolean;            // outdoor steps: treads on two stringers, nothing under them
+  railings?: { left?: boolean; right?: boolean }; // as you climb; only true sides stored (see "Stair railings")
 }
 
 export interface Underlay {
@@ -325,7 +326,17 @@ instead). Then:
   below the floor: outdoor steps that go on down a slope past it; `migrate` drops it elsewhere), a
   climb not above 0, a top more than 1" above the floor above, or risers that are not a whole
   number from 1 to 100; the panel has "Starts at" (negative allowed on the lowest level), "Climbs"
-  and "Risers" (blank follows the defaults, shown as placeholders), and "Open".
+  and "Risers" (blank follows the defaults, shown as placeholders), "Open" and the railings.
+- Stair railings (`buildStairsRailingGeometry(stairs, rise, risers, base)`, `STAIR_RAIL`): on each
+  side `railings` names (left and right as you climb; `stairsRailingsOf` keeps only the true ones,
+  in the store and in `migrate`), inside the flight's width and flush with its side: a 3.5" newel
+  standing on the first tread and one on the last, a 3.5" x 1.5" handrail between their faces
+  whose top is 36" over the line of the nosings (the steps' front edges, `base + rise + d * rise /
+  tread`; level over a one-riser landing), and 1.5" balusters spaced evenly between the newels with
+  at most 4" between them, each from the tread under it to the rail's underside. One geometry per
+  flight, cached with the flight's own (`StairsMesh.railing`), in `railingMaterial` like a floor
+  opening's guard; exported as `Stair railing`. On the plan a railed side has a heavier line half
+  a newel in from it (`stairsSymbol(...).rails`).
 
 `getLevelMeshes(plan, levelId, viewMode)` memoizes per level and view mode, reuses each wall's
 geometry while its footprint object, wall, openings list, height and context (bands, neighbour

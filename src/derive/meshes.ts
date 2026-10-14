@@ -4,7 +4,7 @@ import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonS
 import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
-import { getDeckLayout, type DeckBox, type DeckLayout } from './decks';
+import { DECK, getDeckLayout, type DeckBox, type DeckLayout } from './decks';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
 import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
@@ -790,6 +790,14 @@ export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' 
     profile.push({ x: stairs.run, y: bottom });
     parts.push([profile, -w, w]);
   }
+  return stairsPartsGeometry(stairs, parts);
+}
+
+/**
+ * Profiles in a flight's own frame, each a polygon in (distance up the run, height) extruded across
+ * [l0, l1] of its width (to the right of travel positive), as one geometry in plan space.
+ */
+function stairsPartsGeometry(stairs: Pick<Stairs, 'origin' | 'direction'>, parts: readonly [Vec2[], number, number][]): BufferGeometry {
   const f = stairsFrame(stairs);
   // (along, lateral, height) -> (x, Y, z) is a reflection when u x v points down; keep faces outward.
   const flip = cross(f.u, f.v) > 0;
@@ -812,6 +820,73 @@ export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' 
   g.setAttribute('position', new Float32BufferAttribute(out, 3));
   g.computeVertexNormals();
   return g;
+}
+
+/** A stair railing's sizes (DESIGN.md "Stair railings"): the deck railing's, 36" over the nosings. */
+export const STAIR_RAIL = { height: DECK.railHeight, newel: DECK.railPost, newelAbove: 4, rail: DECK.cap, railThick: DECK.capThick, baluster: DECK.baluster, gap: DECK.balusterGap } as const;
+
+/**
+ * The railings on a flight's railed sides (`railings.left` / `.right`, as you climb), level-local:
+ * per side a newel at the bottom (on the first tread) and at the top (on the last), a handrail
+ * between them whose top is STAIR_RAIL.height over the line of the nosings (level over a landing,
+ * a one-riser flight), and balusters standing on the treads with at most STAIR_RAIL.gap between
+ * them. All of it inside the flight's width, flush with its side. Null with no railed side.
+ */
+export function buildStairsRailingGeometry(
+  stairs: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run' | 'railings'>,
+  rise: number,
+  risers: number,
+  base = 0,
+): BufferGeometry | null {
+  const sides = ([['left', -1], ['right', 1]] as const).filter(([k]) => stairs.railings?.[k]);
+  if (sides.length === 0 || !(risers >= 1) || !(stairs.run > 0)) return null;
+  const R = STAIR_RAIL;
+  const d = stairs.run / risers;
+  const w = stairs.width / 2;
+  // Height of the tread under a point `a` up the run, and of the nosing line there (the step's
+  // front edges; level over a landing).
+  const treadAt = (a: number) => base + (Math.min(risers - 1, Math.max(0, Math.floor(a / d))) + 1) * rise;
+  const slope = risers > 1 ? rise / d : 0;
+  const nosing = (a: number) => base + rise + a * slope;
+  const railTop = (a: number) => nosing(a) + R.height;
+  const c = R.newel / 2;
+  const a0 = c;
+  const a1 = stairs.run - c;
+  const parts: [Vec2[], number, number][] = [];
+  for (const [, sign] of sides) {
+    // Lateral bands, flush with the flight's side: newels and rail across R.newel, balusters centred on it.
+    const outer = sign * w;
+    const inner = sign * (w - R.newel);
+    const band = (width: number): [number, number] => {
+      const mid = sign * (w - c);
+      return [mid - width / 2, mid + width / 2];
+    };
+    const [n0, n1] = [Math.min(outer, inner), Math.max(outer, inner)];
+    // Newels: from the tread they stand on to above the rail.
+    for (const a of [a0, a1]) {
+      const top = railTop(a) + R.newelAbove;
+      parts.push([[{ x: a - c, y: treadAt(a) }, { x: a + c, y: treadAt(a) }, { x: a + c, y: top }, { x: a - c, y: top }], n0, n1]);
+    }
+    // The handrail between the newels' faces, sloped with the nosings.
+    const r0 = a0 + c;
+    const r1 = a1 - c;
+    if (r1 - r0 > 1e-6) {
+      const [l0, l1] = band(R.rail);
+      parts.push([[{ x: r0, y: railTop(r0) - R.railThick }, { x: r1, y: railTop(r1) - R.railThick }, { x: r1, y: railTop(r1) }, { x: r0, y: railTop(r0) }], l0, l1]);
+      // Balusters, evenly between the newels, each from its tread to the rail's underside.
+      const bw = R.baluster;
+      const count = Math.max(0, Math.ceil((r1 - r0 - R.gap) / (R.gap + bw) - 1e-9));
+      const gap = (r1 - r0 - count * bw) / (count + 1);
+      const [b0, b1] = band(bw);
+      for (let m = 0; m < count; m++) {
+        const x0 = r0 + gap * (m + 1) + bw * m;
+        const x1 = x0 + bw;
+        const foot = treadAt((x0 + x1) / 2);
+        parts.push([[{ x: x0, y: foot }, { x: x1, y: foot }, { x: x1, y: railTop(x1) - R.railThick }, { x: x0, y: railTop(x0) - R.railThick }], b0, b1]);
+      }
+    }
+  }
+  return stairsPartsGeometry(stairs, parts);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1039,6 +1114,8 @@ export interface FloorFinishMesh {
 export interface StairsMesh {
   id: Id;
   geometry: BufferGeometry;
+  /** The railings on its railed sides (buildStairsRailingGeometry), null with none. */
+  railing: BufferGeometry | null;
   phase: Phase;
 }
 
@@ -1267,6 +1344,7 @@ interface StairsEntry {
   risers: number;
   base: number;
   geometry: BufferGeometry;
+  railing: BufferGeometry | null;
 }
 
 interface RoofEntry {
@@ -1370,10 +1448,11 @@ function disposeWallEntry(e: WallEntry, keep?: WallEntry): void {
   }
 }
 
-function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null; rafters?: BufferGeometry | null }): void {
+function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null; rafters?: BufferGeometry | null; railing?: BufferGeometry | null }): void {
   e.geometry.dispose();
   e.fascia?.dispose();
   e.rafters?.dispose();
+  e.railing?.dispose();
 }
 
 /** Drop and dispose cache entries of levels that are no longer in the plan. */
@@ -1680,11 +1759,16 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const entry =
       old && old.stairs === s && old.rise === rise && old.risers === risers && old.base === base
         ? old
-        : { stairs: s, rise, risers, base, geometry: buildStairsGeometry(s, rise, risers, base, !!s.open) };
+        : { stairs: s, rise, risers, base, geometry: buildStairsGeometry(s, rise, risers, base, !!s.open), railing: buildStairsRailingGeometry(s, rise, risers, base) };
     nextStairs.set(s.id, entry);
-    stairs.push({ id: s.id, geometry: entry.geometry, phase: sp(s.phase) });
+    stairs.push({ id: s.id, geometry: entry.geometry, railing: entry.railing, phase: sp(s.phase) });
   }
-  if (prevStairs) for (const [id, e] of prevStairs) if (nextStairs.get(id) !== e) e.geometry.dispose();
+  if (prevStairs)
+    for (const [id, e] of prevStairs) {
+      if (nextStairs.get(id) === e) continue;
+      e.geometry.dispose();
+      e.railing?.dispose();
+    }
   stairsCache.set(key, nextStairs);
 
   // Roofs: rebuilt only when the roof object or its bearing height changes.
@@ -1798,7 +1882,7 @@ export function clearMeshCache(): void {
   for (const e of floorCache.values()) e.geometry?.dispose();
   for (const m of floorFinishCache.values()) for (const e of m.values()) e.geometry?.dispose();
   floorFinishCache.clear();
-  for (const m of stairsCache.values()) for (const e of m.values()) e.geometry.dispose();
+  for (const m of stairsCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of roofCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of openingCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
   for (const m of fixtureCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();

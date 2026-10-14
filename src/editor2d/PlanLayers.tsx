@@ -513,6 +513,7 @@ export function StairsGlyph({ sym, k, className, id }: { sym: StairsSymbol; k: n
     <g className={`${className}${sym.landing ? ' stairs-landing' : ''}`} data-stairs-id={id}>
       <path className="stairs-body" d={polyPath(sym.outline)} vectorEffect="non-scaling-stroke" />
       {sym.treads.length > 0 && <path className="stairs-tread" d={segPath(sym.treads)} vectorEffect="non-scaling-stroke" />}
+      {sym.rails.length > 0 && <path className="stairs-rail" d={segPath(sym.rails)} vectorEffect="non-scaling-stroke" />}
       {!sym.landing && (
         <>
           <path className="stairs-arrow" d={segPath([sym.shaft])} vectorEffect="non-scaling-stroke" />

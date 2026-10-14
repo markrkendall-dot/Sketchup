@@ -16,7 +16,8 @@ import {
   STAIRS_HEADROOM,
   stairSteps,
 } from '../derive/stairs';
-import { buildStairsGeometry, triangleCount } from '../derive/meshes';
+import { buildStairsGeometry, buildStairsRailingGeometry, getLevelMeshes, STAIR_RAIL, triangleCount } from '../derive/meshes';
+import { buildExportScene, disposeExportScene } from '../io/export3d';
 import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
 import example from '../../docs/examples/146-mick-road.json';
@@ -382,5 +383,68 @@ describe('outdoor stairs: below the lowest floor, open', () => {
     expect(level().stairs[id].open).toBe(true);
     store().updateStairs(levelId(), id, { open: undefined });
     expect('open' in level().stairs[id]).toBe(false);
+  });
+});
+
+describe('stair railings', () => {
+  const box = (g: NonNullable<ReturnType<typeof buildStairsRailingGeometry>>) => {
+    g.computeBoundingBox();
+    return g.boundingBox!;
+  };
+
+  it('stands a newel at each end and a handrail 36" over the nosings on the railed side, with balusters on the treads', () => {
+    // 12 risers of 7.5" over 120" climbing north from y 200; its right side (as you climb) is east, x 118.
+    const s = flight({ railings: { right: true } });
+    const g = buildStairsRailingGeometry(s, 7.5, 12)!;
+    const b = box(g);
+    expect([b.min.x, b.max.x]).toEqual([118 - STAIR_RAIL.newel, 118]);
+    expect([b.min.z, b.max.z]).toEqual([80, 200]);
+    // From the first tread up to the top newel, 4" over the rail over the last tread's back.
+    expect(b.min.y).toBeCloseTo(7.5, 6);
+    const nosing = (a: number) => 7.5 + (a * 7.5) / 10;
+    expect(b.max.y).toBeCloseTo(nosing(120 - STAIR_RAIL.newel / 2) + 36 + 4, 6);
+    // Two newels, the rail and 20 balusters (4" or less between them), each a four-sided prism.
+    expect(triangleCount(g)).toBe((2 + 1 + 20) * 12);
+    // Both sides; none at all is no geometry.
+    const both = box(buildStairsRailingGeometry(flight({ railings: { left: true, right: true } }), 7.5, 12)!);
+    expect([both.min.x, both.max.x]).toEqual([82, 118]);
+    expect(buildStairsRailingGeometry(flight(), 7.5, 12)).toBeNull();
+    expect(buildStairsRailingGeometry(flight({ railings: {} }), 7.5, 12)).toBeNull();
+  });
+
+  it('runs level over a landing (one riser)', () => {
+    const landing = flight({ run: 42, base: 64.8, rise: 7.2, risers: 1, railings: { left: true } });
+    const b = box(buildStairsRailingGeometry(landing, 7.2, 1, 64.8)!);
+    expect(b.min.y).toBeCloseTo(72, 6);
+    expect(b.max.y).toBeCloseTo(72 + 36 + 4, 6);
+  });
+
+  it('the store keeps only the railed sides, clears none, and a file keeps them the same way', () => {
+    const id = store().addStairs(levelId(), flight({ railings: { left: false, right: true } }))!;
+    expect(level().stairs[id].railings).toEqual({ right: true });
+    store().updateStairs(levelId(), id, { railings: { left: true, right: true } });
+    expect(level().stairs[id].railings).toEqual({ left: true, right: true });
+    undo();
+    expect(level().stairs[id].railings).toEqual({ right: true });
+    store().updateStairs(levelId(), id, { railings: { right: false } });
+    expect('railings' in level().stairs[id]).toBe(false);
+    const doc = JSON.parse(JSON.stringify(store().plan));
+    doc.levels[levelId()].stairs.a = { ...flight(), id: 'a', railings: { left: true, right: 'yes' } };
+    doc.levels[levelId()].stairs.b = { ...flight(), id: 'b', railings: 'both' };
+    const loaded = migrate(doc);
+    expect(loaded.levels[levelId()].stairs.a.railings).toEqual({ left: true });
+    expect('railings' in loaded.levels[levelId()].stairs.b).toBe(false);
+  });
+
+  it('draws a line along each railed side on the plan, and shows and exports the railing in 3D', () => {
+    const sym = stairsSymbol(flight({ railings: { right: true } }), 12);
+    expect(sym.rails).toEqual([[{ x: 116.25, y: 200 }, { x: 116.25, y: 80 }]]);
+    expect(stairsSymbol(flight(), 12).rails).toEqual([]);
+    const id = store().addStairs(levelId(), flight({ railings: { right: true } }))!;
+    const mesh = getLevelMeshes(store().plan, levelId(), 'all').stairs.find((m) => m.id === id)!;
+    expect(mesh.railing).not.toBeNull();
+    const root = buildExportScene(store().plan, 'all', { activeLevelId: levelId(), only3dActiveAndBelow: false, hidden3dLevels: [] });
+    expect(root.getObjectByName('Stair railing')).toBeTruthy();
+    disposeExportScene(root);
   });
 });

@@ -9,6 +9,7 @@ import {
   columnProblem,
   createEmptyPlan,
   deckProblem,
+  stairsRailingsOf,
   floorOpeningProblem,
   fixtureProblem,
   roofOptionProblem,
@@ -790,6 +791,9 @@ export const usePlanStore = create<PlanState>()(
               origin: { x: input.origin.x, y: input.origin.y },
               direction: normalizeDegrees(input.direction),
             };
+            const railings = stairsRailingsOf(input.railings);
+            if (railings) stairs.railings = railings;
+            else delete stairs.railings;
             for (const k of ['headroom', 'holeStart', 'open', ...STAIRS_HEIGHT_KEYS] as const) if (stairs[k] === undefined) delete stairs[k];
             level.stairs[stairs.id] = stairs;
             id = stairs.id;
@@ -824,6 +828,12 @@ export const usePlanStore = create<PlanState>()(
             if ('open' in patch) {
               if (patch.open === undefined) delete st.open;
               else if (st.open !== patch.open) st.open = patch.open;
+            }
+            // Railings: only the sides that have one are stored; none clears the field.
+            if ('railings' in patch) {
+              const r = stairsRailingsOf(patch.railings);
+              if (!r) delete st.railings;
+              else if (st.railings?.left !== r.left || st.railings?.right !== r.right) st.railings = r;
             }
           }),
 

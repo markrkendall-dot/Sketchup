@@ -543,7 +543,7 @@ const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
-const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open'] as const;
+const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
@@ -670,6 +670,18 @@ function migrateRooms(raw: Json): Level['rooms'] {
  * MAX_STAIRS_BELOW below the floor, outdoor steps down a slope), rise (positive), risers (a whole
  * number from 1 to MAX_STAIRS_RISERS) and open (true or false) only when valid.
  */
+/**
+ * A flight's railings as stored: `{ left?: true; right?: true }` with only the sides that have one,
+ * or undefined when neither does (or the value is not an object of booleans).
+ */
+export function stairsRailingsOf(v: unknown): Stairs['railings'] | undefined {
+  if (!isObject(v)) return undefined;
+  const out: { left?: boolean; right?: boolean } = {};
+  if (v.left === true) out.left = true;
+  if (v.right === true) out.right = true;
+  return out.left || out.right ? out : undefined;
+}
+
 function migrateStairs(raw: Json, lowest: boolean): Level['stairs'] {
   const out: Level['stairs'] = {};
   for (const [sid, st] of Object.entries(raw)) {
@@ -689,6 +701,7 @@ function migrateStairs(raw: Json, lowest: boolean): Level['stairs'] {
     put(stairs, 'rise', isNum(st.rise) && st.rise > 0 ? st.rise : undefined);
     put(stairs, 'risers', isNum(st.risers) && stairsRisersOk(st.risers) ? st.risers : undefined);
     put(stairs, 'open', typeof st.open === 'boolean' ? st.open : undefined);
+    put(stairs, 'railings', stairsRailingsOf(st.railings));
     out[sid] = stairs as unknown as Stairs;
   }
   return out;

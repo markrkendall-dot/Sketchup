@@ -326,6 +326,13 @@ export const PLAN_RULES = `.wall-exterior {
   opacity: 0.55;
 }
 
+/* A stair's railing: a heavier line along the railed side. */
+.stairs .stairs-rail {
+  fill: none;
+  stroke: #5c4434;
+  stroke-width: 2.2;
+}
+
 /* The opening a stair below cuts in this floor: "open to below". */
 .stair-hole .stair-hole-body {
   fill: rgba(31, 35, 41, 0.06);

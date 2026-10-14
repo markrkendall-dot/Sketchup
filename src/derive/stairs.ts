@@ -172,9 +172,14 @@ export interface StairsSymbol {
   /** Where the "UP" label goes, and its upright text angle in degrees. */
   label: Vec2;
   labelAngle: number;
+  /** The railings: a line along each railed side, half a newel in from it (`railings`). */
+  rails: Seg[];
 }
 
-export function stairsSymbol(s: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run'>, risers: number): StairsSymbol {
+/** How far in from a flight's side its railing's line is drawn on the plan: half a 3.5" newel. */
+const RAIL_INSET = 1.75;
+
+export function stairsSymbol(s: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run' | 'railings'>, risers: number): StairsSymbol {
   const f = stairsFrame(s);
   const h = s.width / 2;
   const treads: Seg[] = [];
@@ -187,6 +192,10 @@ export function stairsSymbol(s: Pick<Stairs, 'origin' | 'direction' | 'width' | 
   const base = sub(tip, scale(f.u, headLen));
   const shaft: Seg = [stairsPoint(f, Math.min(s.run * 0.12, 10), 0), tip];
   const head: [Vec2, Vec2, Vec2] = [add(base, scale(f.v, -headLen * 0.55)), tip, add(base, scale(f.v, headLen * 0.55))];
+  const rails: Seg[] = [];
+  const inset = Math.min(RAIL_INSET, h / 2);
+  if (s.railings?.left) rails.push([stairsPoint(f, 0, -h + inset), stairsPoint(f, s.run, -h + inset)]);
+  if (s.railings?.right) rails.push([stairsPoint(f, 0, h - inset), stairsPoint(f, s.run, h - inset)]);
   let labelAngle = (Math.atan2(f.u.y, f.u.x) * 180) / Math.PI;
   if (labelAngle > 90 || labelAngle <= -90) labelAngle += 180;
   return {
@@ -197,6 +206,7 @@ export function stairsSymbol(s: Pick<Stairs, 'origin' | 'direction' | 'width' | 
     head,
     label: stairsPoint(f, s.run * 0.3, -Math.min(h * 0.55, 10)),
     labelAngle,
+    rails,
   };
 }
 

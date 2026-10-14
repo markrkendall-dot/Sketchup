@@ -16,6 +16,7 @@ What it draws:
 - **Roofs** (gable, shed, hip, flat) with overhangs, fascia and rake boards or open eaves with
   rafter tails; walls under a roof rise to meet it, so a gable end is a triangle.
 - **Decks** on posts down to the ground, with railings that open where a flight of stairs arrives.
+- **Stair railings** on the open sides of a flight: newels, a handrail over the nosings, balusters.
 - **Floor openings**: a hole in a floor, open to the level below (a double-height hall, a stair
   well), with a 36" guard round it that opens where a flight from below arrives.
 - **The site**: spot elevations of the ground (grade points) become a terrain surface, so a walkout
@@ -93,6 +94,8 @@ Before you start, measure on paper. Then follow these steps in order.
    80") / floor to floor up the flight (the stair's properties change the headroom or set the
    start). Outdoor steps: tick "Open" for treads on stringers instead of a solid flight; on the
    lowest level "Starts at" may be negative, for steps that go on down a slope below its floor.
+   Tick "Railing on the left" or "on the right" (as you climb) for a 36" handrail with newels and
+   balusters on an open side.
 9. **Load a photo as an underlay if you have one.** A scanned plan, a real-estate sketch or a
    photo of graph paper: press `U`, load the image, click "Scale by two points", click the two
    ends of a wall whose length you know and type it, then lock the image and trace over it.
@@ -742,9 +745,8 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
   edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
-- **Not drawn yet**: stair railings (an open stair side has none, nor the hole a flight cuts in the
-  floor above; a deck's railing and a floor opening's guard are drawn, so draw a floor opening
-  round a stair well for its guard),
+- **Not drawn yet**: a guard round the hole a flight cuts in the floor above (draw a floor opening
+  round the stair well instead; it has one), handrails on a wall,
   exterior steps other than a flight (an outside stair is a flight on the lowest level, open and,
   down a slope, starting below its floor, as the starter's are), fences,
   the lot outline, porch floors and steps, foundations under additions and porches, gutters,
