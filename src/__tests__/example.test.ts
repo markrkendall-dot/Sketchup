@@ -99,9 +99,9 @@ describe('docs/examples/146-mick-road.json', () => {
     // closet's two (each splitting what it meets but the demolished walls), the stair strip's south wall (there is none
     // today, photo 16), the coat closet's two under the stair (its west wall splits the north wall
     // and its front wall the hall's east wall), the block under the addition and under the foyer,
-    // and the upstairs bath's south wall. The retaining wall's two pieces on the Basement are existing. Today's grey Kitchen
+    // and the upstairs bath's south wall. The retaining wall's three pieces on the Basement are existing; its two pieces carried west to the property line are new. Today's grey Kitchen
     // to Utility door stays as the bedroom's door (MK), so no new one is cut.
-    expect(count(all('walls'))).toEqual({ existing: 54, demo: 11, new: 26 });
+    expect(count(all('walls'))).toEqual({ existing: 55, demo: 11, new: 28 });
     expect(count(all('openings'))).toEqual({ existing: 16, demo: 16, new: 25 });
     // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
     // side and down the bank, with its landing, a deck) stays (MK). New: the grand stair's platform,
@@ -307,8 +307,9 @@ describe('docs/examples/146-mick-road.json', () => {
     // The porch: screens in its four bays and a screen door.
     expect(openings.filter((o) => o.glazing === 'screen').map((o) => `${o.type} ${o.width}`).sort()).toEqual(['door 36', 'window 18', 'window 18', 'window 44', 'window 44']);
     expect(Object.values(plan.levels[plan.levelOrder[1]].rooms).some((r) => r.name === 'Entry porch (est.)')).toBe(true);
-    // 32 from the photos and MK, and 8 for the bank below the walkout and the lower lawn (photos 24 to 27).
-    expect(Object.keys(plan.site.gradePoints)).toHaveLength(40);
+    // 40 from the photos, MK and the site sketch (the retaining wall's line), and 8 for the bank below
+    // the walkout and the lower lawn (photos 24 to 27).
+    expect(Object.keys(plan.site.gradePoints)).toHaveLength(48);
     // The lake-side terrace is filled in level at -6 from the house's south face to the retaining
     // wall, and from the wall's free west end to the wing (MK); the ground along the house's other
     // faces stays within a foot of the first floor (no sag between grade points).
@@ -366,20 +367,20 @@ describe('docs/examples/146-mick-road.json', () => {
     const door = existing.find((o) => o.type === 'door' && Math.abs(at(f, o).x - 3.5) < 1e-6)!;
     expect(door).toMatchObject({ width: 36, lites: { cols: 1, rows: 1 }, halfLite: true, leafColor: '#2f4a3a' });
     // The basement: grey block, but vertical boards in the stain round the walkout double door
-    // (photo 2), and the poured retaining wall's two pieces outside (photos 2 and 23).
+    // (photo 2), and the poured retaining wall outside (photos 2 and 23): its three pieces today and
+    // the two carrying it on west to the property line (the site sketch).
     const walls = Object.values(b.walls);
+    const plain = (vm: 'existing' | 'proposed') => walls.filter((w) => w.finish === 'plain' && isVisible(w.phase, vm)).length;
+    expect([plain('existing'), plain('proposed')]).toEqual([3, 5]);
     const retaining = walls.filter((w) => w.finish === 'plain');
-    expect(retaining.map((w) => [w.thickness, w.color, w.heightOverride])).toEqual([
-      [10, '#b3b0a8', 96],
-      [10, '#b3b0a8', 96],
-    ]);
+    expect(retaining.map((w) => [w.thickness, w.color, w.heightOverride])).toEqual(Array(5).fill([10, '#b3b0a8', 96]));
     expect(walls.filter((w) => w.finish === 'block' && w.color === '#8f8a84')).toHaveLength(walls.length - 1 - retaining.length);
     const boards = walls.find((w) => w.finish === 'board')!;
     expect(boards.color).toBe('#5a3a35');
     const walkout = Object.values(b.openings);
     expect(walkout).toHaveLength(1);
     // The block under the proposed addition is block too.
-    expect(walls.filter((w) => w.phase === 'new').every((w) => w.finish === 'block' && w.thickness === 8)).toBe(true);
+    expect(walls.filter((w) => w.phase === 'new' && w.finish !== 'plain').every((w) => w.finish === 'block' && w.thickness === 8)).toBe(true);
     expect(walkout[0]).toMatchObject({ type: 'door', wallId: boards.id, width: 72, height: 80, sashes: 2, leafColor: '#5a3a35', trim: 0 });
   });
 
@@ -447,13 +448,13 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(bearing('existing', sId).map((r) => r[2])).toEqual([137.5, 137.5, 152.5]);
   });
 
-  it('has no open wall ends but the retaining wall\'s free west end, and no orphan labels, in any view', () => {
+  it('has no open wall ends but the retaining wall\'s free west end (today\'s, or the new one\'s at the property line), and no orphan labels, in any view', () => {
     for (const vm of ['existing', 'proposed', 'all'] as const) {
       for (const id of plan.levelOrder) {
         const level = plan.levels[id];
         const set = getFaces(level, vm);
         const ends = set.openEnds.map((n) => [level.nodes[n].x, level.nodes[n].y]);
-        expect(ends, `${level.name} ${vm}`).toEqual(id === plan.levelOrder[0] ? [[-120, 435]] : []);
+        expect(ends, `${level.name} ${vm}`).toEqual(id === plan.levelOrder[0] ? [vm === 'existing' ? [-388, 489] : [-984, 519]] : []);
         expect(set.orphanRoomIds, `${plan.levels[id].name} ${vm}`).toHaveLength(0);
       }
     }
@@ -561,7 +562,7 @@ describe('docs/examples/146-mick-road.json', () => {
     const top = elev[f].floorTop + deck.elevation;
     expect(top).toBe(-4);
     const retaining = Object.values(plan.levels[b].walls).filter((w) => w.heightOverride !== undefined);
-    expect(retaining.map((w) => elev[b].floorTop + w.heightOverride!)).toEqual([top, top]);
+    expect(retaining.map((w) => elev[b].floorTop + w.heightOverride!)).toEqual(Array(5).fill(top));
     // The house carries its north edge and the retaining wall its west edge; two posts (the
     // south-east corner and the middle of the south edge); no stair reaches it, so its railings run
     // the full east and south edges.

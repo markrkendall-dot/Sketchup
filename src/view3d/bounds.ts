@@ -2,7 +2,8 @@ import { DECK } from '../derive/decks';
 import { getLevelElevations } from '../derive/levels';
 import { roofBearing, roofExtremes, roofOutlineWithOverhang } from '../derive/roofs';
 import { chimneyPartBoxes, columnOutline, columnPeak, fallbackElevation, terrainHeightAt } from '../derive/site';
-import type { Id, Plan } from '../model/types';
+import { getFaces } from '../derive/rooms';
+import type { Id, Level, Plan, Vec2 } from '../model/types';
 
 export interface Box3d {
   min: [number, number, number];
@@ -10,7 +11,26 @@ export interface Box3d {
 }
 
 /**
- * Bounding box of the given levels in three coordinates (x, Y up, plan y): the nodes, roof
+ * The nodes of the walls that close a room (in any view), so a free-standing wall (a retaining
+ * wall, a garden wall running off across the site) does not zoom the house out of the frame or
+ * stretch the sun's shadow map; a level whose walls close nothing gives all its nodes.
+ */
+function houseNodes(level: Level): Vec2[] {
+  const faces = getFaces(level, 'all').faces;
+  if (!faces.length) return Object.values(level.nodes);
+  const ids = new Set<Id>();
+  for (const f of faces) {
+    for (const wid of f.wallIds) {
+      const w = level.walls[wid];
+      if (w) ids.add(w.a).add(w.b);
+    }
+  }
+  return [...ids].flatMap((id) => (level.nodes[id] ? [level.nodes[id]] : []));
+}
+
+/**
+ * Bounding box of the given levels in three coordinates (x, Y up, plan y): the nodes of the walls
+ * that close rooms (houseNodes), roof
  * overhangs and decks in plan, from the lowest slab bottom to the highest ceiling, roof top or deck
  * railing, the site's
  * columns (a capped chimney's cap, 2" proud, and its spark arrestor, 12" above the top, included),
@@ -31,7 +51,7 @@ export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): 
     if (!level || !e) continue;
     minY = Math.min(minY, e.slabBottom);
     maxY = Math.max(maxY, e.ceiling);
-    for (const n of Object.values(level.nodes)) {
+    for (const n of houseNodes(level)) {
       minX = Math.min(minX, n.x);
       maxX = Math.max(maxX, n.x);
       minZ = Math.min(minZ, n.y);

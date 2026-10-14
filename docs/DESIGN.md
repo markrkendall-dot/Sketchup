@@ -725,7 +725,10 @@ chimney's brick is its flat colour). A capped chimney's cap and arrestor follow 
 `Chimney` meshes, materials `chimney_cap_<phase>` and `chimney_arrestor_<phase>`. The far ground is not
 exported.
 
-**Fit 3D** (`bounds.ts planBox`) includes the columns (a capped chimney's cap, 2" proud, and its arrestor,
+**Fit 3D** (`bounds.ts planBox`) takes in the walls that close a room (`houseNodes`: the walls of
+the All view's faces; a level whose walls close nothing gives all its nodes), so a free-standing
+wall such as the starter's retaining wall, carried 80' west to the property line, neither shrinks
+the house in Fit 3D and the elevations nor coarsens the sun's shadow map; it includes the columns (a capped chimney's cap, 2" proud, and its arrestor,
 12" above its top) and the terrain's height over the house area (a 6 x 6 sampling of the plan box), never
 the 100' margin.
 

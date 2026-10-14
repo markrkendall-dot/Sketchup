@@ -235,3 +235,12 @@ describe('sun shadow camera', () => {
     expect((2 * fit.half) / 2048).toBeLessThan(0.5);
   });
 });
+
+describe('planBox and free-standing walls', () => {
+  it('a wall that closes no room (a retaining wall) does not widen the box', () => {
+    const plan = migrate(example);
+    const box = planBox(plan);
+    // The retaining wall runs to x -984; the house (with its porch roofs) starts near x -114.
+    expect(box.min[0]).toBeGreaterThan(-200);
+  });
+});

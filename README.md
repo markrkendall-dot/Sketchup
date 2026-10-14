@@ -462,7 +462,7 @@ and the plan's north angle is 0.
   shutters on the two west windows, and the house door dark green outside with one large lite over
   two panels, swinging in (photos 8 and 19). The first-floor picture windows' casements are 2 x 4
   lites on the south face and 2 x 2 on the west (photos 14, 17, 18 and 23).
-- **Terrain**: thirty-three grade points, see below, with the lake side's terrace behind the retaining
+- **Terrain**: forty-eight grade points, see below, with the lake side's terrace behind the retaining
   wall.
 - **The two floors share three north-south bands** (inside faces, from the north wall): the north
   band y 7 to 97 (7'6"), a 5" wall (centerline y 99.5), the stair strip y 102 to 135 (2'9"), a 5"
@@ -518,12 +518,13 @@ and the plan's north angle is 0.
   and the walkout bump under the wing is labelled separately as "Utility (below)": it is closed off
   from the main block by the block's east wall in the starter, and stays a separate space until you
   measure how the two connect (delete or move the wall and the labels as you go).
-- **Retaining wall and terrace** (photos 2 and 23): a poured concrete wall, 10" thick, drawn on
-  the Basement level about 10' south of the main block, from 10' past its west face east to the
-  corner of the main block and the wing, then north to it; its top is 2" over the terrace behind
-  it, which sits a few inches under the first floor, so only the wing's basement walks out. Its
-  west end is free, so the Basement shows one open wall end (a red dot) by design. The fence on
-  the wall is not drawn.
+- **Retaining wall and terrace** (photos 2 and 23; its line from the site sketch, photo 10): a
+  poured concrete wall, 10" thick, drawn on the Basement level: a return 10' south from the corner
+  of the main block and the wing, a 22' piece angled west and 4'6" further south, and 37' straight
+  west to its free end, about 32' past the main block's west face. Its top is 2" over the terrace
+  behind it, which sits a few inches under the first floor, so only the wing's basement walks out.
+  Its west end is free, so the Basement shows one open wall end (a red dot) by design. The fence
+  on the wall is not drawn. The proposed design carries it on west (see 11 below).
 - **The bank and the lower lawn** (photos 24 to 27, from the lake road and the lower lawn): the
   ground in front of the walkout doors stays level only about 4' out, then a steep bank falls 8'
   (MK) to the lower lawn, level from about 12'6" out (estimates from the photos).
@@ -618,11 +619,11 @@ front and its two corners against the house, one of them the main block's north-
 main block's north-east corner -4, middle of the north wall -4, middle of the west wall -8; the
 terrace, level at -6 between the house and the retaining wall (MK: filled in, level with the west
 lawn), at the main block's south-west corner, the middle of its south face and its south-east
-corner, at the retaining wall's west end against the house's line, and on the lawn 3' west of that
-end; the wing's south-east corner -100 and
+corner, at the old line of the retaining wall's end against the house's line, and on the lawn behind the
+wall out west (-6, where the garage is to go); the wing's south-east corner -100 and
 north-east corner -20, a point 6' east of the main block's east wall -6, pairs either side of the
-retaining wall (-6 on the terrace just inside it; -50, -60, -85 and -100 on the lawn just outside,
-west to east; east of its return -100 beside the house and -153 on the bank), the bank in front
+retaining wall and its new length west (-6 on the terrace and lawn just inside it; -40, -45, -50,
+-50, -60, -65, -85 and -100 on the ground just outside, west to east; east of its return -100 beside the house and -153 on the bank), the bank in front
 of the walkout (its top 4' south of the wing at -100, its foot 12'6" south at -196, and the lower
 lawn at -196 out to 40'; photos 24 to 27, the 8' drop from MK), two at the walkout's threshold (-100, 6" out from the wall at the double door's jambs), and two points 30'
 north of the house at +6 (the road is slightly higher). Measure them down from the first-floor sill
@@ -769,6 +770,11 @@ with the places where the built design differs from them):
     floor (by the master bedroom's door in the kitchen, on the upstairs balcony) and in the Living
     with the stove. The code asks for alarms hard-wired and interconnected in new work, with
     exceptions in alterations; which apply here is for the electrician and the inspector.
+11. **Retaining wall carried west** (MK, after the site sketch): from today's free end about 20'
+    angled and 27' straight to the west property line (x -984, 3' west of the planned garage), the
+    same poured concrete, its top 2" over the lawn behind it. The garage itself (24' x 26', 55' west
+    of the house, 5' north of this wall) is not drawn. Walls that close no room, like this one, are
+    left out of what the 3D view frames and shadows, so the house keeps its size on screen.
 **After the work** (MK, after his garage across the road), the Proposed view shows the whole house
 re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
 roof (`#2f4a36`) with its rake and fascia boards in the shake brown, with black windows (`#1c1c1c`)

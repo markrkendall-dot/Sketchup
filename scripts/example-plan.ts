@@ -58,8 +58,22 @@ const ROOF_GALVANIZED = '#8a8378';
 const ROOF_WING = '#6e4b3c';
 /** Poured concrete of the retaining wall (photos 02 and 23). */
 const CONCRETE_COLOR = '#b3b0a8';
-/** The retaining wall's centerline: about 10' south of the main block, from past its west face (photo 23). */
-const RETAIN = { y: ft(26) + 3 + ft(10), west: -120 };
+/**
+ * The retaining wall's centerline, after the site sketch (photo 10; MK): a return from the main
+ * block's south-east corner 10' south (y 435), a 22' piece angled west and 4'6" further south, and
+ * 37' straight west to its free end, about 32' past the main block's west face. The design carries it
+ * on (new) about 20' angled and 27' straight to the west property line (3' west of the planned
+ * garage, 55' west of the house: x -984). All estimates (the sketch is not to scale).
+ */
+const RETAIN = { y: ft(26) + 3 + ft(10), bend: { x: 56, y: 489 }, west: -388 };
+const RETAIN_NEW = [{ x: -660, y: 519 }, { x: -984, y: 519 }];
+/** The retaining wall's centerline y at plan x (the existing wall and the new one). */
+const retainY = (x: number): number => {
+  if (x >= RETAIN.bend.x) return RETAIN.y + ((CL.x1 - x) / (CL.x1 - RETAIN.bend.x)) * (RETAIN.bend.y - RETAIN.y);
+  if (x >= RETAIN.west) return RETAIN.bend.y;
+  if (x >= RETAIN_NEW[0].x) return RETAIN.bend.y + ((RETAIN.west - x) / (RETAIN.west - RETAIN_NEW[0].x)) * (RETAIN_NEW[0].y - RETAIN.bend.y);
+  return RETAIN_NEW[0].y;
+};
 /**
  * The bank south of the walkout (photos 24 to 27, estimates): the ground stays at the walkout's -100
  * about 4' out from the wing's south face, then falls 8' (MK) to the lower lawn at -196, which is
@@ -440,20 +454,22 @@ export function buildExamplePlan(): Plan {
   gp(MAIN.x0, MAIN.y1, -6);
   gp(MAIN.x1 / 2, MAIN.y1, -6);
   gp(MAIN.x1, MAIN.y1, -6);
-  gp(RETAIN.west, MAIN.y1, -6);
-  gp(RETAIN.west - 36, RETAIN.y, -6);
+  gp(MAIN.x0 - 120, MAIN.y1, -6);
   gp(WING.x1, WING.y1, -100);
   // The lawn reaches nearly to the first floor at the wing's north-east corner and drops under the
   // deck toward the lake (photo 03).
   gp(WING.x1, WING.y0, -20);
   gp(MAIN.x1 + ft(6), ft(8), -6);
-  // The retaining wall (drawn on the Basement level below): the terrace at -6 just inside it, the lawn
-  // just outside it falling from about -50 at its west end to the walkout's -100 at the wing. The
-  // terrain is sampled on a 24" grid, so the drop is a short ramp that the wall mostly hides.
-  for (const [x, outside] of [[RETAIN.west + 10, -50], [MAIN.x0, -60], [MAIN.x1 / 2, -85], [MAIN.x1 - 16, -100]]) {
-    gp(x, RETAIN.y - 8, -6);
-    gp(x, RETAIN.y + 8, outside);
+  // The retaining wall (drawn on the Basement level below): the terrace at -6 just inside it, out to
+  // the new wall's west end at the property line (the lawn west of the house, where the garage is to
+  // go, at the terrace's level), and the ground just outside it falling from about -40 at the west
+  // to the walkout's -100 at the wing (estimates). The terrain is sampled on a 24" grid, so the drop
+  // is a short ramp that the wall mostly hides.
+  for (const [x, outside] of [[-950, -40], [RETAIN_NEW[0].x, -45], [RETAIN.west, -50], [MAIN.x0 - 110, -50], [MAIN.x0, -60], [RETAIN.bend.x, -65], [MAIN.x1 / 2, -85], [MAIN.x1 - 16, -100]]) {
+    gp(x, retainY(x) - 8, -6);
+    gp(x, retainY(x) + 8, outside);
   }
+  gp(-960, 300, -6);
   for (const y of [MAIN.y1 + 16, RETAIN.y - 16]) {
     gp(CL.x1 - 8, y, -6);
     gp(CL.x1 + 8, y, bankAt(y));
@@ -469,10 +485,11 @@ export function buildExamplePlan(): Plan {
   gp((WING.x0 + WING.x1) / 2 + 36, WING.y1 + 6, -100);
   gp(MAIN.x1 / 4, MAIN.y0 - ft(30), 6);
   gp((MAIN.x1 * 3) / 4, MAIN.y0 - ft(30), 6);
-  // The retaining wall itself (photos 02 and 23): poured concrete, about 10" thick, its top 2" over
-  // the terrace (96" from the basement floor), from past the house's west face east to the corner of
-  // the main block and the wing, then north to it. Its west end is free (an open end on the plan).
-  const retaining = drawWalls(bId, [{ x: RETAIN.west, y: RETAIN.y }, { x: CL.x1, y: RETAIN.y }, { x: CL.x1, y: CL.y1 }], 10);
+  // The retaining wall itself (photos 02 and 23, its line from the site sketch): poured concrete,
+  // about 10" thick, its top 2" over the terrace (96" from the basement floor), from its free west end
+  // east, then angled, to the corner of the main block and the wing, then north to it. Its west end
+  // is free (an open end on the plan).
+  const retaining = drawWalls(bId, [{ x: RETAIN.west, y: RETAIN.bend.y }, RETAIN.bend, { x: CL.x1, y: RETAIN.y }, { x: CL.x1, y: CL.y1 }], 10);
   store().updateWalls(bId, retaining, { finish: 'plain', color: CONCRETE_COLOR, heightOverride: 96 });
   // The wooden stair along the wing's east side (photos 23 and 25): open treads on stringers, from a
   // landing at the walkout's level beside the wing's south-east corner up north to the lawn at the
@@ -1070,6 +1087,12 @@ function proposed(ids: ExistingIds): void {
     const d = columnDefaults(getPlan(), 'post', at, NEW);
     if (!store().addColumn({ at, kind: 'post', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP, top: round2(d.top), color: FINISH_COLOR })) throw new Error(`post at y ${y} rejected`);
   }
+
+  // ---- The retaining wall carried on west to the property line (MK, after the site sketch, photo
+  // 10): from today's free end about 20' angled and 27' straight, the same poured concrete, its top at
+  // the terrace's level plus 2", 5' south of where the garage is to go (not drawn).
+  const retainingNew = drawWalls(bId, [{ x: RETAIN.west, y: RETAIN.bend.y }, ...RETAIN_NEW], 10, false, NEW);
+  store().updateWalls(bId, retainingNew, { finish: 'plain', color: CONCRETE_COLOR, heightOverride: 96 });
 
   // ---- 6. The deck off the master bedroom's sliding door (MK, 14 Oct 2026): about 8' deep, the
   // wing's width from the retaining wall's east face (x 319.5) to the wing's east face (x 463). Its
