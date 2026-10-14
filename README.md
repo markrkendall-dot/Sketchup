@@ -747,6 +747,9 @@ with the places where the built design differs from them):
    timber posts in the stain and a shed roof high at the house wall. The Living's west window,
    which now looks into the porch, is replaced by the same window without shutters. The foyer
    stands on 8" block walls (a crawl space) like the east addition; the screen porch on its posts.
+   The foyer's gable carries stained timbers on its face, after the old porch's (photo 08): a
+   corner post at each end, 45° knee braces up to a tie beam on the eave line, a king post and two
+   rafters under the roof (6x6s, the braces 4x4).
 9. **Deck off the master bedroom** (MK, 14 Oct 2026), about 8' deep: the wing's width from the
    retaining wall's east face to the wing's east face (x 319.5 to 463, y 315 to 411, 11'11 1/2" x
    8'). Its top is 6" below the bedroom floor (elevation -4), flush with the retaining wall's top,
@@ -812,7 +815,6 @@ Still open:
   (settled: MK kept it rather than cut a new door); a hall can still be added later.
 - The kitchen: the stools stand clear of the ledge rather than under it; the hood's duct route (out
   through the wing's ceiling, or a recirculating hood) is worth a second look.
-- The knee braces and the timber truss in the foyer's gable are not modelled.
 - Every new size is from the plan, not measured: check them on site before ordering anything.
 - The garage from the site sketch (24' x 26', 55' west of the house and 20' from the road) is not
   drawn: on the First Floor, **Draw as: new**, the Box tool (`B`, `24' x 26'`, Enter).

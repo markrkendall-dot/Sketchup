@@ -1,6 +1,6 @@
 import { isVisible } from '../../derive/phase';
 import { dist } from '../../model/geometry';
-import { MEMBER_DEFAULTS, joistWords } from '../../model/structure';
+import { isTimber, MEMBER_DEFAULTS, joistWords } from '../../model/structure';
 import type { Vec2 } from '../../model/types';
 import { formatLength } from '../../model/units';
 import { EMPTY_SELECTION } from '../../store/uiStore';
@@ -119,7 +119,7 @@ function snapToBeamEnds(ctx: ToolContext, e: ToolPointerEvent) {
   let bestD = r;
   for (const lvl of levels) {
     for (const m of Object.values(lvl.members ?? {})) {
-      if (m.kind !== 'beam' || !isVisible(m.phase, ui.viewMode)) continue;
+      if (m.kind !== 'beam' || isTimber(m) || !isVisible(m.phase, ui.viewMode)) continue;
       for (const p of [m.a, m.b]) {
         const d = dist(p, e.world);
         if (d <= bestD) {

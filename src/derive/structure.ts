@@ -16,6 +16,7 @@ import { add, cross, dist, dot, normalize, pointInPolygon, scale, sub } from '..
 import type { Id, Level, Plan, Vec2, ViewMode, Wall } from '../model/types';
 import { formatLength } from '../model/units';
 import { getFootprints } from './footprint';
+import { isTimber } from '../model/structure';
 import { joistDepth, joistsAt } from './members';
 import { isVisible } from './phase';
 
@@ -121,7 +122,7 @@ function crossingSupports(plan: Plan, levelId: Id, j: Vec2, viewMode: ViewMode, 
     if (s && crossesJoists(dirOf(s), j)) out.push(s);
   }
   for (const m of Object.values(level.members ?? {})) {
-    if (m.kind === 'beam' && isVisible(m.phase, viewMode) && crossesJoists(dirOf(m), j)) out.push({ a: m.a, b: m.b });
+    if (m.kind === 'beam' && !isTimber(m) && isVisible(m.phase, viewMode) && crossesJoists(dirOf(m), j)) out.push({ a: m.a, b: m.b });
   }
   return out;
 }
@@ -175,9 +176,9 @@ export function wallBearings(plan: Plan, view: BearingView): WallBearings {
         const s = wallSegment(above, u);
         if (s) bearingAbove.push(s);
       }
-      for (const m of Object.values(above.members ?? {})) if (m.kind === 'post' && isVisible(m.phase, view)) postsAbove.push(m.at);
+      for (const m of Object.values(above.members ?? {})) if (m.kind === 'post' && !isTimber(m) && isVisible(m.phase, view)) postsAbove.push(m.at);
     }
-    const beamEnds = Object.values(level.members ?? {}).flatMap((m) => (m.kind === 'beam' && isVisible(m.phase, view) ? [m.a, m.b] : []));
+    const beamEnds = Object.values(level.members ?? {}).flatMap((m) => (m.kind === 'beam' && !isTimber(m) && isVisible(m.phase, view) ? [m.a, m.b] : []));
     for (const w of Object.values(level.walls)) {
       if (!isVisible(w.phase, view)) continue;
       if (w.bearing !== undefined) {

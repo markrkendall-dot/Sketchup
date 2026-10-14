@@ -384,6 +384,15 @@ export interface Beam {
   phase: Phase;
   /** What it is, e.g. "(2) 1 3/4 x 11 7/8 LVL"; placeholder sizes are for the engineer to set. */
   label?: string;
+  /**
+   * A timber at set heights (a truss's rafter, a knee brace): its top at a and at b over the floor,
+   * both or neither. It slopes between them, `depth` deep square to it, may stand above the ceiling,
+   * and the structure checks do not follow it.
+   */
+  za?: Inches;
+  zb?: Inches;
+  /** A colour (hex) for a timber left showing; members are pale wood otherwise. */
+  color?: string;
 }
 
 /** A post (schema version 7): from its level's floor up to the beam over it (else the ceiling). */
@@ -398,6 +407,10 @@ export interface Post {
   label?: string;
   /** A concrete pad under it, on the lowest level only. */
   footing?: { width: Inches; thickness: Inches };
+  /** A timber at set heights over the floor (a king post): both or neither; the checks ignore it. */
+  base?: Inches;
+  top?: Inches;
+  color?: string;
 }
 
 export type Member = Beam | Post;

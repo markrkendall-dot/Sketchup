@@ -597,8 +597,8 @@ const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle'] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
 const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
 const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
-const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'label'] as const;
-const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'label', 'footing'] as const;
+const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'label', 'za', 'zb', 'color'] as const;
+const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'label', 'footing', 'base', 'top', 'color'] as const;
 const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
@@ -967,6 +967,7 @@ function migrateMembers(raw: Json, where: string, lowest: boolean): Level['membe
     const member = pick(m, m.kind === 'beam' ? BEAM_KEYS : POST_KEYS);
     member.id = mid;
     member.phase = phaseOf(m.phase);
+    if (typeof member.color === 'string') member.color = member.color.toLowerCase();
     if (m.kind === 'beam') {
       member.a = { x: (m.a as Vec2).x, y: (m.a as Vec2).y };
       member.b = { x: (m.b as Vec2).x, y: (m.b as Vec2).y };

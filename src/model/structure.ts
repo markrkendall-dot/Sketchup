@@ -14,6 +14,9 @@ export const MEMBER_DEFAULTS = {
   footing: { width: 24, thickness: 12 },
 } as const;
 
+/** Structure in 3D: LVL beams and posts as pale wood, footings as concrete. */
+export const MEMBER_COLOR = { beam: '#d6b98c', post: '#c8a678', footing: '#a8a29e' } as const;
+
 /** The depth of an attic's ceiling joists, where there is no floor above to take it from. */
 export const ATTIC_JOIST_DEPTH = 5.5;
 
@@ -29,6 +32,9 @@ export function joistWords(deg: Degrees, northAngle = 0): string {
 }
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const HEX = /^#[0-9a-fA-F]{6}$/;
+/** A height over the floor a timber may be set to, inches. */
+const settable = (v: unknown): v is number => finite(v) && v >= -600 && v <= 1200;
 const positive = (v: unknown, max = 600): v is number => finite(v) && v > 0 && v <= max;
 
 /** Why a level's framing cannot be used, or null. */
@@ -54,6 +60,8 @@ export function memberProblem(m: Partial<Beam> | Partial<Post>, lowest: boolean)
     if (!positive(b.width, 48) || !positive(b.depth, 48)) return 'width and depth must be from 0" to 48"';
     if (b.mount !== 'flush' && b.mount !== 'dropped') return 'is flush or dropped';
     if (b.label !== undefined && typeof b.label !== 'string') return 'the label must be text';
+    if ((b.za !== undefined || b.zb !== undefined) && !(settable(b.za) && settable(b.zb))) return 'a timber needs its top at both ends';
+    if (b.color !== undefined && !(typeof b.color === 'string' && HEX.test(b.color))) return 'the colour must be a hex colour';
     return null;
   }
   if (m.kind === 'post') {
@@ -62,6 +70,8 @@ export function memberProblem(m: Partial<Beam> | Partial<Post>, lowest: boolean)
     if (!positive(p.width, 48) || !positive(p.depth, 48)) return 'width and depth must be from 0" to 48"';
     if (!finite(p.rotation)) return 'needs a rotation';
     if (p.label !== undefined && typeof p.label !== 'string') return 'the label must be text';
+    if ((p.base !== undefined || p.top !== undefined) && !(settable(p.base) && settable(p.top) && p.top > p.base)) return 'a timber post needs a base under its top';
+    if (p.color !== undefined && !(typeof p.color === 'string' && HEX.test(p.color))) return 'the colour must be a hex colour';
     if (p.footing !== undefined) {
       if (!lowest) return 'only a post on the lowest level stands on a footing';
       if (!positive(p.footing.width, 120) || !positive(p.footing.thickness, 60)) return 'the footing needs a width and a thickness';
@@ -70,6 +80,9 @@ export function memberProblem(m: Partial<Beam> | Partial<Post>, lowest: boolean)
   }
   return 'is a beam or a post';
 }
+
+/** A beam or post at set heights (a timber): drawn as set, not followed by the structure checks. */
+export const isTimber = (m: Member): boolean => (m.kind === 'beam' ? m.za !== undefined : m.base !== undefined);
 
 /** A beam's or post's plan points (to move it). */
 export const memberPoints = (m: Member): Vec2[] => (m.kind === 'beam' ? [m.a, m.b] : [m.at]);

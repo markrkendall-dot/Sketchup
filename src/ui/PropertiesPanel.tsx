@@ -16,7 +16,7 @@ import { directionVector, flightSteps, floorToFloor, headroomHoleStart, STAIRS_H
 import { activateUnderlayTool, makeToolContext, switchTool } from '../editor2d/tools';
 import { beamHeights, joistDepth, memberBoxes } from '../derive/members';
 import { bearingOf } from '../derive/structure';
-import { joistWords, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
+import { isTimber, joistWords, MEMBER_COLOR, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
 import { COLUMN_KIND_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
@@ -1958,24 +1958,68 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
   const size = (key: 'width' | 'depth', label: string, hint: string) => (
     <LengthField label={label} value={member[key]} onCommit={(v) => void (v !== null && set({ [key]: v }))} hint={hint} />
   );
+  const timber = isTimber(member);
+  // A timber at set heights: a sloped or freestanding member the checks do not follow (a gable's truss).
+  const timberFields = (
+    <>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          aria-label="Set heights"
+          checked={timber}
+          onChange={(e) => {
+            const on = e.target.checked;
+            if (member.kind === 'beam') set(on ? { za: boxes.body.top, zb: boxes.body.top } : { za: undefined, zb: undefined, color: undefined });
+            else set(on ? { base: boxes.body.bottom, top: boxes.body.top, footing: undefined } : { base: undefined, top: undefined, color: undefined });
+            releaseFocus(e.currentTarget);
+          }}
+        />
+        Set heights (a timber: drawn as set, not followed by the checks)
+      </label>
+      {timber && member.kind === 'beam' && (
+        <>
+          <LengthField label="Top at its first end" value={member.za} bound="any" onCommit={(v) => void (v !== null && set({ za: v }))} hint="Over this level's floor." />
+          <LengthField label="Top at its other end" value={member.zb} bound="any" onCommit={(v) => void (v !== null && set({ zb: v }))} hint="It slopes between the two; its depth is square to it." />
+        </>
+      )}
+      {timber && member.kind === 'post' && (
+        <>
+          <LengthField label="Base" value={member.base} bound="any" onCommit={(v) => void (v !== null && set({ base: v }))} hint="Over this level's floor." />
+          <LengthField label="Top" value={member.top} bound="any" onCommit={(v) => void (v !== null && set({ top: v }))} />
+        </>
+      )}
+      {timber && (
+        <ColorField
+          label="Colour"
+          value={member.color ?? (member.kind === 'beam' ? MEMBER_COLOR.beam : MEMBER_COLOR.post)}
+          onCommit={(color) => set({ color })}
+          onReset={member.color ? () => set({ color: undefined }) : undefined}
+          hint="A timber left showing, e.g. in the stain."
+        />
+      )}
+    </>
+  );
   if (member.kind === 'beam') {
-    const h = beamHeights(plan, level.id, member);
+    const h = timber ? { bottom: boxes.body.bottom, top: boxes.body.top } : beamHeights(plan, level.id, member);
     return (
       <>
-        <h3>Beam</h3>
+        <h3>{timber ? 'Timber' : 'Beam'}</h3>
         <LabelField id={member.id} value={member.label} placeholder={MEMBER_DEFAULTS.beam.label} onCommit={(label) => set({ label })} />
-        {size('width', 'Width', 'Across the beam: 3 1/2" for two 1 3/4" LVLs.')}
-        {size('depth', 'Depth', 'Top to bottom.')}
-        <SelectField label="Mount" value={member.mount} options={mountOptions} onChange={(mount) => set({ mount })} />
+        {size('width', 'Width', timber ? 'Across it.' : 'Across the beam: 3 1/2" for two 1 3/4" LVLs.')}
+        {size('depth', 'Depth', timber ? 'Square to it.' : 'Top to bottom.')}
+        {!timber && <SelectField label="Mount" value={member.mount} options={mountOptions} onChange={(mount) => set({ mount })} />}
+        {timberFields}
         <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
-        <ReadOnly label="Length">{formatLength(dist(member.a, member.b), denom)}</ReadOnly>
+        <ReadOnly label="Length">{formatLength(dist(member.a, member.b), denom)}{timber ? ' in plan' : ''}</ReadOnly>
         <ReadOnly label="Over the floor">
           {formatLength(h.bottom, denom)} to {formatLength(h.top, denom)}
-          {member.mount === 'flush' && h.bottom < level.wallHeight ? `, ${formatLength(level.wallHeight - h.bottom, denom)} below the ceiling` : ''}
+          {!timber && member.mount === 'flush' && h.bottom < level.wallHeight ? `, ${formatLength(level.wallHeight - h.bottom, denom)} below the ceiling` : ''}
         </ReadOnly>
         <IssueNotes levelId={level.id} target={{ members: [member.id] }} />
         <p className="panel-note">
-          A placeholder size for the engineer to set. A flush beam sits in the floor framing over this level, its top at the joists' top; a dropped one hangs under the ceiling. Drag an end with the select tool to move it.
+          {timber
+            ? 'A timber at set heights: it slopes from one end to the other and may stand above the ceiling (a truss in a gable). The structure checks do not follow it.'
+            : "A placeholder size for the engineer to set. A flush beam sits in the floor framing over this level, its top at the joists' top; a dropped one hangs under the ceiling. Drag an end with the select tool to move it."}
         </p>
       </>
     );
@@ -1988,7 +2032,8 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
       {size('depth', 'Depth', 'Along the plan y axis before rotation.')}
       <NumberField label="Rotation" value={member.rotation} onCommit={(v) => set({ rotation: v })} hint="Degrees, clockwise on the plan." />
       <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
-      {lowest && (
+      {timberFields}
+      {lowest && !timber && (
         <>
           <label className="check-row">
             <input
@@ -2010,7 +2055,10 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
           )}
         </>
       )}
-      <ReadOnly label="Height">{formatLength(boxes.body.top - boxes.body.bottom, denom)}, up to {boxes.body.top < level.wallHeight ? 'the beam over it' : 'the ceiling'}</ReadOnly>
+      <ReadOnly label="Height">
+        {formatLength(boxes.body.top - boxes.body.bottom, denom)}
+        {timber ? '' : `, up to ${boxes.body.top < level.wallHeight ? 'the beam over it' : 'the ceiling'}`}
+      </ReadOnly>
       <ReadOnly label="Position">
         x {formatLength(member.at.x, denom)}, y {formatLength(member.at.y, denom)}
       </ReadOnly>

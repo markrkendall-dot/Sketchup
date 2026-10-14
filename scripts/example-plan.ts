@@ -1030,6 +1030,36 @@ function proposed(ids: ExistingIds): void {
   const ROOF_EAST = MAIN.x0 - 18;
   roof(fId, { shape: 'shed', outline: outline({ x0: MAIN.x1 + 18, x1: WING.x1, y0: MAIN.y0, y1: MAIN.y1 }), ridgeAngle: 0, pitch: 5, overhang: 18 }, ROOF_WING, 0.1, NEW);
   roof(fId, { shape: 'gable', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y0, y1: FOYER.y1 }), ridgeAngle: 0, pitch: 8, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
+  // The foyer's gable timbers (MK; after the old porch's in photo 08): stained 6x6s (5 1/2") on the
+  // gable face, just off the siding (x -99, under the rake's 18" overhang): a corner post at each end
+  // up to a tie beam across the eave line, a 4x4 knee brace at 45 degrees from each post to the tie,
+  // a king post from the tie to the ridge, and two principal rafters 1/4" under the roof from the
+  // tie's ends to the ridge. Timbers at set heights (the structure checks do not follow them);
+  // their fixing is for the engineer.
+  const gable = Object.values(level(fId).roofs).find((r) => r.phase === NEW && r.shape === 'gable')!;
+  const gableUnder = (y: number) => roofHeightAt(gable, roofBearing(level(fId).wallHeight, gable), { x: FOYER.x0 - 3, y })!;
+  const GX = FOYER.x0 - 3;
+  const SIX = 5.5;
+  const TIE = 94;
+  const ridgeY = (FOYER.y0 + FOYER.y1) / 2;
+  const timber = (a: Vec2, za: number, b: Vec2, zb: number, size = SIX, label = '6x6') => {
+    if (!store().addMember(fId, { kind: 'beam', a, b, width: size, depth: size, mount: 'dropped', za, zb, color: FINISH_COLOR, label, phase: NEW })) throw new Error('timber rejected');
+  };
+  const timberPost = (y: number, base: number, top: number) => {
+    if (!store().addMember(fId, { kind: 'post', at: { x: GX, y }, width: SIX, depth: SIX, rotation: 0, base, top, color: FINISH_COLOR, label: '6x6', phase: NEW })) throw new Error('timber post rejected');
+  };
+  const ends = [FOYER.y0 + SIX / 2, FOYER.y1 - SIX / 2];
+  timber({ x: GX, y: FOYER.y0 }, TIE, { x: GX, y: FOYER.y1 }, TIE, SIX, '6x6 tie');
+  timberPost(ridgeY, TIE, round2(gableUnder(ridgeY) - 0.25));
+  for (const [i, y] of ends.entries()) {
+    const inward = i === 0 ? 1 : -1;
+    timberPost(y, 0, TIE - SIX);
+    // The brace's top meets the tie's underside 18" in from the post's face.
+    const from = y + (inward * SIX) / 2;
+    timber({ x: GX, y: from }, TIE - SIX - 18, { x: GX, y: from + inward * 18 }, TIE - SIX, 3.5, '4x4 brace');
+    const eave = i === 0 ? FOYER.y0 : FOYER.y1;
+    timber({ x: GX, y: eave }, round2(gableUnder(eave) - 0.25), { x: GX, y: ridgeY }, round2(gableUnder(ridgeY) - 0.25), SIX, '6x6 rafter');
+  }
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
   // ---- The porch's posts: 8" x 8" in the stain, flush with the outside face of its west wall, at
@@ -1195,6 +1225,11 @@ function proposed(ids: ExistingIds): void {
   beam({ x: PART_KL, y: FRONT_LINE }, { x: CL.x1, y: FRONT_LINE });
   const POST = MEMBER_DEFAULTS.post;
   if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: (92.75 + FRONT_LINE) / 2 }, width: POST.width, depth: 2 * POST.width, rotation: 0, label: '(2) 6x6', phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post rejected');
+  // Studs under each beam end in the partition (two 2x4s, 3 1/2" square), so each end has its own
+  // path down to the basement post.
+  for (const y of [92.75, FRONT_LINE]) {
+    if (!store().addMember(fId, { kind: 'post', at: { x: PART_KL, y }, width: 3.5, depth: 3.5, rotation: 0, label: '(2) 2x4', phase: NEW })) throw new Error('studs rejected');
+  }
   store().updateWalls(fId, [wallAt(fId, { x: 100, y: STAIR_SOUTH }).wallId], { bearing: false });
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two

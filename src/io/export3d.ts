@@ -212,7 +212,8 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         ['footing', mm.footing],
       ] as const) {
         if (!geometry) continue;
-        const m = mesh(MEMBER_NAME[part], geometry, material(`member_${part}_${mm.phase}`, memberMaterial(part, mm.phase)));
+        const color = part === 'footing' || mm.phase === 'demo' ? undefined : mm.color;
+        const m = mesh(MEMBER_NAME[part], geometry, material(`member_${part}_${mm.phase}${color ? `_${color.slice(1)}` : ''}`, memberMaterial(part, mm.phase, color)));
         if (mm.phase === 'demo') m.renderOrder = 1;
         group.add(m);
       }

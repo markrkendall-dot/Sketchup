@@ -3173,6 +3173,154 @@
         "f-m1": {
           "kind": "beam",
           "a": {
+            "x": -99,
+            "y": 64.25
+          },
+          "b": {
+            "x": -99,
+            "y": 158
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "mount": "dropped",
+          "za": 94,
+          "zb": 94,
+          "color": "#5a3a35",
+          "label": "6x6 tie",
+          "phase": "new",
+          "id": "f-m1"
+        },
+        "f-m2": {
+          "kind": "post",
+          "at": {
+            "x": -99,
+            "y": 111.125
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "rotation": 0,
+          "base": 94,
+          "top": 127,
+          "color": "#5a3a35",
+          "label": "6x6",
+          "phase": "new",
+          "id": "f-m2"
+        },
+        "f-m3": {
+          "kind": "post",
+          "at": {
+            "x": -99,
+            "y": 67
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "rotation": 0,
+          "base": 0,
+          "top": 88.5,
+          "color": "#5a3a35",
+          "label": "6x6",
+          "phase": "new",
+          "id": "f-m3"
+        },
+        "f-m4": {
+          "kind": "beam",
+          "a": {
+            "x": -99,
+            "y": 69.75
+          },
+          "b": {
+            "x": -99,
+            "y": 87.75
+          },
+          "width": 3.5,
+          "depth": 3.5,
+          "mount": "dropped",
+          "za": 70.5,
+          "zb": 88.5,
+          "color": "#5a3a35",
+          "label": "4x4 brace",
+          "phase": "new",
+          "id": "f-m4"
+        },
+        "f-m5": {
+          "kind": "beam",
+          "a": {
+            "x": -99,
+            "y": 64.25
+          },
+          "b": {
+            "x": -99,
+            "y": 111.125
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "mount": "dropped",
+          "za": 95.75,
+          "zb": 127,
+          "color": "#5a3a35",
+          "label": "6x6 rafter",
+          "phase": "new",
+          "id": "f-m5"
+        },
+        "f-m6": {
+          "kind": "post",
+          "at": {
+            "x": -99,
+            "y": 155.25
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "rotation": 0,
+          "base": 0,
+          "top": 88.5,
+          "color": "#5a3a35",
+          "label": "6x6",
+          "phase": "new",
+          "id": "f-m6"
+        },
+        "f-m7": {
+          "kind": "beam",
+          "a": {
+            "x": -99,
+            "y": 152.5
+          },
+          "b": {
+            "x": -99,
+            "y": 134.5
+          },
+          "width": 3.5,
+          "depth": 3.5,
+          "mount": "dropped",
+          "za": 70.5,
+          "zb": 88.5,
+          "color": "#5a3a35",
+          "label": "4x4 brace",
+          "phase": "new",
+          "id": "f-m7"
+        },
+        "f-m8": {
+          "kind": "beam",
+          "a": {
+            "x": -99,
+            "y": 158
+          },
+          "b": {
+            "x": -99,
+            "y": 111.125
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "mount": "dropped",
+          "za": 95.75,
+          "zb": 127,
+          "color": "#5a3a35",
+          "label": "6x6 rafter",
+          "phase": "new",
+          "id": "f-m8"
+        },
+        "f-m9": {
+          "kind": "beam",
+          "a": {
             "x": 3.5,
             "y": 92.75
           },
@@ -3185,9 +3333,9 @@
           "mount": "flush",
           "label": "(2) 1 3/4 x 11 7/8 LVL",
           "phase": "new",
-          "id": "f-m1"
+          "id": "f-m9"
         },
-        "f-m2": {
+        "f-m10": {
           "kind": "beam",
           "a": {
             "x": 170.5,
@@ -3202,7 +3350,33 @@
           "mount": "flush",
           "label": "(2) 1 3/4 x 11 7/8 LVL",
           "phase": "new",
-          "id": "f-m2"
+          "id": "f-m10"
+        },
+        "f-m11": {
+          "kind": "post",
+          "at": {
+            "x": 170.5,
+            "y": 92.75
+          },
+          "width": 3.5,
+          "depth": 3.5,
+          "rotation": 0,
+          "label": "(2) 2x4",
+          "phase": "new",
+          "id": "f-m11"
+        },
+        "f-m12": {
+          "kind": "post",
+          "at": {
+            "x": 170.5,
+            "y": 99.5
+          },
+          "width": 3.5,
+          "depth": 3.5,
+          "rotation": 0,
+          "label": "(2) 2x4",
+          "phase": "new",
+          "id": "f-m12"
         }
       },
       "finishes": {

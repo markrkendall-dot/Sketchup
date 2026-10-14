@@ -365,6 +365,10 @@ function cleanMember(m: Member): Member {
     if (t) out.label = t;
     else delete out.label;
   } else delete out.label;
+  if (typeof out.color === 'string') out.color = out.color.toLowerCase();
+  else delete out.color;
+  // A timber's heights: both or neither (memberProblem refuses one alone).
+  for (const k of ['za', 'zb', 'base', 'top'] as const) if ((out as unknown as Record<string, unknown>)[k] === undefined) delete (out as unknown as Record<string, unknown>)[k];
   return out;
 }
 
@@ -1126,7 +1130,7 @@ export const usePlanStore = create<PlanState>()(
             const m = level.members[id];
             if (!m) return false;
             const merged = { ...m, ...patch, id, kind: m.kind } as Member;
-            for (const k of ['label', 'footing'] as const) if (k in patch && (patch as Record<string, unknown>)[k] === undefined) delete (merged as unknown as Record<string, unknown>)[k];
+            for (const k of ['label', 'footing', 'za', 'zb', 'base', 'top', 'color'] as const) if (k in patch && (patch as Record<string, unknown>)[k] === undefined) delete (merged as unknown as Record<string, unknown>)[k];
             const next = cleanMember(merged);
             if (memberProblem(next, plan.levelOrder[0] === levelId)) return false;
             if (JSON.stringify(next) === JSON.stringify(m)) return false;

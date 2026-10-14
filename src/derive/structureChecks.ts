@@ -15,6 +15,7 @@
 //   - a level where a wall comes out and the joists over it are not set.
 
 import { CODE, codeRef, type CodeKey } from '../model/codeLimits';
+import { isTimber } from '../model/structure';
 import { add, cross, dist, dot, normalize, pointInPolygon, scale, sub } from '../model/geometry';
 import type { Beam, Id, Level, Member, Plan, Post, Vec2, Wall } from '../model/types';
 import { formatLength } from '../model/units';
@@ -96,7 +97,7 @@ export function structureIssues(plan: Plan): Issue[] {
       const poly = fps.get(w.id)?.poly;
       if (poly && pointInPolygon(p, poly)) return { kind: 'wall', wall: w, poly };
     }
-    const members = Object.values(level.members ?? {}).filter((m) => m.id !== skip && isVisible(m.phase, VIEW));
+    const members = Object.values(level.members ?? {}).filter((m) => m.id !== skip && !isTimber(m) && isVisible(m.phase, VIEW));
     for (const m of members) if (m.kind === 'post' && pointInPolygon(p, postOutline(m, m.width, m.depth))) return { kind: 'post', post: m };
     for (const m of members) if (m.kind === 'beam' && pointInPolygon(p, beamOutline(m))) return { kind: 'beam', beam: m };
     return null;
@@ -114,7 +115,7 @@ export function structureIssues(plan: Plan): Issue[] {
       const s = wallSegment(level, w);
       if (s) supports.push(s);
     }
-    for (const m of Object.values(level.members ?? {})) if (m.kind === 'beam' && isVisible(m.phase, VIEW)) supports.push({ a: m.a, b: m.b });
+    for (const m of Object.values(level.members ?? {})) if (m.kind === 'beam' && !isTimber(m) && isVisible(m.phase, VIEW)) supports.push({ a: m.a, b: m.b });
     // What a wall taken out carried that stays: the floor above it, or a roof kept over it.
     const aboveId = plan.levelOrder[li + 1];
     const aboveFaces = aboveId && plan.levels[aboveId] ? getFaces(plan.levels[aboveId], VIEW).outerFaces : [];
@@ -160,8 +161,9 @@ export function structureIssues(plan: Plan): Issue[] {
       push('structure.framing-unset', 'joistOffset', 'warning', levelId, wallSegment(level, level.walls[unknownJoists[0]])!.a, { walls: unknownJoists }, `Set the joists over the ${level.name} (Level panel): without them the checks cannot tell whether the walls taken out there bear.`);
 
     // ---- New beams: their ends, and the load from them down to the ground.
+    // Timbers at set heights (a gable's truss) are not followed.
     for (const m of Object.values(level.members ?? {})) {
-      if (m.phase !== 'new' || !isVisible(m.phase, VIEW)) continue;
+      if (m.phase !== 'new' || isTimber(m) || !isVisible(m.phase, VIEW)) continue;
       if (m.kind === 'post') {
         trace(li, m.at, { kind: 'post', post: m }, m, 'the post');
         continue;
@@ -234,7 +236,7 @@ export function structureIssues(plan: Plan): Issue[] {
       const s = wallSegment(framing, w);
       if (s) carriers.push(s);
     }
-    for (const m of Object.values(framing.members ?? {})) if (m.kind === 'beam' && isVisible(m.phase, VIEW)) carriers.push({ a: m.a, b: m.b });
+    for (const m of Object.values(framing.members ?? {})) if (m.kind === 'beam' && !isTimber(m) && isVisible(m.phase, VIEW)) carriers.push({ a: m.a, b: m.b });
     outline.forEach((a, i) => {
       if (supported[i]) return;
       const b = outline[(i + 1) % outline.length];

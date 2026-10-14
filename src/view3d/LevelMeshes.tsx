@@ -153,7 +153,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
                 key={part}
                 name={`member:${m.id}:${part}`}
                 geometry={geometry}
-                material={memberMaterial(part, m.phase)}
+                material={memberMaterial(part, m.phase, part === 'footing' ? undefined : m.color)}
                 renderOrder={m.phase === 'demo' ? 1 : 0}
                 castShadow={m.phase !== 'demo'}
                 receiveShadow

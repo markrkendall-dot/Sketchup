@@ -13,7 +13,7 @@ import { compassName, DECK, getDeckLayout } from './decks';
 import { floorOpeningHoles } from './floorOpenings';
 import { getFootprints } from './footprint';
 import { getLevelElevations } from './levels';
-import { beamHeights, beamOutline } from './members';
+import { beamOutline, memberBoxes } from './members';
 import { isVisible } from './phase';
 import { getFaces } from './rooms';
 import { groundAt } from './site';
@@ -91,7 +91,7 @@ export function stairIssues(plan: Plan): Issue[] {
     const ceiling = level.wallHeight;
     const underSlab = (p: Vec2) => !!above && !holes.some((h) => pointInPolygon(p, h));
     // Beams over this level hang below the ceiling (a dropped one, or a flush one deeper than the joists).
-    const beams = Object.values(level.members ?? {}).flatMap((m) => (m.kind === 'beam' && isVisible(m.phase, VIEW) ? [{ poly: beamOutline(m), bottom: beamHeights(plan, levelId, m).bottom }] : []));
+    const beams = Object.values(level.members ?? {}).flatMap((m) => (m.kind === 'beam' && isVisible(m.phase, VIEW) ? [{ poly: beamOutline(m), bottom: memberBoxes(plan, levelId, m, VIEW).body.bottom }] : []));
     /** What is over a point: the slab's underside, a beam's, or nothing. */
     const overhead = (p: Vec2) => beams.reduce((c, b) => (pointInPolygon(p, b.poly) ? Math.min(c, b.bottom) : c), underSlab(p) ? ceiling : Infinity);
 

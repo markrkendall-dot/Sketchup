@@ -4,6 +4,7 @@ import { buildExampleJson } from '../../scripts/example-plan';
 import example from '../../docs/examples/146-mick-road.json';
 import { getIssues } from '../derive/checks';
 import { wallBearings } from '../derive/structure';
+import { isTimber } from '../model/structure';
 import { getDeckLayout } from '../derive/decks';
 import { floorOpeningHole, getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getLevelElevations } from '../derive/levels';
@@ -661,11 +662,21 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(pointInPolygon({ x: 400, y: 250 }, zones[0].outline)).toBe(true);
     expect(pointInPolygon({ x: 400, y: 100 }, zones[1].outline)).toBe(true);
     expect([plan.levels[bId].joistZones, plan.levels[sId].joistZones]).toEqual([{}, {}]);
-    const beams = Object.values(plan.levels[fId].members);
+    const members = Object.values(plan.levels[fId].members);
+    const beams = members.filter((m) => m.kind === 'beam' && !isTimber(m));
     expect(beams.map((m) => m.kind === 'beam' && [m.a, m.b, m.mount, m.phase, m.label])).toEqual([
       [{ x: 3.5, y: 92.75 }, { x: 170.5, y: 92.75 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL'],
       [{ x: 170.5, y: 99.5 }, { x: 314.5, y: 99.5 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL'],
     ]);
+    // Studs under each beam end in the partition.
+    expect(members.filter((m) => m.kind === 'post' && !isTimber(m)).map((m) => m.kind === 'post' && [m.at, m.width, m.label])).toEqual([
+      [{ x: 170.5, y: 92.75 }, 3.5, '(2) 2x4'],
+      [{ x: 170.5, y: 99.5 }, 3.5, '(2) 2x4'],
+    ]);
+    // The foyer's gable timbers, in the stain on the gable face: tie, king post, two corner posts, two braces, two rafters.
+    const timbers = members.filter(isTimber);
+    expect(timbers.map((m) => m.label).sort()).toEqual(['4x4 brace', '4x4 brace', '6x6', '6x6', '6x6', '6x6 rafter', '6x6 rafter', '6x6 tie']);
+    expect(timbers.every((m) => m.color === '#5a3a35' && m.phase === 'new')).toBe(true);
     const posts = Object.values(plan.levels[bId].members);
     expect(posts).toEqual([expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 96.125 }, width: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' })]);
     // The stair hall's new south wall is not bearing; nothing else is marked.

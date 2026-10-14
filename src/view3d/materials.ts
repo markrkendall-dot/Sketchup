@@ -1,3 +1,4 @@
+import { MEMBER_COLOR } from '../model/structure';
 import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
 import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
@@ -261,10 +262,8 @@ export function stairPartMaterial(mat: 'tread' | 'paint', phase: Phase, color: s
 }
 
 /** Structure: LVL beams and posts as pale wood, footings as concrete (demolished: red, new: pulled toward green). */
-export const MEMBER_COLOR = { beam: '#d6b98c', post: '#c8a678', footing: '#a8a29e' } as const;
-
-export function memberMaterial(part: keyof typeof MEMBER_COLOR, phase: Phase): MeshStandardMaterial {
-  return trimLike(`member-${part}`, MEMBER_COLOR[part], phase);
+export function memberMaterial(part: keyof typeof MEMBER_COLOR, phase: Phase, color?: string): MeshStandardMaterial {
+  return trimLike(`member-${part}`, color ?? MEMBER_COLOR[part], phase);
 }
 
 const partMaterials = new Map<string, MeshStandardMaterial>();

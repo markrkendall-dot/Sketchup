@@ -6,6 +6,7 @@ import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, t
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { DECK, getDeckLayout, type DeckBox, type DeckLayout } from './decks';
 import { memberBoxes } from './members';
+import { isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
 import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
@@ -1222,6 +1223,8 @@ export interface MemberMesh {
   kind: 'beam' | 'post';
   /** The phase as shown in the view mode (shownPhase). */
   phase: Phase;
+  /** A timber's own colour. */
+  color?: string;
   /** Null for a flush beam no deeper than the joists (all of it hidden in the floor). */
   body: BufferGeometry | null;
   footing: BufferGeometry | null;
@@ -1249,22 +1252,25 @@ export function getMemberMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Me
   for (const m of Object.values(level?.members ?? {})) {
     if (!isVisible(m.phase, viewMode)) continue;
     const boxes = memberBoxes(plan, levelId, m, viewMode);
-    const top = Math.min(boxes.body.top, ceiling);
-    const sig = JSON.stringify([boxes.body.poly, boxes.body.bottom, top, boxes.footing]);
+    // A timber is drawn as set (it may stand above the ceiling, in a gable); the rest stop under it.
+    const timber = isTimber(m);
+    const top = timber ? boxes.body.top : Math.min(boxes.body.top, ceiling);
+    const sig = JSON.stringify([boxes.body.poly, boxes.body.bottom, top, boxes.footing, m.kind === 'beam' ? [m.za, m.zb, m.depth] : null]);
     let e = entries.get(m.id);
     if (!e || e.sig !== sig) {
       e?.body?.dispose();
       e?.footing?.dispose();
       const f = boxes.footing;
+      const s = boxes.slope;
       e = {
         sig,
-        body: top - boxes.body.bottom > 0.01 ? deckBoxesGeometry([{ ...boxes.body, top }]) : null,
+        body: s ? slopedPrism(boxes.body.poly, s.bottom, s.top) : top - boxes.body.bottom > 0.01 ? deckBoxesGeometry([{ ...boxes.body, top }]) : null,
         footing: f ? deckBoxesGeometry([{ ...f, top: f.top - MEMBER_INSET }]) : null,
       };
       entries.set(m.id, e);
     }
     seen.add(m.id);
-    out.push({ id: m.id, kind: m.kind, phase: shownPhase(m.phase, viewMode), body: e.body, footing: e.footing });
+    out.push({ id: m.id, kind: m.kind, phase: shownPhase(m.phase, viewMode), ...(m.color ? { color: m.color } : {}), body: e.body, footing: e.footing });
   }
   for (const [id, e] of entries) {
     if (seen.has(id)) continue;
@@ -1275,7 +1281,7 @@ export function getMemberMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Me
   const same =
     !!prev &&
     prev.result.length === out.length &&
-    prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.body === out[i].body && m.footing === out[i].footing);
+    prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.color === out[i].color && m.body === out[i].body && m.footing === out[i].footing);
   const result = same ? prev.result : out;
   memberResult.set(key, { plan, result });
   return result;

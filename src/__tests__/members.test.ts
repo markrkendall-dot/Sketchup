@@ -5,6 +5,7 @@ import { getMemberMeshes, MEMBER_INSET } from '../derive/meshes';
 import { dispatchKey, dispatchPointer, switchTool, type ToolPointerEvent } from '../editor2d/tools';
 import { hitTest } from '../editor2d/tools/selectTool';
 import { buildExportScene } from '../io/export3d';
+import { structureIssues } from '../derive/structureChecks';
 import { createEmptyPlan } from '../model/plan';
 import type { Beam, Id, Post } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
@@ -183,5 +184,37 @@ describe('selecting and moving members', () => {
     click(301, 301);
     press('Delete');
     expect(Object.keys(plan().levels[f].members)).toEqual(['bm']);
+  });
+});
+
+describe('timbers at set heights', () => {
+  it('slope from one end to the other, stand above the ceiling, and the checks leave them alone', () => {
+    // A 45° rafter from 96" at x 0 to 196" at x 100, 5 1/2" square: 7.78" deep plumb.
+    const id = store().addMember(f, { ...beamOf({ a: { x: 0, y: 100 }, b: { x: 100, y: 100 }, width: 5.5, depth: 5.5 }), za: 96, zb: 196, color: '#5A3A35' })!;
+    expect(plan().levels[f].members[id]).toMatchObject({ za: 96, zb: 196, color: '#5a3a35' });
+    const [mesh] = getMemberMeshes(plan(), f, 'all');
+    const p = mesh.body!.getAttribute('position');
+    let top = -Infinity;
+    let bottom = Infinity;
+    for (let i = 0; i < p.count; i++) {
+      top = Math.max(top, p.getY(i));
+      bottom = Math.min(bottom, p.getY(i));
+    }
+    expect(top).toBeCloseTo(196, 4);
+    expect(bottom).toBeCloseTo(96 - 5.5 * Math.SQRT2, 4);
+    expect(mesh.color).toBe('#5a3a35');
+    // It ends on nothing, and no check says so.
+    expect(structureIssues(plan())).toEqual([]);
+  });
+
+  it('need both heights, a base under a post top; clearing them makes a beam again', () => {
+    expect(store().addMember(f, { ...beamOf(), za: 96 })).toBeNull();
+    expect(store().addMember(f, { ...postOf(), base: 50, top: 40 })).toBeNull();
+    const pid = store().addMember(f, { ...postOf(), base: 90, top: 120 })!;
+    expect(memberBoxes(plan(), f, plan().levels[f].members[pid]).body).toMatchObject({ bottom: 90, top: 120 });
+    const bid = store().addMember(f, { ...beamOf(), za: 100, zb: 120 })!;
+    store().updateMember(f, bid, { za: undefined, zb: undefined });
+    expect(plan().levels[f].members[bid]).not.toHaveProperty('za');
+    expect(memberBoxes(plan(), f, plan().levels[f].members[bid]).slope).toBeUndefined();
   });
 });

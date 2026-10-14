@@ -6,7 +6,7 @@
 // the walls' tops. A flush beam's top is the joists' top; a dropped one's is the wall height.
 
 import { add, pointInPolygon, scale } from '../model/geometry';
-import { ATTIC_JOIST_DEPTH } from '../model/structure';
+import { ATTIC_JOIST_DEPTH, isTimber } from '../model/structure';
 import type { Beam, Id, Level, Member, Plan, Post, Vec2, ViewMode } from '../model/types';
 import type { DeckBox } from './decks';
 import { isVisible, phasesCoexist } from './phase';
@@ -80,10 +80,27 @@ export function beamHeights(plan: Plan, levelId: Id, b: Pick<Beam, 'mount' | 'de
 }
 
 export interface MemberBoxes {
-  /** The member itself. */
+  /** The member itself (a sloped timber: the box round it). */
   body: DeckBox;
   /** A post's footing. */
   footing?: DeckBox;
+  /** A sloped timber beam's underside and top over the floor, at a plan point. */
+  slope?: { bottom: (p: Vec2) => number; top: (p: Vec2) => number };
+}
+
+/**
+ * A timber beam's top over the floor at a plan point (linear from za at a to zb at b) and its
+ * vertical depth (`depth` square to its slope).
+ */
+export function timberTop(b: Pick<Beam, 'a' | 'b' | 'za' | 'zb' | 'depth'>): { top: (p: Vec2) => number; vertical: number } {
+  const dx = b.b.x - b.a.x;
+  const dy = b.b.y - b.a.y;
+  const len2 = dx * dx + dy * dy || 1;
+  const za = b.za ?? 0;
+  const zb = b.zb ?? za;
+  const run = Math.sqrt(len2);
+  const vertical = (b.depth * Math.hypot(run, zb - za)) / run;
+  return { top: (p) => za + ((zb - za) * ((p.x - b.a.x) * dx + (p.y - b.a.y) * dy)) / len2, vertical };
 }
 
 /**
@@ -93,13 +110,23 @@ export interface MemberBoxes {
  */
 export function memberBoxes(plan: Plan, levelId: Id, m: Member, viewMode: ViewMode = 'all'): MemberBoxes {
   const lvl = plan.levels[levelId];
+  if (m.kind === 'beam' && isTimber(m)) {
+    const t = timberTop(m);
+    const za = m.za!;
+    const zb = m.zb!;
+    return {
+      body: { poly: beamOutline(m), bottom: Math.min(za, zb) - t.vertical, top: Math.max(za, zb) },
+      slope: { top: t.top, bottom: (p) => t.top(p) - t.vertical },
+    };
+  }
   if (m.kind === 'beam') {
     const h = beamHeights(plan, levelId, m);
     return { body: { poly: beamOutline(m), bottom: h.bottom, top: h.top } };
   }
+  if (isTimber(m)) return { body: { poly: postOutline(m, m.width, m.depth), bottom: m.base!, top: m.top! } };
   let top = lvl?.wallHeight ?? 96;
   for (const o of Object.values(lvl?.members ?? {})) {
-    if (o.kind !== 'beam' || !isVisible(o.phase, viewMode) || !phasesCoexist(o.phase, m.phase)) continue;
+    if (o.kind !== 'beam' || isTimber(o) || !isVisible(o.phase, viewMode) || !phasesCoexist(o.phase, m.phase)) continue;
     if (pointInPolygon(m.at, beamOutline(o))) top = Math.min(top, beamHeights(plan, levelId, o).bottom);
   }
   const out: MemberBoxes = { body: { poly: postOutline(m, m.width, m.depth), bottom: 0, top } };

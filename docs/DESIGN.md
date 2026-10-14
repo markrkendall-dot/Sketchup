@@ -1354,11 +1354,20 @@ zones, which hatch their own way; arrows say "Joists N-S"; walls marked bearing 
 line; beam labels show. The plan export takes the UI's `showStructure`, so a framing plan is an
 export with the overlay on.
 
+Timbers: a beam with `za`/`zb` (its top over the floor at a and at b, both or neither) or a post
+with `base`/`top` is a timber at set heights (`isTimber`), with an optional `color`: a beam slopes
+between its two tops, `depth` deep square to it (`timberTop`; drawn with `slopedPrism`, plumb
+ends), and may stand above the ceiling (a truss in a gable). The structure checks and the bearing
+inference do not follow timbers (supports, beam ends, load paths, header carriers, posts stopping
+under beams); a timber over a flight still counts against its headroom. The panel's "Set heights"
+turns a member into a timber and back.
+
 3D: `getMemberMeshes` (cached per level and view like the decks, by each member's boxes) clips
 every member 1/16" under the ceiling (`MEMBER_INSET`): a flush beam is drawn only where it hangs
 below the ceiling (none when it is no deeper than the joists), and nothing shares a slab's face; a
-footing stops 1/16" under the slab. Materials `memberMaterial` (pale wood, concrete); the export
-names the meshes `Beam`, `Post` and `Footing` (materials `member_<part>_<phase>`).
+footing stops 1/16" under the slab; timbers are drawn as set. Materials `memberMaterial` (pale
+wood, concrete, or a timber's colour); the export names the meshes `Beam`, `Post` and `Footing`
+(materials `member_<part>_<phase>`, plus `_<hex>` for a timber's colour).
 
 Which walls bear (`derive/structure.ts` `wallBearings(plan, view)`, memoized per plan and view,
 top level first): a wall's mark wins; an exterior wall bears when the joists over it cross it (45°
