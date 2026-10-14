@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { WallGeom } from '../derive/openings';
-import type { FixtureKind, Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
+import type { Column, FixtureKind, Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
 export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | OpeningToolName;
@@ -161,9 +161,9 @@ export interface Draft {
   /** Grade point tool: the spot clicked, waiting for its elevation (typed in the length buffer, Enter places). */
   gradePending: Vec2 | null;
   /** Column tool: what the next click places (Tab toggles). */
-  columnKind: 'chimney' | 'post';
+  columnKind: Column['kind'];
   /** Column tool: the column about to be placed, following the snapped cursor. */
-  columnPreview: { at: Vec2; kind: 'chimney' | 'post'; width: number; depth: number } | null;
+  columnPreview: { at: Vec2; kind: Column['kind']; width: number; depth: number } | null;
   /** Fixture tool (C): the kind the next click places (the panel's picker changes it). */
   fixtureKind: FixtureKind;
   /** Fixture tool: the direction a fixture placed away from any wall faces (Tab turns it). */

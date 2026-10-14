@@ -988,7 +988,7 @@ function migrateSite(raw: unknown): Site {
     col.id = id;
     col.at = { x: c.at.x, y: c.at.y };
     col.rotation = isNum(c.rotation) ? c.rotation : 0;
-    col.kind = c.kind === 'chimney' ? 'chimney' : 'post';
+    col.kind = c.kind === 'chimney' || c.kind === 'flue' ? c.kind : 'post';
     col.phase = phaseOf(c.phase);
     // Optional appearance fields: kept when valid, dropped otherwise (the defaults apply).
     put(col, 'color', isHexColor(c.color) ? c.color.toLowerCase() : undefined);

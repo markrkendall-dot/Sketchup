@@ -417,7 +417,7 @@ const columnMaterials = new Map<string, MeshStandardMaterial>();
  * A column's shaft: by kind, phase and colour (the column's own, else brick red for a chimney and
  * tan for a post, model/finish.ts COLUMN_COLOR). A chimney is brick (textures.ts brickTextures:
  * running bond in the colour, the mortar a little lighter, with its normal map) under a white tint;
- * a post is the flat colour. Demolished: translucent red like walls; new: the colour pulled toward
+ * a post is the flat colour; a flue is stainless steel (metal, smooth, reflecting the sky). Demolished: translucent red like walls; new: the colour pulled toward
  * the new-work green (the brick drawn in it). The flat colour is kept in `userData.flatColor` for
  * the export; without a canvas (node) it is the material's colour.
  */
@@ -430,6 +430,13 @@ export function columnMaterial(kind: Column['kind'], phase: Phase, color: string
       const flat = phase === 'new' ? pullGreen(color) : color;
       const tex = kind === 'chimney' ? brickTextures(flat) : null;
       m = make(tex ? '#ffffff' : flat);
+      // A flue is brushed stainless steel: metal that reflects the sky, shaded smooth round.
+      if (kind === 'flue') {
+        m.metalness = 0.8;
+        m.roughness = 0.35;
+        m.flatShading = false;
+        reflectSky(m, 1);
+      }
       if (tex) {
         m.map = tex.map;
         if (tex.normalMap) {
@@ -450,5 +457,6 @@ export function columnMaterial(kind: Column['kind'], phase: Phase, color: string
  * (see-through, no depth write, drawn after the opaque meshes; it casts no shadow).
  */
 export function chimneyPartMaterial(part: ChimneyPart, phase: Phase): MeshStandardMaterial {
+  if (part === 'hood' || part === 'stem') return columnMaterial('flue', phase);
   return part === 'cap' ? trimLike('chimney-cap', CHIMNEY_CAP_COLOR, phase) : screenMaterial(phase);
 }

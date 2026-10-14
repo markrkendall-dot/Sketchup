@@ -149,7 +149,7 @@ export const deckColorOf = (d: Pick<Deck, 'color'>): string => d.color ?? DECK_C
 export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColor ?? DEFAULT_LEAF_COLOR;
 
 /** Column colours by kind: brick red for a chimney, trim tan for a post. */
-export const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c' };
+export const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c', flue: '#b9bdc1' };
 export const columnColorOf = (c: Pick<Column, 'kind' | 'color'>): string => c.color ?? COLUMN_COLOR[c.kind];
 /** A chimney's cap: pale concrete. */
 export const CHIMNEY_CAP_COLOR = '#b8b4ac';

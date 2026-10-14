@@ -153,7 +153,7 @@ export interface GradePoint { id: Id; at: Vec2; elevation: Inches }   // elevati
 export interface Column {
   id: Id; at: Vec2; width: Inches; depth: Inches; rotation: Degrees; // plan rectangle, turned clockwise
   base: Inches; top: Inches;                                         // absolute elevations
-  kind: 'post' | 'chimney'; phase: Phase;
+  kind: 'post' | 'chimney' | 'flue'; phase: Phase;   // a flue is round: width is its diameter
   color?: string; cap?: boolean;                                     // see "Site and terrain"
 }
 export interface Site {
@@ -544,7 +544,7 @@ bare slab edge shows between the shingles and the clapboard).
 
 ## Site and terrain (`derive/site.ts`, `editor2d/tools/siteTools.ts`)
 
-The plan's `site` holds the ground (grade points: spot elevations), the columns (chimney, posts) and
+The plan's `site` holds the ground (grade points: spot elevations), the columns (chimney, posts, flues) and
 the north angle. None of it belongs to a level.
 
 **Terrain** (`site.ts`, pure, position arrays like `roofs.ts`; `meshes.ts` wraps them). `terrainHeightAt`
@@ -615,7 +615,16 @@ appearance"). Defaults (`columnDefaults`): chimney
 24" x 40", base 12" below the ground at its point (`groundAt`), top 48" above the highest roof ridge
 on the plan (the top surface at the ridge; above the top ceiling without roofs); post 6" x 6", base on
 the ground, top at the lowest roof underside over it among roofs it can be seen with (a new post
-ignores a roof being demolished; `phasesCoexist`), else the first floor's ceiling. Optional fields:
+ignores a roof being demolished; `phasesCoexist`), else the first floor's ceiling; flue 8" (its
+diameter), base 30" over the first floor's top (a stove top), top 24" above the highest ridge.
+A **flue** is round: `columnOutline` gives a circle of `width` (`FLUE_SIDES` corners, `depth` and
+`rotation` ignored), `pointInColumn` picks inside it, `buildColumnGeometry` gives its side faces
+normals straight out from the axis so it shades smooth, and `columnMaterial('flue', ...)` is
+stainless (`#b9bdc1`, metalness 0.8, roughness 0.35, not flat shaded, reflecting the sky like
+glass). A capped flue (`hasFlueCap`) has a rain cap (`FLUE_CAP`): a **stem** half its width from
+`top` up 3" and a **hood**, a disc twice its width 1.5" thick, on it, both in the flue's metal;
+`columnPeak` adds 4.5". Columns are not cut by slabs or roofs: a flue through the house stands
+through them, so a stove and a chase are boxes on their levels. Optional fields:
 `color` (`#rrggbb`, lower-cased; `columnColorOf` defaults to brick `#7a4a3e` for a chimney and tan
 `#c9b58c` for a post, `COLUMN_COLOR` in `model/finish.ts`) and `cap` (a chimney's cap and spark
 arrestor; a post ignores it). `migrate()` keeps each when valid and drops it alone otherwise;
@@ -654,7 +663,7 @@ is parked at the lowest.
 midpoints and the grid. Grade point: a click stores the spot in `draft.gradePending`; the length buffer
 takes the elevation in feet-inches (a minus sign is allowed); Enter places it, with nothing typed at the
 first floor's floor top (the level the view shows; `defaultGradeElevation`); Esc clears the buffer, then
-the spot. Column: the column follows the cursor (`draft.columnPreview`), Tab toggles chimney / post,
+the spot. Column: the column follows the cursor (`draft.columnPreview`), Tab steps chimney, post, flue (`nextColumnKind`),
 the click places it with the defaults above in the toolbar's "Draw as" phase. The site select tool
 (`getTool('select')` returns it in site mode) picks grade points (10 px) before columns (visible ones, with
 a 4 px slack), shift-click and box-select add, a drag moves the whole selection with `moveSiteItems`
@@ -681,7 +690,7 @@ and the toolbar's "Draw as" cover them.
 
 **Export**: after the level groups a `Site` group (elevation 0, absolute heights) holds `Terrain` (material
 `terrain`, the flat lawn colour, no texture; with its skirt; only when the site has grade points: flat ground
-would only be a plane at the slab) and the visible columns as `Chimney` / `Post` (materials
+would only be a plane at the slab) and the visible columns as `Chimney` / `Flue` / `Post` (materials
 `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the kind's default unless demolished; a
 chimney's brick is its flat colour). A capped chimney's cap and arrestor follow its shaft as two more
 `Chimney` meshes, materials `chimney_cap_<phase>` and `chimney_arrestor_<phase>`. The far ground is not

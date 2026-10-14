@@ -87,7 +87,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   siteTool('e', 'gradePoint', 'Site only: place a grade point: click a spot on the ground, type its elevation (-4, -6\'4), Enter'),
   {
     keys: 'C',
-    label: 'Cabinets and appliances: the chosen kind follows the cursor along the nearest wall, click to place, type a width first to change it (site: place a chimney; Tab switches to a post)',
+    label: 'Cabinets and appliances: the chosen kind follows the cursor along the nearest wall, click to place, type a width first to change it (site: place a chimney; Tab switches to a post, then a flue)',
     group: 'Tools',
     combos: ['c'],
     run: () => switchTool(useUiStore.getState().siteMode ? 'column' : 'fixture'),

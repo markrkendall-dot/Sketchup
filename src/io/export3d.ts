@@ -62,7 +62,7 @@ const openingMaterialName = (part: FillPart, phase: Phase, color?: string) => {
 /** `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the kind's default (a demolished one is red whatever its colour). */
 const columnMaterialName = (kind: Column['kind'], phase: Phase, color: string) =>
   phase === 'demo' || color === COLUMN_COLOR[kind] ? `column_${kind}_${phase}` : `column_${kind}_${phase}_${color.slice(1)}`;
-const chimneyPartMaterialName = (part: ChimneyPart, phase: Phase) => `chimney_${part}_${phase}`;
+const chimneyPartMaterialName = (part: ChimneyPart, phase: Phase) => (part === 'hood' || part === 'stem' ? `flue_${part}_${phase}` : `chimney_${part}_${phase}`);
 /** `cabinet`, `kick`, `appliance`, `basin` (plus `_<hex>` for cabinets not in the default colour), then `_<phase>` for other phases. */
 const caseworkMaterialName = (part: CasePart, phase: Phase, color: string) => {
   const base = part === 'carcass' || part === 'front' ? (phase !== 'demo' && color !== DEFAULT_CABINET_COLOR ? `cabinet_${color.slice(1)}` : 'cabinet') : part;
@@ -82,10 +82,10 @@ const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sin
  * `fascia_<phase>` and `rafter_<phase>`, plus `_<hex>` in a board colour other than tan), `Deck`, `Deck framing` (with the
  * posts) and `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour other than
  * the default wood), `Stair railing` and `Guard` (a flight's railings and the guard round a floor opening, material `railing_<phase>`), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
- * elevation 0, absolute heights) follows with the `Chimney` and `Post` meshes the view mode shows
+ * elevation 0, absolute heights) follows with the `Chimney`, `Flue` and `Post` meshes the view mode shows
  * (materials `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the default; a capped
  * chimney's cap and spark arrestor are more `Chimney` meshes, `chimney_cap_<phase>` and
- * `chimney_arrestor_<phase>`) and, when the site has grade points, the `Terrain` (material `terrain`; without grade points the
+ * `chimney_arrestor_<phase>`; a capped flue's rain cap is two more `Flue` meshes, `flue_stem_<phase>` and `flue_hood_<phase>`) and, when the site has grade points, the `Terrain` (material `terrain`; without grade points the
  * ground is a flat plane at the slab and is left out). Geometries are clones (the
  * mesh cache owns the originals) and materials are clones of the live view's, one per phase/kind
  * combination; free both with disposeExportScene().
@@ -215,11 +215,11 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     site.add(mesh('Terrain', getTerrainGeometry(plan, viewMode), material('terrain', terrainMaterial)));
   }
   for (const c of getSiteMeshes(plan, viewMode).columns) {
-    const name = c.kind === 'chimney' ? 'Chimney' : 'Post';
+    const name = c.kind === 'chimney' ? 'Chimney' : c.kind === 'flue' ? 'Flue' : 'Post';
     const m = mesh(name, c.geometry, material(columnMaterialName(c.kind, c.phase, c.color), columnMaterial(c.kind, c.phase, c.color)));
     if (c.phase === 'demo') m.renderOrder = 1;
     site.add(m);
-    // A capped chimney's cap and spark arrestor: more Chimney meshes, each in its own material.
+    // A capped chimney's cap and spark arrestor, a capped flue's rain cap: more meshes of its name, each in its own material.
     for (const p of c.parts ?? []) {
       const pm = mesh(name, p.geometry, material(chimneyPartMaterialName(p.part, c.phase), chimneyPartMaterial(p.part, c.phase)));
       if (c.phase === 'demo' || p.part === 'arrestor') pm.renderOrder = 1;

@@ -19,7 +19,10 @@ import {
   columnDefaults,
   columnOutline,
   columnPeak,
+  FLUE_CAP,
+  FLUE_SIDES,
   hasChimneyCap,
+  hasFlueCap,
   defaultGradeElevation,
   fallbackElevation,
   highestRidge,
@@ -1412,3 +1415,86 @@ function pointInPolygonStrict(p: Vec2, poly: Vec2[]): boolean {
   }
   return inside;
 }
+
+describe('flues: round stainless chimney pipes', () => {
+  const flue = (over: Partial<Column> = {}): Column => ({
+    id: 'f1',
+    at: { x: 19, y: 280 },
+    width: 8,
+    depth: 8,
+    rotation: 0,
+    base: 33,
+    top: 320,
+    kind: 'flue',
+    phase: 'new',
+    ...over,
+  });
+  const bbox = (g: BufferGeometry) => {
+    g.computeBoundingBox();
+    return g.boundingBox!;
+  };
+
+  it('is a round pipe of diameter `width` (depth ignored), shading smooth, picked inside its circle', () => {
+    const c = flue({ depth: 30, rotation: 45 });
+    const outline = columnOutline(c);
+    expect(outline).toHaveLength(FLUE_SIDES);
+    for (const p of outline) expect(Math.hypot(p.x - 19, p.y - 280)).toBeCloseTo(4, 9);
+    const g = buildColumnGeometry(c);
+    const b = bbox(g);
+    expect([b.min.x, b.max.x, b.min.y, b.max.y, b.min.z, b.max.z]).toEqual([15, 23, 33, 320, 276, 284]);
+    // Side normals point straight out from the axis.
+    const pos = g.getAttribute('position');
+    const nor = g.getAttribute('normal');
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(nor.getY(i)) > 0.5) continue;
+      const r = Math.hypot(pos.getX(i) - 19, pos.getZ(i) - 280);
+      expect(nor.getX(i)).toBeCloseTo((pos.getX(i) - 19) / r, 5);
+    }
+    expect(pointInColumn(c, { x: 19 + 3.9, y: 280 })).toBe(true);
+    expect(pointInColumn(c, { x: 19 + 3, y: 280 + 3 })).toBe(false);
+  });
+
+  it('has a rain cap with `cap`: a disc twice its width on a stem, 3" over its top', () => {
+    expect(hasFlueCap(flue())).toBe(false);
+    expect(chimneyPartBoxes(flue())).toEqual([]);
+    const c = flue({ cap: true });
+    expect(hasFlueCap(c)).toBe(true);
+    expect(hasChimneyCap(c)).toBe(false);
+    const parts = chimneyPartBoxes(c);
+    expect(parts.map((p) => [p.part, p.bottom, p.top])).toEqual([
+      ['stem', 320, 323],
+      ['hood', 323, 324.5],
+    ]);
+    for (const p of parts[1].outline) expect(Math.hypot(p.x - 19, p.y - 280)).toBeCloseTo(8 * FLUE_CAP.spread / 2, 9);
+    expect(columnPeak(c)).toBe(324.5);
+    // The pipe itself runs to its top (no concrete cap to stop under).
+    expect(bbox(buildColumnGeometry(c)).max.y).toBe(320);
+    expect(buildColumnParts(c).map((p) => p.part)).toEqual(['stem', 'hood']);
+  });
+
+  it('defaults to 8" from a stove top 30" over the first floor to 24" above the highest ridge; a file keeps the kind', () => {
+    const d = columnDefaults(plan(), 'flue', { x: 0, y: 0 });
+    // Empty plan: the first floor top is 8, the Second Floor ceiling 212 (no roofs).
+    expect(d).toMatchObject({ width: 8, depth: 8, rotation: 0, base: 8 + 30, top: 212 + 24 });
+    const id = store().addColumn({ at: { x: 0, y: 0 }, kind: 'flue', phase: 'new', ...d, cap: true })!;
+    const loaded = migrate(JSON.parse(JSON.stringify(plan())));
+    expect(loaded.site.columns[id]).toMatchObject({ kind: 'flue', cap: true });
+  });
+
+  it('is metal in 3D, a stainless rain cap, a circle on the plan, and a Flue in the export', () => {
+    const m = columnMaterial('flue', 'existing');
+    expect(m.metalness).toBeGreaterThan(0.5);
+    expect(m.flatShading).toBe(false);
+    expect(m.color.getHexString()).toBe(COLUMN_COLOR.flue.slice(1));
+    expect(chimneyPartMaterial('hood', 'existing')).toBe(m);
+    const d = columnDefaults(plan(), 'flue', { x: 0, y: 0 });
+    store().addColumn({ at: { x: 0, y: 0 }, kind: 'flue', phase: 'existing', ...d, cap: true });
+    const root = buildExportScene(plan(), 'all', { activeLevelId: defaultLevelId(plan()), only3dActiveAndBelow: false, hidden3dLevels: [] });
+    const flues: string[] = [];
+    root.traverse((o) => {
+      if (o.name === 'Flue' && o instanceof Mesh) flues.push((o.material as MeshStandardMaterial).name);
+    });
+    expect(flues).toEqual(['column_flue_existing', 'flue_stem_existing', 'flue_hood_existing']);
+    disposeExportScene(root);
+  });
+});

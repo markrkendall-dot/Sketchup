@@ -21,7 +21,8 @@ What it draws:
   well), with a 36" guard round it that opens where a flight from below arrives.
 - **The site**: spot elevations of the ground (grade points) become a terrain surface, so a walkout
   basement shows on the downhill side and is buried on the uphill side; **chimneys and posts**
-  stand on it, a chimney with its cap and spark arrestor if it has them.
+  stand on it, a chimney with its cap and spark arrestor if it has them; a **flue** is a round
+  stainless pipe (a wood stove's chimney) with a rain cap.
 - **Exterior appearance**: clapboard, shingle, board, concrete block or screen siding in any
   colour; windows of one or more sashes with divided lites, picture windows, screens, trim and
   shutters; doors with panels or glass, double, sliding and screen doors; corrugated metal roofs that
@@ -139,8 +140,11 @@ Once the walls are in, these make the 3D model look like the house.
   on the ground with its base and top set in the panel, in its "Colour" (brick red for a chimney,
   tan for a post until you set one). A chimney is drawn as brick in its colour; tick "Cap and spark
   arrestor" for a 4" concrete cap at its top, 2" proud of its faces, and a 12" wire box on the cap
-  (in the export they are two more `Chimney` meshes). The north arrow turns with the plan's north
-  angle, and the sun follows it.
+  (in the export they are two more `Chimney` meshes). A flue (Tab twice) is a round stainless
+  pipe, its "Diameter" 8" by default, from a stove top 30" over the first floor to 2' over the
+  ridge; tick "Rain cap" for a disc twice its width 3" over its top. Columns stand through floors
+  and roofs without cutting them: draw a stove and its chase as boxes on each level. The north
+  arrow turns with the plan's north angle, and the sun follows it.
 - **Finishes.** The Level panel's "Exterior finish" and "Exterior colour" set every exterior
   wall of the level at once; the Wall panel sets one wall: shingle, clapboard, vertical board,
   concrete block (for a foundation), plain or screen. The siding, brick and roof textures are in
@@ -272,7 +276,7 @@ visible levels): to export the proposed design, switch to Proposed first.
 - **glTF (.glb)**, in metres: in SketchUp, File > Import and choose the glTF file. Each level is
   a group holding its walls, floor, roofs (with their fascia), windows and doors, cabinets
   (`Cabinet (base)`, `Appliance (range)`, `Sink`, ...) and `Counter` slabs; a `Site` group holds the
-  `Terrain`, `Chimney` and `Post` meshes. Walls are named by kind and phase.
+  `Terrain`, `Chimney`, `Flue` and `Post` meshes. Walls are named by kind and phase.
 - **OBJ (.obj)**, in inches: when importing, set the units to inches.
 - Siding textures are not exported, colours are.
 - **Elevations (.png)**: **Export elevations** saves the north, south, east and west elevations as
@@ -318,14 +322,14 @@ keyboard back to the plan.
 | `C` | Cabinet: the chosen kind follows the cursor along the nearest wall; click to place, type a width first to change it (Site tab: Column) |
 | `B` | Box: four walls; click a corner, type `12' x 10'` (or `12'` Tab `10'`), Enter |
 | `M` | Measure between two points; Esc clears |
-| `E` `C` (Site tab only) | Grade point, Column (chimney; Tab before the click for a post) |
+| `E` `C` (Site tab only) | Grade point, Column (chimney; Tab before the click for a post, again for a flue) |
 | digits, `'`, `"`, space, `/`, then Enter | Type a length or a distance while drawing |
 | `Enter` or click | Walls: with nothing typed, commit the wall at the cursor; roof or deck: close the outline |
 | `Backspace` | Edit the typed length; roof or deck: remove the last corner |
 | `Esc` | Clear the typed length, then end the wall chain / cancel the roof or deck / clear the selection |
 | `X` | Next wall exterior or interior |
 | `Shift` (hold) | Invert ortho lock; with ortho off, 15° steps; cabinet: place away from the walls |
-| `Tab` / `Shift+Tab` | Door swing side / hinge; stairs and free cabinets turn 90°; column chimney or post |
+| `Tab` / `Shift+Tab` | Door swing side / hinge; stairs and free cabinets turn 90°; column chimney, post or flue |
 | `Delete` | Delete the selection |
 | `Enter` / `F2` | Rename the selected room |
 | `Arrows` (`Shift`) | Nudge the selected underlay 1" (1') |

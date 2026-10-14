@@ -86,8 +86,8 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: "Type the elevation (-4, -6'4), Enter places it. Esc cancels.",
   },
   column: {
-    idle: 'Click to place; Tab switches chimney and post.',
-    busy: 'Click to place; Tab switches chimney and post.',
+    idle: 'Click to place; Tab switches chimney, post and flue.',
+    busy: 'Click to place; Tab switches chimney, post and flue.',
   },
 };
 
@@ -157,8 +157,8 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: "Type the elevation in feet and inches (-4, -6'4, 8'), then Enter places the grade point. Esc clears it, then cancels.",
   },
   column: {
-    idle: 'Click to place a column. Tab switches between a chimney (24" x 40") and a post (6" x 6"); set the size and heights in the properties panel.',
-    busy: 'Click to place a column. Tab switches between a chimney and a post.',
+    idle: 'Click to place a column. Tab steps through a chimney (24" x 40"), a post (6" x 6") and a flue (a round 8" metal pipe, a stove\'s chimney); set the size and heights in the properties panel.',
+    busy: 'Click to place a column. Tab steps through a chimney, a post and a flue.',
   },
 };
 

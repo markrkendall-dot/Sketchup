@@ -11,6 +11,7 @@ import { columnDefaults, groundAt } from '../derive/site';
 import { flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool, makeToolContext } from '../editor2d/tools';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
+import { COLUMN_KIND_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import {
   counterColorOf,
@@ -1712,6 +1713,7 @@ const GUARD_HEIGHT = 30;
 const columnKindOptions: { value: Column['kind']; label: string }[] = [
   { value: 'chimney', label: 'Chimney' },
   { value: 'post', label: 'Post' },
+  { value: 'flue', label: 'Flue (round metal pipe)' },
 ];
 
 function GradePointProps({ point }: { point: GradePoint }) {
@@ -1764,19 +1766,25 @@ function ColumnProps({ column }: { column: Column }) {
   };
   return (
     <>
-      <h3>{column.kind === 'chimney' ? 'Chimney' : 'Post'}</h3>
+      <h3>{COLUMN_KIND_NAME[column.kind]}</h3>
       <SelectField label="Kind" value={column.kind} options={columnKindOptions} onChange={(kind) => updateColumn(column.id, { kind })} />
-      {length('width', 'Width', 'positive', 'Along the plan x axis before rotation.')}
-      {length('depth', 'Depth', 'positive', 'Along the plan y axis before rotation.')}
-      <NumberField label="Rotation" value={column.rotation} onCommit={(v) => updateColumn(column.id, { rotation: v })} hint="Degrees, clockwise on the plan." />
+      {column.kind === 'flue' ? (
+        length('width', 'Diameter', 'positive', 'Outside diameter of the pipe (an insulated 6" chimney pipe is about 8").')
+      ) : (
+        <>
+          {length('width', 'Width', 'positive', 'Along the plan x axis before rotation.')}
+          {length('depth', 'Depth', 'positive', 'Along the plan y axis before rotation.')}
+          <NumberField label="Rotation" value={column.rotation} onCommit={(v) => updateColumn(column.id, { rotation: v })} hint="Degrees, clockwise on the plan." />
+        </>
+      )}
       {length('base', 'Base', 'any', 'Bottom, as an elevation (the ground here is shown below).')}
-      {length('top', 'Top', 'any', column.kind === 'chimney' && column.cap ? 'Top of the cap, as an elevation; the spark arrestor stands 12" above it.' : 'Top, as an elevation.')}
+      {length('top', 'Top', 'any', column.kind === 'chimney' && column.cap ? 'Top of the cap, as an elevation; the spark arrestor stands 12" above it.' : column.kind === 'flue' && column.cap ? 'Top of the pipe, as an elevation; the rain cap is 3" above it.' : 'Top, as an elevation.')}
       <ColorField
         label="Colour"
         value={columnColorOf(column)}
         onCommit={(color) => updateColumn(column.id, { color })}
         onReset={column.color ? () => updateColumn(column.id, { color: undefined }) : undefined}
-        hint={`Default for a ${column.kind}: ${COLUMN_COLOR[column.kind]}.${column.kind === 'chimney' ? ' The 3D view draws it as brick.' : ''}`}
+        hint={`Default for a ${column.kind}: ${COLUMN_COLOR[column.kind]}.${column.kind === 'chimney' ? ' The 3D view draws it as brick.' : column.kind === 'flue' ? ' The 3D view draws it as metal.' : ''}`}
       />
       {column.kind === 'chimney' && (
         <label className="check-row">
@@ -1792,6 +1800,20 @@ function ColumnProps({ column }: { column: Column }) {
           Cap and spark arrestor (a 4" concrete cap, a 12" wire box above it)
         </label>
       )}
+      {column.kind === 'flue' && (
+        <label className="check-row">
+          <input
+            type="checkbox"
+            aria-label="Rain cap"
+            checked={!!column.cap}
+            onChange={(e) => {
+              updateColumn(column.id, { cap: e.target.checked ? true : undefined });
+              releaseFocus(e.currentTarget);
+            }}
+          />
+          Rain cap (a disc twice the pipe's width, 3" above its top)
+        </label>
+      )}
       <SelectField label="Phase" value={column.phase} options={phaseOptions} onChange={(phase) => updateColumn(column.id, { phase })} />
       <ReadOnly label="Height">{formatLength(column.top - column.base, denom)}</ReadOnly>
       <ReadOnly label="Position">
@@ -1800,7 +1822,13 @@ function ColumnProps({ column }: { column: Column }) {
       <div className="panel-buttons">
         <button
           onClick={resetHeights}
-          title={column.kind === 'chimney' ? 'Base 12" below the ground here, top 48" above the highest ridge' : 'Base on the ground here, top at the lowest roof underside over it'}
+          title={
+            column.kind === 'chimney'
+              ? 'Base 12" below the ground here, top 48" above the highest ridge'
+              : column.kind === 'flue'
+                ? 'Base 30" over the first floor (a stove top), top 24" above the highest ridge'
+                : 'Base on the ground here, top at the lowest roof underside over it'
+          }
         >
           Reset heights
         </button>

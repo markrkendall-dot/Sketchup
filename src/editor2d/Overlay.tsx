@@ -5,7 +5,8 @@ import { FIXTURE_LABEL } from '../model/casework';
 import { defaultGradeElevation } from '../derive/site';
 import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
 import { add, dist, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
-import type { Underlay, Vec2 } from '../model/types';
+import type { Column, Underlay, Vec2 } from '../model/types';
+import { COLUMN_KIND_NAME, nextColumnKind } from './tools/siteTools';
 import { formatPxScale, nearestAxis, pixelDistance } from '../model/underlay';
 import { formatLength, formatLengthCompact, parseLength } from '../model/units';
 import { usePlanStore } from '../store/planStore';
@@ -424,15 +425,15 @@ function GradeDraft({ at, text, error, v, placeholder }: { at: Vec2; text: strin
 }
 
 /** Column tool: the column about to be placed (rotated rectangle at the snapped cursor), in screen space. */
-function ColumnGhost({ at, kind, width, depth, v }: { at: Vec2; kind: 'chimney' | 'post'; width: number; depth: number; v: Viewport }) {
+function ColumnGhost({ at, kind, width, depth, v }: { at: Vec2; kind: Column['kind']; width: number; depth: number; v: Viewport }) {
   const p = worldToScreen(v, at);
   const w = Math.max(width * v.k, 6);
-  const d = Math.max(depth * v.k, 6);
+  const d = Math.max((kind === 'flue' ? width : depth) * v.k, 6);
   return (
     <g className={`column-ghost column-${kind}`} transform={`translate(${p.x} ${p.y})`}>
-      <rect x={-w / 2} y={-d / 2} width={w} height={d} />
+      <rect x={-w / 2} y={-d / 2} width={w} height={d} rx={kind === 'flue' ? w / 2 : 0} />
       <text x={w / 2 + 6} y={-d / 2 - 4}>
-        {kind === 'chimney' ? 'Chimney (Tab: post)' : 'Post (Tab: chimney)'}
+        {COLUMN_KIND_NAME[kind]} (Tab: {COLUMN_KIND_NAME[nextColumnKind(kind)].toLowerCase()})
       </text>
     </g>
   );

@@ -1345,6 +1345,11 @@ button.primary:hover:not(:disabled) {
   stroke: #5c4a2a;
 }
 
+.column-ghost.column-flue rect {
+  fill: rgba(185, 189, 193, 0.5);
+  stroke: #52525b;
+}
+
 .column-ghost text {
   font-size: 12px;
   fill: #52525b;

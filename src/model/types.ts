@@ -237,13 +237,15 @@ export interface Column {
   rotation: Degrees;
   base: Inches;
   top: Inches;
-  kind: 'post' | 'chimney';
+  /** A flue is a round metal chimney pipe (a stove's): `width` is its diameter, `depth` is ignored. */
+  kind: 'post' | 'chimney' | 'flue';
   phase: Phase;
-  /** Hex colour `#rrggbb`. Absent: brick red for a chimney, tan for a post (model/finish.ts). */
+  /** Hex colour `#rrggbb`. Absent: brick red for a chimney, tan for a post, stainless for a flue (model/finish.ts). */
   color?: string;
   /**
    * Chimneys: a 4" concrete cap at the top (2" proud all round) and a 12" wire spark arrestor above
-   * it (DESIGN.md "Site and terrain"). Ignored on a post.
+   * it; flues: a rain cap, a disc twice the pipe's width a little above its top (DESIGN.md "Site and
+   * terrain"). Ignored on a post.
    */
   cap?: boolean;
 }

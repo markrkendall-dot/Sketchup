@@ -2,7 +2,7 @@ import { getFootprints } from '../../derive/footprint';
 import { columnDefaults, defaultGradeElevation, pointInColumn, siteGhostLevelId } from '../../derive/site';
 import { isVisible } from '../../derive/phase';
 import { add, dist, sub } from '../../model/geometry';
-import type { Id, Site, Vec2, ViewMode } from '../../model/types';
+import type { Column, Id, Site, Vec2, ViewMode } from '../../model/types';
 import { formatLength, tryParseLength } from '../../model/units';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection, type SnapResult } from '../../store/uiStore';
@@ -150,7 +150,13 @@ export const gradePointTool: Tool = {
 // ---------------------------------------------------------------------------------------------
 // Column tool
 
-function columnPreview(ctx: ToolContext, at: Vec2, kind: 'chimney' | 'post') {
+/** The column kinds the tool's Tab steps through, in order. */
+const COLUMN_KINDS: Column['kind'][] = ['chimney', 'post', 'flue'];
+export const COLUMN_KIND_NAME: Record<Column['kind'], string> = { chimney: 'Chimney', post: 'Post', flue: 'Flue' };
+/** The kind Tab switches to after `kind`. */
+export const nextColumnKind = (kind: Column['kind']): Column['kind'] => COLUMN_KINDS[(COLUMN_KINDS.indexOf(kind) + 1) % COLUMN_KINDS.length];
+
+function columnPreview(ctx: ToolContext, at: Vec2, kind: Column['kind']) {
   const ui = ctx.ui();
   const def = columnDefaults(ctx.plan(), kind, at, ui.drawPhase);
   ui.patchDraft({ columnKind: kind, columnPreview: { at, kind, width: def.width, depth: def.depth } });
@@ -158,7 +164,7 @@ function columnPreview(ctx: ToolContext, at: Vec2, kind: 'chimney' | 'post') {
 
 /**
  * Column tool (C in site mode): the column follows the snapped cursor; click places it with the
- * defaults of its kind in the toolbar's "Draw as" phase, Tab toggles chimney / post before the
+ * defaults of its kind in the toolbar's "Draw as" phase, Tab steps chimney, post, flue before the
  * click. Size, heights and rotation are then edited in the properties panel.
  */
 export const columnTool: Tool = {
@@ -174,7 +180,7 @@ export const columnTool: Tool = {
       return;
     }
     ui.setSelection({ ...EMPTY_SELECTION, columns: [id] });
-    ui.patchDraft({ cursor: e.world, snap, error: false, message: `${kind === 'chimney' ? 'Chimney' : 'Post'} placed. Set its size and heights in the properties panel.` });
+    ui.patchDraft({ cursor: e.world, snap, error: false, message: `${COLUMN_KIND_NAME[kind]} placed. Set its size and heights in the properties panel.` });
     columnPreview(ctx, snap.point, kind);
   },
 
@@ -191,9 +197,9 @@ export const columnTool: Tool = {
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     const ui = ctx.ui();
     if (e.key === 'Tab') {
-      const kind = ui.draft.columnKind === 'chimney' ? 'post' : 'chimney';
+      const kind = nextColumnKind(ui.draft.columnKind);
       const at = ui.draft.columnPreview?.at ?? ui.draft.snap?.point ?? ui.draft.cursor ?? { x: 0, y: 0 };
-      ui.patchDraft({ message: `Next: ${kind === 'chimney' ? 'chimney' : 'post'}. Click to place it.`, error: false });
+      ui.patchDraft({ message: `Next: ${COLUMN_KIND_NAME[kind].toLowerCase()}. Click to place it.`, error: false });
       columnPreview(ctx, at, kind);
       return true;
     }

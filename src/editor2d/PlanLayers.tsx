@@ -1177,7 +1177,7 @@ const GradePointShape = memo(function GradePointShape({ pointId }: { pointId: Id
   );
 });
 
-/** A column's plan rectangle: chimneys hatched like brick, posts solid; demo hatched red, new green. */
+/** A column's plan rectangle (a flue's circle): chimneys hatched like brick, posts and flues solid; demo hatched red, new green. */
 const ColumnShape = memo(function ColumnShape({ columnId }: { columnId: Id }) {
   const c = useLayerPlan((s) => s.plan.site.columns[columnId]);
   const viewMode = useLayerUi((s) => s.viewMode);
@@ -1189,7 +1189,11 @@ const ColumnShape = memo(function ColumnShape({ columnId }: { columnId: Id }) {
       data-column-id={columnId}
       transform={`translate(${c.at.x} ${c.at.y}) rotate(${c.rotation})`}
     >
-      <rect className="column-body" x={-c.width / 2} y={-c.depth / 2} width={c.width} height={c.depth} vectorEffect="non-scaling-stroke" />
+      {c.kind === 'flue' ? (
+        <circle className="column-body" r={c.width / 2} vectorEffect="non-scaling-stroke" />
+      ) : (
+        <rect className="column-body" x={-c.width / 2} y={-c.depth / 2} width={c.width} height={c.depth} vectorEffect="non-scaling-stroke" />
+      )}
     </g>
   );
 });

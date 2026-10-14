@@ -27,11 +27,19 @@ export const GRADE_SNAP = 1;
 const SUN_HEIGHT = 1600;
 const SUN_PLAN = { x: -700, y: 1100 };
 
-/** Width and depth of a new chimney / post, and how far the chimney stands below grade and above the ridge. */
+/**
+ * Width and depth of a new chimney / post / flue; how far the chimney stands below grade and above
+ * the ridge; a flue (a stove's pipe) starts at a stove top over the first floor and stands 2' over
+ * the ridge.
+ */
 export const COLUMN_DEFAULTS = {
   chimney: { width: 24, depth: 40, belowGrade: 12, aboveRidge: 48 },
   post: { width: 6, depth: 6 },
+  flue: { width: 8, depth: 8, aboveFloor: 30, aboveRidge: 24 },
 } as const;
+
+/** Sides of the polygon a round flue is drawn with. */
+export const FLUE_SIDES = 24;
 
 const ROTATE = (p: Vec2, deg: number): Vec2 => {
   const r = (deg * Math.PI) / 180;
@@ -561,8 +569,21 @@ export function sunPosition(northAngle: number): [number, number, number] {
 // ---------------------------------------------------------------------------------------------
 // Columns
 
-/** The corners of a column's plan rectangle (width along x, depth along y, turned by `rotation`), clockwise on screen. */
-export function columnOutline(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation'>): Vec2[] {
+/** A circle of `diameter` round `at`, as FLUE_SIDES corners clockwise on screen. */
+export function circleOutline(at: Vec2, diameter: number): Vec2[] {
+  const r = diameter / 2;
+  return Array.from({ length: FLUE_SIDES }, (_, i) => {
+    const t = (2 * Math.PI * i) / FLUE_SIDES;
+    return { x: at.x + r * Math.cos(t), y: at.y + r * Math.sin(t) };
+  });
+}
+
+/**
+ * The corners of a column's plan rectangle (width along x, depth along y, turned by `rotation`),
+ * clockwise on screen; a flue's circle of diameter `width` (circleOutline).
+ */
+export function columnOutline(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation'> & Partial<Pick<Column, 'kind'>>): Vec2[] {
+  if (c.kind === 'flue') return circleOutline(c.at, c.width);
   const hw = c.width / 2;
   const hd = c.depth / 2;
   return [
@@ -586,11 +607,21 @@ export const CHIMNEY_CAP = { thickness: 4, proud: 2, arrestor: 12, inset: 1 } as
 /** True when the column is a chimney with its cap and spark arrestor (a post ignores `cap`). */
 export const hasChimneyCap = (c: Partial<Pick<Column, 'kind' | 'cap'>>): boolean => c.kind === 'chimney' && c.cap === true;
 
-/** The highest point of a column: its top, or the top of the spark arrestor on a capped chimney. */
-export const columnPeak = (c: Pick<Column, 'kind' | 'cap' | 'top'>): number => c.top + (hasChimneyCap(c) ? CHIMNEY_CAP.arrestor : 0);
+/**
+ * A capped flue's rain cap: a disc `spread` times the pipe's width and `thickness` deep, `gap` over
+ * the top of the pipe, on a spacer `stem` times its width.
+ */
+export const FLUE_CAP = { gap: 3, thickness: 1.5, spread: 2, stem: 0.5 } as const;
 
-/** The parts a capped chimney adds to its shaft, each in its own material. */
-export type ChimneyPart = 'cap' | 'arrestor';
+/** True when the column is a flue with its rain cap. */
+export const hasFlueCap = (c: Partial<Pick<Column, 'kind' | 'cap'>>): boolean => c.kind === 'flue' && c.cap === true;
+
+/** The highest point of a column: its top, or the top of a capped chimney's spark arrestor or a capped flue's rain cap. */
+export const columnPeak = (c: Pick<Column, 'kind' | 'cap' | 'top'>): number =>
+  c.top + (hasChimneyCap(c) ? CHIMNEY_CAP.arrestor : hasFlueCap(c) ? FLUE_CAP.gap + FLUE_CAP.thickness : 0);
+
+/** The parts a capped chimney (cap, arrestor) or a capped flue (its rain cap's hood and stem) adds to its shaft, each in its own material. */
+export type ChimneyPart = 'cap' | 'arrestor' | 'hood' | 'stem';
 
 /** One part of a capped chimney: its plan rectangle (columnOutline order) and its bottom and top elevations. */
 export interface ChimneyPartBox {
@@ -607,6 +638,13 @@ export interface ChimneyPartBox {
  * shaft, so a slender one keeps some width). Both turn with the column.
  */
 export function chimneyPartBoxes(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top' | 'kind' | 'cap'>): ChimneyPartBox[] {
+  if (hasFlueCap(c)) {
+    const { gap, thickness, spread, stem } = FLUE_CAP;
+    return [
+      { part: 'stem', outline: circleOutline(c.at, c.width * stem), bottom: c.top, top: c.top + gap },
+      { part: 'hood', outline: circleOutline(c.at, c.width * spread), bottom: c.top + gap, top: c.top + gap + thickness },
+    ];
+  }
   if (!hasChimneyCap(c)) return [];
   const { thickness, proud, arrestor } = CHIMNEY_CAP;
   const inset = Math.min(CHIMNEY_CAP.inset, c.width / 4, c.depth / 4);
@@ -616,8 +654,9 @@ export function chimneyPartBoxes(c: Pick<Column, 'at' | 'width' | 'depth' | 'rot
   ];
 }
 
-/** True when p lies inside the column's rectangle grown by `slack` on every side. */
-export function pointInColumn(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation'>, p: Vec2, slack = 0): boolean {
+/** True when p lies inside the column's rectangle (a flue's circle) grown by `slack` on every side. */
+export function pointInColumn(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotation'> & Partial<Pick<Column, 'kind'>>, p: Vec2, slack = 0): boolean {
+  if (c.kind === 'flue') return Math.hypot(p.x - c.at.x, p.y - c.at.y) <= c.width / 2 + slack;
   const q = ROTATE({ x: p.x - c.at.x, y: p.y - c.at.y }, -c.rotation);
   return Math.abs(q.x) <= c.width / 2 + slack && Math.abs(q.y) <= c.depth / 2 + slack;
 }
@@ -683,6 +722,13 @@ export function columnDefaults(plan: Plan, kind: Column['kind'], at: Vec2, phase
     return { width: d.width, depth: d.depth, rotation: 0, base: ground - d.belowGrade, top };
   }
   const first = plan.levelOrder[1] ?? plan.levelOrder[0];
+  if (kind === 'flue') {
+    const d = COLUMN_DEFAULTS.flue;
+    const base = (first ? elev[first].floorTop : ground) + d.aboveFloor;
+    const ridge = highestRidge(plan);
+    const top = (ridge ?? (last ? elev[last].ceiling : base + 96)) + d.aboveRidge;
+    return { width: d.width, depth: d.depth, rotation: 0, base, top: top > base ? top : base + 96 };
+  }
   const under = lowestRoofUnderside(plan, at, phase);
   const top = under ?? (first ? elev[first].ceiling : ground + 96);
   return { width: COLUMN_DEFAULTS.post.width, depth: COLUMN_DEFAULTS.post.depth, rotation: 0, base: ground, top: top > ground ? top : ground + 96 };

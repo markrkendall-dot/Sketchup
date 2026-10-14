@@ -1945,16 +1945,36 @@ export function addBoxUVs(g: BufferGeometry): BufferGeometry {
  */
 export function buildColumnGeometry(column: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top'> & Partial<Pick<Column, 'kind' | 'cap'>>): BufferGeometry {
   const top = hasChimneyCap(column) ? Math.max(column.base, column.top - CHIMNEY_CAP.thickness) : column.top;
-  return addBoxUVs(prism(columnOutline(column), column.base, top));
+  const g = addBoxUVs(prism(columnOutline(column), column.base, top));
+  return column.kind === 'flue' ? roundNormals(g, column.at) : g;
+}
+
+/** A round solid's side faces get normals pointing straight out from its axis at `at`, so it shades smooth. */
+function roundNormals(g: BufferGeometry, at: Vec2): BufferGeometry {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  for (let i = 0; i < pos.count; i++) {
+    if (Math.abs(nor.getY(i)) > 0.5) continue;
+    const dx = pos.getX(i) - at.x;
+    const dz = pos.getZ(i) - at.y;
+    const len = Math.hypot(dx, dz) || 1;
+    nor.setXYZ(i, dx / len, 0, dz / len);
+  }
+  nor.needsUpdate = true;
+  return g;
 }
 
 /**
- * The cap and spark arrestor of a capped chimney (site.ts chimneyPartBoxes), one geometry each with
- * UVs in inches; none for a column without them. The cap is a closed box; the arrestor is a wire box
- * open at the bottom, where it stands on the cap over the flue.
+ * The cap and spark arrestor of a capped chimney, or the rain cap's stem and hood of a capped flue
+ * (site.ts chimneyPartBoxes), one geometry each with UVs in inches; none for a column without them.
+ * The cap is a closed box; the arrestor is a wire box open at the bottom, where it stands on the cap
+ * over the flue; a flue's parts are round, shading smooth like its pipe.
  */
 export function buildColumnParts(column: Pick<Column, 'at' | 'width' | 'depth' | 'rotation' | 'base' | 'top' | 'kind' | 'cap'>): ColumnPartMesh[] {
-  return chimneyPartBoxes(column).map((b) => ({ part: b.part, geometry: addBoxUVs(prism(b.outline, b.bottom, b.top, [], { bottom: b.part !== 'arrestor' })) }));
+  return chimneyPartBoxes(column).map((b) => {
+    const g = addBoxUVs(prism(b.outline, b.bottom, b.top, [], { bottom: b.part !== 'arrestor' }));
+    return { part: b.part, geometry: column.kind === 'flue' ? roundNormals(g, column.at) : g };
+  });
 }
 
 interface GridSide {
