@@ -134,9 +134,48 @@ export interface Stairs {
   open?: boolean;
   /**
    * Railings on the open sides, left and right as you climb (DESIGN.md "Stair railings"): a 36"
-   * handrail over the nosings with newels and balusters. Absent (or no side true): none.
+   * handrail over the nosings with newels and balusters; `end`, on a landing (a one-riser piece)
+   * only, along its far edge. Absent (or no side true): none.
    */
-  railings?: { left?: boolean; right?: boolean };
+  railings?: { left?: boolean; right?: boolean; end?: boolean };
+  /** The staircase (Level.staircases) this piece belongs to (schema version 6). */
+  staircaseId?: Id;
+}
+
+export type StairStringer = 'closed' | 'open';
+export type StairUnderside = 'solid' | 'framed' | 'open';
+export type StairNewel = 'box' | 'square';
+export type StairHandrail = 'round' | 'board';
+export type StairStartStep = 'square' | 'bullnose';
+
+/**
+ * A staircase (schema version 6): the flights, landings and platform of one stairway, selected,
+ * moved and styled together (DESIGN.md "Staircases"). Its pieces name it (`Stairs.staircaseId`); it
+ * keeps no list of them and no phase of its own (its pieces' phases). Every style field is optional:
+ * absent is the default (model/stairStyle.ts).
+ */
+export interface Staircase {
+  id: Id;
+  name?: string;
+  /** Treads, handrail and newel caps; default oak. */
+  treadColor?: string;
+  /** Risers, skirts, balusters, newel bodies and the soffit; default white. */
+  riserColor?: string;
+  /** How far a tread's front stands past the riser under it. */
+  nosing?: Inches;
+  treadThickness?: Inches;
+  /** Closed: skirt boards along the sides; open: the treads' ends show over a cut stringer. */
+  stringer?: StairStringer;
+  /** Solid to the floor (the default), framed (open space under it, a soffit), or open (stringers only). */
+  underside?: StairUnderside;
+  newel?: StairNewel;
+  handrail?: StairHandrail;
+  /** The handrail's top over the nosings. */
+  handrailHeight?: Inches;
+  /** The most room between balusters. */
+  balusterGap?: Inches;
+  /** The first step: square, or a bullnose round the starting newel. */
+  startStep?: StairStartStep;
 }
 
 export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';
@@ -325,6 +364,8 @@ export interface Level {
   decks: Record<Id, Deck>;
   /** Floor openings, holes in this level's floor (schema version 5). */
   floorOpenings: Record<Id, FloorOpening>;
+  /** Staircases, groups of this level's stairs styled together (schema version 6). */
+  staircases: Record<Id, Staircase>;
   finishes?: LevelFinishes;
   underlay?: Underlay;
 }
@@ -360,7 +401,7 @@ export interface ProposedLook {
 }
 
 export interface Plan {
-  schemaVersion: 5;
+  schemaVersion: 6;
   id: Id;
   name: string;
   levelOrder: Id[]; // bottom to top

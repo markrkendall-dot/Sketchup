@@ -5,10 +5,11 @@ import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './
 import { FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
 import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
-import type { Column, Deck, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
+import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
+import type { Column, Deck, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, Staircase, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
-export const SCHEMA_VERSION = 5 as const;
+export const SCHEMA_VERSION = 6 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
 export const MERGE_EPS = 0.5;
 
@@ -37,6 +38,7 @@ export function createLevel(name: string, wallHeight: number, floorThickness: nu
     fixtures: {},
     decks: {},
     floorOpenings: {},
+    staircases: {},
   };
 }
 
@@ -533,6 +535,17 @@ export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
     next.schemaVersion = 5;
     return next;
   },
+  /** Version 5: levels have no staircases; add an empty `staircases` record to each. */
+  5: (doc) => {
+    const next: Json = { ...doc };
+    if (isObject(doc.levels)) {
+      const upgraded: Json = {};
+      for (const [id, raw] of Object.entries(doc.levels)) upgraded[id] = isObject(raw) ? { ...raw, staircases: {} } : raw;
+      next.levels = upgraded;
+    }
+    next.schemaVersion = 6;
+    return next;
+  },
 };
 
 const PHASES = new Set(['existing', 'demo', 'new']);
@@ -543,7 +556,7 @@ const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
-const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings'] as const;
+const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
@@ -554,7 +567,8 @@ const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'he
 const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle'] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
 const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
-const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'finishes', 'underlay'] as const;
+const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
+const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'finishes', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
@@ -676,10 +690,11 @@ function migrateRooms(raw: Json): Level['rooms'] {
  */
 export function stairsRailingsOf(v: unknown): Stairs['railings'] | undefined {
   if (!isObject(v)) return undefined;
-  const out: { left?: boolean; right?: boolean } = {};
+  const out: { left?: boolean; right?: boolean; end?: boolean } = {};
   if (v.left === true) out.left = true;
   if (v.right === true) out.right = true;
-  return out.left || out.right ? out : undefined;
+  if (v.end === true) out.end = true;
+  return out.left || out.right || out.end ? out : undefined;
 }
 
 function migrateStairs(raw: Json, lowest: boolean): Level['stairs'] {
@@ -702,6 +717,7 @@ function migrateStairs(raw: Json, lowest: boolean): Level['stairs'] {
     put(stairs, 'risers', isNum(st.risers) && stairsRisersOk(st.risers) ? st.risers : undefined);
     put(stairs, 'open', typeof st.open === 'boolean' ? st.open : undefined);
     put(stairs, 'railings', stairsRailingsOf(st.railings));
+    put(stairs, 'staircaseId', typeof st.staircaseId === 'string' && st.staircaseId ? st.staircaseId : undefined);
     out[sid] = stairs as unknown as Stairs;
   }
   return out;
@@ -876,6 +892,31 @@ function migrateDecks(raw: Json, where: string): Level['decks'] {
  * Floor openings read field by field, like decks: an unusable outline drops the opening (with a
  * console warning naming it); railings are fitted to the outline (normalizeRailings).
  */
+/**
+ * Staircases field by field: a style field that cannot be used is dropped (its default applies) with
+ * a console warning naming it, colours lower-cased. The caller drops the ones no stairs belong to.
+ */
+function migrateStaircases(raw: Json, where: string): Level['staircases'] {
+  const out: Level['staircases'] = {};
+  for (const [sid, sc] of Object.entries(raw)) {
+    if (!isObject(sc)) {
+      console.warn(`HomePlan: ${where}: dropped staircase ${sid}: not an object`);
+      continue;
+    }
+    const staircase = pick(sc, STAIRCASE_KEYS);
+    staircase.id = sid;
+    for (const k of STAIRCASE_STYLE_KEYS) {
+      const problem = staircaseFieldProblem(k, sc[k] as Staircase[typeof k]);
+      if (problem) {
+        console.warn(`HomePlan: ${where}: staircase ${sid}: ${problem}; using the default`);
+        delete staircase[k];
+      } else if ((k === 'treadColor' || k === 'riserColor') && typeof sc[k] === 'string') staircase[k] = sc[k].toLowerCase();
+    }
+    out[sid] = staircase as unknown as Staircase;
+  }
+  return out;
+}
+
 function migrateFloorOpenings(raw: Json, where: string): Level['floorOpenings'] {
   const out: Level['floorOpenings'] = {};
   for (const [oid, o] of Object.entries(raw)) {
@@ -1032,6 +1073,17 @@ function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   level.fixtures = migrateFixtures(record(raw.fixtures, `${where} fixtures`), where);
   level.decks = migrateDecks(record(raw.decks, `${where} decks`), where);
   level.floorOpenings = migrateFloorOpenings(record(raw.floorOpenings, `${where} floor openings`), where);
+  // A piece of stairs names its staircase; one naming none there forgets it, and a staircase with no
+  // pieces is dropped.
+  const staircases = migrateStaircases(record(raw.staircases, `${where} staircases`), where);
+  const used = new Set<Id>();
+  for (const st of Object.values(level.stairs as Level['stairs'])) {
+    if (st.staircaseId === undefined) continue;
+    if (staircases[st.staircaseId]) used.add(st.staircaseId);
+    else delete st.staircaseId;
+  }
+  for (const id of Object.keys(staircases)) if (!used.has(id)) delete staircases[id];
+  level.staircases = staircases;
   put(level, 'finishes', migrateFinishes(raw.finishes));
   put(level, 'underlay', migrateUnderlay(raw.underlay));
   return level as unknown as Level;

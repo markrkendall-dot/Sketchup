@@ -89,7 +89,7 @@ describe('floor opening store actions', () => {
 
 describe('floor openings in files', () => {
   it('schema 5 adds floor openings to every level; a v4 file gains empty records', () => {
-    expect(SCHEMA_VERSION).toBe(5);
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(5);
     const v4 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 4 }));
     for (const l of Object.values(v4.levels) as Record<string, unknown>[]) delete l.floorOpenings;
     const up = MIGRATIONS[4](v4);

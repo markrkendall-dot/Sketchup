@@ -40,9 +40,20 @@ export type Hit =
   | { kind: 'roof'; id: Id }
   | { kind: 'deck'; id: Id }
   | { kind: 'floorOpening'; id: Id }
+  | { kind: 'staircase'; id: Id }
   | null;
 
-const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', fixture: 'fixtures', roof: 'roofs', deck: 'decks', floorOpening: 'floorOpenings' } as const;
+const SEL_KEY = { node: 'nodes', wall: 'walls', opening: 'openings', room: 'rooms', stairs: 'stairs', fixture: 'fixtures', roof: 'roofs', deck: 'decks', floorOpening: 'floorOpenings', staircase: 'staircases' } as const;
+
+/**
+ * A click on a piece of a staircase picks the staircase, unless that staircase is open (a
+ * double-click on one of its pieces opened it): then the piece alone.
+ */
+export function liftToStaircase(level: Level, hit: Hit, openStaircaseId: Id | null): Hit {
+  if (hit?.kind !== 'stairs') return hit;
+  const sc = level.stairs[hit.id]?.staircaseId;
+  return sc && level.staircases?.[sc] && sc !== openStaircaseId ? { kind: 'staircase', id: sc } : hit;
+}
 
 /** Pick radius of a selected roof's or deck's outline corner handles, in screen px. */
 const OUTLINE_HANDLE_PX = 8;
@@ -185,6 +196,8 @@ type DragState =
     }
   | ({ kind: 'room' } & RoomDrag)
   | { kind: 'stairs'; id: Id; grab: Vec2; origin: Vec2; startScreen: Vec2; started: boolean }
+  /** A staircase's pieces, moved together. */
+  | { kind: 'staircase'; grab: Vec2; origins: Record<Id, Vec2>; startScreen: Vec2; started: boolean }
   /** The selected fixtures, moved together. */
   | { kind: 'fixtures'; grab: Vec2; origins: Record<Id, Vec2>; startScreen: Vec2; started: boolean }
   /** An outline corner of a selected roof, deck or floor opening. */
@@ -226,8 +239,9 @@ function pruneSelection(ctx: ToolContext): void {
   const fixtures = sel.fixtures.filter((id) => level.fixtures[id]);
   const decks = sel.decks.filter((id) => level.decks?.[id]);
   const floorOpenings = sel.floorOpenings.filter((id) => level.floorOpenings?.[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
-    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings });
+  const staircases = sel.staircases.filter((id) => level.staircases?.[id]);
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
+    ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases });
   }
 }
 
@@ -272,7 +286,7 @@ function finishDrag(ctx: ToolContext): void {
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
     resumeHistory();
     pruneSelection(ctx);
-  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs' || drag?.kind === 'fixtures' || drag?.kind === 'outline-vertex') && drag.started) {
+  } else if ((drag?.kind === 'opening' || drag?.kind === 'stairs' || drag?.kind === 'staircase' || drag?.kind === 'fixtures' || drag?.kind === 'outline-vertex') && drag.started) {
     resumeHistory();
   } else if (drag?.kind === 'room') {
     endRoomDrag(drag);
@@ -317,7 +331,9 @@ export const selectTool: Tool = {
       drag = { kind: 'outline-vertex', target: roofHandle ? 'roofs' : deckHandle ? 'decks' : 'floorOpenings', id: handle.id, index: handle.index, startScreen: e.screen, started: false };
       return;
     }
-    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode);
+    const hit = liftToStaircase(level, hitTest(level, e.world, ui.viewport.k, ui.viewMode), ui.openStaircaseId);
+    // A click off the open staircase's pieces closes it.
+    if (ui.openStaircaseId && !(hit?.kind === 'stairs' && level.stairs[hit.id]?.staircaseId === ui.openStaircaseId)) ui.setOpenStaircase(null);
 
     if (!hit) {
       // An unlocked underlay under the cursor is selected and dragged; Shift still box-selects.
@@ -349,6 +365,12 @@ export const selectTool: Tool = {
     if (hit.kind === 'stairs') {
       const st = level.stairs[hit.id];
       drag = { kind: 'stairs', id: hit.id, grab: e.world, origin: { ...st.origin }, startScreen: e.screen, started: false };
+      return;
+    }
+    if (hit.kind === 'staircase') {
+      const origins: Record<Id, Vec2> = {};
+      for (const st of Object.values(level.stairs)) if (st.staircaseId === hit.id) origins[st.id] = { ...st.origin };
+      drag = { kind: 'staircase', grab: e.world, origins, startScreen: e.screen, started: false };
       return;
     }
     if (hit.kind === 'fixture') {
@@ -421,6 +443,23 @@ export const selectTool: Tool = {
       ui.patchDraft({ cursor: e.world, snap: null });
       ctx.actions.updateStairs(ctx.levelId, drag.id, { origin: add(drag.origin, { x: round(d.x), y: round(d.y) }) });
       if (!drag.started) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
+
+    if (drag.kind === 'staircase') {
+      const grid = ctx.plan().settings.snapGrid;
+      const round = (v: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
+      const d = sub(e.world, drag.grab);
+      const step = { x: round(d.x), y: round(d.y) };
+      const positions: Record<Id, Vec2> = {};
+      for (const [id, o] of Object.entries(drag.origins)) positions[id] = add(o, step);
+      ui.patchDraft({ cursor: e.world, snap: null, dragReadout: displacementText(step, ctx.plan().settings.precisionDenominator) });
+      const before = ctx.plan();
+      ctx.actions.moveStairs(ctx.levelId, positions);
+      if (!drag.started && ctx.plan() !== before) {
         drag.started = true;
         pauseHistory();
       }
@@ -553,8 +592,17 @@ export const selectTool: Tool = {
 
   onDoubleClick(e, ctx) {
     const ui = ctx.ui();
-    const hit = hitTest(ctx.level(), e.world, ui.viewport.k, ui.viewMode);
+    const level = ctx.level();
+    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode);
     if (hit?.kind === 'room') startRename(ctx, hit.id);
+    // A piece of a staircase: open the staircase and select the piece alone.
+    if (hit?.kind === 'stairs') {
+      const sc = level.stairs[hit.id]?.staircaseId;
+      if (sc && level.staircases?.[sc]) {
+        ui.setOpenStaircase(sc);
+        ui.setSelection({ ...EMPTY_SELECTION, stairs: [hit.id] });
+      }
+    }
   },
 
   onKeyDown(e, ctx) {
@@ -587,6 +635,13 @@ export const selectTool: Tool = {
     if (e.key === 'Escape') {
       if (drag) {
         selectTool.cancel(ctx);
+        return true;
+      }
+      // An open staircase closes back to the staircase selected.
+      if (ui.openStaircaseId) {
+        const sc = ui.openStaircaseId;
+        ui.setOpenStaircase(null);
+        if (ctx.level().staircases?.[sc]) ui.setSelection({ ...EMPTY_SELECTION, staircases: [sc] });
         return true;
       }
       if (!selectionSize(sel)) return false;

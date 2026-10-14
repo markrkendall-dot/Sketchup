@@ -533,7 +533,8 @@ const StairsShape = memo(function StairsShape({ levelId, stairsId }: { levelId: 
   const st = useLayerPlan((s) => s.plan.levels[levelId]?.stairs[stairsId]);
   const ftf = useLayerPlan((s) => floorToFloor(s.plan, levelId));
   const viewMode = useLayerUi((s) => s.viewMode);
-  const selected = useLayerUi((s) => s.selection.stairs.includes(stairsId));
+  // Selected itself, or as a piece of its selected staircase.
+  const selected = useLayerUi((s) => s.selection.stairs.includes(stairsId) || (!!st?.staircaseId && s.selection.staircases.includes(st.staircaseId)));
   const k = useLayerUi(viewportScale);
   const sym = useMemo(() => (st ? stairsSymbol(st, flightSteps(st, ftf).risers) : null), [st, ftf]);
   if (!st || !sym || !isVisible(st.phase, viewMode)) return null;

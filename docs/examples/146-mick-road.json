@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "id": "plan-146-mick-road",
   "name": "146 Mick Road (starter, estimates flagged)",
   "levelOrder": [
@@ -384,7 +384,8 @@
           "id": "b-d1"
         }
       },
-      "floorOpenings": {}
+      "floorOpenings": {},
+      "staircases": {}
     },
     "level-f": {
       "id": "level-f",
@@ -1830,7 +1831,8 @@
           "risers": 1,
           "phase": "new",
           "cutsFloorAbove": false,
-          "id": "f-s2"
+          "id": "f-s2",
+          "staircaseId": "f-x1"
         },
         "f-s3": {
           "origin": {
@@ -1848,7 +1850,8 @@
           },
           "phase": "new",
           "cutsFloorAbove": false,
-          "id": "f-s3"
+          "id": "f-s3",
+          "staircaseId": "f-x1"
         },
         "f-s4": {
           "origin": {
@@ -1863,7 +1866,8 @@
           "risers": 1,
           "phase": "new",
           "cutsFloorAbove": false,
-          "id": "f-s4"
+          "id": "f-s4",
+          "staircaseId": "f-x1"
         },
         "f-s5": {
           "origin": {
@@ -1881,7 +1885,8 @@
           },
           "phase": "new",
           "cutsFloorAbove": false,
-          "id": "f-s5"
+          "id": "f-s5",
+          "staircaseId": "f-x1"
         }
       },
       "roofs": {
@@ -3037,6 +3042,12 @@
         }
       },
       "floorOpenings": {},
+      "staircases": {
+        "f-x1": {
+          "name": "Grand stair",
+          "id": "f-x1"
+        }
+      },
       "finishes": {
         "cabinetColor": "#c4884e",
         "counterColor": "#e2dccb",
@@ -3798,7 +3809,8 @@
           ],
           "phase": "new"
         }
-      }
+      },
+      "staircases": {}
     }
   },
   "baseFloorElevation": -100,

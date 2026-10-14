@@ -190,6 +190,8 @@ export interface Selection {
   fixtures: Id[];
   decks: Id[];
   floorOpenings: Id[];
+  /** Staircases (Level.staircases): a click on one of a staircase's pieces selects the staircase. */
+  staircases: Id[];
   /** Site elements (plan.site), selectable in site mode. */
   gradePoints: Id[];
   columns: Id[];
@@ -355,6 +357,11 @@ export interface UiState {
   checksOpen: boolean;
   /** The issue picked in the checks list: the plan outlines its element. */
   pickedIssueId: string | null;
+  /**
+   * The staircase opened by a double-click on one of its pieces: clicks on its pieces select the
+   * piece alone until Esc or a click elsewhere closes it.
+   */
+  openStaircaseId: Id | null;
   toggleLevelBar: () => void;
   toggleProperties: () => void;
   setOrthoLock: (on: boolean) => void;
@@ -407,6 +414,7 @@ export interface UiState {
   setIssues: (issues: readonly Issue[]) => void;
   setChecksOpen: (open: boolean) => void;
   setPickedIssue: (id: string | null) => void;
+  setOpenStaircase: (id: Id | null) => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -441,11 +449,11 @@ export const emptyDraft = (): Draft => ({
   dragReadout: null,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], floorOpenings: [], gradePoints: [], columns: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], floorOpenings: [], staircases: [], gradePoints: [], columns: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.decks.length + s.floorOpenings.length + s.gradePoints.length + s.columns.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.decks.length + s.floorOpenings.length + s.staircases.length + s.gradePoints.length + s.columns.length;
 
 /** Split ratio bounds, so neither view collapses. */
 export const MIN_SPLIT = 0.2;
@@ -493,6 +501,7 @@ export const useUiStore = create<UiState>()((set) => ({
   issues: [],
   checksOpen: false,
   pickedIssueId: null,
+  openStaircaseId: null,
   toggleLevelBar: () => set((s) => ({ levelBarOpen: !s.levelBarOpen })),
   toggleProperties: () => set((s) => ({ propertiesOpen: !s.propertiesOpen })),
   setOrthoLock: (orthoLock) => {
@@ -520,6 +529,7 @@ export const useUiStore = create<UiState>()((set) => ({
       // The site tools only exist in site mode.
       activeTool: SITE_TOOLS.includes(s.activeTool) ? 'select' : s.activeTool,
       selection: EMPTY_SELECTION,
+      openStaircaseId: null,
       underlaySelected: false,
       draft: emptyDraft(),
       hover: NO_HOVER,
@@ -532,6 +542,7 @@ export const useUiStore = create<UiState>()((set) => ({
       siteMode: true,
       activeTool: isSiteModeTool(s.activeTool) ? s.activeTool : 'select',
       selection: EMPTY_SELECTION,
+      openStaircaseId: null,
       underlaySelected: false,
       draft: emptyDraft(),
       hover: NO_HOVER,
@@ -628,6 +639,7 @@ export const useUiStore = create<UiState>()((set) => ({
     set((s) => ({ issues, pickedIssueId: s.pickedIssueId && issues.some((i) => i.id === s.pickedIssueId) ? s.pickedIssueId : null })),
   setChecksOpen: (checksOpen) => set((s) => (s.checksOpen === checksOpen ? s : { checksOpen, pickedIssueId: checksOpen ? s.pickedIssueId : null })),
   setPickedIssue: (pickedIssueId) => set((s) => (s.pickedIssueId === pickedIssueId ? s : { pickedIssueId })),
+  setOpenStaircase: (openStaircaseId) => set((s) => (s.openStaircaseId === openStaircaseId ? s : { openStaircaseId })),
 }));
 
 let noticeTimer: ReturnType<typeof setTimeout> | null = null;

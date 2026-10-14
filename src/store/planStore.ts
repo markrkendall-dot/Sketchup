@@ -25,7 +25,8 @@ import {
   wallOverlapping,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
-import type { Column, Deck, Fixture, FloorOpening, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Column, Deck, Fixture, FloorOpening, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
@@ -66,8 +67,13 @@ export type RoomPatch = Partial<Omit<Room, 'id'>>;
 /** Room fields that a patch clears with undefined. */
 const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
-export type StairsPatch = Partial<Omit<Stairs, 'id'>>;
+/** A flight's fields; its staircase is set by groupStairs and ungroupStaircase, not here. */
+export type StairsPatch = Partial<Omit<Stairs, 'id' | 'staircaseId'>>;
 export type NewStairs = Omit<Stairs, 'id'> & { id?: Id };
+export type NewStaircase = Omit<Staircase, 'id'> & { id?: Id };
+type StaircaseStyleKey = (typeof STAIRCASE_STYLE_KEYS)[number];
+/** A staircase's style; undefined clears a field (back to its default). */
+export type StaircasePatch = { [K in StaircaseStyleKey]?: Staircase[K] | undefined };
 export type RoofPatch = Partial<Omit<Roof, 'id'>>;
 export type NewRoof = Omit<Roof, 'id'> & { id?: Id };
 export type GradePointPatch = Partial<Omit<GradePoint, 'id'>>;
@@ -101,6 +107,8 @@ export interface EntitySelection {
   fixtures?: Id[];
   decks?: Id[];
   floorOpenings?: Id[];
+  /** Staircases: deleting one deletes its pieces; a phase goes to its pieces. */
+  staircases?: Id[];
   /** Site elements (plan.site); the level id the action is given only scopes the other kinds. */
   gradePoints?: Id[];
   columns?: Id[];
@@ -179,6 +187,17 @@ export interface PlanState {
    */
   updateStairs: (levelId: Id, id: Id, patch: StairsPatch) => void;
   deleteStairs: (levelId: Id, ids: Id[]) => void;
+  /** Move pieces of stairs to new origins in one undo step (a staircase dragged as one). */
+  moveStairs: (levelId: Id, positions: Record<Id, Vec2>) => void;
+  /**
+   * Make the pieces one staircase with `style` (taking them out of any other; one left with no
+   * pieces goes). Null when no id names a piece of stairs or the style cannot be used.
+   */
+  groupStairs: (levelId: Id, ids: readonly Id[], style?: NewStaircase) => Id | null;
+  /** Change a staircase's style; undefined clears a field (its default). */
+  updateStaircase: (levelId: Id, id: Id, patch: StaircasePatch) => void;
+  /** Its pieces go back to separate flights and the staircase goes. */
+  ungroupStaircase: (levelId: Id, id: Id) => void;
   /** Add a roof; returns the id, or null when its outline, sizes or optional fields are not usable (roofOptionProblem). */
   addRoof: (levelId: Id, roof: NewRoof) => Id | null;
   /**
@@ -248,7 +267,7 @@ export interface PlanState {
    */
   setPhase: (
     levelId: Id,
-    sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; floorOpenings?: Id[]; columns?: Id[]; rooms?: Id[] },
+    sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; floorOpenings?: Id[]; staircases?: Id[]; columns?: Id[]; rooms?: Id[] },
     phase: Phase,
   ) => void;
   /**
@@ -305,6 +324,22 @@ function moveNodesInPlace(level: Level, positions: Record<Id, Vec2>): void {
   }
 }
 
+/** Drop the staircases no piece of stairs belongs to any more. */
+function pruneStaircases(level: Level): void {
+  const used = new Set<Id>();
+  for (const st of Object.values(level.stairs)) if (st.staircaseId) used.add(st.staircaseId);
+  for (const id of Object.keys(level.staircases)) if (!used.has(id)) delete level.staircases[id];
+}
+
+/** A staircase's stored form: no undefined fields, colours lower-cased. */
+function cleanStaircase(sc: Staircase): Staircase {
+  const out = { ...sc };
+  for (const k of STAIRCASE_STYLE_KEYS) if (out[k] === undefined) delete out[k];
+  if (out.treadColor) out.treadColor = out.treadColor.toLowerCase();
+  if (out.riserColor) out.riserColor = out.riserColor.toLowerCase();
+  return out;
+}
+
 function deleteInPlace(
   level: Level,
   nodeIds: Id[],
@@ -324,6 +359,7 @@ function deleteInPlace(
   for (const id of openingIds) delete level.openings[id];
   for (const id of roomIds) delete level.rooms[id];
   for (const id of stairsIds) delete level.stairs[id];
+  pruneStaircases(level);
   const walls = new Set(wallIds);
   const nodes = new Set(nodeIds);
   for (const w of Object.values(level.walls)) if (nodes.has(w.a) || nodes.has(w.b)) walls.add(w.id);
@@ -601,7 +637,10 @@ export const usePlanStore = create<PlanState>()(
 
         deleteEntities: (levelId, sel) =>
           editLevel(levelId, (level, plan) => {
-            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, sel.stairs, sel.roofs, sel.fixtures, sel.decks, sel.floorOpenings);
+            // A staircase goes with its pieces.
+            const staircases = new Set(sel.staircases ?? []);
+            const stairs = [...(sel.stairs ?? []), ...Object.values(level.stairs).flatMap((st) => (st.staircaseId && staircases.has(st.staircaseId) ? [st.id] : []))];
+            deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, stairs, sel.roofs, sel.fixtures, sel.decks, sel.floorOpenings);
             for (const id of sel.gradePoints ?? []) delete plan.site.gradePoints[id];
             for (const id of sel.columns ?? []) delete plan.site.columns[id];
             // Removing walls changes the corner joins of their neighbours.
@@ -794,6 +833,7 @@ export const usePlanStore = create<PlanState>()(
             const railings = stairsRailingsOf(input.railings);
             if (railings) stairs.railings = railings;
             else delete stairs.railings;
+            if (!stairs.staircaseId || !level.staircases[stairs.staircaseId]) delete stairs.staircaseId;
             for (const k of ['headroom', 'holeStart', 'open', ...STAIRS_HEIGHT_KEYS] as const) if (stairs[k] === undefined) delete stairs[k];
             level.stairs[stairs.id] = stairs;
             id = stairs.id;
@@ -833,7 +873,7 @@ export const usePlanStore = create<PlanState>()(
             if ('railings' in patch) {
               const r = stairsRailingsOf(patch.railings);
               if (!r) delete st.railings;
-              else if (st.railings?.left !== r.left || st.railings?.right !== r.right) st.railings = r;
+              else if (st.railings?.left !== r.left || st.railings?.right !== r.right || st.railings?.end !== r.end) st.railings = r;
             }
           }),
 
@@ -841,6 +881,60 @@ export const usePlanStore = create<PlanState>()(
           editLevel(levelId, (level) => {
             if (!ids.some((id) => level.stairs[id])) return false;
             for (const id of ids) delete level.stairs[id];
+            pruneStaircases(level);
+          }),
+
+        moveStairs: (levelId, positions) =>
+          editLevel(levelId, (level) => {
+            let changed = false;
+            for (const [id, p] of Object.entries(positions)) {
+              const st = level.stairs[id];
+              if (!st || !isPoint(p) || (st.origin.x === p.x && st.origin.y === p.y)) continue;
+              st.origin = { x: p.x, y: p.y };
+              changed = true;
+            }
+            if (!changed) return false;
+          }),
+
+        groupStairs: (levelId, ids, style) => {
+          let made: Id | null = null;
+          editLevel(levelId, (level) => {
+            const pieces = ids.flatMap((id) => (level.stairs[id] ? [level.stairs[id]] : []));
+            if (!pieces.length || (style && staircaseProblem(style))) return false;
+            const sc = cleanStaircase({ ...style, id: style?.id ?? newId() });
+            level.staircases[sc.id] = sc;
+            for (const st of pieces) st.staircaseId = sc.id;
+            pruneStaircases(level);
+            made = sc.id;
+          });
+          return made;
+        },
+
+        updateStaircase: (levelId, id, patch) =>
+          editLevel(levelId, (level) => {
+            const sc = level.staircases[id];
+            if (!sc) return false;
+            const keys = (Object.keys(patch) as StaircaseStyleKey[]).filter((k) => (STAIRCASE_STYLE_KEYS as readonly string[]).includes(k));
+            if (keys.some((k) => staircaseFieldProblem(k, patch[k]))) return false;
+            let changed = false;
+            for (const k of keys) {
+              let v = patch[k];
+              if (typeof v === 'string' && (k === 'treadColor' || k === 'riserColor')) v = v.toLowerCase();
+              if (v === undefined) {
+                if (!(k in sc)) continue;
+                delete sc[k];
+              } else if (sc[k] === v) continue;
+              else (sc as unknown as Record<string, unknown>)[k] = v;
+              changed = true;
+            }
+            if (!changed) return false;
+          }),
+
+        ungroupStaircase: (levelId, id) =>
+          editLevel(levelId, (level) => {
+            if (!level.staircases[id]) return false;
+            for (const st of Object.values(level.stairs)) if (st.staircaseId === id) delete st.staircaseId;
+            delete level.staircases[id];
           }),
 
         addRoof: (levelId, input) => {
@@ -1164,9 +1258,9 @@ export const usePlanStore = create<PlanState>()(
               const r = level.roofs[id];
               if (r && r.phase !== phase) r.phase = phase;
             }
-            for (const id of sel.stairs ?? []) {
-              const st = level.stairs[id];
-              if (st && st.phase !== phase) st.phase = phase;
+            const staircases = new Set(sel.staircases ?? []);
+            for (const st of Object.values(level.stairs)) {
+              if ((sel.stairs?.includes(st.id) || (st.staircaseId && staircases.has(st.staircaseId))) && st.phase !== phase) st.phase = phase;
             }
             for (const id of sel.fixtures ?? []) {
               const f = level.fixtures[id];

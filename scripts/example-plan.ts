@@ -298,6 +298,7 @@ function stableIds(plan: Plan): string {
       ['c', lvl.fixtures],
       ['d', lvl.decks],
       ['h', lvl.floorOpenings],
+      ['x', lvl.staircases],
     ];
     for (const [k, rec] of kinds) Object.keys(rec).forEach((id, i) => add(id, `${pre}-${k}${i + 1}`));
   });
@@ -964,14 +965,20 @@ function proposed(ids: ExistingIds): void {
   // and the balcony, y 91..135, leads to the bedroom door (x 150) and east into the upstairs hall.
   const R = 108 / 15;
   const TREAD = 10.5;
-  const flight = (s: Omit<NewStairs, 'phase' | 'cutsFloorAbove'>) => {
-    if (!store().addStairs(fId, { ...s, phase: NEW, cutsFloorAbove: false })) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
+  const flight = (s: Omit<NewStairs, 'phase' | 'cutsFloorAbove'>): Id => {
+    const id = store().addStairs(fId, { ...s, phase: NEW, cutsFloorAbove: false });
+    if (!id) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
+    return id;
   };
   const STAIR = { platformEast: 43, landingWest: 127, east: 168, south: 49, top: 91 };
-  flight({ origin: { x: (CL.x0 + HALF + STAIR.platformEast) / 2, y: STAIR.south }, direction: 270, width: STAIR.platformEast - (CL.x0 + HALF), run: STAIR.south - (CL.y0 + HALF), rise: R, risers: 1 });
-  flight({ origin: { x: STAIR.platformEast, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: 8 * TREAD, base: R, rise: 8 * R, risers: 8, railings: { right: true } });
-  flight({ origin: { x: STAIR.landingWest, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: STAIR.east - STAIR.landingWest, base: 9 * R, rise: R, risers: 1 });
-  flight({ origin: { x: (STAIR.landingWest + STAIR.east) / 2, y: STAIR.south }, direction: 90, width: STAIR.east - STAIR.landingWest, run: 4 * TREAD, base: 10 * R, rise: 4 * R, risers: 4, railings: { right: true } });
+  const pieces = [
+    flight({ origin: { x: (CL.x0 + HALF + STAIR.platformEast) / 2, y: STAIR.south }, direction: 270, width: STAIR.platformEast - (CL.x0 + HALF), run: STAIR.south - (CL.y0 + HALF), rise: R, risers: 1 }),
+    flight({ origin: { x: STAIR.platformEast, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: 8 * TREAD, base: R, rise: 8 * R, risers: 8, railings: { right: true } }),
+    flight({ origin: { x: STAIR.landingWest, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: STAIR.east - STAIR.landingWest, base: 9 * R, rise: R, risers: 1 }),
+    flight({ origin: { x: (STAIR.landingWest + STAIR.east) / 2, y: STAIR.south }, direction: 90, width: STAIR.east - STAIR.landingWest, run: 4 * TREAD, base: 10 * R, rise: 4 * R, risers: 4, railings: { right: true } }),
+  ];
+  // The four pieces are one staircase (Level.staircases), selected, moved and styled together.
+  if (!store().groupStairs(fId, pieces, { name: 'Grand stair' })) throw new Error('staircase rejected');
   const well = { x0: CL.x0 + HALF, x1: 169, y0: CL.y0 + HALF, y1: STAIR.top, bathCorner: 86 };
   const wellOutline = [
     { x: well.x0, y: well.y0 },

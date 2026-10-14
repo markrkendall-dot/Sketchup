@@ -92,8 +92,12 @@ Before you start, measure on paper. Then follow these steps in order.
    add walls (walls that would land on top of walls already there are skipped, and the status
    bar says how many). Stairs (`T`) go on the lower level and cut the floor above where the
    headroom would be under 80", measured as the code does from the line of the nosings to the
-   underside of the floor above (the stair's properties change the headroom or set the start). Outdoor steps: tick "Open" for treads on stringers instead of a solid flight; on the
-   lowest level "Starts at" may be negative, for steps that go on down a slope below its floor.
+   underside of the floor above (the stair's properties change the headroom or set the start).
+   Outdoor steps: tick "Open" for treads on stringers instead of a solid flight; on the lowest
+   level "Starts at" may be negative, for steps that go on down a slope below its floor.
+   A stair made of several pieces (a flight, a landing, another flight) becomes one **staircase**
+   with "Make one staircase" in a piece's properties: a click then selects all of it and a drag
+   moves all of it; double-click a piece to edit it alone (Esc goes back to the staircase).
    Tick "Railing on the left" or "on the right" (as you climb) for a 36" handrail with newels and
    balusters on an open side.
 9. **Load a photo as an underlay if you have one.** A scanned plan, a real-estate sketch or a

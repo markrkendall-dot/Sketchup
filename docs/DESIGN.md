@@ -81,7 +81,19 @@ export interface Stairs {
   rise?: Inches;             // height it climbs; default floorToFloor - base (a short flight to a landing)
   risers?: number;           // step count; default round(rise / 7.5"), at least 1 (a landing is 1)
   open?: boolean;            // outdoor steps: treads on two stringers, nothing under them
-  railings?: { left?: boolean; right?: boolean }; // as you climb; only true sides stored (see "Stair railings")
+  railings?: { left?: boolean; right?: boolean; end?: boolean }; // as you climb; only true sides stored
+                             // (see "Stair railings"); end: a landing's far edge
+  staircaseId?: Id;          // the staircase it belongs to (schema 6, see "Staircases")
+}
+
+// A stairway's pieces grouped (schema 6): selected, moved and styled together. No member list (the
+// pieces name it) and no phase (its pieces'). Style fields optional; defaults in model/stairStyle.ts.
+export interface Staircase {
+  id: Id; name?: string;
+  treadColor?: string; riserColor?: string; nosing?: Inches; treadThickness?: Inches;
+  stringer?: 'closed' | 'open'; underside?: 'solid' | 'framed' | 'open';
+  newel?: 'box' | 'square'; handrail?: 'round' | 'board'; handrailHeight?: Inches;
+  balusterGap?: Inches; startStep?: 'square' | 'bullnose';
 }
 
 export interface Underlay {
@@ -145,6 +157,7 @@ export interface Level {
   nodes: Record<Id, Node>; walls: Record<Id, Wall>; openings: Record<Id, Opening>;
   rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; roofs: Record<Id, Roof>;
   fixtures: Record<Id, Fixture>; decks: Record<Id, Deck>; floorOpenings: Record<Id, FloorOpening>;
+  staircases: Record<Id, Staircase>;
   finishes?: LevelFinishes; underlay?: Underlay;
 }
 
@@ -1206,6 +1219,27 @@ view, onto the level, the target selected, the plan centred at the same zoom, an
 plan export never draws it) marks the active level's issues with a disc of constant screen size and
 outlines the picked one. The properties panel's `IssueNotes` lists an element's issues under its
 fields (the deck and floor opening panels' old hand-written warnings are these now).
+
+## Staircases (`model/stairStyle.ts`, store `groupStairs`, `selectTool.ts liftToStaircase`)
+
+A staircase groups a stairway's flights, landings and platform (schema 6, `Level.staircases`). The
+pieces name it (`Stairs.staircaseId`); it has no list of them and no phase. `migrate()` keeps its
+style fields one by one (a bad one is dropped with a warning and its default applies, colours
+lower-cased), forgets a piece's `staircaseId` that names no staircase on its level, and drops a
+staircase no piece names; the store does the same (`pruneStaircases`) whenever stairs are deleted.
+`groupStairs(levelId, ids, style)` makes one (taking the pieces out of any other), `updateStaircase`
+patches its style (undefined clears a field, `staircaseFieldProblem` refuses a bad value),
+`ungroupStaircase` lets the pieces go, `moveStairs` moves pieces in one undo step, and
+`deleteEntities` / `setPhase` take `staircases` (deleting or phasing their pieces).
+
+On the plan a click on a piece selects its staircase (`Selection.staircases`, `liftToStaircase`);
+dragging it moves every piece; a double-click on a piece opens the staircase
+(`uiStore.openStaircaseId`): clicks then pick its pieces alone until Esc (back to the staircase
+selected) or a click elsewhere. Its pieces draw selected with it. The panel names it, lists its
+pieces in stairway order (each a button selecting it alone), sets their phase, lists their issues
+and ungroups it; a single piece offers "Make one staircase" (of the stairway it is part of,
+`stairChains`), several selected flights the same. The style is drawn from M3b of
+PLAN-v8-stair-structure.md on.
 
 ## Derivation and memoization
 

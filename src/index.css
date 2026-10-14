@@ -1555,3 +1555,18 @@ button.primary:hover:not(:disabled) {
 .move-wall .move-buttons {
   margin: 6px 0 0;
 }
+
+/* A staircase's pieces in its properties: one button each. */
+.staircase-pieces {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.staircase-pieces button {
+  width: 100%;
+  text-align: left;
+}

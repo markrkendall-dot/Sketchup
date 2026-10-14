@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { issuesFor, type IssueTarget } from '../derive/checks';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { stairChains } from '../derive/stairChain';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getFootprints } from '../derive/footprint';
 import { compassName, deckTopWords, edgeOutward, getDeckLayout } from '../derive/decks';
 import { getFloorOpeningLayout } from '../derive/floorOpenings';
@@ -10,7 +11,7 @@ import { isVisible, PHASE_LABEL } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, groundAt } from '../derive/site';
-import { flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
+import { directionVector, flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool, makeToolContext } from '../editor2d/tools';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
 import { COLUMN_KIND_NAME } from '../editor2d/tools/siteTools';
@@ -41,7 +42,7 @@ import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
-import type { Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Staircase, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type LengthAnchor, type RoomPatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -1069,6 +1070,117 @@ const DIRECTION_OPTIONS: { value: string; label: string }[] = [
   { value: '270', label: 'Up (-y)' },
 ];
 
+/** A piece's staircase, or a button making one of the stairway it is part of (stairChain.ts). */
+function StaircaseMembership({ level, stairs }: { level: Level; stairs: Stairs }) {
+  const groupStairs = usePlanStore((s) => s.groupStairs);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const sc = stairs.staircaseId ? level.staircases?.[stairs.staircaseId] : undefined;
+  const select = (id: Id) => {
+    const ui = useUiStore.getState();
+    ui.setOpenStaircase(null);
+    ui.setSelection({ ...EMPTY_SELECTION, staircases: [id] });
+  };
+  if (sc) {
+    return (
+      <div className="panel-buttons">
+        <button onClick={() => select(sc.id)} title="Select the whole staircase (Esc)">
+          Select the staircase{sc.name ? ` (${sc.name})` : ''}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="panel-buttons">
+      <button
+        title="Join this piece and the pieces of the stairway it is part of into one staircase, selected, moved and styled together"
+        onClick={() => {
+          const chain = stairChains(usePlanStore.getState().plan, level.id, viewMode).find((c) => c.includes(stairs.id)) ?? [stairs.id];
+          const id = groupStairs(level.id, chain);
+          if (id) select(id);
+        }}
+      >
+        Make one staircase
+      </button>
+    </div>
+  );
+}
+
+/**
+ * A staircase (types.ts Staircase): its name, its pieces (each one a button that selects it alone),
+ * their phase, and ungrouping. Its style is drawn from M3b of PLAN-v8 on.
+ */
+function StaircaseProps({ level, staircase }: { level: Level; staircase: Staircase }) {
+  const updateStaircase = usePlanStore((s) => s.updateStaircase);
+  const ungroupStaircase = usePlanStore((s) => s.ungroupStaircase);
+  const setPhase = usePlanStore((s) => s.setPhase);
+  const ftf = usePlanStore((s) => floorToFloor(s.plan, level.id));
+  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const plan = usePlanStore((s) => s.plan);
+  const chains = useMemo(() => stairChains(plan, level.id, viewMode), [plan, level.id, viewMode]);
+  const pieces = Object.values(level.stairs).filter((st) => st.staircaseId === staircase.id);
+  // In stairway order where they chain, the rest after.
+  const order = chains.flat();
+  pieces.sort((a, b) => (order.indexOf(a.id) + 1 || 1e9) - (order.indexOf(b.id) + 1 || 1e9));
+  const phases = [...new Set(pieces.map((p) => p.phase))];
+  const pieceName = (st: Stairs) => {
+    const { risers } = flightSteps(st, ftf);
+    return risers <= 1 ? `Landing at ${formatLength(stairsBase(st) + stairsRise(st, ftf))}` : `Flight up ${compassName(directionVector(st.direction), northAngle)}, ${risers} risers`;
+  };
+  return (
+    <>
+      <h3>Staircase</h3>
+      <div className="field">
+        <label htmlFor={`staircase-name-${staircase.id}`}>Name</label>
+        <input
+          id={`staircase-name-${staircase.id}`}
+          aria-label="Name"
+          defaultValue={staircase.name ?? ''}
+          placeholder="none"
+          onBlur={(e) => updateStaircase(level.id, staircase.id, { name: e.target.value.trim() || undefined })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') releaseFocus(e.currentTarget);
+          }}
+        />
+      </div>
+      {phases.length === 1 && (
+        <SelectField
+          label="Phase"
+          value={phases[0]}
+          options={phaseOptions}
+          onChange={(phase) => setPhase(level.id, { walls: [], openings: [], staircases: [staircase.id] }, phase)}
+        />
+      )}
+      <div className="field">
+        <span className="label">Pieces</span>
+      </div>
+      <ul className="staircase-pieces">
+        {pieces.map((st) => (
+          <li key={st.id}>
+            <button
+              title="Select this piece alone (double-click it on the plan)"
+              onClick={() => {
+                const ui = useUiStore.getState();
+                ui.setOpenStaircase(staircase.id);
+                ui.setSelection({ ...EMPTY_SELECTION, stairs: [st.id] });
+              }}
+            >
+              {pieceName(st)}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <IssueNotes levelId={level.id} target={{ stairs: pieces.map((p) => p.id) }} />
+      <div className="panel-buttons">
+        <button onClick={() => ungroupStaircase(level.id, staircase.id)} title="Back to separate flights and landings">
+          Ungroup
+        </button>
+      </div>
+      <p className="panel-note">Drag it on the plan to move every piece. Double-click a piece to edit it alone; Esc goes back to the staircase.</p>
+    </>
+  );
+}
+
 function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
   const updateStairs = usePlanStore((s) => s.updateStairs);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
@@ -1196,6 +1308,7 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
       ))}
       {stairs.cutsFloorAbove && <StairsOpeningFields level={level} stairs={stairs} ftf={ftf} />}
       <IssueNotes levelId={level.id} target={{ stairs: [stairs.id] }} />
+      <StaircaseMembership level={level} stairs={stairs} />
       <ReadOnly label="Step depth">{formatLength(tread, denom)}</ReadOnly>
       <p className="panel-note">
         {base !== 0 || stairs.rise !== undefined
@@ -1913,7 +2026,9 @@ function MixedProps({
   const parts: string[] = [];
   if (walls.length) parts.push(`${walls.length} ${walls.length === 1 ? 'wall' : 'walls'}`);
   if (openings.length) parts.push(`${openings.length} ${openings.length === 1 ? 'opening' : 'openings'}`);
-  if (stairs.length) parts.push(`${stairs.length} stairs`);
+  if (sel.staircases.length) parts.push(`${sel.staircases.length} ${sel.staircases.length === 1 ? 'staircase' : 'staircases'}`);
+  const loose = stairs.filter((st) => !st.staircaseId || !sel.staircases.includes(st.staircaseId)).length;
+  if (loose) parts.push(`${loose} stairs`);
   if (roofs.length) parts.push(`${roofs.length} ${roofs.length === 1 ? 'roof' : 'roofs'}`);
   if (fixtures.length) parts.push(`${fixtures.length} ${fixtures.length === 1 ? 'fixture' : 'fixtures'}`);
   if (decks.length) parts.push(`${decks.length} ${decks.length === 1 ? 'deck' : 'decks'}`);
@@ -1924,9 +2039,23 @@ function MixedProps({
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
   const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...columns, ...rooms]);
   const onlyFixtures = fixtures.length > 0 && phases.length === fixtures.length;
+  const groupStairs = usePlanStore((s) => s.groupStairs);
   return (
     <>
       <h3>{parts.join(', ')}</h3>
+      {stairs.length >= 2 && (
+        <div className="panel-buttons">
+          <button
+            title="Join the selected flights and landings into one staircase, selected, moved and styled together"
+            onClick={() => {
+              const id = groupStairs(levelId, stairs.map((st) => st.id));
+              if (id) useUiStore.getState().setSelection({ ...EMPTY_SELECTION, staircases: [id] });
+            }}
+          >
+            Make one staircase
+          </button>
+        </div>
+      )}
       {phases.length > 0 && (
         <SelectField
           label="Phase"
@@ -2486,6 +2615,10 @@ export function PropertiesPanel() {
   const fixtures = sel.fixtures.map((id) => level.fixtures?.[id]).filter(Boolean);
   const decks = sel.decks.map((id) => level.decks?.[id]).filter(Boolean);
   const floorOpenings = sel.floorOpenings.map((id) => level.floorOpenings?.[id]).filter(Boolean);
+  const staircases = sel.staircases.map((id) => level.staircases?.[id]).filter(Boolean);
+  // A staircase's pieces take its phase and go with it (SelectionActions).
+  const scIds = new Set(staircases.map((sc) => sc.id));
+  const withPieces = [...stairs, ...Object.values(level.stairs).filter((st) => st.staircaseId && scIds.has(st.staircaseId) && !sel.stairs.includes(st.id))];
   const gradePoints = sel.gradePoints.map((id) => site.gradePoints[id]).filter(Boolean);
   const columns = sel.columns.map((id) => site.columns[id]).filter(Boolean);
   const live: Selection = {
@@ -2498,6 +2631,7 @@ export function PropertiesPanel() {
     fixtures: fixtures.map((f) => f.id),
     decks: decks.map((d) => d.id),
     floorOpenings: floorOpenings.map((o) => o.id),
+    staircases: staircases.map((sc) => sc.id),
     gradePoints: gradePoints.map((g) => g.id),
     columns: columns.map((c) => c.id),
   };
@@ -2513,6 +2647,7 @@ export function PropertiesPanel() {
     body = <OpeningProps key={openings[0].id} level={level} opening={openings[0]} />;
   else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
   else if (total === 1 && stairs.length === 1) body = <StairsProps key={stairs[0].id} level={level} stairs={stairs[0]} />;
+  else if (total === 1 && staircases.length === 1) body = <StaircaseProps key={staircases[0].id} level={level} staircase={staircases[0]} />;
   else if (total === 1 && roofs.length === 1) body = <RoofProps key={roofs[0].id} level={level} roof={roofs[0]} />;
   else if (total === 1 && decks.length === 1) body = <DeckProps key={decks[0].id} level={level} deck={decks[0]} />;
   else if (total === 1 && floorOpenings.length === 1) body = <FloorOpeningProps key={floorOpenings[0].id} level={level} opening={floorOpenings[0]} />;
@@ -2520,14 +2655,14 @@ export function PropertiesPanel() {
   else if (total === 1 && gradePoints.length === 1) body = <GradePointProps key={gradePoints[0].id} point={gradePoints[0]} />;
   else if (total === 1 && columns.length === 1) body = <ColumnProps key={columns[0].id} column={columns[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} columns={columns} rooms={rooms} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} columns={columns} rooms={rooms} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} columns={columns} rooms={rooms} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} columns={columns} rooms={rooms} />}
       </div>
     </aside>
   );

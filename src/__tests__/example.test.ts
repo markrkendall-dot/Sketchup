@@ -469,6 +469,10 @@ describe('docs/examples/146-mick-road.json', () => {
       [{ x: 127, y: 28 }, 0, 42, 41, 1, false, null],
       [{ x: 147.5, y: 49 }, 90, 41, 42, 4, false, { right: true }],
     ]);
+    // One staircase, the "Grand stair", holds the four pieces.
+    expect(Object.values(f.staircases).map((sc) => sc.name)).toEqual(['Grand stair']);
+    const [sc] = Object.values(f.staircases);
+    expect(flights.map((st) => st.staircaseId)).toEqual([sc.id, sc.id, sc.id, sc.id]);
     let top = 0;
     for (const st of flights) {
       expect(stairsBase(st)).toBeCloseTo(top, 9);
