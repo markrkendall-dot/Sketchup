@@ -43,7 +43,7 @@ import { dist, pointInPolygon, polygonSignedArea } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
 import { columnProblem, MAX_DECK_ELEVATION, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
-import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
+import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import type { Beam, Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
@@ -243,6 +243,10 @@ const kindOptions: { value: WallKind; label: string }[] = [
 ];
 
 const finishOptions = WALL_FINISHES.map((f) => ({ value: f, label: WALL_FINISH_LABEL[f] }));
+type BandChoice = 'none' | WallFinish;
+const bandOptions: { value: BandChoice; label: string }[] = [{ value: 'none', label: 'None' }, ...BAND_FINISHES.map((f) => ({ value: f, label: WALL_FINISH_LABEL[f] }))];
+/** A new lower band's height: a knee wall's. */
+const DEFAULT_BAND = 36;
 
 /**
  * A colour: the browser's picker plus a hex field. The picker previews while it is open and commits
@@ -590,9 +594,56 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
             : 'A face on the side of a room that sets its own wall finish shows that instead.'
         }
       />
+      <WallBandFields levelId={levelId} wall={wall} wallHeight={wall.heightOverride ?? level.wallHeight} />
       <WallFaceLengths level={level} wall={wall} />
       <MoveWall level={level} wall={wall} />
       <ReadOnly label="Openings">{openingCount}</ReadOnly>
+    </>
+  );
+}
+
+/**
+ * A wall's lower band (Wall.band): its outside face below a height in another finish, like a
+ * wainscot outside (a stone base, a half-log knee wall). Each change is one undo step.
+ */
+function WallBandFields({ levelId, wall, wallHeight }: { levelId: Id; wall: Wall; wallHeight: number }) {
+  const updateWalls = usePlanStore((s) => s.updateWalls);
+  const set = (band: Wall['band']) => updateWalls(levelId, [wall.id], { band });
+  const b = wall.band;
+  return (
+    <>
+      <SelectField
+        label="Lower band"
+        value={b?.finish ?? 'none'}
+        options={bandOptions}
+        onChange={(v) => set(v === 'none' ? undefined : { ...b, finish: v, height: b?.height ?? Math.min(DEFAULT_BAND, wallHeight / 2) })}
+      />
+      {b && (
+        <>
+          <LengthField
+            label="Band height"
+            value={b.height}
+            onCommit={(h) => {
+              if (h === null) return;
+              if (h >= wallHeight) return 'Must be lower than the wall.';
+              set({ ...b, height: h });
+            }}
+          />
+          <ColorField
+            label="Band colour"
+            value={b.color ?? wallColorOf(wall)}
+            onCommit={(color) => set({ ...b, color })}
+            onReset={b.color ? () => set({ finish: b.finish, height: b.height }) : undefined}
+            hint="Default: the wall's own colour."
+          />
+          <div className="panel-buttons">
+            <button onClick={() => set(undefined)} title="Remove the lower band: the whole face shows the wall's finish">
+              Clear band
+            </button>
+          </div>
+          <p className="panel-note">In 3D the outside face shows this finish below the band's height. A proposed look re-sides only the part above.</p>
+        </>
+      )}
     </>
   );
 }

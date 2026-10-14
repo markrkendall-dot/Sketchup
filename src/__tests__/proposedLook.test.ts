@@ -110,6 +110,27 @@ describe('the proposed look in 3D', () => {
     }
   });
 
+  it('keeps a stone or half-log wall, and a banded wall below its band, as they are', () => {
+    const { lid, block } = house();
+    const l = store().plan.levels[lid];
+    const others = Object.values(l.walls).filter((w) => w.id !== block);
+    const [stone, halflog, banded] = others;
+    store().updateWalls(lid, [stone.id], { finish: 'stone', color: '#8e8579' });
+    store().updateWalls(lid, [halflog.id], { finish: 'halflog', color: '#5b4632' });
+    store().updateWalls(lid, [banded.id], { band: { finish: 'halflog', color: '#5b4632', height: 36 } });
+    store().updateProposedLook(LOOK);
+    const walls = new Map(meshesIn(lid, 'proposed').walls.map((w) => [w.id, w]));
+    expect([walls.get(stone.id)!.finish, walls.get(stone.id)!.color]).toEqual(['stone', '#8e8579']);
+    expect([walls.get(halflog.id)!.finish, walls.get(halflog.id)!.color]).toEqual(['halflog', '#5b4632']);
+    // The banded wall's upper part takes the shakes; its band keeps the half-log, all of it below 36".
+    const w = walls.get(banded.id)!;
+    expect([w.finish, w.color]).toEqual(['shake', '#4b3a32']);
+    expect(w.band).toMatchObject({ finish: 'halflog', color: '#5b4632' });
+    const pos = w.band!.geometry.getAttribute('position');
+    expect(pos.count).toBeGreaterThan(0);
+    for (let i = 0; i < pos.count; i++) expect(pos.getY(i)).toBeLessThanOrEqual(36 + 1e-6);
+  });
+
   it('follows an edit of the look (the level cache is keyed on it)', () => {
     const { lid } = house();
     store().updateProposedLook({ roofColor: '#2f4a36' });

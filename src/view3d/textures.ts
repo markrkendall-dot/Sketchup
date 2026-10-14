@@ -6,7 +6,7 @@ import type { RoofFinish, WallFinish } from '../model/types';
 // 48" x 48" of wall, so a texel is 3/32". Wall geometry carries UVs in inches (meshes.ts
 // addWallUVs) and the texture repeats every 48", so courses run level and continuous across wall
 // pieces and openings. Every finish with relief (laps, shingle butts and keyways, V-grooves,
-// mortar joints) also has a height field in inches, turned into a normal map. The layouts, the
+// mortar joints, fieldstone and half-log crowns) also has a height field in inches, turned into a normal map. The layouts, the
 // height fields and the normal-map rule are pure (testable in node); only drawing needs a canvas,
 // and `sidingTextures` returns null where there is no `document` (node, tests). A chimney's brick
 // (`brickTextures`) uses the same tile. Roof textures (corrugated metal, asphalt shingle) follow at
@@ -37,11 +37,30 @@ export const MORTAR_JOINT = 0.375;
 /** Modular brick (a chimney's shaft): a course every 2 2/3" (three to 8"), 8" long, joints included. */
 export const BRICK_COURSE = 8 / 3;
 export const BRICK_LENGTH = 8;
+/**
+ * Fieldstone: 6 courses to the tile (8" on average), stones 6" to 14" long, at least 3/4" of mortar
+ * between them.
+ */
+export const STONE_COURSES = 6;
+export const STONE_WIDTH = { min: 6, max: 14 } as const;
+export const STONE_JOINT = 0.75;
+/**
+ * The tones fieldstone is mixed toward, STONE_TONE_MIX of the way from the wall's colour: grey,
+ * blue-grey, tan and brown.
+ */
+export const STONE_TONES = ['#8c8c88', '#7d838a', '#9a8468', '#6f5a48'] as const;
+export const STONE_TONE_MIX = 0.35;
+/** Half-log siding: 8" courses (6 per tile), a 3/4" chink line between logs. */
+export const HALFLOG_COURSE = 8;
+export const CHINK = 0.75;
 /** Wire spacing of a screen, in pixels (3/16"): 1 px wires every 2 px. */
 export const SCREEN_MESH_PX = 2;
 
-/** Relief in inches: a clapboard's lap step, a shingle's butt, a keyway, a V-groove, a raked mortar joint. */
-export const RELIEF = { lap: 0.6, butt: 0.4, keyway: 0.3, groove: 0.2, mortar: 0.25 } as const;
+/**
+ * Relief in inches: a clapboard's lap step, a shingle's butt, a keyway, a V-groove, a raked mortar
+ * joint, a fieldstone's crown, a half log's crown.
+ */
+export const RELIEF = { lap: 0.6, butt: 0.4, keyway: 0.3, groove: 0.2, mortar: 0.25, stone: 0.6, log: 1.2 } as const;
 /** How far the normal maps bend the light (MeshStandardMaterial.normalScale). */
 export const NORMAL_SCALE = 0.6;
 /**
@@ -200,11 +219,59 @@ function runningBond(height: number, length: number): TileRect[] {
   return out;
 }
 
+/** The face of each half log in a tile: 6 courses of 8", less a CHINK line centred on each course line. */
+export const halflogFaces = (): TileRect[] =>
+  courseBoundaries(TILE_INCHES, HALFLOG_COURSE)
+    .slice(0, -1)
+    .map((y) => ({ x0: 0, y0: y + CHINK / 2, x1: TILE_INCHES, y1: y + HALFLOG_COURSE - CHINK / 2 }));
+
 /** The faces of the concrete blocks in a tile: 6 courses of 3 blocks in running bond. */
 export const blockFaces = (): TileRect[] => runningBond(BLOCK_HEIGHT, BLOCK_LENGTH);
 
 /** The faces of the bricks in a tile (a chimney): 18 courses of 6 bricks in running bond. */
 export const brickFaces = (): TileRect[] => runningBond(BRICK_COURSE, BRICK_LENGTH);
+
+/** One fieldstone: its box in tile inches (x1 may pass the tile's right edge: it wraps) and its looks. */
+export interface Stone extends TileRect {
+  /** Superellipse exponent of its outline: 2 an ellipse, higher squarer. */
+  p: number;
+  /** Index into STONE_TONES. */
+  tone: number;
+  /** Brightness factor, 0.8 to 1.15. */
+  shade: number;
+}
+
+/**
+ * The fieldstones of a tile: STONE_COURSES courses, each cut into stones STONE_WIDTH long that sum
+ * to the tile and stagger from course to course (shingleJoints); each stone inset by half a joint
+ * all round and by up to 1 1/4" more top and bottom, so the courses wander, with its own roundness,
+ * tone and brightness. Seeded, so the same every time.
+ */
+export function stoneFaces(): Stone[] {
+  const rand = seeded(61);
+  const m = STONE_JOINT / 2;
+  const course = TILE_INCHES / STONE_COURSES;
+  const out: Stone[] = [];
+  for (let k = 0; k < STONE_COURSES; k++) {
+    const joints = shingleJoints(k, TILE_INCHES, rand, STONE_WIDTH.min, STONE_WIDTH.max);
+    joints.forEach((x, j) => {
+      const next = j + 1 < joints.length ? joints[j + 1] : joints[0] + TILE_INCHES;
+      out.push({
+        x0: x + m,
+        x1: next - m,
+        y0: k * course + m + rand() * 1.25,
+        y1: (k + 1) * course - m - rand() * 1.25,
+        p: 2.2 + rand() * 1.3,
+        tone: Math.floor(rand() * STONE_TONES.length),
+        shade: 0.8 + rand() * 0.35,
+      });
+    });
+  }
+  return out;
+}
+
+/** How far a point of a stone's box (fractions across and up, 0 to 1) is from its middle: under 1 inside the stone. */
+export const stoneDistance = (s: Pick<Stone, 'p'>, fx: number, fy: number): number => (Math.abs(2 * fx - 1) ** s.p + Math.abs(2 * fy - 1) ** s.p) ** (1 / s.p);
 
 const wrap = (i: number, n: number): number => ((i % n) + n) % n;
 /** Canvas column of a position across the tile, and canvas row of a height up it (rows grow downward). */
@@ -237,7 +304,9 @@ function heightRect(f: Float32Array, r: TileRect, h: (fx: number, fy: number) =>
  * top), or null for a finish without relief (plain, screen). Clapboard: each board tapers from its
  * butt to nothing under the board above, a RELIEF.lap step at every lap. Shingle: the same taper
  * per course (RELIEF.butt), each shingle a little proud or shy of its neighbours, a keyway between
- * shingles. Board: a V-groove at each joint. Block: flat faces, raked mortar joints.
+ * shingles. Board: a V-groove at each joint. Block: flat faces, raked mortar joints. Stone: each
+ * stone a dome RELIEF.stone high in raked mortar. Half-log: each log a round crown RELIEF.log high,
+ * a raked chink line between logs.
  */
 export function sidingHeight(finish: WallFinish): Float32Array | null {
   const f = new Float32Array(TEXTURE_PX * TEXTURE_PX);
@@ -260,6 +329,17 @@ export function sidingHeight(finish: WallFinish): Float32Array | null {
   } else if (finish === 'block') {
     f.fill(-RELIEF.mortar);
     for (const r of blockFaces()) heightRect(f, r, () => 0);
+  } else if (finish === 'stone') {
+    f.fill(-RELIEF.mortar);
+    for (const s of stoneFaces()) {
+      heightRect(f, s, (fx, fy) => {
+        const d = stoneDistance(s, fx, fy);
+        return d < 1 ? RELIEF.stone * Math.sqrt(1 - d ** 4) : -RELIEF.mortar;
+      });
+    }
+  } else if (finish === 'halflog') {
+    f.fill(-RELIEF.mortar);
+    for (const r of halflogFaces()) heightRect(f, r, (_, fy) => RELIEF.log * Math.sqrt(1 - (2 * fy - 1) ** 2));
   } else return null;
   return f;
 }
@@ -516,6 +596,67 @@ function drawBlock(ctx: Ctx, color: string): void {
   for (let y = BLOCK_HEIGHT; y <= TILE_INCHES; y += BLOCK_HEIGHT) lapShadow(ctx, y + MORTAR_JOINT / 2, JOINT_SHADOW);
 }
 
+/**
+ * Fieldstone in mortar: the mortar lighter than the stone, speckled; each stone (stoneFaces) its own
+ * mix of the colour and one of STONE_TONES, painted pixel by pixel through the same outline as its
+ * relief (stoneDistance), darker toward its rim so it reads as rounded, with a little speckle.
+ */
+function drawStone(ctx: Ctx, color: string): void {
+  const rand = seeded(67);
+  const tile = { x0: 0, y0: 0, x1: TILE_INCHES, y1: TILE_INCHES };
+  ctx.fillStyle = mortarColor(color, BLOCK_MORTAR);
+  ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
+  speckle(ctx, rand, tile, 1200);
+  const stones = stoneFaces();
+  const img = ctx.getImageData(0, 0, TEXTURE_PX, TEXTURE_PX);
+  for (const s of stones) {
+    const [r, g, b] = hexToRgb(mix(color, STONE_TONES[s.tone], STONE_TONE_MIX));
+    const c0 = colOf(s.x0);
+    const c1 = colOf(s.x1);
+    const top = rowOf(s.y1);
+    const bottom = rowOf(s.y0);
+    for (let row = top; row < bottom; row++) {
+      const fy = (bottom - row - 0.5) / (bottom - top);
+      for (let c = c0; c < c1; c++) {
+        const d = stoneDistance(s, (c - c0 + 0.5) / (c1 - c0), fy);
+        if (d >= 1) continue;
+        const k = s.shade * (0.72 + 0.28 * Math.sqrt(1 - d * d));
+        const i = (wrap(row, TEXTURE_PX) * TEXTURE_PX + wrap(c, TEXTURE_PX)) * 4;
+        img.data[i] = byte(r * k);
+        img.data[i + 1] = byte(g * k);
+        img.data[i + 2] = byte(b * k);
+        img.data[i + 3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  for (const s of stones) speckle(ctx, rand, { x0: s.x0 + 1, y0: s.y0 + 1, x1: s.x1 - 1, y1: s.y1 - 1 }, Math.round((s.x1 - s.x0) * (s.y1 - s.y0) * 0.6));
+}
+
+/**
+ * Bark-on half logs: each course a few percent lighter or darker, shaded row by row toward its top
+ * and bottom (the round of the log), heavy streaks of bark along it and speckle; a dark chink line
+ * between logs, in the shadow of the log above.
+ */
+function drawHalflog(ctx: Ctx, color: string): void {
+  const rand = seeded(71);
+  ctx.fillStyle = shade(color, 0.3);
+  ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
+  for (const r of halflogFaces()) {
+    const base = brightness(rand);
+    const top = rowOf(r.y1);
+    const bottom = rowOf(r.y0);
+    for (let row = top; row < bottom; row++) {
+      const fy = (bottom - row - 0.5) / (bottom - top);
+      ctx.fillStyle = shade(color, base * (0.62 + 0.38 * Math.sqrt(1 - (2 * fy - 1) ** 2)));
+      pixelRect(ctx, 0, row, TEXTURE_PX, 1);
+    }
+    grain(ctx, rand, 'x', r, 420);
+    speckle(ctx, rand, r, 900);
+  }
+  for (const r of halflogFaces()) lapShadow(ctx, r.y0, JOINT_SHADOW);
+}
+
 function drawBrick(ctx: Ctx, color: string): void {
   const rand = seeded(53);
   const tile = { x0: 0, y0: 0, x1: TILE_INCHES, y1: TILE_INCHES };
@@ -619,6 +760,8 @@ export function sidingTextures(finish: WallFinish, color: string, variant: Textu
   else if (finish === 'shake') drawShake(ctx, color);
   else if (finish === 'board') drawBoard(ctx, color);
   else if (finish === 'block') drawBlock(ctx, color);
+  else if (finish === 'stone') drawStone(ctx, color);
+  else if (finish === 'halflog') drawHalflog(ctx, color);
   else drawScreen(ctx);
   if (variant === 'new') {
     const img = ctx.getImageData(0, 0, TEXTURE_PX, TEXTURE_PX);

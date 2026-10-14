@@ -162,7 +162,11 @@ export interface PlanState {
   /** Delete nodes (with their walls), walls (with their openings) and openings in one undo step. */
   deleteEntities: (levelId: Id, sel: EntitySelection) => void;
   updateWall: (levelId: Id, id: Id, patch: WallPatch) => void;
-  /** Patch several walls at once (phase, thickness, heightOverride...). Not for a/b. */
+  /**
+   * Patch several walls at once (phase, thickness, heightOverride, finish, band...). Not for a/b.
+   * undefined clears an optional field; a band is copied per wall, its colour lower-cased, and one
+   * with a height not above 0 is refused.
+   */
   updateWalls: (levelId: Id, ids: Id[], patch: Omit<WallPatch, 'a' | 'b'>) => void;
   /**
    * Change wall kind. A wall whose thickness is still the default for its old kind gets the
@@ -727,13 +731,18 @@ export const usePlanStore = create<PlanState>()(
         updateWalls: (levelId, ids, patch) =>
           editLevel(levelId, (level) => {
             if (patch.thickness !== undefined && !(patch.thickness > 0)) return false;
+            if (patch.band && !(patch.band.height > 0)) return false;
             for (const id of ids) {
               const w = level.walls[id];
               if (!w) continue;
               for (const [key, value] of Object.entries(patch) as [keyof Wall, unknown][]) {
                 // undefined clears an optional field; required fields are never removed.
                 if (value === undefined) {
-                  if (key === 'heightOverride' || key === 'finish' || key === 'color' || key === 'bearing') delete w[key];
+                  if (key === 'heightOverride' || key === 'finish' || key === 'color' || key === 'bearing' || key === 'band') delete w[key];
+                } else if (key === 'band') {
+                  // A copy per wall, the colour lower-cased, in the loader's key order.
+                  const b = value as NonNullable<Wall['band']>;
+                  w.band = { finish: b.finish, ...(b.color ? { color: b.color.toLowerCase() } : {}), height: b.height };
                 } else if (w[key] !== value) (w as unknown as Record<string, unknown>)[key] = value;
               }
             }

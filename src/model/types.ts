@@ -18,7 +18,17 @@ export interface Node {
 
 export type WallKind = 'exterior' | 'interior';
 /** How a wall's face is dressed in 3D (DESIGN.md "Exterior appearance"). */
-export type WallFinish = 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'plain' | 'screen';
+export type WallFinish = 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'stone' | 'halflog' | 'plain' | 'screen';
+/**
+ * A lower band of a wall's outside face in another finish, up to `height` above the floor top: an
+ * exterior wainscot (a stone base, a half-log knee wall).
+ */
+export interface WallBand {
+  finish: WallFinish;
+  /** Absent: the wall's own colour. */
+  color?: string;
+  height: Inches;
+}
 /** How a room dresses the faces of the walls round it (DESIGN.md "Interior finishes"). */
 export type RoomWallFinish = 'paint' | 'boards' | 'pine' | 'check';
 /** How a room's floor is dressed: a flat colour, painted boards, square tiles or parquet. */
@@ -47,6 +57,8 @@ export interface Wall {
   color?: string;
   /** Carries load (schema version 7): true or false as marked; absent, inferred (derive/structure.ts). */
   bearing?: boolean;
+  /** The outside face below a height in its own finish (model/finish.ts wallBandOf); never re-sided by a proposed look. */
+  band?: WallBand;
 }
 
 export interface Opening {

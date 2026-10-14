@@ -42,8 +42,9 @@ export interface Wall {
   kind: 'exterior' | 'interior';
   phase: Phase;
   heightOverride?: Inches;   // defaults to level.wallHeight
-  finish?: 'clapboard' | 'shingle' | 'board' | 'block' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
+  finish?: 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'stone' | 'halflog' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
   bearing?: boolean;         // marked bearing or not; undefined = inferred (see "Structure")
+  band?: { finish: WallFinish; color?: string; height: Inches }; // the outside face below height ("Exterior appearance")
 }
 
 export interface Opening {
@@ -829,8 +830,9 @@ two cabinets whose counter is mitred), appliance details beyond a few boxes, cop
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
 All of it is optional data on existing elements (no schema bump: `migrate()` reads the fields when they are
-valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | board | block | plain | screen`; an unknown
-value is dropped) and `Wall.color` (`#rrggbb`, lower-cased on load), `Opening.lites {cols, rows}` (whole numbers 1 to
+valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | shake | board | block | stone | halflog | plain |
+screen`; an unknown value is dropped), `Wall.color` (`#rrggbb`, lower-cased on load) and `Wall.band` (see "Lower
+band" below), `Opening.lites {cols, rows}` (whole numbers 1 to
 12), `Opening.shutters`, `Opening.trim` (0 to 24"), `Opening.sashes` (whole number 1 to 6), `Opening.fixedCenter`,
 `Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.sliding`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`,
 `Roof.eave` (`fascia | open`), `Roof.rafter` (finite `depth` and `spacing` above 0, rebuilt as `{ depth, spacing }`),
@@ -857,14 +859,24 @@ joints every 4" to 8" that sum to exactly 48" per course and stagger from course
 `shingleCourses`), a dark keyway at each joint, each course's butts shading the top of the course below, per-shingle
 brightness and a slight warm or cool shift, fine vertical grain. Board: 8" vertical boards (6 per tile) with a
 V-groove at each joint. Block: 8" x 16" concrete block in running bond (`blockFaces`), 3/8" mortar lighter than the
-faces, per-block brightness and speckle, the top of each bed joint in the shadow of the block above. Plain: no
+faces, per-block brightness and speckle, the top of each bed joint in the shadow of the block above. Stone
+(fieldstone): 6 courses of 8" cells 6" to 14" long that fill the tile and stagger (`stoneFaces`, reusing
+`shingleJoints`), each stone inset by at least 3/8" of mortar and up to 1 1/4" more top and bottom so the courses
+wander, its outline a superellipse (exponent 2.2 to 3.5, `stoneDistance`), its colour the wall's colour mixed 35% toward
+one of four tones (grey, blue-grey, tan, brown, `STONE_TONES`) at 0.8 to 1.15 brightness, darker toward its rim,
+painted pixel by pixel through the same outline as its relief; mortar lighter than the stone, speckled. Half-log:
+bark-on half logs in 8" courses (`halflogFaces`), each course a few percent lighter or darker, shaded toward its
+top and bottom (the round of the log), heavy bark streaks and speckle, a dark 3/4" chink line between logs in the
+shadow of the log above. Plain: no
 texture, a flat colour. Screen: 1 px wires every 2 px (3/16") over a translucent dark grey (alpha 0.55), a fine mesh
 up close and an even grey veil further off (as a wall finish: material `transparent`, opacity 0.4, no depth write,
 `DoubleSide`).
 
 **Relief**: every finish but plain and screen has a height field in inches (`sidingHeight`): clapboard tapers from
 its butt to nothing under the next board (a 0.6" step at each lap), shingles taper from a 0.4" butt, each a little
-proud or shy of its neighbours, with 0.3" deep keyways, boards have 0.2" V-grooves, block mortar is raked 0.25".
+proud or shy of its neighbours, with 0.3" deep keyways, boards have 0.2" V-grooves, block mortar is raked 0.25",
+each fieldstone is a dome 0.6" high (`RELIEF.stone * sqrt(1 - d^4)`) in mortar raked 0.25", each half log a round
+crown 1.2" high (`RELIEF.log`) with its chink line raked 0.25".
 `normalFromHeight` makes a tangent-space normal map of it with Sobel derivatives sampled modulo the tile (no seam
 line) at the true slope (strength `PX_PER_INCH`). Canvas y grows downward and the texture's v upward (flipY), so
 R = 0.5 - 0.5 k dh/dx and G = 0.5 + 0.5 k dh/dy (then normalized): a lap's butt, higher above than below, faces down.
@@ -884,6 +896,19 @@ geometry with one material, so it cannot tell the faces of a wall apart: **both 
 siding** (the inside of a window reveal shows shingle too); interior walls are plain unless given a finish. The one
 exception is a face on the side of a room that sets interior finishes: it is split off and dressed by the room (see
 "Interior finishes").
+
+**Lower band** (`Wall.band { finish, color?, height }`, `wallBandOf`): the wall's outside face below `height` in its
+own finish and colour (absent: the wall's colour), an exterior wainscot such as a stone base or a half-log knee wall.
+Any finish but screen (`BAND_FINISHES`); `migrate` drops a band without a usable finish and a height above 0 (a bad
+colour alone is dropped) and keeps it as `{ finish, color?, height }`; `updateWalls` copies it per wall with the colour
+lower-cased, clears it with `undefined` and refuses a height not above 0. The Wall panel's "Lower band" sets the
+finish (36" or half the wall's height for a new band), the band's height and colour, and "Clear band" removes it. In
+3D (`getLevelMeshes`) a band below the wall's top adds its height to the level-wide band heights, so every wall of
+the level is cut there alike, and `splitWallFaces` (cut `{ band }`) takes the triangles of the outside face below it
+(the side `outwardSide` gives, the one the trim goes on) into `WallMesh.band`, drawn and exported (`Wall n lower
+band`, material `wall_<phase>_<kind>_<finish>_<hex>`) with `wallMaterial` in the band's finish; the rest of that face
+stays in the wall's mesh. A room that dresses the outside face wins over the band; a demolished or screen wall has
+none. Walls without a band are built exactly as before.
 
 ## Interior finishes (`model/finish.ts`, `derive/meshes.ts`, `view3d/textures.ts`)
 
@@ -936,8 +961,8 @@ window reveals, and a default interior finish for the inside faces of rooms that
 
 **The proposed look** (`Plan.proposedLook`, types.ts `ProposedLook`): how the house looks after the work, without
 redrawing it. Optional fields: `wallFinish` and `wallColor` for every exterior wall in a siding finish
-(`SIDING_FINISHES`: shingle, shake, clapboard, board; block, plain and screen walls and room-dressed inside faces
-keep theirs), `roofFinish`, `roofColor` and `boardColor` for every roof (a re-roofed roof has no weathering),
+(`SIDING_FINISHES`: shingle, shake, clapboard, board; block, stone, half-log, plain and screen walls, room-dressed
+inside faces and a wall's lower band keep theirs, so a banded wall is re-sided above its band only), `roofFinish`, `roofColor` and `boardColor` for every roof (a re-roofed roof has no weathering),
 `trimColor` and `sashColor` for every window and door (trim: casings and sills; sash: sashes, muntins and door
 frames; `OpeningMesh.trimColor`/`sashColor`, `openingMaterial` keys by them), and `shutters: false` to build the
 fills without shutters. `getLevelMeshes` applies it in the Proposed view only (the level cache is keyed on it);
@@ -1234,7 +1259,7 @@ out that bears in the house as it stands, wherever what it carried stays (the fl
 roof kept over it), needs a wall or beam of the proposed view on its line or within the joists'
 depth of it (R502.4), sampled every 6"; gaps of 12" or more are a warning (an error when the wall
 is marked bearing) (`structure.bearing-removed`). Each end of a new beam bears on a wall at least
-1 1/2" along the beam (3" on a block wall), or on a post, or on another beam (a hanger) (R502.6,
+1 1/2" along the beam (3" on a block or stone wall, `isMasonryFinish`), or on a post, or on another beam (a hanger) (R502.6,
 `structure.beam-end`). The load from each end of a new beam and from each new post is followed
 down (`structure.load-path`, R301.1): at each level below, the wall, post or beam under the point
 (a beam passes it to its two ends); on the lowest level a wall is a foundation wall and a post needs

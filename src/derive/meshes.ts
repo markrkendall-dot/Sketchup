@@ -9,7 +9,7 @@ import { memberBoxes } from './members';
 import { isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
@@ -596,14 +596,15 @@ export function buildFloorGeometry(
 /**
  * How one long face of a wall is split off for a room's finish: false, not at all (it stays in the
  * wall's own finish); null, as one face; a number, as a wainscot below that height and the upper
- * face above it.
+ * face above it; `{ band }`, only the part below that height (the outside face under an exterior
+ * band, Wall.band), the rest staying in the core.
  */
-export type SideCut = false | null | number;
+export type SideCut = false | null | number | { band: number };
 
-/** A long face of a wall split off from the rest, in one band. */
+/** A long face of a wall split off from the rest, in one band ('lower': under an exterior band). */
 export interface WallFacePart {
   side: 'left' | 'right';
-  band: 'upper' | 'wainscot';
+  band: 'upper' | 'wainscot' | 'lower';
   geometry: BufferGeometry;
 }
 
@@ -642,7 +643,9 @@ export function splitWallFaces(
       }
       if (!on) continue;
       const cy = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3;
-      key = `${side}:${cut !== null && cy < cut ? 'wainscot' : 'upper'}`;
+      if (cut !== null && typeof cut === 'object') {
+        if (cy < cut.band) key = `${side}:lower`;
+      } else key = `${side}:${cut !== null && cy < cut ? 'wainscot' : 'upper'}`;
     }
     let b = buckets.get(key);
     if (!b) buckets.set(key, (b = { p: [], n: [], t: [] }));
@@ -661,7 +664,7 @@ export function splitWallFaces(
   };
   const faces: WallFacePart[] = [];
   for (const side of ['left', 'right'] as const) {
-    for (const band of ['wainscot', 'upper'] as const) {
+    for (const band of ['wainscot', 'upper', 'lower'] as const) {
       const b = buckets.get(`${side}:${band}`);
       if (b) faces.push({ side, band, geometry: make(b) });
     }
@@ -1102,6 +1105,12 @@ export interface WallMesh {
    * each band in the room's finish and colour; absent when no room dresses the wall.
    */
   faces?: { roomId: Id; side: 'left' | 'right'; band: 'upper' | 'wainscot'; geometry: BufferGeometry; finish: RoomWallFinish; color: string }[];
+  /**
+   * The outside face below an exterior band (Wall.band), in the band's finish and colour (a proposed
+   * look never re-sides it); absent without a band, on a demolished or screen wall, or where a room
+   * dresses that face.
+   */
+  band?: { side: 'left' | 'right'; geometry: BufferGeometry; finish: WallFinish; color: string };
 }
 
 /** A room's floor finish (DESIGN.md "Interior finishes"): a surface just over the slab top. */
@@ -1703,6 +1712,12 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const w = room && wainscotOf(room, level.wallHeight);
     if (w) bandSet.add(w.height);
   }
+  // Exterior bands (Wall.band) likewise.
+  for (const w of Object.values(level.walls)) {
+    const b = fps.has(w.id) ? wallBandOf(w, heightOf(w)) : null;
+    if (b) bandSet.add(b.height);
+  }
+  const centroid = levelCentroid(level);
   const bands = [...bandSet].sort((p, q) => p - q);
   const bandsKey = bands.join(',');
   // Heights of the visible walls at each node, for the join faces. Only a neighbour drawn the same
@@ -1779,9 +1794,17 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       return room && (look || wainscot) ? { room, look, wainscot } : null;
     };
     const looks = { left: sideLook('left'), right: sideLook('right') };
-    const cutOf = (s: ReturnType<typeof sideLook>): SideCut => (s ? (s.wainscot?.height ?? null) : false);
-    const cuts = { left: cutOf(looks.left), right: cutOf(looks.right) };
-    const splitKey = `${cuts.left}|${cuts.right}`;
+    // An exterior band dresses the outside face below its height (the side the trim goes on), unless a room dresses that side.
+    const band = dressable ? wallBandOf(wall, heightOf(wall)) : null;
+    const bandSide = band ? (outwardSide(fp, wall, faces, centroid) === 1 ? 'left' : 'right') : null;
+    const cutOf = (side: 'left' | 'right'): SideCut => {
+      const s = looks[side];
+      if (s) return s.wainscot?.height ?? null;
+      return band && side === bandSide ? { band: band.height } : false;
+    };
+    const cuts = { left: cutOf('left'), right: cutOf('right') };
+    const cutKey = (c: SideCut) => (c !== null && typeof c === 'object' ? `band:${c.band}` : String(c));
+    const splitKey = `${cutKey(cuts.left)}|${cutKey(cuts.right)}`;
     const old = prevWalls?.get(wall.id);
     const sameGeometry = !!old && old.fp === fp && old.wall === wall && old.openings === openings && old.height === height && old.ctxKey === ctxKey;
     const geometry = sameGeometry
@@ -1801,13 +1824,15 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
             split: cuts.left === false && cuts.right === false ? null : splitWallFaces(geometry, fp, cuts),
           };
     nextWalls.set(wall.id, entry);
-    const dressed = entry.split?.faces.map((part) => {
+    const dressed = entry.split?.faces.flatMap((part) => {
+      if (part.band === 'lower') return [];
       const s = looks[part.side]!;
       const look = part.band === 'wainscot' && s.wainscot ? s.wainscot : (s.look ?? { finish: 'paint' as const, color: DEFAULT_INTERIOR_COLOR });
-      return { roomId: s.room.id, side: part.side, band: part.band, geometry: part.geometry, finish: look.finish, color: look.color };
+      return [{ roomId: s.room.id, side: part.side, band: part.band, geometry: part.geometry, finish: look.finish, color: look.color }];
     });
     // A re-sided wall: an exterior wall in a siding finish takes the proposed look's.
     const resided = !!look && wall.kind === 'exterior' && SIDING_FINISHES.includes(wallFinishOf(wall));
+    const lower = band && entry.split?.faces.find((part) => part.band === 'lower');
     walls.push({
       id: wall.id,
       geometry: entry.split ? entry.split.core : entry.geometry,
@@ -1815,7 +1840,8 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       kind: wall.kind,
       finish: (resided && look.wallFinish) || wallFinishOf(wall),
       color: (resided && look.wallColor) || wallColorOf(wall),
-      ...(dressed ? { faces: dressed } : {}),
+      ...(dressed && (looks.left || looks.right) ? { faces: dressed } : {}),
+      ...(band && lower ? { band: { side: lower.side, geometry: lower.geometry, finish: band.finish, color: band.color } } : {}),
     });
   }
   if (prevWalls) for (const [id, e] of prevWalls) if (nextWalls.get(id) !== e) disposeWallEntry(e, nextWalls.get(id));
@@ -1952,7 +1978,6 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const prevFills = openingCache.get(key);
   const nextFills = new Map<Id, OpeningEntry>();
   const openingMeshes: OpeningMesh[] = [];
-  const centroid = levelCentroid(level);
   for (const wall of Object.values(level.walls)) {
     const fp = fps.get(wall.id);
     const list = byWall.get(wall.id);

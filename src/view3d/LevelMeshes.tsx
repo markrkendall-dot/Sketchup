@@ -58,6 +58,17 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
               dispose={null}
             />
           ))}
+          {/* The outside face below an exterior band, in the band's finish (never a screen). */}
+          {w.band && (
+            <mesh
+              name={`wall:${w.id}:band`}
+              geometry={w.band.geometry}
+              material={wallMaterial(w.phase, w.kind, w.band.finish, w.band.color)}
+              castShadow
+              receiveShadow
+              dispose={null}
+            />
+          )}
         </group>
       ))}
       {meshes.stairs.map((s) => (

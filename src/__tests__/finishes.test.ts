@@ -1,10 +1,10 @@
 import { produce } from 'immer';
 import { FrontSide, type BufferGeometry } from 'three';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeFootprints } from '../derive/footprint';
 import { buildWallGeometry, clearMeshCache, getLevelMeshes } from '../derive/meshes';
 import { muntinCounts, openingFill, sashSpans, shutterWidth, type FillBox, type FillInput } from '../derive/openings3d';
-import { DEFAULT_EXTERIOR_COLOR, DEFAULT_INTERIOR_COLOR, DEFAULT_LEAF_COLOR, normalizeHex, roofColorOf, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
+import { BAND_FINISHES, DEFAULT_EXTERIOR_COLOR, DEFAULT_INTERIOR_COLOR, DEFAULT_LEAF_COLOR, isMasonryFinish, normalizeHex, roofColorOf, SIDING_FINISHES, WALL_FINISHES, WALL_FINISH_LABEL, wallColorOf, wallFinishOf } from '../model/finish';
 import { createEmptyPlan, createLevel, migrate, SCHEMA_VERSION } from '../model/plan';
 import type { Level, Opening, Plan, Wall } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
@@ -12,6 +12,7 @@ import {
   blendPixels,
   blockFaces,
   brightness,
+  halflogFaces,
   CLAPBOARD_COURSE,
   courseBoundaries,
   hexToRgb,
@@ -26,6 +27,10 @@ import {
   sidingHeight,
   sidingTexture,
   sidingTextures,
+  STONE_COURSES,
+  STONE_JOINT,
+  STONE_WIDTH,
+  stoneFaces,
   TEXTURE_PX,
   TILE_INCHES,
 } from '../view3d/textures';
@@ -953,5 +958,108 @@ describe('new-work walls are washed green, not darkened (REVIEW-2 C4)', () => {
     // No canvas in node, so the flat blended colour; with a canvas the map carries the blend and the tint is white.
     expect(m.color.getHexString()).toBe('828b76');
     expect(wallMaterial('demo', 'exterior', 'clapboard', '#5a3a35').opacity).toBeCloseTo(0.35, 9);
+  });
+});
+
+describe('fieldstone and half-log', () => {
+  const at = (f: Float32Array, row: number, col: number) => f[((row + TEXTURE_PX) % TEXTURE_PX) * TEXTURE_PX + ((col + TEXTURE_PX) % TEXTURE_PX)];
+
+  it('are wall finishes of their own, labelled, not siding (a proposed look keeps them); stone is masonry', () => {
+    for (const f of ['stone', 'halflog'] as const) {
+      expect(WALL_FINISHES).toContain(f);
+      expect(BAND_FINISHES).toContain(f);
+      expect(SIDING_FINISHES).not.toContain(f);
+    }
+    expect(BAND_FINISHES).not.toContain('screen');
+    expect([WALL_FINISH_LABEL.stone, WALL_FINISH_LABEL.halflog]).toEqual(['Fieldstone', 'Half-log']);
+    expect([isMasonryFinish('stone'), isMasonryFinish('block'), isMasonryFinish('halflog'), isMasonryFinish(undefined)]).toEqual([true, true, false, false]);
+    const m = wallMaterial('existing', 'exterior', 'stone', '#8e8579');
+    expect(m).not.toBe(wallMaterial('existing', 'exterior', 'halflog', '#8e8579'));
+    expect(m.color.getHexString()).toBe('8e8579');
+  });
+
+  it('stones: courses of 6" to 14" cells that fill the tile, each stone inside its course, in several tones', () => {
+    const stones = stoneFaces();
+    expect(stoneFaces()).toEqual(stones);
+    const course = TILE_INCHES / STONE_COURSES;
+    for (let k = 0; k < STONE_COURSES; k++) {
+      const row = stones.filter((s) => s.y0 >= k * course && s.y1 <= (k + 1) * course);
+      const cells = row.map((s) => s.x1 - s.x0 + STONE_JOINT);
+      expect(cells.reduce((t, w) => t + w, 0)).toBeCloseTo(TILE_INCHES, 9);
+      for (const w of cells) expect(w).toBeGreaterThanOrEqual(STONE_WIDTH.min - 1e-9);
+      for (const w of cells) expect(w).toBeLessThanOrEqual(STONE_WIDTH.max + 1e-9);
+    }
+    expect(stones.length).toBe(stones.filter((s) => s.y1 - s.y0 >= course - STONE_JOINT - 2.5 - 1e-9).length);
+    expect(new Set(stones.map((s) => s.tone)).size).toBeGreaterThan(2);
+  });
+
+  it('stone relief: rounded stones up to RELIEF.stone in raked mortar', () => {
+    const f = sidingHeight('stone')!;
+    expect(f).toHaveLength(TEXTURE_PX * TEXTURE_PX);
+    const max = f.reduce((m, h) => Math.max(m, h), -Infinity);
+    expect(max).toBeLessThanOrEqual(RELIEF.stone + 1e-6);
+    expect(max).toBeGreaterThan(0.9 * RELIEF.stone);
+    expect(f.reduce((m, h) => Math.min(m, h), Infinity)).toBeCloseTo(-RELIEF.mortar, 6);
+    const mortar = f.filter((h) => h < 0).length / f.length;
+    expect(mortar).toBeGreaterThan(0.15);
+    expect(mortar).toBeLessThan(0.5);
+    // A stone is highest at its middle and falls toward its rim.
+    const s = stoneFaces()[0];
+    const mid = TEXTURE_PX - Math.round(((s.y0 + s.y1) / 2) * PX_PER_INCH);
+    const c = Math.round(((s.x0 + s.x1) / 2) * PX_PER_INCH);
+    expect(at(f, mid, c)).toBeGreaterThan(0.9 * RELIEF.stone);
+    expect(at(f, mid, Math.round((s.x0 + 0.3) * PX_PER_INCH))).toBeLessThan(at(f, mid, c));
+  });
+
+  it('half-log relief: six round logs a tile, a chink line between, level across the tile', () => {
+    const f = sidingHeight('halflog')!;
+    expect(halflogFaces()).toHaveLength(6);
+    const col = Array.from({ length: TEXTURE_PX }, (_, row) => at(f, row, 100));
+    // Chink runs: recessed rows, each entered from a log above.
+    expect(col.filter((h, row) => h < 0 && !(col[(row + TEXTURE_PX - 1) % TEXTURE_PX] < 0))).toHaveLength(6);
+    // The crown of the first log (4" up) near RELIEF.log; lower toward its edges.
+    const crown = TEXTURE_PX - Math.round(4 * PX_PER_INCH);
+    expect(at(f, crown, 100)).toBeGreaterThan(0.95 * RELIEF.log);
+    expect(at(f, TEXTURE_PX - Math.round(1 * PX_PER_INCH), 100)).toBeLessThan(0.8 * RELIEF.log);
+    for (const row of [20, 200, 400]) expect(at(f, row, 0)).toBe(at(f, row, 511));
+  });
+
+  it('both draw on a canvas (no fall-through to the screen) with a normal map', () => {
+    // A minimal canvas: records fills, hands back image data.
+    let fills = 0;
+    let puts = 0;
+    const ctx = {
+      fillStyle: '',
+      fillRect: () => void fills++,
+      clearRect: () => {},
+      createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+      putImageData: () => void puts++,
+    };
+    vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) });
+    try {
+      for (const finish of ['stone', 'halflog'] as const) {
+        fills = 0;
+        const t = sidingTextures(finish, '#8e8579');
+        expect(t?.map).toBeTruthy();
+        expect(t?.normalMap).toBeTruthy();
+        expect(fills).toBeGreaterThan(500);
+      }
+      expect(puts).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('migrate keeps the two finishes', () => {
+    const plan = createEmptyPlan();
+    const l = plan.levels[plan.levelOrder[1]];
+    l.nodes.p = { id: 'p', x: 0, y: 0 };
+    l.nodes.q = { id: 'q', x: 240, y: 0 };
+    l.nodes.r = { id: 'r', x: 240, y: 120 };
+    l.walls.s = { id: 's', a: 'p', b: 'q', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'stone' };
+    l.walls.h = { id: 'h', a: 'q', b: 'r', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'halflog' };
+    const back = migrate(JSON.parse(JSON.stringify(plan))).levels[plan.levelOrder[1]].walls;
+    expect([back.s.finish, back.h.finish]).toEqual(['stone', 'halflog']);
   });
 });

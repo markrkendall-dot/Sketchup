@@ -15,6 +15,7 @@
 //   - a level where a wall comes out and the joists over it are not set.
 
 import { CODE, codeRef, type CodeKey } from '../model/codeLimits';
+import { isMasonryFinish } from '../model/finish';
 import { isTimber } from '../model/structure';
 import { add, cross, dist, dot, normalize, pointInPolygon, scale, sub } from '../model/geometry';
 import type { Beam, Id, Level, Member, Plan, Post, Vec2, Wall } from '../model/types';
@@ -181,9 +182,9 @@ export function structureIssues(plan: Plan): Issue[] {
         }
         if (s.kind === 'wall') {
           const bearing = exitDistance(end, u, s.poly);
-          const need = s.wall.finish === 'block' ? CODE.bearingMasonry.value : CODE.bearingWood.value;
+          const need = isMasonryFinish(s.wall.finish) ? CODE.bearingMasonry.value : CODE.bearingWood.value;
           if (bearing < need - TOL)
-            push('structure.beam-end', s.wall.finish === 'block' ? 'bearingMasonry' : 'bearingWood', 'error', levelId, end, { members: [m.id] }, `${capitalize(name)} bears ${fmt(bearing)} on the wall, under the ${fmt(need)} needed: run it further onto the wall.`, beamOutline(m), part);
+            push('structure.beam-end', isMasonryFinish(s.wall.finish) ? 'bearingMasonry' : 'bearingWood', 'error', levelId, end, { members: [m.id] }, `${capitalize(name)} bears ${fmt(bearing)} on the wall, under the ${fmt(need)} needed: run it further onto the wall.`, beamOutline(m), part);
         }
         if (s.kind !== 'beam') trace(li, end, s, m, name);
       }

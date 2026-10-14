@@ -143,6 +143,11 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
       for (const f of w.faces ?? []) {
         group.add(mesh(`Wall ${i + 1} finish (${roomName(f.roomId)}${f.band === 'wainscot' ? ', wainscot' : ''})`, f.geometry, material(interiorMaterialName('interior', w.phase, f.finish, f.color), roomWallMaterial(w.phase, f.finish, f.color))));
       }
+      // The outside face below an exterior band, in the band's finish and colour.
+      if (w.band) {
+        const { finish, color } = w.band;
+        group.add(mesh(`Wall ${i + 1} lower band`, w.band.geometry, material(wallMaterialName(w.phase, w.kind, finish, color), wallMaterial(w.phase, w.kind, finish, color))));
+      }
     });
     for (const s of meshes.stairs) {
       group.add(mesh('Stairs', s.geometry, material(stairsMaterialName(s.phase), stairsMaterial(s.phase))));

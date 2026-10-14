@@ -3,7 +3,7 @@ import { coreInterval, draftFootprints, type FootprintSource } from '../derive/o
 import { phasesCoexist } from '../derive/phase';
 import { MAX_STAIRS_BELOW, stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
-import { FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
+import { BAND_FINISHES, FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
 import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
@@ -582,7 +582,7 @@ const phaseOf = (v: unknown): Phase => (typeof v === 'string' && PHASES.has(v) ?
 const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 
 const NODE_KEYS = ['id', 'x', 'y'] as const;
-const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color', 'bearing'] as const;
+const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color', 'bearing', 'band'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
@@ -631,6 +631,15 @@ function migrateWalls(raw: Json, nodes: Level['nodes'], where: string): Level['w
     put(wall, 'finish', typeof w.finish === 'string' && WALL_FINISHES.includes(w.finish as WallFinish) ? w.finish : undefined);
     put(wall, 'color', isHexColor(w.color) ? w.color.toLowerCase() : undefined);
     put(wall, 'bearing', typeof w.bearing === 'boolean' ? w.bearing : undefined);
+    // A lower band (Wall.band): dropped unless its finish and height are usable; a bad colour alone is dropped.
+    const band = w.band;
+    put(
+      wall,
+      'band',
+      isObject(band) && isNum(band.height) && band.height > 0 && typeof band.finish === 'string' && BAND_FINISHES.includes(band.finish as WallFinish)
+        ? { finish: band.finish, ...(isHexColor(band.color) ? { color: band.color.toLowerCase() } : {}), height: band.height }
+        : undefined,
+    );
     out[wid] = wall as unknown as Wall;
   }
   return out;
