@@ -5,7 +5,7 @@ import { selfIntersects } from '../../derive/rooms';
 import { hitOpeningRect, hitOpeningSwing } from '../../derive/openings';
 import { hitStairs } from '../../derive/stairs';
 import { postOutline } from '../../derive/members';
-import { memberPoints } from '../../model/structure';
+import { isLog, memberPoints } from '../../model/structure';
 import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase';
 import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../../model/geometry';
 import { WALL_OVERLAP_MESSAGE } from '../../model/plan';
@@ -154,11 +154,11 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   }
   if (best) return best;
 
-  // Posts (topmost first): inside, or within 2 px.
+  // Posts (topmost first): inside, or within 2 px (a round log post: its circle).
   const members = Object.values(level.members ?? {})
     .reverse()
     .filter((m) => isVisible(m.phase, viewMode));
-  const post = members.find((m) => m.kind === 'post' && nearOutline(postOutline(m, m.width, m.depth), p, 2 / k));
+  const post = members.find((m) => m.kind === 'post' && (isLog(m) ? dist(m.at, p) <= m.width / 2 + 2 / k : nearOutline(postOutline(m, m.width, m.depth), p, 2 / k)));
   if (post) return { kind: 'member', id: post.id };
 
   const fps = getFootprints(level, viewMode);

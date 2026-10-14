@@ -1506,6 +1506,11 @@ button.primary:hover:not(:disabled) {
   stroke: #52525b;
 }
 
+.column-ghost.column-pier rect {
+  fill: rgba(138, 131, 120, 0.35);
+  stroke: #57534e;
+}
+
 .column-ghost text {
   font-size: 12px;
   fill: #52525b;

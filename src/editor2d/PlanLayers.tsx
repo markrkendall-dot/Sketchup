@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
 import { deckTopWords, getDeckLayout, scanSegments } from '../derive/decks';
 import { beamOutline, postOutline } from '../derive/members';
-import { joistWords } from '../model/structure';
+import { isLog, joistWords } from '../model/structure';
 import { bearingOf } from '../derive/structure';
 import { getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getFootprints, type Footprint } from '../derive/footprint';
@@ -697,7 +697,8 @@ const JOIST_SPACING = 16;
 /**
  * A beam or post on the plan (DESIGN.md "Structure"): a beam as its dashed outline (it is overhead,
  * in the framing over this level) with its label along it while the structure overlay is on; a post
- * as a box with an X, its footing as a dashed square on the lowest level.
+ * as a box with an X (a round log post as a circle), its footing as a dashed square on the lowest
+ * level.
  */
 const MemberShape = memo(function MemberShape({ levelId, memberId }: { levelId: Id; memberId: Id }) {
   const m = useLayerPlan((s) => s.plan.levels[levelId]?.members?.[memberId]);
@@ -713,8 +714,10 @@ const MemberShape = memo(function MemberShape({ levelId, memberId }: { levelId: 
       let deg = (Math.atan2(m.b.y - m.a.y, m.b.x - m.a.x) * 180) / Math.PI;
       if (deg > 90) deg -= 180;
       if (deg <= -90) deg += 180;
-      return { body: polyPath(o), cross: '', footing: '', mid, deg, ends: [m.a, m.b] };
+      return { body: polyPath(o), cross: '', footing: '', mid, deg, ends: [m.a, m.b], circle: 0 };
     }
+    const footing = m.footing ? polyPath(postOutline(m, m.footing.width, m.footing.width)) : '';
+    if (isLog(m)) return { body: '', cross: '', footing, mid: m.at, deg: 0, ends: [] as Vec2[], circle: m.width / 2 };
     const o = postOutline(m, m.width, m.depth);
     return {
       body: polyPath(o),
@@ -722,10 +725,11 @@ const MemberShape = memo(function MemberShape({ levelId, memberId }: { levelId: 
         [o[0], o[2]],
         [o[1], o[3]],
       ]),
-      footing: m.footing ? polyPath(postOutline(m, m.footing.width, m.footing.width)) : '',
+      footing,
       mid: m.at,
       deg: 0,
       ends: [] as Vec2[],
+      circle: 0,
     };
   }, [m]);
   if (!m || !paths || !isVisible(m.phase, viewMode)) return null;
@@ -733,7 +737,11 @@ const MemberShape = memo(function MemberShape({ levelId, memberId }: { levelId: 
   return (
     <g className={`member member-${m.kind} phase-${shownPhase(m.phase, viewMode)}${selected ? ' is-selected' : ''}`} data-member-id={memberId}>
       {paths.footing && <path className="member-footing" d={paths.footing} vectorEffect="non-scaling-stroke" />}
-      <path className="member-body" d={paths.body} vectorEffect="non-scaling-stroke" />
+      {paths.circle > 0 ? (
+        <circle className="member-body" cx={paths.mid.x} cy={paths.mid.y} r={paths.circle} vectorEffect="non-scaling-stroke" />
+      ) : (
+        <path className="member-body" d={paths.body} vectorEffect="non-scaling-stroke" />
+      )}
       {paths.cross && <path className="member-cross" d={paths.cross} vectorEffect="non-scaling-stroke" />}
       {structure && label && m.kind === 'beam' && (
         <g transform={`translate(${paths.mid.x} ${paths.mid.y}) rotate(${paths.deg}) scale(${1 / k})`} className="member-label">

@@ -88,8 +88,8 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: "Type the elevation (-4, -6'4), Enter places it. Esc cancels.",
   },
   column: {
-    idle: 'Click to place; Tab switches chimney, post and flue.',
-    busy: 'Click to place; Tab switches chimney, post and flue.',
+    idle: 'Click to place; Tab switches chimney, post, flue and pier.',
+    busy: 'Click to place; Tab switches chimney, post, flue and pier.',
   },
   beam: {
     idle: "Click one end of the beam; it snaps like a wall.",
@@ -171,8 +171,8 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
     busy: "Type the elevation in feet and inches (-4, -6'4, 8'), then Enter places the grade point. Esc clears it, then cancels.",
   },
   column: {
-    idle: 'Click to place a column. Tab steps through a chimney (24" x 40"), a post (6" x 6") and a flue (a round 8" metal pipe, a stove\'s chimney); set the size and heights in the properties panel.',
-    busy: 'Click to place a column. Tab steps through a chimney, a post and a flue.',
+    idle: 'Click to place a column. Tab steps through a chimney (24" x 40"), a post (6" x 6"), a flue (a round 8" metal pipe, a stove\'s chimney) and a pier (16" x 16" fieldstone); set the size and heights in the properties panel.',
+    busy: 'Click to place a column. Tab steps through a chimney, a post, a flue and a pier.',
   },
   beam: {
     idle: 'Click one end of a beam, then the other; the ends snap like wall corners. A new beam is a flush (2) 1 3/4" x 11 7/8" LVL in the floor framing over this level: a placeholder for the engineer to size. Set it in the properties panel.',

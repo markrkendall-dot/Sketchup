@@ -136,3 +136,29 @@ export function memberBoxes(plan: Plan, levelId: Id, m: Member, viewMode: ViewMo
   }
   return out;
 }
+
+/** A point in plan (x, y) and over the floor (z), inches. */
+export interface AxisPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * A member's centreline over its level's floor, from end to end (a round log is drawn along it): a
+ * post's runs up through `at` from its body's bottom to its top (pass boxes with the top a post is
+ * drawn to); a sloped timber's follows its top (timberTop) half its plumb depth down; a level beam's
+ * runs from a to b halfway up it.
+ */
+export function memberAxis(m: Member, boxes: MemberBoxes): { a: AxisPoint; b: AxisPoint } {
+  if (m.kind === 'post') {
+    return { a: { x: m.at.x, y: m.at.y, z: boxes.body.bottom }, b: { x: m.at.x, y: m.at.y, z: boxes.body.top } };
+  }
+  if (isTimber(m)) {
+    const t = timberTop(m);
+    const z = (p: Vec2) => t.top(p) - t.vertical / 2;
+    return { a: { x: m.a.x, y: m.a.y, z: z(m.a) }, b: { x: m.b.x, y: m.b.y, z: z(m.b) } };
+  }
+  const z = (boxes.body.bottom + boxes.body.top) / 2;
+  return { a: { x: m.a.x, y: m.a.y, z }, b: { x: m.b.x, y: m.b.y, z } };
+}

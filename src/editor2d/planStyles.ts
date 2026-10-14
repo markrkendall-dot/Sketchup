@@ -862,12 +862,18 @@ export const PLAN_RULES = `.wall-exterior {
   stroke: #52525b;
 }
 
+.column-pier .column-body {
+  fill: #d6d0c4;
+  stroke: #57534e;
+}
+
 .column.phase-new .column-body {
   stroke: var(--new-edge);
 }
 
 .column-post.phase-new .column-body,
-.column-flue.phase-new .column-body {
+.column-flue.phase-new .column-body,
+.column-pier.phase-new .column-body {
   fill: #86c79a;
 }
 
@@ -878,7 +884,8 @@ export const PLAN_RULES = `.wall-exterior {
 
 .column-post.phase-demo .column-body,
 .column-chimney.phase-demo .column-body,
-.column-flue.phase-demo .column-body {
+.column-flue.phase-demo .column-body,
+.column-pier.phase-demo .column-body {
   fill: url(#hp-hatch-demo);
 }
 

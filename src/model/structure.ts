@@ -14,8 +14,19 @@ export const MEMBER_DEFAULTS = {
   footing: { width: 24, thickness: 12 },
 } as const;
 
-/** Structure in 3D: LVL beams and posts as pale wood, footings as concrete. */
-export const MEMBER_COLOR = { beam: '#d6b98c', post: '#c8a678', footing: '#a8a29e' } as const;
+/** Structure in 3D: LVL beams and posts as pale wood, footings as concrete, a log's end grain paler. */
+export const MEMBER_COLOR = { beam: '#d6b98c', post: '#c8a678', footing: '#a8a29e', end: '#e6d3b0' } as const;
+
+/** A log's end grain: its colour 40% of the way to white, else MEMBER_COLOR.end. */
+export function logEndColor(color?: string): string {
+  if (!color || !HEX.test(color)) return MEMBER_COLOR.end;
+  const n = parseInt(color.slice(1), 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * 0.4);
+  const r = mix((n >> 16) & 255);
+  const g = mix((n >> 8) & 255);
+  const b = mix(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
 
 /** The depth of an attic's ceiling joists, where there is no floor above to take it from. */
 export const ATTIC_JOIST_DEPTH = 5.5;
@@ -62,6 +73,7 @@ export function memberProblem(m: Partial<Beam> | Partial<Post>, lowest: boolean)
     if (b.label !== undefined && typeof b.label !== 'string') return 'the label must be text';
     if ((b.za !== undefined || b.zb !== undefined) && !(settable(b.za) && settable(b.zb))) return 'a timber needs its top at both ends';
     if (b.color !== undefined && !(typeof b.color === 'string' && HEX.test(b.color))) return 'the colour must be a hex colour';
+    if (b.profile !== undefined && b.profile !== 'log') return 'the profile is a round log or none';
     return null;
   }
   if (m.kind === 'post') {
@@ -72,6 +84,7 @@ export function memberProblem(m: Partial<Beam> | Partial<Post>, lowest: boolean)
     if (p.label !== undefined && typeof p.label !== 'string') return 'the label must be text';
     if ((p.base !== undefined || p.top !== undefined) && !(settable(p.base) && settable(p.top) && p.top > p.base)) return 'a timber post needs a base under its top';
     if (p.color !== undefined && !(typeof p.color === 'string' && HEX.test(p.color))) return 'the colour must be a hex colour';
+    if (p.profile !== undefined && p.profile !== 'log') return 'the profile is a round log or none';
     if (p.footing !== undefined) {
       if (!lowest) return 'only a post on the lowest level stands on a footing';
       if (!positive(p.footing.width, 120) || !positive(p.footing.thickness, 60)) return 'the footing needs a width and a thickness';
@@ -83,6 +96,9 @@ export function memberProblem(m: Partial<Beam> | Partial<Post>, lowest: boolean)
 
 /** A beam or post at set heights (a timber): drawn as set, not followed by the structure checks. */
 export const isTimber = (m: Member): boolean => (m.kind === 'beam' ? m.za !== undefined : m.base !== undefined);
+
+/** A round log (a beam or post with `profile: 'log'`). */
+export const isLog = (m: Member): boolean => m.profile === 'log';
 
 /** A beam's or post's plan points (to move it). */
 export const memberPoints = (m: Member): Vec2[] => (m.kind === 'beam' ? [m.a, m.b] : [m.at]);

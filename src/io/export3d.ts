@@ -78,11 +78,11 @@ const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sin
 /**
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
  * with one group per visible level at its floor-top elevation holding `Wall <n> (<kind>, <phase>)`,
- * `Floor`, `Stairs`, `Roof` (with its `Fascia` boards and, under open eaves, its `Rafters`, materials
+ * `Floor`, `Stairs`, `Beam`, `Post` and `Footing` (a round log's end discs: `Log end`, material `member_end_<phase>`), `Roof` (with its `Fascia` boards and, under open eaves, its `Rafters`, materials
  * `fascia_<phase>` and `rafter_<phase>`, plus `_<hex>` in a board colour other than tan), `Deck`, `Deck framing` (with the
  * posts) and `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour other than
  * the default wood), `Stair railing` and `Guard` (a flight's railings and the guard round a floor opening, material `railing_<phase>`), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
- * elevation 0, absolute heights) follows with the `Chimney`, `Flue` and `Post` meshes the view mode shows
+ * elevation 0, absolute heights) follows with the `Chimney`, `Flue`, `Post` and `Pier` meshes the view mode shows
  * (materials `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the default; a capped
  * chimney's cap and spark arrestor are more `Chimney` meshes, `chimney_cap_<phase>` and
  * `chimney_arrestor_<phase>`; a capped flue's rain cap is two more `Flue` meshes, `flue_stem_<phase>` and `flue_hood_<phase>`) and, when the site has grade points, the `Terrain` (material `terrain`; without grade points the
@@ -209,12 +209,13 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         group.add(r);
       }
     }
-    // Beams, posts and footings.
-    const MEMBER_NAME = { beam: 'Beam', post: 'Post', footing: 'Footing' } as const;
+    // Beams, posts and footings, and a round log's end discs (`Log end`, `member_end_<phase>`).
+    const MEMBER_NAME = { beam: 'Beam', post: 'Post', footing: 'Footing', end: 'Log end' } as const;
     for (const mm of members) {
       for (const [part, geometry] of [
         [mm.kind, mm.body],
         ['footing', mm.footing],
+        ['end', mm.ends],
       ] as const) {
         if (!geometry) continue;
         const color = part === 'footing' || mm.phase === 'demo' ? undefined : mm.color;
@@ -253,7 +254,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     site.add(mesh('Terrain', getTerrainGeometry(plan, viewMode), material('terrain', terrainMaterial)));
   }
   for (const c of getSiteMeshes(plan, viewMode).columns) {
-    const name = c.kind === 'chimney' ? 'Chimney' : c.kind === 'flue' ? 'Flue' : 'Post';
+    const name = c.kind === 'chimney' ? 'Chimney' : c.kind === 'flue' ? 'Flue' : c.kind === 'pier' ? 'Pier' : 'Post';
     const m = mesh(name, c.geometry, material(columnMaterialName(c.kind, c.phase, c.color), columnMaterial(c.kind, c.phase, c.color)));
     if (c.phase === 'demo') m.renderOrder = 1;
     site.add(m);

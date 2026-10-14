@@ -168,7 +168,7 @@ export interface GradePoint { id: Id; at: Vec2; elevation: Inches }   // elevati
 export interface Column {
   id: Id; at: Vec2; width: Inches; depth: Inches; rotation: Degrees; // plan rectangle, turned clockwise
   base: Inches; top: Inches;                                         // absolute elevations
-  kind: 'post' | 'chimney' | 'flue'; phase: Phase;   // a flue is round: width is its diameter
+  kind: 'post' | 'chimney' | 'flue' | 'pier'; phase: Phase;   // a flue is round: width is its diameter
   color?: string; cap?: boolean;                                     // see "Site and terrain"
 }
 export interface Site {
@@ -646,7 +646,11 @@ appearance"). Defaults (`columnDefaults`): chimney
 on the plan (the top surface at the ridge; above the top ceiling without roofs); post 6" x 6", base on
 the ground, top at the lowest roof underside over it among roofs it can be seen with (a new post
 ignores a roof being demolished; `phasesCoexist`), else the first floor's ceiling; flue 8" (its
-diameter), base 30" over the first floor's top (a stove top), top 24" above the highest ridge.
+diameter), base 30" over the first floor's top (a stove top), top 24" above the highest ridge;
+pier 16" x 16", base on the ground, top at the first floor's floor top (24" high where that is not
+above the ground). A **pier** is fieldstone, of any width and depth (under a post, or a low wide
+stoop): a box like a post, drawn by `columnMaterial('pier', ...)` with the walls' stone texture
+(`sidingTextures('stone', ...)`) on its box UVs, `#8a8378` by default; the export names it `Pier`.
 A **flue** is round: `columnOutline` gives a circle of `width` (`FLUE_SIDES` corners, `depth` and
 `rotation` ignored), `pointInColumn` picks inside it, `buildColumnGeometry` gives its side faces
 normals straight out from the axis so it shades smooth, and `columnMaterial('flue', ...)` is
@@ -655,8 +659,8 @@ glass). A capped flue (`hasFlueCap`) has a rain cap (`FLUE_CAP`): a **stem** hal
 `top` up 3" and a **hood**, a disc twice its width 1.5" thick, on it, both in the flue's metal;
 `columnPeak` adds 4.5". Columns are not cut by slabs or roofs: a flue through the house stands
 through them, so a stove and a chase are boxes on their levels. Optional fields:
-`color` (`#rrggbb`, lower-cased; `columnColorOf` defaults to brick `#7a4a3e` for a chimney and tan
-`#c9b58c` for a post, `COLUMN_COLOR` in `model/finish.ts`) and `cap` (a chimney's cap and spark
+`color` (`#rrggbb`, lower-cased; `columnColorOf` defaults to brick `#7a4a3e` for a chimney, tan
+`#c9b58c` for a post and grey-brown `#8a8378` for a pier, `COLUMN_COLOR` in `model/finish.ts`) and `cap` (a chimney's cap and spark
 arrestor; a post ignores it). `migrate()` keeps each when valid and drops it alone otherwise;
 `columnProblem` refuses a bad one in `addColumn` and `updateColumn`, which deletes either on
 `undefined`. A capped chimney (`hasChimneyCap`) has two more parts (`CHIMNEY_CAP`,
@@ -679,8 +683,8 @@ drawn after the opaque meshes like a screen).
 makes the lowest level active (so the panel and store actions have a level), clears the selection and
 shows, in place of the level's layers (`PlanLayers.tsx SiteView`), the first floor (the level above the
 lowest, or the lowest if alone) as a ghost, every level's roofs as faint ghosts, and the site layer: grade
-points as small triangles with their elevation, columns as rectangles (chimney hatched like brick, post
-solid; demolished hatched red, new green; hidden in the views that hide them), a north arrow in the
+points as small triangles with their elevation, columns as rectangles (chimney hatched like brick, post and
+pier solid; demolished hatched red, new green; hidden in the views that hide them), a north arrow in the
 canvas corner turned by `northAngle`. Choosing any level (the lowest too) leaves site mode
 (`setActiveLevel` clears the flag). In site mode only select, grade point (E) and column (C) work;
 `switchTool` refuses the level tools and says "Choose a level to draw walls" in the status bar (the
@@ -693,7 +697,7 @@ is parked at the lowest.
 midpoints and the grid. Grade point: a click stores the spot in `draft.gradePending`; the length buffer
 takes the elevation in feet-inches (a minus sign is allowed); Enter places it, with nothing typed at the
 first floor's floor top (the level the view shows; `defaultGradeElevation`); Esc clears the buffer, then
-the spot. Column: the column follows the cursor (`draft.columnPreview`), Tab steps chimney, post, flue (`nextColumnKind`),
+the spot. Column: the column follows the cursor (`draft.columnPreview`), Tab steps chimney, post, flue, pier (`nextColumnKind`),
 the click places it with the defaults above in the toolbar's "Draw as" phase. The site select tool
 (`getTool('select')` returns it in site mode) picks grade points (10 px) before columns (visible ones, with
 a 4 px slack), shift-click and box-select add, a drag moves the whole selection with `moveSiteItems`
@@ -1350,9 +1354,10 @@ does not size anything, and every size it starts with is a placeholder for the e
 ```ts
 interface LevelFraming { joists: Degrees; depth?: Inches }          // Level.framing?
 interface JoistZone { id; outline: Vec2[]; joists: Degrees; phase }  // Level.joistZones
-interface Beam { id; kind: 'beam'; a; b; width; depth; mount: 'flush' | 'dropped'; phase; label? }
+interface Beam { id; kind: 'beam'; a; b; width; depth; mount: 'flush' | 'dropped'; phase; label?;
+  za?; zb?; color?; profile?: 'log' }
 interface Post { id; kind: 'post'; at; width; depth; rotation; phase; label?;
-  footing?: { width; thickness } }                                   // Level.members: Beam | Post
+  footing?: { width; thickness }; base?; top?; color?; profile?: 'log' }  // Level.members: Beam | Post
 ```
 
 A level's framing is the floor above it (on the top level, the ceiling under the roof), so a beam,
@@ -1396,6 +1401,20 @@ below the ceiling (none when it is no deeper than the joists), and nothing share
 footing stops 1/16" under the slab; timbers are drawn as set. Materials `memberMaterial` (pale
 wood, concrete, or a timber's colour); the export names the meshes `Beam`, `Post` and `Footing`
 (materials `member_<part>_<phase>`, plus `_<hex>` for a timber's colour).
+
+Logs: a beam or post with `profile: 'log'` (`isLog`) is a round log, `width` its diameter and
+`depth` kept equal to it (`cleanMember`, `migrate()`); `memberProblem` refuses any other profile.
+`memberAxis(m, boxes)` gives its centreline over the floor: a post's up through `at` from its body's
+bottom to its top (the top it is drawn to, clipped under the ceiling unless a timber), a sloped
+timber's along `timberTop` half its plumb depth down, a level beam's halfway up it (drawn whole, not
+clipped). `logBetween(a, b, diameter)` builds the log upright along +Y: the body a `FLUE_SIDES`-sided
+cylinder (`circleOutline`, `prism` without caps) with `roundNormals`, the two end discs apart
+(`prism` without sides), then turns both onto a to b with one `applyMatrix4` (a quaternion from +Y,
+then a move to a). `MemberMesh.ends` holds the discs, in `memberMaterial('end', ...)`: the end grain,
+the member's colour 40% toward white (`logEndColor`), else `MEMBER_COLOR.end`; the export names them
+`Log end` (`member_end_<phase>`). On the plan a log post is a circle (`MemberShape`) and picks as one
+(`selectTool` hitTest); a log beam keeps its outline. The panel's "Round log" checkbox turns it on and
+off; a log shows Diameter in place of Width and Depth, and a log post no Rotation.
 
 Which walls bear (`derive/structure.ts` `wallBearings(plan, view)`, memoized per plan and view,
 top level first): a wall's mark wins; an exterior wall bears when the joists over it cross it (45°
@@ -1650,9 +1669,9 @@ edit is set after it (Open, Undo's "Undid a change on ...", the duplicate room n
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
 skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, `Fascia`, `Rafters`,
-`Deck`, `Deck framing`, `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour
+`Beam`, `Post`, `Footing`, `Log end`, `Deck`, `Deck framing`, `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour
 other than the default), `Stair railing` and `Guard` (material `railing_<phase>`), `Window`, `Door`, then a `Site` group
-(`Terrain`, `Chimney`, `Flue`, `Post`; a capped chimney's cap and arrestor are more `Chimney` meshes, a capped flue's
+(`Terrain`, `Chimney`, `Flue`, `Post`, `Pier`; a capped chimney's cap and arrestor are more `Chimney` meshes, a capped flue's
 rain cap two more `Flue` meshes, `flue_stem_<phase>` and `flue_hood_<phase>`) with cloned geometry and cloned live materials
 (one per phase/kind, roofs `roof_<finish>_<phase>`, boards `fascia_<phase>` and tails `rafter_<phase>` (plus `_<hex>`
 in a board colour other than tan), columns `column_<kind>_<phase>` (plus `_<hex>` in a colour other than the

@@ -32,7 +32,7 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
 /** Only in site mode. */
 const SITE_TOOL_BUTTONS: { name: ToolName; label: string; key: string; title: string }[] = [
   { name: 'gradePoint', label: 'Grade point', key: 'E', title: 'Grade point (E): click a spot on the ground, type its elevation, Enter' },
-  { name: 'column', label: 'Column', key: 'C', title: 'Column (C): click to place a chimney; Tab switches to a post, then a flue (a round metal pipe)' },
+  { name: 'column', label: 'Column', key: 'C', title: 'Column (C): click to place a chimney; Tab switches to a post, then a flue (a round metal pipe), then a pier (fieldstone)' },
 ];
 
 const TOOL_TITLE: Partial<Record<ToolName, string>> = {

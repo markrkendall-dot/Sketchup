@@ -1,12 +1,14 @@
 import type { BufferGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { beamHeights, joistDepth, joistsAt, joistTop, memberBoxes } from '../derive/members';
-import { getMemberMeshes, MEMBER_INSET } from '../derive/meshes';
+import { beamHeights, joistDepth, joistsAt, joistTop, memberAxis, memberBoxes, timberTop, type AxisPoint } from '../derive/members';
+import { getMemberMeshes, logBetween, MEMBER_INSET } from '../derive/meshes';
+import { FLUE_SIDES } from '../derive/site';
 import { dispatchKey, dispatchPointer, switchTool, type ToolPointerEvent } from '../editor2d/tools';
 import { hitTest } from '../editor2d/tools/selectTool';
 import { buildExportScene } from '../io/export3d';
 import { structureIssues } from '../derive/structureChecks';
-import { createEmptyPlan } from '../model/plan';
+import { createEmptyPlan, migrate } from '../model/plan';
+import { logEndColor, MEMBER_COLOR, memberProblem } from '../model/structure';
 import type { Beam, Id, Post } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
@@ -216,5 +218,132 @@ describe('timbers at set heights', () => {
     store().updateMember(f, bid, { za: undefined, zb: undefined });
     expect(plan().levels[f].members[bid]).not.toHaveProperty('za');
     expect(memberBoxes(plan(), f, plan().levels[f].members[bid]).slope).toBeUndefined();
+  });
+});
+
+describe('round logs', () => {
+  /** The centroid of a geometry's vertices that `keep` takes (three's axes). */
+  const centroid = (g: BufferGeometry, keep: (x: number, y: number, z: number) => boolean) => {
+    const p = g.getAttribute('position');
+    let n = 0;
+    const c = { x: 0, y: 0, z: 0 };
+    for (let i = 0; i < p.count; i++) {
+      if (!keep(p.getX(i), p.getY(i), p.getZ(i))) continue;
+      c.x += p.getX(i);
+      c.y += p.getY(i);
+      c.z += p.getZ(i);
+      n++;
+    }
+    return { x: c.x / n, y: c.y / n, z: c.z / n };
+  };
+  /** Plan x, y and z over the floor, as three's x, z and y. */
+  const three = (a: AxisPoint) => ({ x: a.x, y: a.z, z: a.y });
+  const near = (p: { x: number; y: number; z: number }, q: { x: number; y: number; z: number }) => {
+    expect(p.x).toBeCloseTo(q.x, 4);
+    expect(p.y).toBeCloseTo(q.y, 4);
+    expect(p.z).toBeCloseTo(q.z, 4);
+  };
+
+  it('logBetween: a capless body with normals straight out from its axis, and two end discs at a and b', () => {
+    const a = { x: 10, y: 20, z: 30 };
+    const b = { x: 110, y: 20, z: 130 };
+    const { body, ends } = logBetween(a, b, 8);
+    const dir = { x: 100 / Math.hypot(100, 100), y: 100 / Math.hypot(100, 100), z: 0 };
+    const pos = body.getAttribute('position');
+    const nor = body.getAttribute('normal');
+    // FLUE_SIDES sides, two triangles each.
+    expect(pos.count).toBe(FLUE_SIDES * 6);
+    for (let i = 0; i < pos.count; i++) {
+      const n = { x: nor.getX(i), y: nor.getY(i), z: nor.getZ(i) };
+      expect(n.x * dir.x + n.y * dir.y + n.z * dir.z).toBeCloseTo(0, 5);
+      // The vertex is 4" from the axis, along its normal.
+      const v = { x: pos.getX(i) - a.x, y: pos.getY(i) - a.z, z: pos.getZ(i) - a.y };
+      const along = v.x * dir.x + v.y * dir.y + v.z * dir.z;
+      const r = { x: v.x - along * dir.x, y: v.y - along * dir.y, z: v.z - along * dir.z };
+      expect(Math.hypot(r.x, r.y, r.z)).toBeCloseTo(4, 4);
+      expect(r.x / 4).toBeCloseTo(n.x, 4);
+      expect(r.y / 4).toBeCloseTo(n.y, 4);
+    }
+    // The discs: one at each end, facing out along the axis.
+    const endA = centroid(ends, (x, y) => (x - a.x) * dir.x + (y - a.z) * dir.y < 1);
+    const endB = centroid(ends, (x, y) => (x - a.x) * dir.x + (y - a.z) * dir.y > 1);
+    near(endA, three(a));
+    near(endB, three(b));
+    const en = ends.getAttribute('normal');
+    for (let i = 0; i < en.count; i++) expect(Math.abs(en.getX(i) * dir.x + en.getY(i) * dir.y)).toBeCloseTo(1, 5);
+  });
+
+  it('a log post stands from the floor to under the ceiling, its end discs on its axis; a sloped log follows its timber', () => {
+    const pid = store().addMember(f, { ...postOf({ profile: 'log', width: 10, depth: 4, rotation: 30 }) })!;
+    const post = plan().levels[f].members[pid];
+    expect(post).toMatchObject({ profile: 'log', width: 10, depth: 10 });
+    const [pm] = getMemberMeshes(plan(), f, 'all');
+    expect(pm.ends).not.toBeNull();
+    const bb = (g: BufferGeometry) => {
+      g.computeBoundingBox();
+      return g.boundingBox!;
+    };
+    expect(bb(pm.body!).min.y).toBeCloseTo(0, 4);
+    expect(bb(pm.body!).max.y).toBeCloseTo(96 - MEMBER_INSET, 4);
+    expect(bb(pm.body!).max.x).toBeCloseTo(105, 4);
+    near(centroid(pm.ends!, (_x, y) => y < 1), { x: 100, y: 0, z: 100 });
+    near(centroid(pm.ends!, (_x, y) => y > 1), { x: 100, y: 96 - MEMBER_INSET, z: 100 });
+    // A 45° log rafter, 8" round: its ends on its axis, half its plumb depth under its top.
+    const id = store().addMember(f, { ...beamOf({ a: { x: 0, y: 100 }, b: { x: 100, y: 100 }, width: 8, depth: 8, profile: 'log' }), za: 96, zb: 196 })!;
+    const m = plan().levels[f].members[id];
+    const ax = memberAxis(m, memberBoxes(plan(), f, m));
+    const half = timberTop(m as Beam).vertical / 2;
+    expect(ax.a).toEqual({ x: 0, y: 100, z: 96 - half });
+    expect(ax.b.z).toBeCloseTo(196 - half, 9);
+    const lm = getMemberMeshes(plan(), f, 'all').find((x) => x.id === id)!;
+    near(centroid(lm.ends!, (x) => x < 50), three(ax.a));
+    near(centroid(lm.ends!, (x) => x > 50), three(ax.b));
+    // A level beam's axis runs halfway up it.
+    const level = memberAxis(beamOf({ mount: 'dropped' }) as Beam, { body: { poly: [], bottom: 80, top: 96 } });
+    expect(level).toEqual({ a: { x: 0, y: 100, z: 88 }, b: { x: 200, y: 100, z: 88 } });
+  });
+
+  it('the end grain is a lighter tint of the colour, a Log end mesh in the export', () => {
+    expect(logEndColor()).toBe(MEMBER_COLOR.end);
+    expect(logEndColor('#000000')).toBe('#666666');
+    expect(logEndColor('#5a3a35')).toBe('#9c8986');
+    store().addMember(f, { ...postOf({ profile: 'log' }), id: 'lg' });
+    const root = buildExportScene(plan(), 'all', { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: f });
+    const parts = ((root.children.find((c) => c.name === 'First Floor') as Group).children as Mesh[]).map((m) => `${m.name}:${(m.material as MeshStandardMaterial).name}`);
+    expect(parts).toEqual(expect.arrayContaining(['Post:member_post_new', 'Log end:member_end_new']));
+  });
+
+  it('keeps the depth equal to the diameter, refuses another profile, and clears back to a squared member', () => {
+    expect(memberProblem({ ...postOf(), profile: 'square' as 'log' }, false)).toBe('the profile is a round log or none');
+    // The store keeps only a log's profile (cleanMember); migrate() drops a member with another (below).
+    const sq = store().addMember(f, { ...beamOf(), profile: 'square' as 'log' })!;
+    expect(plan().levels[f].members[sq]).not.toHaveProperty('profile');
+    const id = store().addMember(f, { ...beamOf({ profile: 'log', width: 9 }) })!;
+    expect(plan().levels[f].members[id]).toMatchObject({ width: 9, depth: 9 });
+    store().updateMember(f, id, { width: 12 });
+    expect(plan().levels[f].members[id]).toMatchObject({ width: 12, depth: 12 });
+    store().updateMember(f, id, { profile: undefined });
+    expect(plan().levels[f].members[id]).not.toHaveProperty('profile');
+    expect(getMemberMeshes(plan(), f, 'all').find((m) => m.id === id)!.ends).toBeNull();
+  });
+
+  it('a log post picks inside its circle, not at the corner of its square', () => {
+    store().addMember(f, { ...postOf({ at: { x: 300, y: 300 }, width: 10, profile: 'log' }), id: 'lg' });
+    expect(hitTest(plan().levels[f], { x: 304, y: 302 }, 1)).toEqual({ kind: 'member', id: 'lg' });
+    // 5" by 5" off the centre: in the 10" square, outside the circle (and its 2 px).
+    expect(hitTest(plan().levels[f], { x: 305, y: 305 }, 1)).toBeNull();
+  });
+
+  it("loads files with and without a profile; a log's depth follows its width", () => {
+    store().addMember(f, { ...postOf(), id: 'sq' });
+    store().addMember(f, { ...postOf({ profile: 'log', width: 8 }), id: 'lg' });
+    const json = JSON.stringify(plan());
+    expect(JSON.stringify(migrate(JSON.parse(json)))).toBe(json);
+    const raw = JSON.parse(json);
+    raw.levels[f].members.lg.depth = 3;
+    raw.levels[f].members.sq.profile = 'square';
+    const loaded = migrate(raw);
+    expect(loaded.levels[f].members.lg).toMatchObject({ profile: 'log', width: 8, depth: 8 });
+    expect(loaded.levels[f].members.sq).toBeUndefined();
   });
 });

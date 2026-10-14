@@ -597,8 +597,8 @@ const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle'] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
 const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
 const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
-const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'label', 'za', 'zb', 'color'] as const;
-const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'label', 'footing', 'base', 'top', 'color'] as const;
+const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'label', 'za', 'zb', 'color', 'profile'] as const;
+const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
 const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
@@ -977,6 +977,7 @@ function migrateMembers(raw: Json, where: string, lowest: boolean): Level['membe
     member.id = mid;
     member.phase = phaseOf(m.phase);
     if (typeof member.color === 'string') member.color = member.color.toLowerCase();
+    if (member.profile === 'log') member.depth = member.width; // a log's depth is kept equal to its diameter
     if (m.kind === 'beam') {
       member.a = { x: (m.a as Vec2).x, y: (m.a as Vec2).y };
       member.b = { x: (m.b as Vec2).x, y: (m.b as Vec2).y };
@@ -1127,7 +1128,7 @@ function migrateSite(raw: unknown): Site {
     col.id = id;
     col.at = { x: c.at.x, y: c.at.y };
     col.rotation = isNum(c.rotation) ? c.rotation : 0;
-    col.kind = c.kind === 'chimney' || c.kind === 'flue' ? c.kind : 'post';
+    col.kind = c.kind === 'chimney' || c.kind === 'flue' || c.kind === 'pier' ? c.kind : 'post';
     col.phase = phaseOf(c.phase);
     // Optional appearance fields: kept when valid, dropped otherwise (the defaults apply).
     put(col, 'color', isHexColor(c.color) ? c.color.toLowerCase() : undefined);

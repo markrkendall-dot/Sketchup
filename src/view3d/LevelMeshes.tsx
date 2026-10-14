@@ -157,6 +157,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
             [
               [m.kind, m.body],
               ['footing', m.footing],
+              ['end', m.ends],
             ] as const
           ).map(([part, geometry]) =>
             geometry ? (

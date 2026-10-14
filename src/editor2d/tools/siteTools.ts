@@ -151,8 +151,8 @@ export const gradePointTool: Tool = {
 // Column tool
 
 /** The column kinds the tool's Tab steps through, in order. */
-const COLUMN_KINDS: Column['kind'][] = ['chimney', 'post', 'flue'];
-export const COLUMN_KIND_NAME: Record<Column['kind'], string> = { chimney: 'Chimney', post: 'Post', flue: 'Flue' };
+const COLUMN_KINDS: Column['kind'][] = ['chimney', 'post', 'flue', 'pier'];
+export const COLUMN_KIND_NAME: Record<Column['kind'], string> = { chimney: 'Chimney', post: 'Post', flue: 'Flue', pier: 'Pier' };
 /** The kind Tab switches to after `kind`. */
 export const nextColumnKind = (kind: Column['kind']): Column['kind'] => COLUMN_KINDS[(COLUMN_KINDS.indexOf(kind) + 1) % COLUMN_KINDS.length];
 
@@ -164,7 +164,7 @@ function columnPreview(ctx: ToolContext, at: Vec2, kind: Column['kind']) {
 
 /**
  * Column tool (C in site mode): the column follows the snapped cursor; click places it with the
- * defaults of its kind in the toolbar's "Draw as" phase, Tab steps chimney, post, flue before the
+ * defaults of its kind in the toolbar's "Draw as" phase, Tab steps chimney, post, flue, pier before the
  * click. Size, heights and rotation are then edited in the properties panel.
  */
 export const columnTool: Tool = {

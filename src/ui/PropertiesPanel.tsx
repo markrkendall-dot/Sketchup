@@ -16,7 +16,7 @@ import { directionVector, flightSteps, floorToFloor, headroomHoleStart, STAIRS_H
 import { activateUnderlayTool, makeToolContext, switchTool } from '../editor2d/tools';
 import { beamHeights, joistDepth, memberBoxes } from '../derive/members';
 import { bearingOf } from '../derive/structure';
-import { isTimber, joistWords, MEMBER_COLOR, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
+import { isLog, isTimber, joistWords, MEMBER_COLOR, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
 import { COLUMN_KIND_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
@@ -2010,6 +2010,23 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
     <LengthField label={label} value={member[key]} onCommit={(v) => void (v !== null && set({ [key]: v }))} hint={hint} />
   );
   const timber = isTimber(member);
+  const log = isLog(member);
+  // A round log: its width is its diameter (the depth follows it), drawn round in 3D and, as a post, on the plan.
+  const logField = (
+    <label className="check-row">
+      <input
+        type="checkbox"
+        aria-label="Round log"
+        checked={log}
+        onChange={(e) => {
+          set(e.target.checked ? { profile: 'log', depth: member.width } : { profile: undefined });
+          releaseFocus(e.currentTarget);
+        }}
+      />
+      Round log (its width is the diameter)
+    </label>
+  );
+  const diameter = size('width', 'Diameter', 'Across the log.');
   // A timber at set heights: a sloped or freestanding member the checks do not follow (a gable's truss).
   const timberFields = (
     <>
@@ -2056,8 +2073,15 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
       <>
         <h3>{timber ? 'Timber' : 'Beam'}</h3>
         <LabelField id={member.id} value={member.label} placeholder={MEMBER_DEFAULTS.beam.label} onCommit={(label) => set({ label })} />
-        {size('width', 'Width', timber ? 'Across it.' : 'Across the beam: 3 1/2" for two 1 3/4" LVLs.')}
-        {size('depth', 'Depth', timber ? 'Square to it.' : 'Top to bottom.')}
+        {logField}
+        {log ? (
+          diameter
+        ) : (
+          <>
+            {size('width', 'Width', timber ? 'Across it.' : 'Across the beam: 3 1/2" for two 1 3/4" LVLs.')}
+            {size('depth', 'Depth', timber ? 'Square to it.' : 'Top to bottom.')}
+          </>
+        )}
         {!timber && <SelectField label="Mount" value={member.mount} options={mountOptions} onChange={(mount) => set({ mount })} />}
         {timberFields}
         <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
@@ -2079,9 +2103,16 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
     <>
       <h3>Post</h3>
       <LabelField id={member.id} value={member.label} placeholder={MEMBER_DEFAULTS.post.label} onCommit={(label) => set({ label })} />
-      {size('width', 'Width', 'Along the plan x axis before rotation.')}
-      {size('depth', 'Depth', 'Along the plan y axis before rotation.')}
-      <NumberField label="Rotation" value={member.rotation} onCommit={(v) => set({ rotation: v })} hint="Degrees, clockwise on the plan." />
+      {logField}
+      {log ? (
+        diameter
+      ) : (
+        <>
+          {size('width', 'Width', 'Along the plan x axis before rotation.')}
+          {size('depth', 'Depth', 'Along the plan y axis before rotation.')}
+          <NumberField label="Rotation" value={member.rotation} onCommit={(v) => set({ rotation: v })} hint="Degrees, clockwise on the plan." />
+        </>
+      )}
       <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
       {timberFields}
       {lowest && !timber && (
@@ -2205,6 +2236,7 @@ const columnKindOptions: { value: Column['kind']; label: string }[] = [
   { value: 'chimney', label: 'Chimney' },
   { value: 'post', label: 'Post' },
   { value: 'flue', label: 'Flue (round metal pipe)' },
+  { value: 'pier', label: 'Pier (fieldstone)' },
 ];
 
 function GradePointProps({ point }: { point: GradePoint }) {
@@ -2275,7 +2307,7 @@ function ColumnProps({ column }: { column: Column }) {
         value={columnColorOf(column)}
         onCommit={(color) => updateColumn(column.id, { color })}
         onReset={column.color ? () => updateColumn(column.id, { color: undefined }) : undefined}
-        hint={`Default for a ${column.kind}: ${COLUMN_COLOR[column.kind]}.${column.kind === 'chimney' ? ' The 3D view draws it as brick.' : column.kind === 'flue' ? ' The 3D view draws it as metal.' : ''}`}
+        hint={`Default for a ${column.kind}: ${COLUMN_COLOR[column.kind]}.${column.kind === 'chimney' ? ' The 3D view draws it as brick.' : column.kind === 'flue' ? ' The 3D view draws it as metal.' : column.kind === 'pier' ? ' The 3D view draws it as fieldstone.' : ''}`}
       />
       {column.kind === 'chimney' && (
         <label className="check-row">
@@ -2318,7 +2350,9 @@ function ColumnProps({ column }: { column: Column }) {
               ? 'Base 12" below the ground here, top 48" above the highest ridge'
               : column.kind === 'flue'
                 ? 'Base 30" over the first floor (a stove top), top 24" above the highest ridge'
-                : 'Base on the ground here, top at the lowest roof underside over it'
+                : column.kind === 'pier'
+                  ? 'Base on the ground here, top at the first floor'
+                  : 'Base on the ground here, top at the lowest roof underside over it'
           }
         >
           Reset heights

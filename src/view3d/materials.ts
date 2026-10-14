@@ -1,4 +1,4 @@
-import { MEMBER_COLOR } from '../model/structure';
+import { logEndColor, MEMBER_COLOR } from '../model/structure';
 import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
 import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
@@ -261,9 +261,12 @@ export function stairPartMaterial(mat: 'tread' | 'paint', phase: Phase, color: s
   return trimLike(`stair-${mat}`, color, phase);
 }
 
-/** Structure: LVL beams and posts as pale wood, footings as concrete (demolished: red, new: pulled toward green). */
+/**
+ * Structure: LVL beams and posts as pale wood, footings as concrete, a round log's end grain a
+ * lighter tint of its colour (logEndColor) (demolished: red, new: pulled toward green).
+ */
 export function memberMaterial(part: keyof typeof MEMBER_COLOR, phase: Phase, color?: string): MeshStandardMaterial {
-  return trimLike(`member-${part}`, color ?? MEMBER_COLOR[part], phase);
+  return trimLike(`member-${part}`, part === 'end' ? logEndColor(color) : (color ?? MEMBER_COLOR[part]), phase);
 }
 
 const partMaterials = new Map<string, MeshStandardMaterial>();
@@ -428,7 +431,8 @@ const columnMaterials = new Map<string, MeshStandardMaterial>();
  * A column's shaft: by kind, phase and colour (the column's own, else brick red for a chimney and
  * tan for a post, model/finish.ts COLUMN_COLOR). A chimney is brick (textures.ts brickTextures:
  * running bond in the colour, the mortar a little lighter, with its normal map) under a white tint;
- * a post is the flat colour; a flue is stainless steel (metal, smooth, reflecting the sky). Demolished: translucent red like walls; new: the colour pulled toward
+ * a pier is fieldstone (the walls' stone texture, sidingTextures, on the column's box UVs) the same
+ * way; a post is the flat colour; a flue is stainless steel (metal, smooth, reflecting the sky). Demolished: translucent red like walls; new: the colour pulled toward
  * the new-work green (the brick drawn in it). The flat colour is kept in `userData.flatColor` for
  * the export; without a canvas (node) it is the material's colour.
  */
@@ -439,7 +443,7 @@ export function columnMaterial(kind: Column['kind'], phase: Phase, color: string
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
       const flat = phase === 'new' ? pullGreen(color) : color;
-      const tex = kind === 'chimney' ? brickTextures(flat) : null;
+      const tex = kind === 'chimney' ? brickTextures(flat) : kind === 'pier' ? sidingTextures('stone', color, phase === 'new' ? 'new' : 'plain') : null;
       m = make(tex ? '#ffffff' : flat);
       // A flue is brushed stainless steel: metal that reflects the sky, shaded smooth round.
       if (kind === 'flue') {

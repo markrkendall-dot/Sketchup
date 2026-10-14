@@ -1,12 +1,12 @@
-import { BufferGeometry, Float32BufferAttribute, ShapeUtils, Uint32BufferAttribute, Vector2 } from 'three';
+import { BufferGeometry, Float32BufferAttribute, Matrix4, Quaternion, ShapeUtils, Uint32BufferAttribute, Vector2, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
 import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { DECK, getDeckLayout, type DeckBox, type DeckLayout } from './decks';
-import { memberBoxes } from './members';
-import { isTimber } from '../model/structure';
+import { memberAxis, memberBoxes, type AxisPoint } from './members';
+import { isLog, isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
 import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
@@ -15,7 +15,7 @@ import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
 import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, wallSideFaces, type FaceSet } from './rooms';
-import { CHIMNEY_CAP, chimneyPartBoxes, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
+import { CHIMNEY_CAP, chimneyPartBoxes, circleOutline, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
 import { boardColorOf, DEFAULT_SASH_COLOR, ROOF_COLOR, roofColorOf, ROOF_TILE, SIDING_FINISHES, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsPoint } from './stairs';
@@ -1237,6 +1237,8 @@ export interface MemberMesh {
   /** Null for a flush beam no deeper than the joists (all of it hidden in the floor). */
   body: BufferGeometry | null;
   footing: BufferGeometry | null;
+  /** A round log's two end discs (its end grain); null for a squared member. */
+  ends: BufferGeometry | null;
 }
 
 /** How far a member stops short of a slab face it would otherwise share (no coplanar faces). */
@@ -1264,36 +1266,70 @@ export function getMemberMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Me
     // A timber is drawn as set (it may stand above the ceiling, in a gable); the rest stop under it.
     const timber = isTimber(m);
     const top = timber ? boxes.body.top : Math.min(boxes.body.top, ceiling);
-    const sig = JSON.stringify([boxes.body.poly, boxes.body.bottom, top, boxes.footing, m.kind === 'beam' ? [m.za, m.zb, m.depth] : null]);
+    const log = isLog(m);
+    const sig = JSON.stringify([boxes.body.poly, boxes.body.bottom, top, boxes.footing, m.kind === 'beam' ? [m.za, m.zb, m.depth] : null, log ? m.width : null]);
     let e = entries.get(m.id);
     if (!e || e.sig !== sig) {
       e?.body?.dispose();
       e?.footing?.dispose();
+      e?.ends?.dispose();
       const f = boxes.footing;
       const s = boxes.slope;
-      e = {
-        sig,
-        body: s ? slopedPrism(boxes.body.poly, s.bottom, s.top) : top - boxes.body.bottom > 0.01 ? deckBoxesGeometry([{ ...boxes.body, top }]) : null,
-        footing: f ? deckBoxesGeometry([{ ...f, top: f.top - MEMBER_INSET }]) : null,
-      };
+      const footing = f ? deckBoxesGeometry([{ ...f, top: f.top - MEMBER_INSET }]) : null;
+      if (log) {
+        // A log post stops where a squared one would; a log beam is drawn whole along its axis.
+        const ax = memberAxis(m, m.kind === 'post' ? { ...boxes, body: { ...boxes.body, top } } : boxes);
+        const g = logBetween(ax.a, ax.b, m.width);
+        e = { sig, body: g.body, footing, ends: g.ends };
+      } else {
+        e = {
+          sig,
+          body: s ? slopedPrism(boxes.body.poly, s.bottom, s.top) : top - boxes.body.bottom > 0.01 ? deckBoxesGeometry([{ ...boxes.body, top }]) : null,
+          footing,
+          ends: null,
+        };
+      }
       entries.set(m.id, e);
     }
     seen.add(m.id);
-    out.push({ id: m.id, kind: m.kind, phase: shownPhase(m.phase, viewMode), ...(m.color ? { color: m.color } : {}), body: e.body, footing: e.footing });
+    out.push({ id: m.id, kind: m.kind, phase: shownPhase(m.phase, viewMode), ...(m.color ? { color: m.color } : {}), body: e.body, footing: e.footing, ends: e.ends });
   }
   for (const [id, e] of entries) {
     if (seen.has(id)) continue;
     e.body?.dispose();
     e.footing?.dispose();
+    e.ends?.dispose();
     entries.delete(id);
   }
   const same =
     !!prev &&
     prev.result.length === out.length &&
-    prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.color === out[i].color && m.body === out[i].body && m.footing === out[i].footing);
+    prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.color === out[i].color && m.body === out[i].body && m.footing === out[i].footing && m.ends === out[i].ends);
   const result = same ? prev.result : out;
   memberResult.set(key, { plan, result });
   return result;
+}
+
+/**
+ * A round log from a to b (plan x, y and z over the floor), `diameter` across: its body a
+ * FLUE_SIDES-sided cylinder with smooth normals and no caps, and its two end discs apart (they take
+ * the end grain's colour). Both are built upright along +Y from the origin (roundNormals about the
+ * Y axis), then turned onto a to b and moved to a.
+ */
+export function logBetween(a: AxisPoint, b: AxisPoint, diameter: number): { body: BufferGeometry; ends: BufferGeometry } {
+  const from = new Vector3(a.x, a.z, a.y);
+  const dir = new Vector3(b.x, b.z, b.y).sub(from);
+  const length = dir.length();
+  const ring = circleOutline({ x: 0, y: 0 }, diameter);
+  const body = roundNormals(prism(ring, 0, length, [], { top: false, bottom: false }), { x: 0, y: 0 });
+  const ends = prism(ring, 0, length, [], { side: () => false });
+  if (length > 0) {
+    const turn = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), dir.normalize());
+    const place = new Matrix4().makeRotationFromQuaternion(turn).setPosition(from);
+    body.applyMatrix4(place);
+    ends.applyMatrix4(place);
+  }
+  return { body, ends };
 }
 
 /** A floor opening's guard (level-local, standing on the floor round the hole). */
@@ -1529,7 +1565,7 @@ const deckResult = new Map<string, { plan: Plan; result: DeckMesh[] }>();
 const guardCache = new Map<string, Map<Id, { layout: FloorOpeningLayout; railing: BufferGeometry; rail?: BufferGeometry }>>();
 const guardResult = new Map<string, { plan: Plan; result: FloorOpeningMesh[] }>();
 /** Beams and posts, cached like the decks (by their boxes). */
-const memberCache = new Map<string, Map<Id, { sig: string; body: BufferGeometry | null; footing: BufferGeometry | null }>>();
+const memberCache = new Map<string, Map<Id, { sig: string; body: BufferGeometry | null; footing: BufferGeometry | null; ends: BufferGeometry | null }>>();
 const memberResult = new Map<string, { plan: Plan; result: MemberMesh[] }>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
@@ -1643,6 +1679,7 @@ function pruneCaches(plan: Plan): void {
     for (const e of m.values()) {
       e.body?.dispose();
       e.footing?.dispose();
+      e.ends?.dispose();
     }
     memberCache.delete(key);
   }
@@ -2128,7 +2165,10 @@ export function buildColumnGeometry(column: Pick<Column, 'at' | 'width' | 'depth
   return column.kind === 'flue' ? roundNormals(g, column.at) : g;
 }
 
-/** A round solid's side faces get normals pointing straight out from its axis at `at`, so it shades smooth. */
+/**
+ * A round solid's side faces get normals pointing straight out from its upright axis at `at`, so it
+ * shades smooth (a log is built upright, given these, then turned onto its own axis: logBetween).
+ */
 function roundNormals(g: BufferGeometry, at: Vec2): BufferGeometry {
   const pos = g.getAttribute('position');
   const nor = g.getAttribute('normal');

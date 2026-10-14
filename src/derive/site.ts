@@ -28,14 +28,15 @@ const SUN_HEIGHT = 1600;
 const SUN_PLAN = { x: -700, y: 1100 };
 
 /**
- * Width and depth of a new chimney / post / flue; how far the chimney stands below grade and above
- * the ridge; a flue (a stove's pipe) starts at a stove top over the first floor and stands 2' over
- * the ridge.
+ * Width and depth of a new chimney / post / flue / pier; how far the chimney stands below grade and
+ * above the ridge; a flue (a stove's pipe) starts at a stove top over the first floor and stands 2'
+ * over the ridge; a pier (fieldstone) stands on the ground up to the first floor.
  */
 export const COLUMN_DEFAULTS = {
   chimney: { width: 24, depth: 40, belowGrade: 12, aboveRidge: 48 },
   post: { width: 6, depth: 6 },
   flue: { width: 8, depth: 8, aboveFloor: 30, aboveRidge: 24 },
+  pier: { width: 16, depth: 16, height: 24 },
 } as const;
 
 /** Sides of the polygon a round flue is drawn with. */
@@ -709,7 +710,8 @@ export function lowestRoofUnderside(plan: Plan, p: Vec2, phase: Column['phase'] 
  * Size and heights of a column about to be placed at `at` (DESIGN.md "Site and terrain").
  * Chimney: 24" x 40", from 12" below the ground to 48" above the highest ridge (above the top
  * level's ceiling without roofs). Post: 6" x 6", from the ground to the lowest roof underside over
- * it (the first floor's ceiling without one).
+ * it (the first floor's ceiling without one). Pier: 16" x 16", from the ground to the first floor's
+ * floor top (24" high where that is not above the ground).
  */
 export function columnDefaults(plan: Plan, kind: Column['kind'], at: Vec2, phase: Column['phase'] = 'existing'): Pick<Column, 'width' | 'depth' | 'rotation' | 'base' | 'top'> {
   const ground = groundAt(plan, at);
@@ -722,6 +724,11 @@ export function columnDefaults(plan: Plan, kind: Column['kind'], at: Vec2, phase
     return { width: d.width, depth: d.depth, rotation: 0, base: ground - d.belowGrade, top };
   }
   const first = plan.levelOrder[1] ?? plan.levelOrder[0];
+  if (kind === 'pier') {
+    const d = COLUMN_DEFAULTS.pier;
+    const top = first ? elev[first].floorTop : ground + d.height;
+    return { width: d.width, depth: d.depth, rotation: 0, base: ground, top: top > ground ? top : ground + d.height };
+  }
   if (kind === 'flue') {
     const d = COLUMN_DEFAULTS.flue;
     const base = (first ? elev[first].floorTop : ground) + d.aboveFloor;

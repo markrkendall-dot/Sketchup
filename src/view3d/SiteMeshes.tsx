@@ -35,7 +35,7 @@ export const FarGround = memo(function FarGround() {
 });
 
 /**
- * The site's columns (chimney, posts) in absolute elevation, hidden by the view mode like walls,
+ * The site's columns (chimneys, posts, flues, piers) in absolute elevation, hidden by the view mode like walls,
  * with a capped chimney's cap and spark arrestor. They cast and receive shadows; a demolished one
  * (translucent) casts none, and neither does the arrestor (a see-through wire mesh, drawn after the
  * opaque meshes like a window screen).

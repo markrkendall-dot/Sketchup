@@ -46,7 +46,7 @@ import {
 import { getFaces, slabOutlines } from '../derive/rooms';
 import example from '../../docs/examples/146-mick-road.json';
 import { dispatchKey, dispatchPointer, enterSiteMode, setViewMode, switchLevel, switchTool, type ToolPointerEvent } from '../editor2d/tools';
-import { hitSite } from '../editor2d/tools/siteTools';
+import { COLUMN_KIND_NAME, hitSite, nextColumnKind } from '../editor2d/tools/siteTools';
 import { buildExportScene, disposeExportScene, type ExportLevelVisibility } from '../io/export3d';
 import { CHIMNEY_CAP_COLOR, COLUMN_COLOR } from '../model/finish';
 import { createEmptyPlan, defaultLevelId, defaultSite, migrate } from '../model/plan';
@@ -1496,5 +1496,46 @@ describe('flues: round stainless chimney pipes', () => {
     });
     expect(flues).toEqual(['column_flue_existing', 'flue_stem_existing', 'flue_hood_existing']);
     disposeExportScene(root);
+  });
+});
+
+describe('piers: fieldstone', () => {
+  it('defaults to 16" x 16" from the ground to the first floor; a file keeps the kind', () => {
+    // Empty plan: the first floor top is 8.
+    const d = columnDefaults(plan(), 'pier', { x: 0, y: 0 });
+    expect(d).toMatchObject({ width: 16, depth: 16, rotation: 0, top: 8 });
+    expect(d.base).toBe(columnDefaults(plan(), 'post', { x: 0, y: 0 }).base);
+    // Ground above the first floor: 24" of pier over it.
+    store().addGradePoint({ at: { x: 0, y: 0 }, elevation: 40 });
+    expect(columnDefaults(plan(), 'pier', { x: 0, y: 0 })).toMatchObject({ base: 40, top: 64 });
+    // A low wide stoop is a pier too.
+    const id = store().addColumn({ at: { x: 0, y: 0 }, kind: 'pier', phase: 'new', width: 60, depth: 36, rotation: 0, base: 0, top: 14 })!;
+    const loaded = migrate(JSON.parse(JSON.stringify(plan())));
+    expect(loaded.site.columns[id]).toMatchObject({ kind: 'pier', width: 60, depth: 36 });
+  });
+
+  it('is fieldstone in 3D (the flat colour without a canvas), a box with UVs, and a Pier in the export', () => {
+    const m = columnMaterial('pier', 'existing');
+    expect(m.color.getHexString()).toBe(COLUMN_COLOR.pier.slice(1));
+    expect(m.userData.flatColor).toBe(COLUMN_COLOR.pier);
+    expect(columnMaterial('pier', 'existing')).toBe(m);
+    expect(columnMaterial('pier', 'new')).not.toBe(m);
+    const c: Column = { id: 'p1', at: { x: 0, y: 0 }, width: 16, depth: 16, rotation: 0, base: 0, top: 8, kind: 'pier', phase: 'existing' };
+    expect(buildColumnGeometry(c).getAttribute('uv')).toBeDefined();
+    expect(buildColumnParts({ ...c, cap: true })).toEqual([]);
+    store().addColumn(c);
+    const root = buildExportScene(plan(), 'all', { activeLevelId: defaultLevelId(plan()), only3dActiveAndBelow: false, hidden3dLevels: [] });
+    const piers: string[] = [];
+    root.traverse((o) => {
+      if (o.name === 'Pier' && o instanceof Mesh) piers.push((o.material as MeshStandardMaterial).name);
+    });
+    expect(piers).toEqual(['column_pier_existing']);
+    disposeExportScene(root);
+  });
+
+  it('comes after the flue in the column tool, then back to the chimney', () => {
+    expect(nextColumnKind('flue')).toBe('pier');
+    expect(nextColumnKind('pier')).toBe('chimney');
+    expect(COLUMN_KIND_NAME.pier).toBe('Pier');
   });
 });

@@ -290,10 +290,13 @@ export interface Column {
   rotation: Degrees;
   base: Inches;
   top: Inches;
-  /** A flue is a round metal chimney pipe (a stove's): `width` is its diameter, `depth` is ignored. */
-  kind: 'post' | 'chimney' | 'flue';
+  /**
+   * A flue is a round metal chimney pipe (a stove's): `width` is its diameter, `depth` is ignored.
+   * A pier is fieldstone of any width and depth (under a post, or a low wide stoop).
+   */
+  kind: 'post' | 'chimney' | 'flue' | 'pier';
   phase: Phase;
-  /** Hex colour `#rrggbb`. Absent: brick red for a chimney, tan for a post, stainless for a flue (model/finish.ts). */
+  /** Hex colour `#rrggbb`. Absent: brick red for a chimney, tan for a post, stainless for a flue, grey-brown for a pier (model/finish.ts). */
   color?: string;
   /**
    * Chimneys: a 4" concrete cap at the top (2" proud all round) and a 12" wire spark arrestor above
@@ -405,6 +408,8 @@ export interface Beam {
   zb?: Inches;
   /** A colour (hex) for a timber left showing; members are pale wood otherwise. */
   color?: string;
+  /** A round log: `width` is its diameter, `depth` is kept equal to it. */
+  profile?: 'log';
 }
 
 /** A post (schema version 7): from its level's floor up to the beam over it (else the ceiling). */
@@ -423,6 +428,8 @@ export interface Post {
   base?: Inches;
   top?: Inches;
   color?: string;
+  /** A round log: `width` is its diameter, `depth` is kept equal to it; drawn without a rotation. */
+  profile?: 'log';
 }
 
 export type Member = Beam | Post;
