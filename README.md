@@ -677,7 +677,10 @@ with the places where the built design differs from them):
    has **placeholder** fixtures: a 36" shower in the north-west corner, a 48" vanity under the
    transom and a WC on the east wall; its door is east of the laundry.
 2. **Laundry** (MK): a closet in the master bath's south-west corner, 2'8" x 5'3 1/2" inside, with
-   the washer and dryer side by side (27" each) behind bifold doors (drawn as a 56" opening).
+   the washer and dryer side by side (27" each) behind bifold doors (drawn as a 56" opening), 4"
+   off the back wall for the **dryer's vent**: a 4" metal duct up behind the dryer to 86", north
+   under the ceiling over the shower and out through the master bath's north wall to a vent hood
+   (about 13' with two bends, inside the code's 35' less 5' a bend: M1502.4.5.1, to verify).
 3. **Stair hall.** The old front room, the stair strip and the Bunk over them are one stair hall,
    13'5" x 10'8", **open through both floors** north of the balcony (a floor opening over x 7 to
    169, y 7 to 91). The old stair, the front room's walls (the y 99.5 line and the old bath's west
@@ -701,9 +704,8 @@ with the places where the built design differs from them):
    The house door (32", green) is in the west wall in the middle of the old stair strip, in line
    with the foyer's front door, and a new 32" cased opening at the strip's east end leads straight
    on into the kitchen. New windows light the hall: a 24" one over the platform, a second casement
-   pair upstairs in the north wall over the landing and one in the upstairs west wall. The wall
-   between the strip and the Living (5", with a 36" and a 30" opening) is **new** work: there is
-   none today (photo 16).
+   pair upstairs in the north wall over the landing and one in the upstairs west wall. The hall is
+   **open to the Living** (MK): no wall on the strip's south side, as today (photo 16).
 4. **North band** (MK: the kitchen stops short of the north wall): a 4' band along the north wall
    east of the stair hall holds the **powder room** (7'2" x 4', a 30" vanity and a WC as
    placeholders, a 28" door from the kitchen and a small window) and, in the north-east corner, a
@@ -714,11 +716,11 @@ with the places where the built design differs from them):
    new; today's cabinets and the bath's fixtures (photos 13 to 22) are demolished:
    - the **island** with its fronts facing north, so whoever is at the sink faces the lake: a 24"
      dishwasher and a 36" sink cabinet under one top 66" x 37" with a 12" seating ledge on the lake
-     side and **two stools**; 36" walkways at both ends, 60" from the ledge to the lake wall;
+     side and **two stools** tucked 6" under it; 36" walkways at both ends, 60" from the ledge to the lake wall;
    - on the east wall (shared with the master suite), north to south: a 24" base by the pantry,
-     the **refrigerator** (a wall cabinet over it), a 24" base, the **range** with its hood (ducted
-     through the east wall into the wing's ceiling and up through the wing roof, or recirculating)
-     and a 30" base, wall cabinets over the bases;
+     the **refrigerator** (a wall cabinet over it), a 24" base, the **range** with its hood (an 8"
+     duct east through the wall and along the master bedroom's ceiling in a soffit, 86" to 94", to
+     a wall cap over the bedroom's east window, about 13'; no roof penetration) and a 30" base, wall cabinets over the bases;
    - the **work triangle**, centre to centre: refrigerator to sink about 10'9", sink to range
      about 6'7", range to refrigerator 4'9", about 22' in all.
 
@@ -749,7 +751,8 @@ with the places where the built design differs from them):
    stands on 8" block walls (a crawl space) like the east addition; the screen porch on its posts.
    The foyer's gable carries stained timbers on its face, after the old porch's (photo 08): a
    corner post at each end, 45° knee braces up to a tie beam on the eave line, a king post and two
-   rafters under the roof (6x6s, the braces 4x4).
+   rafters under the roof (6x6s, the braces 4x4). For coats (the closet under the stair is narrow),
+   a 48" bench under the foyer's north window and a rail of hooks either side of it.
 9. **Deck off the master bedroom** (MK, 14 Oct 2026), about 8' deep: the wing's width from the
    retaining wall's east face to the wing's east face (x 319.5 to 463, y 315 to 411, 11'11 1/2" x
    8'). Its top is 6" below the bedroom floor (elevation -4), flush with the retaining wall's top,
@@ -760,6 +763,12 @@ with the places where the built design differs from them):
    4" east of the deck's east edge, from the lawn down along the wing's east side to its landing
    at the walkout's level and on down the bank to the lower lawn.
 
+10. **Alarms** (the wood stove brings carbon monoxide alarms; R314 and R315, to verify against the
+    2025 RCNYS): a smoke alarm in each bedroom (the master bedroom, the upstairs Master and Guest)
+    and in the basement, and a combination smoke and CO alarm outside the sleeping areas on each
+    floor (by the master bedroom's door in the kitchen, on the upstairs balcony) and in the Living
+    with the stove. The code asks for alarms hard-wired and interconnected in new work, with
+    exceptions in alterations; which apply here is for the electrician and the inspector.
 **After the work** (MK, after his garage across the road), the Proposed view shows the whole house
 re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
 roof (`#2f4a36`) with its rake and fascia boards in the shake brown, with black windows (`#1c1c1c`)

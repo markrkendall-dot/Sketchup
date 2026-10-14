@@ -109,9 +109,8 @@ const FRIDGE_BLUE = '#3a5fa0';
 const KITCHEN_WINDOW_Y = 160;
 const PHASE: Phase = 'existing';
 const NEW: Phase = 'new';
-/** The Kitchen/Living partition's centerline and the stair strip's south line (no wall there today). */
+/** The Kitchen/Living partition's centerline. */
 const PART_KL = 170.5;
-const STAIR_SOUTH = 137.5;
 /** The First Floor's y 99.5 line: the Kitchen's north wall and the front room's south wall. */
 const FRONT_LINE = 99.5;
 /**
@@ -873,11 +872,9 @@ function proposed(ids: ExistingIds): void {
   partition(fId, { x: PART_KL, y: BAND.south }, { x: CL.x1, y: BAND.south }, NEW);
   partition(fId, { x: BAND.divide, y: CL.y0 }, { x: BAND.divide, y: BAND.south }, NEW);
 
-  // ---- The design keeps the entry hall apart from the Living (the brief's bands: "wall y 137.5"),
-  // but the photos show no wall on the stair strip's south side today, so the proposed phase builds
-  // it, 5", from the west wall to the Kitchen/Living partition, with the two openings the brief keeps
-  // in it: 36" at x 132..168 and 30" at x 7..37. One deletion leaves the entry open to the Living.
-  partition(fId, { x: PART_KL, y: STAIR_SOUTH }, { x: CL.x0, y: STAIR_SOUTH }, NEW);
+  // ---- The stair hall is open to the Living (MK, 14 Oct 2026): the brief's wall at y 137.5 is not
+  // built (there is none today, photo 16), so the house door opens on the hall, the stair and the
+  // Living together.
 
   // ---- 7. The laundry (MK): a closet in the master bath's south-west corner, x 318..350, y 54..117.5
   // inside, its north wall at y 51.5 and its front at x 352.5, open 56" for bifold doors (drawn as a
@@ -937,9 +934,6 @@ function proposed(ids: ExistingIds): void {
   // The stair hall: a 24" window over the stair's bottom platform in the north wall (x 13..37, sill
   // 36, 2 x 3 lites); safety glass, being this near the steps.
   add({ x: 25, y: CL.y0 }, { type: 'window', width: 24, height: 48, sill: 36, lites: { cols: 2, rows: 3 } });
-  // The new strip wall's two openings (above).
-  add({ x: 150, y: STAIR_SOUTH }, { type: 'passage', width: 36, height: 80, sill: 0 });
-  add({ x: 22, y: STAIR_SOUTH }, { type: 'passage', width: 30, height: 80, sill: 0 });
   // Upstairs, the transoms in place of the two east windows: 46 x 24, two sashes of 2 x 2 lites,
   // sill 60, so the head is at 84. The wing's shed (below) meets the wall with its top 50.9" above
   // the Second Floor, so each sill is 9.1" over the roof and its trim 5.1". The Guest's stays on its
@@ -1060,6 +1054,12 @@ function proposed(ids: ExistingIds): void {
     const eave = i === 0 ? FOYER.y0 : FOYER.y1;
     timber({ x: GX, y: eave }, round2(gableUnder(eave) - 0.25), { x: GX, y: ridgeY }, round2(gableUnder(ridgeY) - 0.25), SIX, '6x6 rafter');
   }
+  // Coats in the foyer (MK, 14 Oct 2026; the closet under the stair is narrow): a 48" bench 16" deep
+  // and 18" high under the north window (sill 36), clear of the front door's swing, and a 24" rail
+  // of hooks at 60" either side of the window. Stained like the trim.
+  const foyerNorth = FOYER.y0 + T;
+  fixture(fId, { kind: 'box', label: 'Bench', origin: { x: -44, y: foyerNorth }, direction: 90, width: 48, depth: 16, height: 18, elevation: 0, frontColor: FINISH_COLOR, phase: NEW });
+  for (const x of [FOYER.x0 + T + 12, -12]) fixture(fId, { kind: 'box', label: 'Hooks', origin: { x, y: foyerNorth }, direction: 90, width: 24, depth: 2, height: 4, elevation: 60, frontColor: FINISH_COLOR, phase: NEW });
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
   // ---- The porch's posts: 8" x 8" in the stain, flush with the outside face of its west wall, at
@@ -1097,8 +1097,9 @@ function proposed(ids: ExistingIds): void {
   const ISLAND_BACK = 236;
   kitchen({ kind: 'dishwasher', origin: { x: 224, y: ISLAND_BACK }, direction: 270, width: 24, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { front: 1, back: 12, left: 3, right: 0 } });
   kitchen({ kind: 'sink', origin: { x: 254, y: ISLAND_BACK }, direction: 270, width: 36, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { front: 1, back: 12, left: 0, right: 3 } });
-  // Two stools on the lake side of the ledge, 16" square and 30" high, centred y 258.
-  for (const x of [226, 258]) kitchen({ kind: 'box', origin: { x, y: 266 }, direction: 270, width: 16, depth: 16, height: 30, label: 'Stool' });
+  // Two stools on the lake side of the ledge, 16" square and 30" high, centred y 250: tucked 6" under
+  // the 12" ledge, as they stand when no one sits.
+  for (const x of [226, 258]) kitchen({ kind: 'box', origin: { x, y: 258 }, direction: 270, width: 16, depth: 16, height: 30, label: 'Stool' });
   // The east wall (the wall shared with the master suite), fronts facing west, north to south from
   // the band's wall (y 60) and ending at y 204, north of the island's east walkway: a 24" base by
   // the pantry, the refrigerator (30" deep, 36" wide, a wall cabinet over it), a 24" base, the
@@ -1136,12 +1137,42 @@ function proposed(ids: ExistingIds): void {
   // ---- The master bath's placeholders (x 318..456, y 7..117.5, door at x 375..403 swinging in from
   // the partition): a 36" shower in the north-west corner, a 48" vanity on the north wall under the
   // transom (sill 70), the WC against the east wall south of the east window (y 38..86), and in the
-  // laundry closet the washer and the dryer, 27" each, side by side facing east.
+  // laundry closet the washer and the dryer, 27" each, side by side facing east, 4" off the back
+  // wall for the dryer's vent, their fronts at the closet's opening (x 350).
   kitchen({ kind: 'box', label: 'Shower', origin: { x: 336, y: 7 }, direction: 90, width: 36, depth: 36, height: 78, frontColor: WHITE });
   kitchen({ kind: 'sink', origin: { x: 424, y: 7 }, direction: 90, width: 48, depth: 21, height: 34.5 });
   kitchen({ ...WC, origin: { x: 456, y: 100 }, direction: 180 });
-  kitchen({ kind: 'box', label: 'Washer', origin: { x: 318, y: 71.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
-  kitchen({ kind: 'box', label: 'Dryer', origin: { x: 318, y: 99.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  kitchen({ kind: 'box', label: 'Washer', origin: { x: 322, y: 71.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  kitchen({ kind: 'box', label: 'Dryer', origin: { x: 322, y: 99.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+
+  // ---- Vents through walls, not the roof (MK, 14 Oct 2026). The dryer's: a 4" rigid metal duct
+  // rising behind the dryer (x 318..322) to 86" and running north under the ceiling, over the
+  // shower, out through the master bath's north wall at x 320 to a vent hood with a damper: about
+  // 13' of duct and two 90-degree bends, well inside the 35' less 5' per bend the code allows
+  // (M1502.4.5.1; verify against the 2025 RCNYS and the dryer's instructions). The range hood's: an
+  // 8" duct from the hood's back east through the kitchen's east wall and along the master bedroom's
+  // ceiling (boxed in a soffit, 86..94", as the wing's east wall tops out at 96") to a wall cap
+  // above the bedroom's east window: about 13'. Drawn as boxes (they pass through the walls).
+  const METAL = COLUMN_COLOR.flue;
+  kitchen({ kind: 'box', label: 'Dryer vent', origin: { x: 318, y: 99.5 }, direction: 0, width: 4, depth: 4, elevation: 30, height: 60, frontColor: METAL });
+  kitchen({ kind: 'box', label: 'Dryer vent', origin: { x: 318, y: (101.5 + -1) / 2 }, direction: 0, width: 102.5, depth: 4, elevation: 86, height: 4, frontColor: METAL });
+  kitchen({ kind: 'box', label: 'Vent hood', origin: { x: 320, y: 0 }, direction: 270, width: 8, depth: 5, elevation: 84, height: 8, frontColor: METAL });
+  kitchen({ kind: 'box', label: 'Hood duct', origin: { x: KITCHEN_EAST, y: RANGE_Y }, direction: 0, width: 8, depth: 464 - KITCHEN_EAST, elevation: 86, height: 8, frontColor: METAL });
+  kitchen({ kind: 'box', label: 'Duct cap', origin: { x: 463, y: RANGE_Y }, direction: 0, width: 12, depth: 5, elevation: 84, height: 12, frontColor: METAL });
+
+  // ---- Alarms (the wood stove brings carbon monoxide alarms; R314, R315: verify against the 2025
+  // RCNYS): a smoke alarm in each bedroom and in the basement, and a combination smoke and CO alarm
+  // outside the sleeping areas on each floor (by the master bedroom's door in the kitchen, and on the
+  // upstairs balcony hall) and in the Living with the stove. 6" discs drawn as boxes under the ceiling.
+  const alarm = (lid: Id, at: Vec2, label: string) =>
+    fixture(lid, { kind: 'box', label, origin: { x: at.x, y: at.y - 3 }, direction: 90, width: 6, depth: 6, height: 2, elevation: level(lid).wallHeight - 2, frontColor: WHITE, phase: NEW });
+  alarm(fId, { x: 390, y: 215 }, 'Smoke');
+  alarm(fId, { x: 290, y: 288 }, 'Smoke/CO');
+  alarm(fId, { x: 100, y: 200 }, 'Smoke/CO');
+  alarm(sId, { x: 90, y: 225 }, 'Smoke');
+  alarm(sId, { x: 242, y: 235 }, 'Smoke');
+  alarm(sId, { x: 100, y: 120 }, 'Smoke/CO');
+  alarm(bId, { x: MAIN.x1 / 2, y: MAIN.y1 / 2 + 24 }, 'Smoke');
 
   // ---- 8. The wood stove (MK, 14 Oct 2026), in the Living's south-west corner with its back to the
   // west wall, facing east into the room, centred y 280: a stone hearth 50" out from the wall and
@@ -1230,7 +1261,6 @@ function proposed(ids: ExistingIds): void {
   for (const y of [92.75, FRONT_LINE]) {
     if (!store().addMember(fId, { kind: 'post', at: { x: PART_KL, y }, width: 3.5, depth: 3.5, rotation: 0, label: '(2) 2x4', phase: NEW })) throw new Error('studs rejected');
   }
-  store().updateWalls(fId, [wallAt(fId, { x: 100, y: STAIR_SOUTH }).wallId], { bearing: false });
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two
   // never share a face there. Placeholder finishes (MK), which also dress the faces of the old
@@ -1239,7 +1269,6 @@ function proposed(ids: ExistingIds): void {
   // hall's opening).
   label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW, PLACEHOLDER_WET);
-  label(fId, 'Stair hall (proposed)', { x: 100, y: 118.5 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Coats (proposed)', { x: 154.5, y: 47 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Powder room (proposed)', { x: 213, y: 28 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Pantry (proposed)', { x: 287, y: 30 }, NEW, PLACEHOLDER_ROOM);

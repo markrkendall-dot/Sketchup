@@ -79,7 +79,6 @@ describe('docs/examples/146-mick-road.json', () => {
       'Pantry (proposed)',
       'Powder room (proposed)',
       'Screen porch (proposed)',
-      'Stair hall (proposed)',
     ]);
     // Upstairs the Bunk is the stair hall's upper half (open to below); the rest keep their names.
     expect(names(ls, 'proposed')).toEqual(names(ls, 'existing').filter((n) => n !== 'Bunk'));
@@ -102,8 +101,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // and its front wall the hall's east wall), the block under the addition and under the foyer,
     // and the upstairs bath's south wall. The retaining wall's two pieces on the Basement are existing. Today's grey Kitchen
     // to Utility door stays as the bedroom's door (MK), so no new one is cut.
-    expect(count(all('walls'))).toEqual({ existing: 56, demo: 11, new: 27 });
-    expect(count(all('openings'))).toEqual({ existing: 16, demo: 16, new: 27 });
+    expect(count(all('walls'))).toEqual({ existing: 54, demo: 11, new: 26 });
+    expect(count(all('openings'))).toEqual({ existing: 16, demo: 16, new: 25 });
     // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
     // side and down the bank, with its landing, a deck) stays (MK). New: the grand stair's platform,
     // two flights and landing, and the master bedroom's deck; the stair hall's floor opening upstairs.
@@ -111,11 +110,12 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(count(all('decks'))).toEqual({ existing: 1, demo: 0, new: 1 });
     expect(count(all('floorOpenings'))).toEqual({ existing: 0, demo: 0, new: 1 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
-    expect(count(all('rooms'))).toEqual({ existing: 9, demo: 5, new: 11 });
+    expect(count(all('rooms'))).toEqual({ existing: 9, demo: 5, new: 10 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen,
     // the pantry's shelves, the stove with its stovepipe and tee, and the placeholder bath and
-    // laundry fixtures, all new.
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 31 });
+    // laundry fixtures, the foyer's bench and hooks, the dryer's vent and the range hood's duct, and
+    // seven alarms, all new.
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 46 });
     // The masonry chimney is demolished; the porch's three posts, the stove's connector and its
     // flue are new.
     expect(count(Object.values(plan.site.columns))).toEqual({ existing: 0, demo: 1, new: 5 });
@@ -440,7 +440,7 @@ describe('docs/examples/146-mick-road.json', () => {
       ['demo', 170.5, 99.5, 3.5, 99.5, 'the joists cross it mid-span'],
     ]);
     expect(bearing('proposed', fId)).toEqual([
-      ['existing', 170.5, 137.5, 170.5, 99.5, "a beam's end bears on it"],
+      ['existing', 170.5, 311.5, 170.5, 99.5, "a beam's end bears on it"],
       ['new', 170.5, 88.5, 170.5, 99.5, "a beam's end bears on it"],
     ]);
     // Upstairs, the Bunk's south wall (y 99.5) is not bearing: the attic joists span 11'-2" without it.
@@ -469,12 +469,11 @@ describe('docs/examples/146-mick-road.json', () => {
         'Master bedroom': [138, 185.5],
         // The kitchen south of the north band, the old bath included.
         Kitchen: [138, 248],
-        Living: [161, 168],
+        // The Living, open to the stair hall (the old front room, the stair strip and the stair).
+        Living: [161, 301],
         // The north band, 3'6" deep: the powder room and the walk-in pantry.
         'Powder room': [86, 48],
         Pantry: [47, 48],
-        // The old front room, the stair strip and the stair in one face, up to the hall's east wall.
-        'Stair hall': [161, 128],
         Foyer: [89, 79.75],
         'Screen porch': [89, 150],
       },
@@ -514,9 +513,9 @@ describe('docs/examples/146-mick-road.json', () => {
     }
     expect(top + 7.2).toBeCloseTo(ftf, 9);
     for (const st of [flights[1], flights[3]]) expect(st.run / flightSteps(st, ftf).risers).toBe(10.5);
-    // The platform is in the stair hall's face, two steps from the house door.
+    // The platform is in the stair hall, open to the Living, two steps from the house door.
     const set = getFaces(f, 'proposed');
-    expect(f.rooms[faceAt(set, { x: 25, y: 25 })!.roomId!].name).toBe('Stair hall (proposed)');
+    expect(f.rooms[faceAt(set, { x: 25, y: 25 })!.roomId!].name).toBe('Living');
     // Upstairs: the floor opening over the hall north of y 91, its guard along the balcony's edge
     // west of the stair's arrival (and the 5" south of the old bath's corner); the walls carry the
     // rest. The arriving flight opens the guard over its width.
@@ -679,9 +678,8 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(timbers.every((m) => m.color === '#5a3a35' && m.phase === 'new')).toBe(true);
     const posts = Object.values(plan.levels[bId].members);
     expect(posts).toEqual([expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 96.125 }, width: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' })]);
-    // The stair hall's new south wall is not bearing; nothing else is marked.
-    const marked = Object.values(plan.levels[fId].walls).filter((w) => w.bearing !== undefined);
-    expect(marked.map((w) => [plan.levels[fId].nodes[w.a].y, plan.levels[fId].nodes[w.b].y, w.bearing])).toEqual([[137.5, 137.5, false]]);
+    // No wall is marked: the tool infers them all.
+    expect(Object.values(plan.levels[fId].walls).filter((w) => w.bearing !== undefined)).toEqual([]);
   });
 
   it('swings each new door into the room the design names', () => {
@@ -701,11 +699,11 @@ describe('docs/examples/146-mick-road.json', () => {
     // The powder room's door swings out, into the kitchen's north-west corner (clear of its vanity);
     // the pantry's swings in.
     expect(doors.map((o) => `${o.width} ${into(o)}`).sort()).toEqual([
+      '24 Living',
       '24 Pantry',
-      '24 Stair hall',
       '28 Kitchen',
       '28 Master bath',
-      '32 Stair hall',
+      '32 Living',
       '36 Foyer',
       '36 Screen porch',
       '36 outside',
@@ -761,27 +759,40 @@ describe('docs/examples/146-mick-road.json', () => {
     // vanity and a WC in the master bath, the washer and dryer in its laundry closet; the pantry's
     // shelves; the wood stove on its hearth before its stone surround in the Living, with its
     // stovepipe into the wall, and the flue's tee outside in the screen porch.
+    // The coats bench and hooks in the foyer; the vents (the dryer's riser in the laundry, its run
+    // over the master bath and its hood outside; the range hood's duct across the master bedroom and
+    // its cap outside); the alarms.
     expect(allNew.filter((x) => roomOf(x) !== 'Kitchen').map((x) => `${roomOf(x)}: ${x.label ?? x.kind}`).sort()).toEqual([
+      'Foyer: Bench',
+      'Foyer: Hooks',
+      'Foyer: Hooks',
       'Laundry: Dryer',
+      'Laundry: Dryer vent',
       'Laundry: Washer',
       'Living: Hearth',
+      'Living: Smoke/CO',
       'Living: Stone',
       'Living: Stovepipe',
       'Living: Wood stove',
       'Master bath: Shower',
       'Master bath: WC',
       'Master bath: sink',
+      'Master bedroom: Hood duct',
+      'Master bedroom: Smoke',
       'Pantry: Shelves',
       'Pantry: Shelves',
       'Powder room: WC',
       'Powder room: sink',
       'Screen porch: Tee',
+      'none: Dryer vent',
+      'none: Duct cap',
+      'none: Vent hood',
     ]);
     const kinds: Record<string, number> = {};
     for (const x of fixtures) kinds[x.kind] = (kinds[x.kind] ?? 0) + 1;
-    expect(kinds).toEqual({ dishwasher: 1, sink: 1, box: 2, fridge: 1, wall: 4, base: 3, range: 1, hood: 1 });
+    expect(kinds).toEqual({ dishwasher: 1, sink: 1, box: 3, fridge: 1, wall: 4, base: 3, range: 1, hood: 1 });
     expect(fixtures.every((x) => x.phase === 'new')).toBe(true);
-    expect(fixtures.filter((x) => x.kind === 'box').map((x) => x.label)).toEqual(['Stool', 'Stool']);
+    expect(fixtures.filter((x) => x.kind === 'box').map((x) => x.label)).toEqual(['Stool', 'Stool', 'Smoke/CO']);
     const bounds = (poly: Vec2[]) => {
       const xs = poly.map((p) => p.x);
       const ys = poly.map((p) => p.y);
@@ -809,13 +820,15 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(run.map((x) => x.kind)).toEqual(['base', 'fridge', 'base', 'range', 'base']);
     expect([Math.min(...run.map((x) => bounds(fixtureOutline(x)).y0)), Math.max(...run.map((x) => bounds(fixtureOutline(x)).y1))]).toEqual([60, 204]);
     expect(Math.max(...run.map((x) => bounds(fixtureOutline(x)).y1))).toBeLessThan(top.y0);
-    // The stools stand clear of the ledge, on the lake side.
-    for (const s of fixtures.filter((x) => x.kind === 'box')) expect(bounds(fixtureOutline(s)).y0).toBeGreaterThan(top.y1);
+    // The stools are tucked 6" under the ledge, on the lake side.
+    for (const s of fixtures.filter((x) => x.label === 'Stool')) expect([bounds(fixtureOutline(s)).y0, bounds(fixtureOutline(s)).y1]).toEqual([top.y1 - 6, top.y1 + 10]);
 
     // Every new fixture is inside its room's face in the proposed view and overlaps no wall, and no
     // two fixtures share any space (a plan overlap and an overlap in height).
     const walls = [...computeFootprints(f, 'proposed').values()].map((fp) => bounds(fp.poly));
-    const boxes = allNew.map((x) => ({ id: x.id, face: set.faces.find((fc) => fc.roomId && pointInPolygon(centre(x), fc.netPolygon))!, ...bounds(fixtureOutline(x)), z0: x.elevation, z1: x.elevation + x.height }));
+    // The vents pass through the walls (that is their job); the rest stay clear.
+    const through = new Set(['Dryer vent', 'Vent hood', 'Hood duct', 'Duct cap']);
+    const boxes = allNew.filter((x) => !through.has(x.label ?? '')).map((x) => ({ id: x.id, face: set.faces.find((fc) => fc.roomId && pointInPolygon(centre(x), fc.netPolygon))!, ...bounds(fixtureOutline(x)), z0: x.elevation, z1: x.elevation + x.height }));
     const overlaps = (p: { x0: number; x1: number; y0: number; y1: number }, q: typeof p) =>
       Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0) > 1e-6 && Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0) > 1e-6;
     for (const b of boxes) {
@@ -866,8 +879,9 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([existing.fixtures.length, existing.counters.length]).toEqual([34, 5]);
     const proposedMeshes = getLevelMeshes(plan, f.id, 'proposed');
     // The kitchen's 14 and its four counters, the pantry's two shelves, the stove's five parts, and
-    // the seven placeholder bath and laundry fixtures, whose two vanities carry a counter each.
-    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([28, 6]);
+    // the seven placeholder bath and laundry fixtures, whose two vanities carry a counter each; the
+    // foyer's bench and hooks, the five pieces of the two vents and three alarms.
+    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([39, 6]);
   });
 
   it('has the wood stove in the Living\'s south-west corner on a stainless flue outside the house that clears the roof by the 3-2-10 rule, and no chimney', () => {
@@ -934,7 +948,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // Downstairs, the washer and dryer side by side in the master bath's laundry closet.
     const fset = getFaces(f, 'proposed');
     const laundry = Object.values(f.fixtures).filter((x) => x.phase === 'new' && f.rooms[faceAt(fset, centre(x))?.roomId ?? '']?.name === 'Laundry (proposed)');
-    expect(laundry.map((x) => x.label).sort()).toEqual(['Dryer', 'Washer']);
+    expect(laundry.map((x) => x.label).sort()).toEqual(['Dryer', 'Dryer vent', 'Washer']);
   });
 
   it('builds every level without throwing, and the export has the parts of the house', () => {

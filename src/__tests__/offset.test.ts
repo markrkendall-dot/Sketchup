@@ -27,8 +27,8 @@ const wallAt = (a: Vec2, b: Vec2): Id => {
   if (!hit) throw new Error(`no wall ${JSON.stringify([a, b])}`);
   return hit.id;
 };
-/** The example's Kitchen/Living partition: its piece from the south wall up to the stair strip's wall. */
-const kitchenLiving = (): Id => wallAt({ x: 170.5, y: 311.5 }, { x: 170.5, y: 137.5 });
+/** The example's Kitchen/Living partition: its piece from the south wall up to the old front wall's line (y 99.5). */
+const kitchenLiving = (): Id => wallAt({ x: 170.5, y: 311.5 }, { x: 170.5, y: 99.5 });
 const roomSize = (name: string) => {
   const l = level();
   const room = Object.values(l.rooms).find((r) => r.name.startsWith(name))!;
@@ -94,7 +94,7 @@ describe('offsetWalls: a partition (REVIEW-2 B1)', () => {
     const partition = kitchenLiving();
     const problem = runWallMove(lid, partition, () => store().offsetWalls(lid, [partition], 6, 'left'), 'Moved the wall 6" toward Living');
     expect(problem).toBeNull();
-    expect(ui().draft.message).toBe(`Moved the wall 6" toward Living. Now Living 12'-11" x 14'-0", Kitchen (17'2" adjusted: re-measure) 12'-0" x 17'-2".`);
+    expect(ui().draft.message).toBe(`Moved the wall 6" toward Living. Now Living 12'-11" x 17'-2", Kitchen (17'2" adjusted: re-measure) 12'-0" x 17'-2".`);
   });
 
   it('moves a partition in a box and keeps openings at their offset from the a end', () => {
