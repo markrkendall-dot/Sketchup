@@ -92,6 +92,14 @@ describe('a flight against the code', () => {
     expect(codes()).not.toContain('stair.headroom');
   });
 
+  it('counts a beam over the flight in the headroom', () => {
+    east();
+    expect(codes()).not.toContain('stair.headroom');
+    // A dropped beam across the flight's foot, 84 1/8" up: about 5'-2" over the nosings there.
+    store().addMember(f, { kind: 'beam', a: { x: 60, y: 3 }, b: { x: 60, y: 120 }, width: 3.5, depth: 11.875, mount: 'dropped', phase: 'new' });
+    expect(stairIssues(plan()).find((i) => i.code === 'stair.headroom')?.message).toMatch(/under the floor or beam above/);
+  });
+
   it('does not check existing stairs', () => {
     east({ phase: 'existing', railings: undefined, run: 100, width: 30 });
     expect(codes()).toEqual([]);
@@ -149,6 +157,6 @@ describe('the starter', () => {
   });
 
   it('has nothing to check: the Grand stair\'s round rail is graspable', () => {
-    expect(getIssues(starter).map((i) => `${i.code} ${i.target.stairs?.join(',')}`)).toEqual([]);
+    expect(getIssues(starter).filter((i) => i.category === 'stair').map((i) => `${i.code} ${i.target.stairs?.join(',')}`)).toEqual([]);
   });
 });

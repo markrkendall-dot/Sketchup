@@ -395,9 +395,9 @@
             "y": 96.125
           },
           "width": 5.5,
-          "depth": 5.5,
+          "depth": 11,
           "rotation": 0,
-          "label": "6x6",
+          "label": "(2) 6x6",
           "phase": "new",
           "footing": {
             "width": 24,

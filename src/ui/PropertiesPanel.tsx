@@ -15,6 +15,7 @@ import { columnDefaults, groundAt } from '../derive/site';
 import { directionVector, flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool, makeToolContext, switchTool } from '../editor2d/tools';
 import { beamHeights, joistDepth, memberBoxes } from '../derive/members';
+import { bearingOf } from '../derive/structure';
 import { joistWords, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
 import { COLUMN_KIND_NAME } from '../editor2d/tools/siteTools';
@@ -524,6 +525,13 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const len = wallLength(level, wall);
   const openingCount = Object.values(level.openings).filter((o) => o.wallId === wall.id).length;
+  const viewMode = useUiStore((s) => s.viewMode);
+  // What the tool makes of it when it is not marked (derive/structure.ts), as a string (a stable selection).
+  const inferred = usePlanStore((s) => {
+    const w = s.plan.levels[levelId]?.walls[wall.id];
+    const b = w && w.bearing === undefined ? bearingOf(s.plan, levelId, w, viewMode) : undefined;
+    return b ? `Auto: ${b.bearing ? `likely bearing, ${b.reason}` : b.reason === 'not bearing' ? 'not bearing, as far as the tool can tell' : `not bearing, ${b.reason}`}.` : null;
+  });
   return (
     <>
       <h3>Wall</h3>
@@ -558,6 +566,8 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
         options={bearingOptions}
         onChange={(v) => updateWalls(levelId, [wall.id], { bearing: v === 'auto' ? undefined : v === 'yes' })}
       />
+      {inferred && <p className="field-hint">{inferred}</p>}
+      <IssueNotes levelId={levelId} target={{ walls: [wall.id] }} />
       <LengthField
         label="Height"
         value={wall.heightOverride}

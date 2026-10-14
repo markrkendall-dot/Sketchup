@@ -13,6 +13,7 @@ import { compassName, DECK, getDeckLayout } from './decks';
 import { floorOpeningHoles } from './floorOpenings';
 import { getFootprints } from './footprint';
 import { getLevelElevations } from './levels';
+import { beamHeights, beamOutline } from './members';
 import { isVisible } from './phase';
 import { getFaces } from './rooms';
 import { groundAt } from './site';
@@ -89,6 +90,10 @@ export function stairIssues(plan: Plan): Issue[] {
     for (const s of all) if (s.cutsFloorAbove) holes.push(...[stairsHoleOutline(s, ftf, level.wallHeight)].filter((h): h is Vec2[] => !!h));
     const ceiling = level.wallHeight;
     const underSlab = (p: Vec2) => !!above && !holes.some((h) => pointInPolygon(p, h));
+    // Beams over this level hang below the ceiling (a dropped one, or a flush one deeper than the joists).
+    const beams = Object.values(level.members ?? {}).flatMap((m) => (m.kind === 'beam' && isVisible(m.phase, VIEW) ? [{ poly: beamOutline(m), bottom: beamHeights(plan, levelId, m).bottom }] : []));
+    /** What is over a point: the slab's underside, a beam's, or nothing. */
+    const overhead = (p: Vec2) => beams.reduce((c, b) => (pointInPolygon(p, b.poly) ? Math.min(c, b.bottom) : c), underSlab(p) ? ceiling : Infinity);
 
     // Walls that stand beside an edge (a guard's work done by the wall).
     const fps = getFootprints(level, VIEW);
@@ -123,13 +128,15 @@ export function stairIssues(plan: Plan): Issue[] {
       const f = stairsFrame(s);
       let short = Infinity;
       // Up to an inch short of the top edge: past it is the floor above (or the next piece).
-      for (let d = 1; d <= s.run - 1 + 1e-6; d += Math.min(SAMPLE, s.run - 2)) {
+      // Closer samples under beams, so a 3 1/2" beam is not stepped over.
+      for (let d = 1; d <= s.run - 1 + 1e-6; d += Math.min(beams.length ? 1.5 : SAMPLE, s.run - 2)) {
         const h = risers >= 2 ? stairsBase(s) + rise + (d * rise) / tread : stairsBase(s) + rise;
         for (const side of [-s.width / 2 + 1, 0, s.width / 2 - 1]) {
-          if (underSlab(stairsPoint(f, d, side))) short = Math.min(short, ceiling - Math.min(h, stairsBase(s) + risers * rise));
+          const over = overhead(stairsPoint(f, d, side));
+          if (over < Infinity) short = Math.min(short, over - Math.min(h, stairsBase(s) + risers * rise));
         }
       }
-      if (short < CODE.headroom.value - TOL) push('stair.headroom', 'headroom', 'error', s, at, `${name}: ${fmt(Math.max(0, short))} of headroom under the floor above, under the ${fmt(CODE.headroom.value)} required.`);
+      if (short < CODE.headroom.value - TOL) push('stair.headroom', 'headroom', 'error', s, at, `${name}: ${fmt(Math.max(0, short))} of headroom under the floor or beam above, under the ${fmt(CODE.headroom.value)} required.`);
 
       // Guards: an edge with a drop over 30" beside it, no railing, no wall along it and no piece
       // of the stairway joined to it.

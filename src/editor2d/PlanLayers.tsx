@@ -4,6 +4,7 @@ import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casewo
 import { deckTopWords, getDeckLayout, scanSegments } from '../derive/decks';
 import { beamOutline, postOutline } from '../derive/members';
 import { joistWords } from '../model/structure';
+import { bearingOf } from '../derive/structure';
 import { getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
@@ -787,11 +788,13 @@ function JoistLabel({ at, joists, northAngle, k }: { at: Vec2; joists: number; n
  * (the level's direction outside its joist zones, each zone's inside it) with their direction, the
  * walls marked bearing. Off by default; an export shows it when it is on (a framing plan).
  */
-const StructureLayer = memo(function StructureLayer({ levelId }: { levelId: Id }) {
+const StructureLayer = memo(function StructureLayer({ levelId, part }: { levelId: Id; part: 'under' | 'over' }) {
   const on = useLayerUi((s) => s.showStructure);
-  const level = useLayerPlan((s) => s.plan.levels[levelId]);
-  const northAngle = useLayerPlan((s) => s.plan.site.northAngle);
+  const plan = useLayerPlan((s) => s.plan);
+  const level = plan.levels[levelId];
+  const northAngle = plan.site.northAngle;
   const viewMode = useLayerUi((s) => s.viewMode);
+  const headers = useLayerUi(useShallow((s) => s.issues.filter((i) => i.levelId === levelId && (i.code === 'structure.wall-opening' || i.code === 'structure.opening-header'))));
   const selectedZones = useLayerUi((s) => s.selection.joistZones);
   const k = useLayerUi(viewportScale);
   const data = useMemo(() => {
@@ -802,21 +805,40 @@ const StructureLayer = memo(function StructureLayer({ levelId }: { levelId: Id }
     const main = level.framing ? segPath(slabs.flatMap((p) => scanSegments(p, dir(level.framing!.joists), JOIST_SPACING))) : '';
     const largest = slabs.reduce<Vec2[] | null>((best, p) => (!best || Math.abs(polygonSignedArea(p)) > Math.abs(polygonSignedArea(best)) ? p : best), null);
     const bearing: [Vec2, Vec2][] = [];
+    const likely: [Vec2, Vec2][] = [];
     for (const w of Object.values(level.walls)) {
-      if (!w.bearing || !isVisible(w.phase, viewMode)) continue;
-      const a = level.nodes[w.a];
-      const b = level.nodes[w.b];
-      if (a && b) bearing.push([a, b]);
+      if (!isVisible(w.phase, viewMode)) continue;
+      const b = bearingOf(plan, levelId, w, viewMode);
+      const na = level.nodes[w.a];
+      const nb = level.nodes[w.b];
+      if (b?.bearing && na && nb) (b.explicit ? bearing : likely).push([na, nb]);
     }
     return {
       main,
       mainAt: largest ? interiorPoint(largest) : null,
       zones: zones.map((z) => ({ id: z.id, outline: polyPath(z.outline), lines: segPath(scanSegments(z.outline, dir(z.joists), JOIST_SPACING)), at: interiorPoint(z.outline), joists: z.joists, raw: z.outline })),
       bearing: segPath(bearing),
+      likely: segPath(likely),
     };
-  }, [on, level, viewMode]);
+  }, [on, level, viewMode, plan]);
   if (!data || !level) return null;
   const maskId = `hp-joist-mask-${levelId}`;
+  // Over the walls: the bearing marks along them and the header tags.
+  if (part === 'over')
+    return (
+      <g className="layer-structure-marks" pointerEvents="none">
+        {data.likely && <path className="bearing-wall bearing-likely" d={data.likely} vectorEffect="non-scaling-stroke" />}
+        {data.bearing && <path className="bearing-wall" d={data.bearing} vectorEffect="non-scaling-stroke" />}
+        {headers.map((i) => (
+          <g key={i.id} transform={`translate(${i.at.x} ${i.at.y}) scale(${1 / k})`} className="hdr-tag">
+            <rect x={-13} y={-7} width={26} height={14} rx={2} />
+            <text textAnchor="middle" dominantBaseline="central">
+              HDR
+            </text>
+          </g>
+        ))}
+      </g>
+    );
   return (
     <g className="layer-structure" pointerEvents="none">
       {data.zones.length > 0 && (
@@ -836,7 +858,6 @@ const StructureLayer = memo(function StructureLayer({ levelId }: { levelId: Id }
           {selectedZones.includes(z.id) && <OutlineHandles outline={z.raw} className="deck-handle" />}
         </g>
       ))}
-      {data.bearing && <path className="bearing-wall" d={data.bearing} vectorEffect="non-scaling-stroke" />}
       {level.framing && data.mainAt && <JoistLabel at={data.mainAt} joists={level.framing.joists} northAngle={northAngle} k={k} />}
       {!level.framing && data.mainAt && (
         <g transform={`translate(${data.mainAt.x} ${data.mainAt.y}) scale(${1 / k})`} className="joist-label joist-unset">
@@ -1462,12 +1483,13 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
       <DecksLayer levelId={levelId} />
       <RoofGhostLayer levelId={levelId} />
       <RoofsLayer levelId={levelId} />
-      <StructureLayer levelId={levelId} />
+      <StructureLayer levelId={levelId} part="under" />
       <StairsLayer levelId={levelId} />
       <FixturesLayer levelId={levelId} />
       <WallsLayer levelId={levelId} />
       <OpeningsLayer levelId={levelId} />
       <MembersLayer levelId={levelId} />
+      <StructureLayer levelId={levelId} part="over" />
       <RoomLabelsLayer levelId={levelId} />
       <LabelsLayer levelId={levelId} />
       <OpenEndsLayer levelId={levelId} />

@@ -759,6 +759,23 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-width: 1.4;
 }
 
+.bearing-wall.bearing-likely {
+  stroke: rgba(146, 64, 14, 0.55);
+  stroke-width: 2;
+}
+
+.hdr-tag rect {
+  fill: #fff7ed;
+  stroke: #92400e;
+  stroke-width: 1;
+}
+
+.hdr-tag text {
+  font-size: 9px;
+  font-weight: 700;
+  fill: #92400e;
+}
+
 .joist-zone .joist-zone-outline {
   fill: none;
   stroke: #92400e;

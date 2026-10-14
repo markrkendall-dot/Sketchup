@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { buildExampleJson } from '../../scripts/example-plan';
 import example from '../../docs/examples/146-mick-road.json';
 import { getIssues } from '../derive/checks';
+import { wallBearings } from '../derive/structure';
 import { getDeckLayout } from '../derive/decks';
 import { floorOpeningHole, getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getLevelElevations } from '../derive/levels';
@@ -412,8 +413,38 @@ describe('docs/examples/146-mick-road.json', () => {
     }
   });
 
-  it('passes the code checks: guards, the grand stair and the walls of the closet under it', () => {
-    expect(getIssues(plan).map((i) => `${i.code}: ${i.message}`)).toEqual([]);
+  it('passes the code checks: guards, the grand stair, the closet under it and the structure; four header notes', () => {
+    expect(getIssues(plan).filter((i) => i.severity !== 'info').map((i) => `${i.code}: ${i.message}`)).toEqual([]);
+    // Headers for the engineer: the new openings cut into existing bearing walls.
+    expect(getIssues(plan).map((i) => [plan.levels[i.levelId].name, i.code, i.at])).toEqual([
+      ['First Floor', 'structure.wall-opening', { x: 170.5, y: 118.5 }],
+      ['First Floor', 'structure.wall-opening', { x: 214, y: 3.5 }],
+      ['First Floor', 'structure.wall-opening', { x: 25, y: 3.5 }],
+      ['Second Floor', 'structure.wall-opening', { x: 140, y: 3.5 }],
+    ]);
+  });
+
+  it('infers the bearing walls: the y 99.5 wall taken out, the partition the beams land on', () => {
+    const [, fId, sId] = plan.levelOrder;
+    const bearing = (view: 'existing' | 'proposed', lid: string) =>
+      [...wallBearings(plan, view)[lid]]
+        .filter(([id, b]) => b.bearing && plan.levels[lid].walls[id].kind === 'interior')
+        .map(([id, b]) => {
+          const l = plan.levels[lid];
+          const w = l.walls[id];
+          return [w.phase, l.nodes[w.a].x, l.nodes[w.a].y, l.nodes[w.b].x, l.nodes[w.b].y, b.reason.split(' (')[0]];
+        });
+    expect(bearing('existing', fId)).toEqual([
+      ['demo', 314.5, 99.5, 194.5, 99.5, 'the joists cross it mid-span'],
+      ['demo', 194.5, 99.5, 170.5, 99.5, 'the joists cross it mid-span'],
+      ['demo', 170.5, 99.5, 3.5, 99.5, 'the joists cross it mid-span'],
+    ]);
+    expect(bearing('proposed', fId)).toEqual([
+      ['existing', 170.5, 137.5, 170.5, 99.5, "a beam's end bears on it"],
+      ['new', 170.5, 88.5, 170.5, 99.5, "a beam's end bears on it"],
+    ]);
+    // Upstairs, the Bunk's south wall (y 99.5) is not bearing: the attic joists span 11'-2" without it.
+    expect(bearing('existing', sId).map((r) => r[2])).toEqual([137.5, 137.5, 152.5]);
   });
 
   it('has no open wall ends but the retaining wall\'s free west end, and no orphan labels, in any view', () => {

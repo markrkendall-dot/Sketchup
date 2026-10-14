@@ -1177,8 +1177,9 @@ function proposed(ids: ExistingIds): void {
   // balcony header along the floor opening's edge, centred y 92.75 (faces 91..94.5) so it clears the
   // top tread, from the west wall to the x 170.5 partition; and the kitchen beam on the old wall's
   // line, from that partition to the east wall. Both land on the partition, so a post under the
-  // landing point (between the two ends, y 96.125) carries it down through the basement to a
-  // 24" x 12" footing. The new y 137.5 wall (the stair hall's south side) is not bearing.
+  // landing points carries them down through the basement to a 24" x 12" footing: two 6x6s side
+  // by side (5 1/2" x 11"), centred between the two ends (y 96.125), so each end is over it. The new
+  // y 137.5 wall (the stair hall's south side) is not bearing.
   for (const lid of [bId, fId, sId]) store().setLevelFraming(lid, { joists: 90 });
   const wingZones: [Rect, Phase][] = [
     [{ x0: WING.x0, x1: WING.x1, y0: WING.y0, y1: WING.y1 }, 'existing'],
@@ -1192,7 +1193,7 @@ function proposed(ids: ExistingIds): void {
   beam({ x: CL.x0, y: 92.75 }, { x: PART_KL, y: 92.75 });
   beam({ x: PART_KL, y: FRONT_LINE }, { x: CL.x1, y: FRONT_LINE });
   const POST = MEMBER_DEFAULTS.post;
-  if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: (92.75 + FRONT_LINE) / 2 }, width: POST.width, depth: POST.depth, rotation: 0, label: POST.label, phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post rejected');
+  if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: (92.75 + FRONT_LINE) / 2 }, width: POST.width, depth: 2 * POST.width, rotation: 0, label: '(2) 6x6', phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post rejected');
   store().updateWalls(fId, [wallAt(fId, { x: 100, y: STAIR_SOUTH }).wallId], { bearing: false });
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two

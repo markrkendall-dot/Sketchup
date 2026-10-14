@@ -1178,7 +1178,7 @@ sorted target ids, `issueId`), a `code` (`guard.deck-edge`, ...), a `severity` (
 shown as "Check", `info` shown as "Note"), a `category`, the `levelId`, a plan point `at` and an
 optional `outline` to draw when the issue is picked, the `message`, the code section `ref`, and
 the `target` ids by selection kind. `getIssues(plan)` gathers every family (one file each:
-`guardChecks.ts` so far) and orders them by level, severity, category and message; it is memoized
+`guardChecks.ts`, `stairChecks.ts`, `structureChecks.ts`) and orders them by level, severity, category and message; it is memoized
 per plan object (`WeakMap`), so the panels, the list and the tests share one array per plan.
 `issuesFor(issues, levelId, target)` picks an element's issues; `issueCounts` splits what to check
 from notes.
@@ -1212,7 +1212,25 @@ layout's `openings`) arrive at its boards, not at the floor above. A staircase's
 too: its handrail 34" to 38" over the nosings, a graspable one (a flight on its own, or a staircase
 with the board rail, gets `stair.handrail-grip`), balusters under the 4 3/8" sphere, nosings of
 3/4" to 1 1/4" where treads are under 11", no wall rising into its underside, and no piece left
-unjoined (`stair.chain-broken`).
+unjoined (`stair.chain-broken`). Headroom counts the beams over the level too (a dropped beam, or a
+flush one deeper than the joists), sampled every 1 1/2" where there are beams.
+
+Structure (`structure.ts`, `structureChecks.ts`; see "Structure" for the inference): a wall taken
+out that bears in the house as it stands, wherever what it carried stays (the floor above, or a
+roof kept over it), needs a wall or beam of the proposed view on its line or within the joists'
+depth of it (R502.4), sampled every 6"; gaps of 12" or more are a warning (an error when the wall
+is marked bearing) (`structure.bearing-removed`). Each end of a new beam bears on a wall at least
+1 1/2" along the beam (3" on a block wall), or on a post, or on another beam (a hanger) (R502.6,
+`structure.beam-end`). The load from each end of a new beam and from each new post is followed
+down (`structure.load-path`, R301.1): at each level below, the wall, post or beam under the point
+(a beam passes it to its two ends); on the lowest level a wall is a foundation wall and a post needs
+a footing (`structure.footing`, R403.1); nothing under it is an error, or a note when the level is
+not drawn at all. Notes (`info`, "HDR" on the structure overlay): a new floor opening's or a
+cutting flight's edge across the joists with no wall or beam along it wants a header (single,
+doubled over 4', on hangers over 6': R502.10, `structure.opening-header`); a new opening cut in an
+existing bearing wall wants a header (R602.7, `structure.wall-opening`). A level where an existing
+interior wall comes out and no joists are set gets `structure.framing-unset`. Issues of one code on
+one element are told apart by a part suffix on the id (a beam's ends, an opening's edges).
 
 The UI keeps a copy: `ui/checks.ts startChecks()` (main.tsx) sets `uiStore.issues` at start and
 `CHECKS_DELAY_MS` (150 ms) after the plan stops changing, so a drag does not re-run the checks at
@@ -1330,6 +1348,18 @@ every member 1/16" under the ceiling (`MEMBER_INSET`): a flush beam is drawn onl
 below the ceiling (none when it is no deeper than the joists), and nothing shares a slab's face; a
 footing stops 1/16" under the slab. Materials `memberMaterial` (pale wood, concrete); the export
 names the meshes `Beam`, `Post` and `Footing` (materials `member_<part>_<phase>`).
+
+Which walls bear (`derive/structure.ts` `wallBearings(plan, view)`, memoized per plan and view,
+top level first): a wall's mark wins; an exterior wall bears when the joists over it cross it (45°
+or more) or are not set; any wall bears when a bearing wall of the level above stands on it
+(parallel, within the joists' depth, overlapping 12"), a post above stands in it, or a beam of its
+level ends in it; an existing interior wall whose collinear run is 4' or more bears when the joists
+cross it and would span more than 14' (`SPAN_LIMIT`) without it, measured from points a quarter,
+half and three quarters along it to the nearest wall or beam that crosses the joists either way
+(`spanWithout`). A new wall never bears by span. `bearingOf` reads a wall in the view it is seen
+in: the house as it stands for a demolished wall or the Existing view, after the work otherwise.
+The Wall panel says what the tool made of an unmarked wall; the overlay draws marked bearing walls
+dash-dot and inferred ones lighter.
 
 ## Renovation moves (`model/renovate.ts`, `ui/wallMove.ts`, `editor2d/WallMovePrompt.tsx`)
 

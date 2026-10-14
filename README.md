@@ -228,8 +228,10 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
    Residential Code of New York State as it goes: a deck edge more than 30" above the ground with no
    railing, a floor opening's edge with no guard, and new stairs (risers at most 8 1/4", treads at
    least 9", 36" wide, 6'8" of headroom from the nosings, a graspable handrail on four risers or
-   more, guards on open sides more than 30" up, matching risers and big enough landings). Load
-   path checks come next (`docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show**
+   more, guards on open sides more than 30" up, matching risers and big enough landings), and the
+   structure: a wall taken out that likely bears needs a beam or wall within the joists' depth of
+   it, a new beam's ends need 1 1/2" of bearing, and every new beam and post needs something under
+   it on each level down to a footing (headers for new openings are notes). Click the count for the list; **Show**
    selects the element, centres the plan on it and outlines it, and the plan marks each issue with a red
    (error) or orange (to check) disc in the Proposed and All views. The element's properties
    repeat its issues with their code sections. The code numbers live in `src/model/codeLimits.ts`:
@@ -240,7 +242,9 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
    framed another way, **Draw a joist zone**. `I` draws a beam (two clicks; it starts as a flush
    pair of 1 3/4" x 11 7/8" LVLs in the floor framing, a placeholder for the engineer to size),
    `L` places a post that runs up to the beam over it (on the lowest level it stands on a 24" x 12"
-   footing). A wall's **Bearing** field marks it bearing or not (Auto leaves it to the tool). `Y`
+   footing). A wall's **Bearing** field marks it bearing or not; Auto leaves it to the tool, which
+   says what it made of it (likely bearing when the joists cross it and would span more than 14'
+   without it, when something above stands on it, or when the joists bear on an exterior wall). `Y`
    shows the structure overlay: the joists, their direction, beam labels and bearing walls; export
    the plan with it on for a framing plan. Nothing is sized: the sizes are for the engineer.
 
@@ -785,9 +789,15 @@ Still open:
   east-west in the wing's ceiling under its shed roof; the wing's floor over the crawl space is
   unknown (left north-south). Verify them on site. The y 99.5 wall's removal is carried by a flush
   balcony header (y 92.75, from the west wall to the x 170.5 partition) and a flush kitchen beam on
-  the old wall's line (to the east wall); both land on the partition, with a 6x6 post under that
-  point in the basement on a 24" x 12" footing. The engineer sizes the header, the beam, the post
-  and the footing; the basement under it is not surveyed.
+  the old wall's line (to the east wall); both land on the partition, with a post of two 6x6s
+  under both ends in the basement on a 24" x 12" footing. The checks find nothing missing in that
+  load path. For the engineer: size the header, the beam, the post and the footing (and the squash
+  blocks or studs in the partition under each end); confirm the y 99.5 wall was the bearing wall
+  (the tool infers it: the joists would span 25'-8" without it); confirm the Bunk's south wall
+  upstairs (taken out) carried no more than its own weight (the tool finds the attic joists span
+  11'-2" without it); survey the basement under the post. Headers are noted (HDR on the overlay)
+  for the new openings cut into bearing walls: the cased opening in the partition, the two First
+  Floor north windows and the stair hall's upper north window.
 - **Coats**: the closet under the stair is narrow (2'3" inside, the old window's span sets its west
   wall); hooks or a bench in the foyer would add room.
 - **The pantry** is small (3'11" x 3'6"); the north band is 3'6" deep rather than the 4' asked

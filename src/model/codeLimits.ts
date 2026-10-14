@@ -63,6 +63,9 @@ export const CODE = {
   headerDouble: limit(48, 'R502.10', 'R502.10', 'headers over 4\' doubled, over 6\' on hangers'),
   headerHanger: limit(72, 'R502.10', 'R502.10', 'headers over 4\' doubled, over 6\' on hangers'),
   wallHeader: limit(0, 'R602.7', 'R602.7', 'a header sized for the load over each opening in a bearing wall'),
+  /** Every load carried down to the foundation. */
+  loadPath: limit(0, 'R301.1', 'R301.1', 'a complete load path from the floors and roof down to the foundation'),
+  footing: limit(0, 'R403.1', 'R403.1', 'posts and walls that carry loads stand on footings'),
 } as const;
 
 export type CodeKey = keyof typeof CODE;
