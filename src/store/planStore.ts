@@ -1,5 +1,6 @@
 import { create, useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { current } from 'immer';
 import { temporal } from 'zundo';
 import { dist } from '../model/geometry';
 import { coreInterval, draftFootprints } from '../derive/openings';
@@ -25,6 +26,7 @@ import {
   wallOverlapping,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
+import { planRenovation } from '../model/renovate';
 import type { Column, Deck, Fixture, FloorOpening, GradePoint, Id, Level, LevelFinishes, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
@@ -136,6 +138,12 @@ export interface PlanState {
   offsetWalls: (levelId: Id, ids: readonly Id[], distance: number, side: WallSide) => string | null;
   /** Like offsetWalls with a shift vector per wall (perpendicular to it). Null when done, else why not. */
   shiftWalls: (levelId: Id, shifts: Record<Id, Vec2>) => string | null;
+  /**
+   * Move walls as a renovation (model/renovate.ts): existing ones demolished where they are and built
+   * new where they go, the walls they meet extended or cut back; one undo step. The walls now where
+   * the moved ones went, or why not (nothing changes).
+   */
+  renovateWalls: (levelId: Id, shifts: Record<Id, Vec2>) => { walls: Id[] } | { error: string };
   moveNode: (levelId: Id, nodeId: Id, pos: Vec2, opts?: { normalize?: boolean }) => void;
   /** Move nodes; a move that would lay a wall on top of another wall is refused (nothing changes). */
   moveNodes: (levelId: Id, positions: Record<Id, Vec2>, opts?: { normalize?: boolean }) => void;
@@ -600,6 +608,24 @@ export const usePlanStore = create<PlanState>()(
             normalizeLevel(level, new Set(Object.keys(planned.positions)));
           });
           return problem;
+        },
+
+        renovateWalls: (levelId, shiftsIn) => {
+          let out: { walls: Id[] } | { error: string } = { error: 'Nothing to move.' };
+          editLevel(levelId, (level) => {
+            const shifts = new Map(Object.entries(shiftsIn).filter(([, s]) => isPoint(s) && Math.hypot(s.x, s.y) > 1e-9));
+            if (shifts.size === 0) return false;
+            const r = planRenovation(current(level), shifts);
+            if ('error' in r) {
+              out = r;
+              return false;
+            }
+            level.nodes = r.level.nodes;
+            level.walls = r.level.walls;
+            level.openings = r.level.openings;
+            out = { walls: r.walls };
+          });
+          return out;
         },
 
         moveNode: (levelId, nodeId, pos, opts) =>

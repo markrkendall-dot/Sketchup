@@ -233,6 +233,22 @@ export interface WalkFrom {
   point: Vec2;
 }
 
+/**
+ * A wall move waiting for the answer to "rebuild it there, or correct the drawing?" (ui/wallMove.ts):
+ * the perpendicular shifts a rebuild uses, and the move as drawn (`correct`, null when done, else why
+ * not) a correction runs.
+ */
+export interface WallMoveRequest {
+  levelId: Id;
+  /** The wall whose rooms the status bar reports after a correction. */
+  wallId: Id | null;
+  shifts: Record<Id, Vec2>;
+  what: string;
+  correct: () => string | null;
+  /** The level and the moved walls: the choice to correct is remembered for the same walls. */
+  key: string;
+}
+
 /** The 2D canvas's right-click menu, at a canvas (screen) point, for a world point on a level. */
 export interface ContextMenu {
   screen: Vec2;
@@ -362,6 +378,10 @@ export interface UiState {
    * piece alone until Esc or a click elsewhere closes it.
    */
   openStaircaseId: Id | null;
+  /** A wall move asking how to apply it (WallMovePrompt). */
+  wallMovePrompt: WallMoveRequest | null;
+  /** "Correct the drawing", remembered while the same walls are nudged again. */
+  wallMoveChoice: { key: string } | null;
   toggleLevelBar: () => void;
   toggleProperties: () => void;
   setOrthoLock: (on: boolean) => void;
@@ -415,6 +435,8 @@ export interface UiState {
   setChecksOpen: (open: boolean) => void;
   setPickedIssue: (id: string | null) => void;
   setOpenStaircase: (id: Id | null) => void;
+  setWallMovePrompt: (req: WallMoveRequest | null) => void;
+  setWallMoveChoice: (choice: { key: string } | null) => void;
 }
 
 export const emptyDraft = (): Draft => ({
@@ -502,6 +524,8 @@ export const useUiStore = create<UiState>()((set) => ({
   checksOpen: false,
   pickedIssueId: null,
   openStaircaseId: null,
+  wallMovePrompt: null,
+  wallMoveChoice: null,
   toggleLevelBar: () => set((s) => ({ levelBarOpen: !s.levelBarOpen })),
   toggleProperties: () => set((s) => ({ propertiesOpen: !s.propertiesOpen })),
   setOrthoLock: (orthoLock) => {
@@ -640,6 +664,8 @@ export const useUiStore = create<UiState>()((set) => ({
   setChecksOpen: (checksOpen) => set((s) => (s.checksOpen === checksOpen ? s : { checksOpen, pickedIssueId: checksOpen ? s.pickedIssueId : null })),
   setPickedIssue: (pickedIssueId) => set((s) => (s.pickedIssueId === pickedIssueId ? s : { pickedIssueId })),
   setOpenStaircase: (openStaircaseId) => set((s) => (s.openStaircaseId === openStaircaseId ? s : { openStaircaseId })),
+  setWallMovePrompt: (wallMovePrompt) => set({ wallMovePrompt }),
+  setWallMoveChoice: (wallMoveChoice) => set({ wallMoveChoice }),
 }));
 
 let noticeTimer: ReturnType<typeof setTimeout> | null = null;

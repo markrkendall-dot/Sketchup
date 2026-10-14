@@ -3,10 +3,10 @@
 // rooms either side of the wall measure now.
 import { faceOfRoom, facesBesideWall, getFaces, roomDimensions, type Face, type FaceSet } from '../derive/rooms';
 import type { WallSide } from '../model/offset';
-import type { Id, Level, Wall } from '../model/types';
+import type { Id, Level, Vec2, Wall } from '../model/types';
 import { formatArea, formatLength } from '../model/units';
-import { getPlan } from '../store/planStore';
-import { useUiStore } from '../store/uiStore';
+import { getPlan, usePlanStore } from '../store/planStore';
+import { EMPTY_SELECTION, useUiStore, type WallMoveRequest } from '../store/uiStore';
 
 /** Name of the room a face belongs to, or null (no face, or a face no room names). */
 export function roomNameOf(level: Level, face: Face | null): string | null {
@@ -69,4 +69,66 @@ export function runWallMove(levelId: Id, wallId: Id | null, run: () => string | 
   }
   ui.patchDraft({ message: parts.length ? `${what}. Now ${parts.join(', ')}.` : `${what}.`, error: false });
   return null;
+}
+
+/**
+ * Whether moving these walls asks how (DESIGN.md "Renovation moves"): while drawing new work
+ * (Draw as: new) in a view that shows it, when one of them is part of the house as it stands.
+ */
+export function needsRenovationChoice(levelId: Id, wallIds: readonly Id[]): boolean {
+  const ui = useUiStore.getState();
+  if (ui.drawPhase !== 'new' || ui.viewMode === 'existing') return false;
+  const level = getPlan().levels[levelId];
+  return wallIds.some((id) => level?.walls[id]?.phase === 'existing');
+}
+
+/**
+ * Move walls: at once (`correct`, today's move, in every view) unless the move needs the choice
+ * (needsRenovationChoice), then the prompt asks; "correct the drawing" is remembered while the same
+ * walls are moved again.
+ */
+export function requestWallMove(req: Omit<WallMoveRequest, 'key'>): string | null {
+  const key = `${req.levelId}|${Object.keys(req.shifts).sort().join(',')}`;
+  const ui = useUiStore.getState();
+  if (!needsRenovationChoice(req.levelId, Object.keys(req.shifts)) || ui.wallMoveChoice?.key === key) return runWallMove(req.levelId, req.wallId, req.correct, req.what);
+  ui.setWallMovePrompt({ ...req, key });
+  return null;
+}
+
+/** The prompt's answer: rebuild the walls there (new work), correct the drawing, or leave them. */
+export function resolveWallMove(choice: 'renovate' | 'correct' | 'cancel'): void {
+  const ui = useUiStore.getState();
+  const req = ui.wallMovePrompt;
+  if (!req) return;
+  ui.setWallMovePrompt(null);
+  if (choice === 'cancel') return;
+  if (choice === 'correct') {
+    ui.setWallMoveChoice({ key: req.key });
+    runWallMove(req.levelId, req.wallId, req.correct, req.what);
+    return;
+  }
+  let made: Id[] = [];
+  runWallMove(
+    req.levelId,
+    null,
+    () => {
+      const r = usePlanStore.getState().renovateWalls(req.levelId, req.shifts);
+      if ('error' in r) return r.error;
+      made = r.walls;
+      return null;
+    },
+    `${req.what}, rebuilt there: the old wall demolished, the moved one and its joins new`,
+  );
+  if (made.length) ui.setSelection({ ...EMPTY_SELECTION, walls: made });
+}
+
+/** The shift that moves a wall across by the part of `delta` square to it. */
+export function perpendicularShift(level: Level, wallId: Id, delta: Vec2): Vec2 {
+  const w = level.walls[wallId];
+  const a = level.nodes[w.a];
+  const b = level.nodes[w.b];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const n = { x: -(b.y - a.y) / len, y: (b.x - a.x) / len };
+  const d = delta.x * n.x + delta.y * n.y;
+  return { x: n.x * d || 0, y: n.y * d || 0 };
 }

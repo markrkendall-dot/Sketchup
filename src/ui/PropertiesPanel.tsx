@@ -48,8 +48,8 @@ import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type LengthAnchor, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { duplicateRoomNotice, showNotice } from './fileActions';
-import { roomNameOf, runWallMove, wallSideNames } from './wallMove';
-import type { WallSide } from '../model/offset';
+import { requestWallMove, roomNameOf, wallSideNames } from './wallMove';
+import { wallShift, type WallSide } from '../model/offset';
 import { releaseFocus } from './focus';
 
 const PHASES: Phase[] = ['existing', 'demo', 'new'];
@@ -435,7 +435,13 @@ function MoveWall({ level, wall }: { level: Level; wall: Wall }) {
       return;
     }
     const what = `Moved the wall ${formatLength(v, denom)} toward ${names[side]}`;
-    const problem = runWallMove(level.id, wall.id, () => usePlanStore.getState().offsetWalls(level.id, [wall.id], v, side), what);
+    const problem = requestWallMove({
+      levelId: level.id,
+      wallId: wall.id,
+      shifts: { [wall.id]: wallShift(level, wall.id, v, side) },
+      what,
+      correct: () => usePlanStore.getState().offsetWalls(level.id, [wall.id], v, side),
+    });
     setError(problem);
   };
   return (

@@ -8,10 +8,10 @@ import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase'
 import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../../model/geometry';
 import { WALL_OVERLAP_MESSAGE } from '../../model/plan';
 import { nudgeShifts } from '../../model/offset';
-import type { Id, Level, Vec2, ViewMode } from '../../model/types';
+import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { formatLength } from '../../model/units';
-import { runWallMove } from '../../ui/wallMove';
-import { pauseHistory, resumeHistory } from '../../store/planStore';
+import { needsRenovationChoice, perpendicularShift, requestWallMove } from '../../ui/wallMove';
+import { pauseHistory, resumeHistory, usePlanStore } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection } from '../../store/uiStore';
 import { hitRoomLabel } from '../roomLabels';
 import { SNAP_RADIUS_PX } from '../snap';
@@ -183,6 +183,16 @@ type DragState =
       /** When dragging one node directly, it snaps like a cursor. */
       single: Id | null;
       started: boolean;
+      /**
+       * Walls of the house as it stands, moved while drawing new work: the drag is shown live but
+       * kept out of the history, and at the end the plan goes back to `startPlan` and the move is
+       * asked about (ui/wallMove.ts requestWallMove), so whichever way it goes is one undo step.
+       */
+      ask: boolean;
+      startPlan: Plan;
+      walls: Id[];
+      step: Vec2;
+      paused: boolean;
     }
   | {
       kind: 'opening';
@@ -275,13 +285,41 @@ function nudgeWalls(ctx: ToolContext, e: KeyboardEvent): boolean {
     return true;
   }
   const n = shifts.size;
-  runWallMove(ctx.levelId, n === 1 ? [...shifts.keys()][0] : null, () => ctx.actions.shiftWalls(ctx.levelId, Object.fromEntries(shifts)), `Moved ${n === 1 ? 'the wall' : `${n} walls`} 1" ${arrow.name}`);
+  const all = Object.fromEntries(shifts);
+  requestWallMove({ levelId: ctx.levelId, wallId: n === 1 ? [...shifts.keys()][0] : null, shifts: all, what: `Moved ${n === 1 ? 'the wall' : `${n} walls`} 1" ${arrow.name}`, correct: () => ctx.actions.shiftWalls(ctx.levelId, all) });
   return true;
 }
 
 function finishDrag(ctx: ToolContext): void {
   if (ctx.ui().draft.dragReadout) ctx.ui().patchDraft({ dragReadout: null });
-  if (drag?.kind === 'move' && drag.started) {
+  if (drag?.kind === 'move' && drag.ask) {
+    // Back to where the drag began (still paused, so no step is recorded), then ask.
+    const d = drag;
+    if (d.paused) {
+      usePlanStore.setState({ plan: d.startPlan });
+      resumeHistory();
+    }
+    if (!d.started) return;
+    const level = d.startPlan.levels[ctx.levelId];
+    if (!level) return;
+    const shifts: Record<Id, Vec2> = {};
+    for (const id of d.walls) if (level.walls[id]) shifts[id] = perpendicularShift(level, id, d.step);
+    const positions: Record<Id, Vec2> = {};
+    for (const [id, o] of Object.entries(d.origins)) positions[id] = add(o, d.step);
+    const denom = d.startPlan.settings.precisionDenominator;
+    requestWallMove({
+      levelId: ctx.levelId,
+      wallId: d.walls.length === 1 ? d.walls[0] : null,
+      shifts,
+      what: `${d.walls.length === 1 ? 'The wall' : `${d.walls.length} walls`} ${displacementText(d.step, denom)}`,
+      correct: () => {
+        const before = ctx.plan();
+        ctx.actions.moveNodes(ctx.levelId, positions);
+        return ctx.plan() === before ? WALL_OVERLAP_MESSAGE : null;
+      },
+    });
+    pruneSelection(ctx);
+  } else if (drag?.kind === 'move' && drag.started) {
     // Still paused: the normalize pass belongs to the same undo step as the drag.
     ctx.actions.normalize(ctx.levelId, Object.keys(drag.origins));
     resumeHistory();
@@ -406,7 +444,8 @@ export const selectTool: Tool = {
     } else {
       origins = nodesToMove(level, next);
     }
-    drag = { kind: 'move', startScreen: e.screen, grab: e.world, origins, single, started: false };
+    const walls = single ? [] : next.walls.filter((id) => level.walls[id]);
+    drag = { kind: 'move', startScreen: e.screen, grab: e.world, origins, single, started: false, ask: walls.length > 0 && needsRenovationChoice(ctx.levelId, walls), startPlan: ctx.plan(), walls, step: { x: 0, y: 0 }, paused: false };
   },
 
   onPointerMove(e, ctx) {
@@ -541,6 +580,11 @@ export const selectTool: Tool = {
       for (const [id, o] of Object.entries(drag.origins)) positions[id] = add(o, step);
       ui.patchDraft({ cursor: e.world, snap: null });
     }
+    // A move to be asked about is kept out of the history from its first step.
+    if (drag.ask && !drag.paused) {
+      pauseHistory();
+      drag.paused = true;
+    }
     const before = ctx.plan();
     ctx.actions.moveNodes(ctx.levelId, positions, { normalize: false });
     if (ctx.plan() === before) {
@@ -552,10 +596,11 @@ export const selectTool: Tool = {
     // Live displacement of the drag in the status bar (REVIEW-2 B3).
     const key = drag.single ?? Object.keys(positions)[0];
     if (key) ui.patchDraft({ dragReadout: displacementText(sub(positions[key], drag.origins[key]), ctx.plan().settings.precisionDenominator) });
+    if (key) drag.step = sub(positions[key], drag.origins[key]);
     if (!drag.started) {
       // First set of the drag that changes the plan is tracked; the rest are folded into it.
       drag.started = true;
-      pauseHistory();
+      if (!drag.paused) pauseHistory();
     }
   },
 

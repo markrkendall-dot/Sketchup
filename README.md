@@ -229,8 +229,8 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
    railing, a floor opening's edge with no guard, and new stairs (risers at most 8 1/4", treads at
    least 9", 36" wide, 6'8" of headroom from the nosings, a graspable handrail on four risers or
    more, guards on open sides more than 30" up, matching risers and big enough landings). Structure
-   comes next (`docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show** selects the
-   element, centres the plan on it and outlines it, and the plan marks each issue with a red
+   comes next (`docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show**
+   selects the element, centres the plan on it and outlines it, and the plan marks each issue with a red
    (error) or orange (to check) disc in the Proposed and All views. The element's properties
    repeat its issues with their code sections. The code numbers live in `src/model/codeLimits.ts`:
    verify them against the code text before relying on them.
@@ -244,6 +244,15 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
   keep their place along it. The status bar then gives both rooms' new net sizes. `Shift` + an
   arrow key moves the selected walls 1" that way. A move that would put a wall on top of another,
   or a corner whose walls meet at odd angles, is refused with a message. Roofs do not follow.
+- **Moving a wall of the house as it stands, while drawing new work.** With **Draw as: new**, moving
+  an existing wall (by dragging it, the **Move** buttons or `Shift` + an arrow) asks how:
+  **Rebuild it there** (`R` or Enter) leaves the old wall in place, marked demolished with its
+  doors and windows, builds the moved wall new with copies of them, and joins it to its
+  neighbours with new pieces (a wall it moves away from is carried out to it) or cuts them back (a
+  wall it moves into loses the piece it passes, demolished); **Correct the drawing** (`C`) moves it
+  in every view, as a measurement fix; `Esc` leaves it. Either is one undo step, and "correct" is
+  remembered while you keep nudging the same walls. A rebuild that would cut a wall through a door
+  or window, lay a wall on another, or change the house as it stands is refused with a message.
 - **Draw a box (`B`).** For a room, an addition or a garage: click a corner (it snaps like the
   wall tool, including the corners of the level below), move the mouse toward where the box goes,
   type the two sizes, `12' x 10'` (or `12' by 10'`, or `12'` Tab `10'`) and Enter; or click the

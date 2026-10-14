@@ -1284,6 +1284,36 @@ lines out. The export names the parts `Stairs`, `Stair framing` and `Stair raili
 `stair_tread_<phase>_<hex>`, `stair_paint_<phase>_<hex>`), and the styled guard `Guard` in the same
 materials.
 
+## Renovation moves (`model/renovate.ts`, `ui/wallMove.ts`, `editor2d/WallMovePrompt.tsx`)
+
+Moving a wall is a correction (it moves in every view: today's `shiftWalls`, `moveNodes`) or, for a
+wall of the house as it stands moved while drawing new work, a renovation, and the editor asks which:
+`requestWallMove` runs the move at once unless `needsRenovationChoice` (Draw as: new, a view that
+shows new work, an existing wall among the moved ones) and the same walls were not just corrected
+(`uiStore.wallMoveChoice`); then `WallMovePrompt` asks (R or Enter rebuild, C correct, Esc leave it;
+its keys are taken in the capture phase, before the tools) and `resolveWallMove` applies the answer.
+The panel's Move buttons, Shift+arrow nudges and the select tool's wall drag go through it; a drag
+that will ask pauses the history before its first live step, and at pointer-up the plan goes back
+to the drag's start (still paused) before the answer applies, so either way is one undo step. The
+rebuild's shifts are the drag's displacement square to each wall (`perpendicularShift`); a
+correction applies the dragged positions. Corner drags never ask.
+
+`planRenovation(level, shifts)` is pure (on a `structuredClone`; the store's `renovateWalls` puts
+its nodes, walls and openings in, one step). `planWallOffset` places the corners as a correction
+would, with the walls running straight on from the moved ones; each moved existing wall is marked
+`demo` with its existing openings and a `new` copy (same thickness, kind, finish, colour, height)
+built between new nodes at the corners' places, with copies of those openings as new; its new
+openings move to the copy; a moved new wall just moves. At each moved corner: a wall running on
+through it (a T) is met further along (normalize splits it at the new node); a wall the move goes
+away from gets a new piece out to the new corner; one it moves into is cut at the new corner and the
+piece between demolished (removed, if it was new) with the openings on it. Refused: a demolished
+wall (`DEMO_MOVE_MESSAGE`), a cut inside a door or window (`CUT_IN_OPENING_MESSAGE`), a new wall
+lying on another (`WALL_OVERLAP_MESSAGE`), the corner rules of `planWallOffset`, and anything that
+changes the existing view: `existingViewSignature` (the points every 3" along each existing or
+demolished wall on a grid from the origin, its ends but for joints where two pieces of one wall run
+on straight, and each such opening's centre and size) must come out the same. The new walls (between
+new nodes) come back to be selected.
+
 ## Derivation and memoization
 
 `derive/*` are pure functions of plan objects. `getGraph(level)`, `getFootprints(level, viewMode)`,
