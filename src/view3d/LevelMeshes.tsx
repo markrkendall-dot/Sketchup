@@ -5,7 +5,7 @@ import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { counterColorOf } from '../model/casework';
-import { caseworkMaterial, counterMaterial, deckMaterial, fasciaMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { caseworkMaterial, counterMaterial, deckMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -74,6 +74,22 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           )}
         </group>
       ))}
+      {meshes.staircases.map((sc) => (
+        <group key={sc.id} name={`staircase:${sc.id}`}>
+          {sc.parts.map((p) => (
+            <mesh
+              key={`${p.group}|${p.mat}`}
+              name={`staircase:${sc.id}:${p.group}:${p.mat}`}
+              geometry={p.geometry}
+              material={stairPartMaterial(p.mat, sc.phase, p.mat === 'tread' ? sc.treadColor : sc.paintColor)}
+              renderOrder={sc.phase === 'demo' ? 1 : 0}
+              castShadow={sc.phase !== 'demo'}
+              receiveShadow
+              dispose={null}
+            />
+          ))}
+        </group>
+      ))}
       {decks.map((d) => (
         <group key={d.id} name={`deck:${d.id}`}>
           {(
@@ -99,16 +115,28 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
         </group>
       ))}
       {guards.map((g) => (
-        <mesh
-          key={g.id}
-          name={`floor-opening:${g.id}:railing`}
-          geometry={g.railing}
-          material={railingMaterial(g.phase)}
-          renderOrder={g.phase === 'demo' ? 1 : 0}
-          castShadow={g.phase !== 'demo'}
-          receiveShadow
-          dispose={null}
-        />
+        <group key={g.id}>
+          <mesh
+            name={`floor-opening:${g.id}:railing`}
+            geometry={g.railing}
+            material={g.style ? stairPartMaterial('paint', g.phase, g.style.paintColor) : railingMaterial(g.phase)}
+            renderOrder={g.phase === 'demo' ? 1 : 0}
+            castShadow={g.phase !== 'demo'}
+            receiveShadow
+            dispose={null}
+          />
+          {g.rail && g.style && (
+            <mesh
+              name={`floor-opening:${g.id}:rail`}
+              geometry={g.rail}
+              material={stairPartMaterial('tread', g.phase, g.style.treadColor)}
+              renderOrder={g.phase === 'demo' ? 1 : 0}
+              castShadow={g.phase !== 'demo'}
+              receiveShadow
+              dispose={null}
+            />
+          )}
+        </group>
       ))}
       {showRoofs && meshes.roofs.map((r) => (
         <group key={r.id}>

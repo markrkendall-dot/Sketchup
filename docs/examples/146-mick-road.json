@@ -567,13 +567,28 @@
           "id": "f-n35",
           "x": 352.5,
           "y": 120
+        },
+        "f-n36": {
+          "id": "f-n36",
+          "x": 138.5,
+          "y": 3.5
+        },
+        "f-n37": {
+          "id": "f-n37",
+          "x": 138.5,
+          "y": 88.5
+        },
+        "f-n38": {
+          "id": "f-n38",
+          "x": 170.5,
+          "y": 88.5
         }
       },
       "walls": {
         "f-w1": {
           "id": "f-w1",
           "a": "f-n1",
-          "b": "f-n26",
+          "b": "f-n36",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -937,7 +952,7 @@
         "f-w39": {
           "id": "f-w39",
           "a": "f-n27",
-          "b": "f-n13",
+          "b": "f-n38",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1040,6 +1055,42 @@
           "id": "f-w51",
           "a": "f-n35",
           "b": "f-n19",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w52": {
+          "id": "f-w52",
+          "a": "f-n36",
+          "b": "f-n37",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new",
+          "heightOverride": 61.75
+        },
+        "f-w53": {
+          "id": "f-w53",
+          "a": "f-n36",
+          "b": "f-n26",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w54": {
+          "id": "f-w54",
+          "a": "f-n37",
+          "b": "f-n38",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new",
+          "heightOverride": 92.25
+        },
+        "f-w55": {
+          "id": "f-w55",
+          "a": "f-n38",
+          "b": "f-n13",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1636,6 +1687,21 @@
           "sill": 0,
           "phase": "new",
           "id": "f-o41"
+        },
+        "f-o42": {
+          "wallId": "f-w54",
+          "type": "door",
+          "offset": 16,
+          "width": 24,
+          "height": 80,
+          "sill": 0,
+          "phase": "new",
+          "swing": {
+            "hinge": "a",
+            "side": "right"
+          },
+          "leafColor": "#8a5a34",
+          "id": "f-o42"
         }
       },
       "rooms": {
@@ -1749,6 +1815,18 @@
           "id": "f-r9"
         },
         "f-r10": {
+          "name": "Coats (proposed)",
+          "anchor": {
+            "x": 154.5,
+            "y": 47
+          },
+          "phase": "new",
+          "wallFinish": "paint",
+          "floorFinish": "boards",
+          "floorColor": "#a87a4c",
+          "id": "f-r10"
+        },
+        "f-r11": {
           "name": "Powder room (proposed)",
           "anchor": {
             "x": 213,
@@ -1757,9 +1835,9 @@
           "phase": "new",
           "wallFinish": "paint",
           "floorFinish": "tile",
-          "id": "f-r10"
+          "id": "f-r11"
         },
-        "f-r11": {
+        "f-r12": {
           "name": "Pantry (proposed)",
           "anchor": {
             "x": 287,
@@ -1769,9 +1847,9 @@
           "wallFinish": "paint",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
-          "id": "f-r11"
+          "id": "f-r12"
         },
-        "f-r12": {
+        "f-r13": {
           "name": "Laundry (proposed)",
           "anchor": {
             "x": 334,
@@ -1781,9 +1859,9 @@
           "wallFinish": "paint",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
-          "id": "f-r12"
+          "id": "f-r13"
         },
-        "f-r13": {
+        "f-r14": {
           "name": "Foyer (proposed)",
           "anchor": {
             "x": -48,
@@ -1792,9 +1870,9 @@
           "phase": "new",
           "wallFinish": "paint",
           "floorFinish": "tile",
-          "id": "f-r13"
+          "id": "f-r14"
         },
-        "f-r14": {
+        "f-r15": {
           "name": "Screen porch (proposed)",
           "anchor": {
             "x": -48,
@@ -1803,7 +1881,7 @@
           "phase": "new",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
-          "id": "f-r14"
+          "id": "f-r15"
         }
       },
       "stairs": {
@@ -3045,6 +3123,8 @@
       "staircases": {
         "f-x1": {
           "name": "Grand stair",
+          "underside": "framed",
+          "startStep": "bullnose",
           "id": "f-x1"
         }
       },

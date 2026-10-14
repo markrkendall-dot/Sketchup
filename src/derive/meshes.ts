@@ -17,6 +17,7 @@ import { CHIMNEY_CAP, chimneyPartBoxes, columnOutline, hasChimneyCap, planTerrai
 import { boardColorOf, DEFAULT_SASH_COLOR, ROOF_COLOR, roofColorOf, ROOF_TILE, SIDING_FINISHES, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsPoint } from './stairs';
+import { getStaircaseLayout, heightAt, type StairPartGroup, type StairPartMat, type StairSolid, type StaircaseLayout } from './staircase';
 
 /** Moved to rooms.ts (the 2D editor uses it for "Fit to walls"); re-exported for the 3D code. */
 export { slabOutlines };
@@ -1111,6 +1112,19 @@ export interface FloorFinishMesh {
   geometry: BufferGeometry;
 }
 
+/**
+ * A staircase's parts (derive/staircase.ts), one geometry per group and material: the stair (treads
+ * in the tread colour, the carcass and risers in the paint), its framing and panels (paint), its
+ * railing (handrail and newel caps in the tread colour, newels and balusters in the paint).
+ */
+export interface StaircaseMesh {
+  id: Id;
+  phase: Phase;
+  treadColor: string;
+  paintColor: string;
+  parts: { group: StairPartGroup; mat: StairPartMat; geometry: BufferGeometry }[];
+}
+
 export interface StairsMesh {
   id: Id;
   geometry: BufferGeometry;
@@ -1128,6 +1142,18 @@ export interface DeckMesh {
   boards: BufferGeometry;
   frame: BufferGeometry;
   railing: BufferGeometry | null;
+}
+
+/** A staircase's solids as one geometry per group and material (empty ones left out). */
+export function buildStaircaseParts(solids: readonly StairSolid[]): StaircaseMesh['parts'] {
+  const by = new Map<string, { group: StairPartGroup; mat: StairPartMat; pos: number[] }>();
+  for (const s of solids) {
+    const k = `${s.group}|${s.mat}`;
+    let e = by.get(k);
+    if (!e) by.set(k, (e = { group: s.group, mat: s.mat, pos: [] }));
+    slopedPrismPositions(s.poly, (p) => heightAt(s.zb, p), (p) => heightAt(s.zt, p), {}, e.pos);
+  }
+  return [...by.values()].filter((e) => e.pos.length).map((e) => ({ group: e.group, mat: e.mat, geometry: geometryFrom(e.pos) }));
 }
 
 /** The boxes of a deck as one geometry (prisms concatenated into one buffer). */
@@ -1195,6 +1221,9 @@ export interface FloorOpeningMesh {
   /** The phase as shown in the view mode (shownPhase). */
   phase: Phase;
   railing: BufferGeometry;
+  /** In an arriving staircase's style: its handrail as the cap, in `style.treadColor`; the rest in `style.paintColor`. */
+  rail?: BufferGeometry;
+  style?: { treadColor: string; paintColor: string };
 }
 
 /**
@@ -1220,18 +1249,23 @@ export function getFloorOpeningMeshes(plan: Plan, levelId: Id, viewMode: ViewMod
     let e = entries.get(o.id);
     if (!e || e.layout !== layout) {
       e?.railing.dispose();
-      e = { layout, railing: deckBoxesGeometry(layout.railing) };
+      e?.rail?.dispose();
+      e = { layout, railing: deckBoxesGeometry(layout.railing), ...(layout.rail.length ? { rail: deckBoxesGeometry(layout.rail) } : {}) };
       entries.set(o.id, e);
     }
     seen.add(o.id);
-    out.push({ id: o.id, phase: shownPhase(o.phase, viewMode), railing: e.railing });
+    out.push({ id: o.id, phase: shownPhase(o.phase, viewMode), railing: e.railing, ...(e.rail ? { rail: e.rail } : {}), ...(layout.style ? { style: layout.style } : {}) });
   }
   for (const [id, e] of entries) {
     if (seen.has(id)) continue;
     e.railing.dispose();
+    e.rail?.dispose();
     entries.delete(id);
   }
-  const same = !!prev && prev.result.length === out.length && prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.railing === out[i].railing);
+  const same =
+    !!prev &&
+    prev.result.length === out.length &&
+    prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.railing === out[i].railing && m.rail === out[i].rail && m.style?.treadColor === out[i].style?.treadColor && m.style?.paintColor === out[i].style?.paintColor);
   const result = same ? prev.result : out;
   guardResult.set(key, { plan, result });
   return result;
@@ -1281,6 +1315,8 @@ export interface LevelMeshes {
   /** The floor finishes of the rooms labelled in the view mode that set one. */
   floorFinishes: FloorFinishMesh[];
   stairs: StairsMesh[];
+  /** Staircases (their pieces are not in `stairs`). */
+  staircases: StaircaseMesh[];
   /** The level's roofs visible in the view mode (level-local, like the walls). */
   roofs: RoofMesh[];
   /** Window and door fills of the visible openings (passages have none). */
@@ -1389,6 +1425,11 @@ const wallCache = new Map<string, Map<Id, WallEntry>>();
 const floorCache = new Map<string, FloorEntry>();
 const floorFinishCache = new Map<string, Map<Id, FloorFinishEntry>>();
 const stairsCache = new Map<string, Map<Id, StairsEntry>>();
+interface StaircaseEntry {
+  layout: StaircaseLayout;
+  parts: StaircaseMesh['parts'];
+}
+const staircaseCache = new Map<string, Map<Id, StaircaseEntry>>();
 const roofCache = new Map<string, Map<Id, RoofEntry>>();
 const openingCache = new Map<string, Map<Id, OpeningEntry>>();
 const fixtureCache = new Map<string, Map<Id, FixtureEntry>>();
@@ -1404,7 +1445,7 @@ interface DeckEntry {
 const deckCache = new Map<string, Map<Id, DeckEntry>>();
 const deckResult = new Map<string, { plan: Plan; result: DeckMesh[] }>();
 /** Floor openings' guards, cached like the decks. */
-const guardCache = new Map<string, Map<Id, { layout: FloorOpeningLayout; railing: BufferGeometry }>>();
+const guardCache = new Map<string, Map<Id, { layout: FloorOpeningLayout; railing: BufferGeometry; rail?: BufferGeometry }>>();
 const guardResult = new Map<string, { plan: Plan; result: FloorOpeningMesh[] }>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
@@ -1485,6 +1526,11 @@ function pruneCaches(plan: Plan): void {
     for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
     openingCache.delete(key);
   }
+  for (const [key, m] of staircaseCache) {
+    if (alive(key)) continue;
+    for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
+    staircaseCache.delete(key);
+  }
   for (const [key, m] of fixtureCache) {
     if (alive(key)) continue;
     for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
@@ -1531,7 +1577,7 @@ function counterPhase(members: readonly Fixture[]): Phase {
  */
 export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): LevelMeshes {
   const level = plan.levels[levelId];
-  if (!level) return { walls: [], floorFinishes: [], stairs: [], roofs: [], openings: [], fixtures: [], counters: [] };
+  if (!level) return { walls: [], floorFinishes: [], stairs: [], staircases: [], roofs: [], openings: [], fixtures: [], counters: [] };
   const key = `${levelId}|${viewMode}`;
   // Every mesh carries the phase it is drawn in (phase.ts shownPhase): red and green only in All.
   const sp = (p: Phase): Phase => shownPhase(p, viewMode);
@@ -1752,6 +1798,8 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const stairs: StairsMesh[] = [];
   for (const s of Object.values(level.stairs)) {
     if (!isVisible(s.phase, viewMode) || !(s.width > 0) || !(s.run > 0)) continue;
+    // A staircase's pieces are drawn with it.
+    if (s.staircaseId && level.staircases?.[s.staircaseId]) continue;
     const { rise, risers } = flightSteps(s, ftf);
     const base = stairsBase(s);
     if (!(rise > 0)) continue;
@@ -1770,6 +1818,22 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       e.railing?.dispose();
     }
   stairsCache.set(key, nextStairs);
+
+  // Staircases: rebuilt when their layout object changes (getStaircaseLayout).
+  const prevStaircases = staircaseCache.get(key);
+  const nextStaircases = new Map<Id, StaircaseEntry>();
+  const staircases: StaircaseMesh[] = [];
+  for (const id of Object.keys(level.staircases ?? {})) {
+    const layout = getStaircaseLayout(plan, levelId, id, viewMode);
+    if (!layout) continue;
+    const old = prevStaircases?.get(id);
+    const entry = old && old.layout === layout ? old : { layout, parts: buildStaircaseParts(layout.solids) };
+    nextStaircases.set(id, entry);
+    const first = level.stairs[layout.members[0]];
+    staircases.push({ id, phase: sp(first?.phase ?? 'existing'), treadColor: layout.style.treadColor, paintColor: layout.style.riserColor, parts: entry.parts });
+  }
+  if (prevStaircases) for (const [id, e] of prevStaircases) if (nextStaircases.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
+  staircaseCache.set(key, nextStaircases);
 
   // Roofs: rebuilt only when the roof object or its bearing height changes.
   const prevRoofs = roofCache.get(key);
@@ -1871,7 +1935,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     counterCache.set(key, { fixtures: counterFixtures, counters });
   }
 
-  const result: LevelMeshes = { walls, floorFinishes, stairs, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  const result: LevelMeshes = { walls, floorFinishes, stairs, staircases, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
   levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, look: plan.proposedLook, result });
   return result;
 }
@@ -1885,12 +1949,18 @@ export function clearMeshCache(): void {
   for (const m of stairsCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of roofCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of openingCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
+  for (const m of staircaseCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
+  staircaseCache.clear();
   for (const m of fixtureCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
   for (const e of counterCache.values()) for (const c of e.counters) c.geometry.dispose();
   for (const m of deckCache.values()) for (const e of m.values()) disposeDeckEntry(e);
   deckCache.clear();
   deckResult.clear();
-  for (const m of guardCache.values()) for (const e of m.values()) e.railing.dispose();
+  for (const m of guardCache.values())
+    for (const e of m.values()) {
+      e.railing.dispose();
+      e.rail?.dispose();
+    }
   guardCache.clear();
   guardResult.clear();
   roofCache.clear();

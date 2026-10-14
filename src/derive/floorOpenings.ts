@@ -1,6 +1,9 @@
-import { add, pointInPolygon, polygonSignedArea, scale } from '../model/geometry';
+import { add, pointInPolygon, polygonSignedArea, projectPointToSegment, scale } from '../model/geometry';
+import { staircaseStyleOf } from '../model/stairStyle';
 import type { FloorOpening, Id, Plan, Vec2, ViewMode } from '../model/types';
-import { DECK, deckStairOpenings, edgeOutward, railingParts, railingRuns, type DeckBox, type DeckOpening } from './decks';
+import { DECK, DECK_RAIL, deckStairOpenings, edgeOutward, railingParts, railingRuns, type DeckBox, type DeckOpening, type RailSizes, type RunEnds } from './decks';
+import { STAIRCASE } from './staircase';
+import { stairsOutline } from './stairs';
 import { getFootprints } from './footprint';
 import { isVisible, phasesCoexist } from './phase';
 import { insetPolygon } from './rooms';
@@ -19,8 +22,14 @@ export interface FloorOpeningLayout {
   supported: boolean[];
   /** Where a flight from below arrives at an edge: the guard is cut there. */
   openings: DeckOpening[];
-  /** The guard's posts, bottom rails, balusters and caps, standing on the floor round the hole. */
+  /**
+   * The guard's posts, bottom rails, balusters and caps, standing on the floor round the hole. When a
+   * staircase arrives (`style`) the guard is in its style and its caps are in `rail` instead.
+   */
   railing: DeckBox[];
+  rail: DeckBox[];
+  /** The arriving staircase's colours: the rail in the tread colour, the rest in the paint. */
+  style?: { treadColor: string; paintColor: string };
   /** The caps' plan polygons (the plan draws the guard with them). */
   caps: Vec2[][];
 }
@@ -67,12 +76,84 @@ export function floorOpeningHoles(plan: Plan, levelId: Id, viewMode: ViewMode): 
 
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
-function buildLayout(opening: FloorOpening, supported: boolean[], openings: DeckOpening[]): FloorOpeningLayout {
-  const sig = JSON.stringify([opening.outline.map((p) => [r4(p.x), r4(p.y)]), opening.railings, supported, openings.map((o) => [o.edge, r4(o.from), r4(o.to)])]);
+/**
+ * The guard's style when a staircase arrives at the opening: its newels as the posts, its handrail
+ * as the cap (at least 36" up), its balusters standing on the floor; and at each railed side of an
+ * arriving flight, the guard's run reaches on to that newel (which the staircase draws) instead of
+ * ending on a post of its own beside it.
+ */
+interface GuardStyle {
+  sizes: RailSizes;
+  colors: { treadColor: string; paintColor: string };
+  /** Per arrival: the edge, the run end to carry on past (`from` or `to`), the newel's width. */
+  reach: { edge: number; at: number; dir: 1 | -1; by: number }[];
+}
+
+function guardStyle(plan: Plan, opening: FloorOpening, openings: DeckOpening[]): GuardStyle | null {
+  let out: GuardStyle | null = null;
+  for (const o of openings) {
+    const st = o.levelId && o.stairsId ? plan.levels[o.levelId]?.stairs[o.stairsId] : undefined;
+    const sc = st?.staircaseId ? plan.levels[o.levelId!]?.staircases?.[st.staircaseId] : undefined;
+    if (!st || !sc) continue;
+    const style = staircaseStyleOf(sc);
+    const post = style.newel === 'box' ? STAIRCASE.boxNewel : STAIRCASE.squareNewel;
+    if (!out) {
+      out = {
+        sizes: {
+          height: Math.max(DECK.railHeight, style.handrailHeight),
+          post,
+          postSpacing: 96,
+          cap: style.handrail === 'round' ? STAIRCASE.roundRail : STAIRCASE.boardRail,
+          capThick: style.handrail === 'round' ? STAIRCASE.roundRail : STAIRCASE.boardRailThick,
+          bottomRail: false,
+          baluster: STAIRCASE.baluster,
+          gap: style.balusterGap,
+        },
+        colors: { treadColor: style.treadColor, paintColor: style.riserColor },
+        reach: [],
+      };
+    }
+    // The flight's railed sides' top corners: the newel stands just inside each.
+    const [, tl, tr] = stairsOutline(st);
+    const a = opening.outline[o.edge];
+    const b = opening.outline[(o.edge + 1) % opening.outline.length];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    for (const [side, corner] of [
+      ['left', tl],
+      ['right', tr],
+    ] as const) {
+      if (!st.railings?.[side]) continue;
+      const s = projectPointToSegment(corner, a, b).t * len;
+      if (Math.abs(s - o.from) < 0.5) out.reach.push({ edge: o.edge, at: o.from, dir: 1, by: post });
+      else if (Math.abs(s - o.to) < 0.5) out.reach.push({ edge: o.edge, at: o.to, dir: -1, by: post });
+    }
+  }
+  return out;
+}
+
+function buildLayout(opening: FloorOpening, supported: boolean[], openings: DeckOpening[], style: GuardStyle | null): FloorOpeningLayout {
+  const sig = JSON.stringify([opening.outline.map((p) => [r4(p.x), r4(p.y)]), opening.railings, supported, openings.map((o) => [o.edge, r4(o.from), r4(o.to)]), style]);
   // A wall along an edge is the guard there.
   const railings = opening.railings.map((r, i) => r && !supported[i]);
-  const { railing, caps } = railingParts(opening.outline, railingRuns({ outline: opening.outline, railings }, openings), 0, -1);
-  return { sig, supported, openings, railing, caps };
+  const runs = railingRuns({ outline: opening.outline, railings }, openings).map((rs) => rs.map(([s0, s1]) => [s0, s1] as [number, number]));
+  const ends: RunEnds[][] = runs.map((rs) => rs.map(() => ({})));
+  const lens = opening.outline.map((p, i) => {
+    const q = opening.outline[(i + 1) % opening.outline.length];
+    return Math.hypot(q.x - p.x, q.y - p.y);
+  });
+  for (const r of style?.reach ?? []) {
+    runs[r.edge]?.forEach((run, k) => {
+      if (r.dir === 1 && Math.abs(run[1] - r.at) < 0.5) {
+        run[1] = Math.min(lens[r.edge], run[1] + r.by);
+        ends[r.edge][k].noEndPost = true;
+      } else if (r.dir === -1 && Math.abs(run[0] - r.at) < 0.5) {
+        run[0] = Math.max(0, run[0] - r.by);
+        ends[r.edge][k].noStartPost = true;
+      }
+    });
+  }
+  const { railing, caps, capBoxes } = railingParts(opening.outline, runs, 0, -1, style?.sizes ?? DECK_RAIL, ends, !!style);
+  return { sig, supported, openings, railing, rail: style ? capBoxes : [], caps, ...(style ? { style: style.colors } : {}) };
 }
 
 const layoutCache = new Map<string, { plan: Plan; layout: FloorOpeningLayout }>();
@@ -99,7 +180,7 @@ export function getFloorOpeningLayout(plan: Plan, levelId: Id, openingId: Id, vi
   const supported = floorOpeningSupportedEdges(plan, levelId, opening, viewMode);
   // A flight arrives at an edge when its top is one riser or less below this floor (a deck at the floor's top).
   const openings = deckStairOpenings(plan, levelId, { outline: opening.outline, elevation: 0, phase: opening.phase }, viewMode);
-  const layout = buildLayout(opening, supported, openings);
+  const layout = buildLayout(opening, supported, openings, guardStyle(plan, opening, openings));
   if (hit && hit.layout.sig === layout.sig) {
     hit.plan = plan;
     return hit.layout;

@@ -148,7 +148,7 @@ describe('the starter', () => {
     ]);
   });
 
-  it('has only its board handrails to check', () => {
-    expect(getIssues(starter).map((i) => `${i.code} ${i.target.stairs?.join(',')}`)).toEqual(['stair.handrail-grip f-s3', 'stair.handrail-grip f-s5']);
+  it('has nothing to check: the Grand stair\'s round rail is graspable', () => {
+    expect(getIssues(starter).map((i) => `${i.code} ${i.target.stairs?.join(',')}`)).toEqual([]);
   });
 });

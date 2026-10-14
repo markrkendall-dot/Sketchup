@@ -9,6 +9,7 @@ import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
 import { faceAt, getFaces, interiorPoint, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
 import { siteGhostLevelId } from '../derive/site';
+import { getStaircaseLayout } from '../derive/staircase';
 import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
 import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
@@ -426,7 +427,7 @@ const NO_RECORD: Readonly<Record<Id, unknown>> = {};
  * layer of per-entity components does not re-render (and re-create every child) when an entity
  * only changes, e.g. on every step of a corner drag. The children select their own entity.
  */
-function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures' | 'decks' | 'floorOpenings'): Id[] {
+function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures' | 'decks' | 'floorOpenings' | 'staircases'): Id[] {
   return useLayerPlan(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
 }
 
@@ -536,18 +537,48 @@ const StairsShape = memo(function StairsShape({ levelId, stairsId }: { levelId: 
   // Selected itself, or as a piece of its selected staircase.
   const selected = useLayerUi((s) => s.selection.stairs.includes(stairsId) || (!!st?.staircaseId && s.selection.staircases.includes(st.staircaseId)));
   const k = useLayerUi(viewportScale);
-  const sym = useMemo(() => (st ? stairsSymbol(st, flightSteps(st, ftf).risers) : null), [st, ftf]);
+  // A staircase's piece leaves its railings to the staircase (StaircaseShape).
+  const member = useLayerPlan((s) => !!st?.staircaseId && !!s.plan.levels[levelId]?.staircases?.[st.staircaseId]);
+  const sym = useMemo(() => (st ? stairsSymbol(member ? { ...st, railings: undefined } : st, flightSteps(st, ftf).risers) : null), [st, ftf, member]);
   if (!st || !sym || !isVisible(st.phase, viewMode)) return null;
   return <StairsGlyph sym={sym} k={k} id={stairsId} className={`stairs phase-${shownPhase(st.phase, viewMode)}${selected ? ' is-selected' : ''}`} />;
 });
 
+/**
+ * A staircase's railing on the plan (derive/staircase.ts): the handrails as heavy lines, the newels
+ * as squares, and the bullnose's outline round the starting newel.
+ */
+const StaircaseShape = memo(function StaircaseShape({ levelId, staircaseId }: { levelId: Id; staircaseId: Id }) {
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const layout = useLayerPlan((s) => getStaircaseLayout(s.plan, levelId, staircaseId, viewMode));
+  const phase = useLayerPlan((s) => {
+    const first = layout ? s.plan.levels[levelId]?.stairs[layout.members[0]] : undefined;
+    return first ? shownPhase(first.phase, viewMode) : 'existing';
+  });
+  if (!layout) return null;
+  const half = (n: { at: Vec2; size: number }) => n.size / 2;
+  return (
+    <g className={`stairs staircase phase-${phase}`} data-staircase-id={staircaseId}>
+      {layout.bullnose && <path className="stairs-body" d={polyPath(layout.bullnose)} vectorEffect="non-scaling-stroke" />}
+      {layout.rails.length > 0 && <path className="stairs-rail" d={segPath(layout.rails.map((r) => [r.a, r.b] as [Vec2, Vec2]))} vectorEffect="non-scaling-stroke" />}
+      {layout.newels.map((n, i) => (
+        <rect key={i} className="stairs-newel" x={n.at.x - half(n)} y={n.at.y - half(n)} width={n.size} height={n.size} vectorEffect="non-scaling-stroke" />
+      ))}
+    </g>
+  );
+});
+
 const StairsLayer = memo(function StairsLayer({ levelId }: { levelId: Id }) {
   const ids = useEntityIds(levelId, 'stairs');
+  const staircases = useEntityIds(levelId, 'staircases');
   if (ids.length === 0) return null;
   return (
     <g className="layer-stairs" pointerEvents="none">
       {ids.map((id) => (
         <StairsShape key={id} levelId={levelId} stairsId={id} />
+      ))}
+      {staircases.map((id) => (
+        <StaircaseShape key={id} levelId={levelId} staircaseId={id} />
       ))}
     </g>
   );

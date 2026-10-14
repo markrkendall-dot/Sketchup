@@ -10,7 +10,7 @@ import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_L
 import { COLUMN_COLOR, DECK_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FixtureKind, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -122,7 +122,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     const meshes = getLevelMeshes(plan, id, viewMode);
     const decks = getDeckMeshes(plan, id, viewMode);
     const guards = getFloorOpeningMeshes(plan, id, viewMode);
-    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length)) continue;
+    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.staircases.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length)) continue;
     const group = new Group();
     group.name = level.name;
     group.position.set(0, elev[id]?.floorTop ?? 0, 0);
@@ -149,6 +149,17 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         const r = mesh('Stair railing', s.railing, material(`railing_${s.phase}`, railingMaterial(s.phase)));
         if (s.phase === 'demo') r.renderOrder = 1;
         group.add(r);
+      }
+    }
+    // A staircase: its stair (treads, carcass), framing and railing, each in the tread colour or the paint.
+    const STAIR_PART_NAME = { stair: 'Stairs', frame: 'Stair framing', rail: 'Stair railing' } as const;
+    for (const sc of meshes.staircases) {
+      for (const p of sc.parts) {
+        const color = p.mat === 'tread' ? sc.treadColor : sc.paintColor;
+        const name = sc.phase === 'demo' ? `stair_${p.mat}_demo` : `stair_${p.mat}_${sc.phase}_${color.slice(1)}`;
+        const m = mesh(STAIR_PART_NAME[p.group], p.geometry, material(name, stairPartMaterial(p.mat, sc.phase, color)));
+        if (sc.phase === 'demo') m.renderOrder = 1;
+        group.add(m);
       }
     }
     for (const r of meshes.roofs) {
@@ -181,9 +192,16 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     }
     // The guards round floor openings.
     for (const g of guards) {
-      const m = mesh('Guard', g.railing, material(`railing_${g.phase}`, railingMaterial(g.phase)));
+      // In an arriving staircase's style: its paint and its tread colour (the rail).
+      const stairMat = (mat: 'tread' | 'paint', color: string) => material(g.phase === 'demo' ? `stair_${mat}_demo` : `stair_${mat}_${g.phase}_${color.slice(1)}`, stairPartMaterial(mat, g.phase, color));
+      const m = mesh('Guard', g.railing, g.style ? stairMat('paint', g.style.paintColor) : material(`railing_${g.phase}`, railingMaterial(g.phase)));
       if (g.phase === 'demo') m.renderOrder = 1;
       group.add(m);
+      if (g.rail && g.style) {
+        const r = mesh('Guard', g.rail, stairMat('tread', g.style.treadColor));
+        if (g.phase === 'demo') r.renderOrder = 1;
+        group.add(r);
+      }
     }
     // Windows and doors: one mesh per material part, named Window or Door.
     for (const o of meshes.openings) {

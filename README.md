@@ -657,14 +657,20 @@ with the places where the built design differs from them):
    169, y 7 to 91). The old stair, the front room's walls (the y 99.5 line and the old bath's west
    wall) and its 80" north window are demolished; upstairs the Bunk's south wall and door and the
    stub of its east wall go. The new **stair wraps the hall** round an open court: 15 risers of
-   7.2" on 10.5" treads, 42" wide, solid underneath:
+   7.2" on 10.5" treads, 42" wide, one staircase (the "Grand stair") in oak treads with a 1"
+   nosing over white risers, box newels and a round oak handrail on white balusters, framed
+   underneath, with a bullnose round the starting newel:
    - a one-riser **platform** in the north-west corner, two steps from the house door: you step up
      onto it heading north and turn east;
    - a flight of 8 risers **east along the north wall**, railed on its open side;
    - a **landing** in the north-east corner at 6';
    - a flight of 4 risers **south**, railed on its open side, arriving at the **balcony** (y 91 to
-     135), which has a guard along its edge and leads straight to the upstairs bedroom's door and
-     east into the upstairs hall.
+     135), which has a guard along its edge in the stair's style, running on to the stair's top
+     newel, and leads straight to the upstairs bedroom's door and east into the upstairs hall;
+   - a **coat closet** under the landing and the top flight, 2'3" x 6'7" inside, with a 24" door
+     into the hall; its walls stand to the stair's underside. Its west wall is at x 138.5, not under
+     the landing's edge: there it would meet the north wall inside the span of the old 80" window,
+     which the model cannot split. The landing's free corner stands on a post.
 
    The house door (32", green) is in the west wall in the middle of the old stair strip, in line
    with the foyer's front door, and a new 32" cased opening at the strip's east end leads straight
@@ -755,8 +761,8 @@ Still open:
   CO alarms are required with a fuel-burning appliance. See `docs/history/PLAN-v7-exterior-flue.md`.
 - **The dryer's vent**: up through the wing's ceiling and roof, or along the ceiling to an outside
   wall.
-- **Coats** at the front door: there is no closet in the new layout; hooks or a bench in the foyer,
-  or a closet under the stair's landing (the stair is drawn solid there).
+- **Coats**: the closet under the stair is narrow (2'3" inside, the old window's span sets its west
+  wall); hooks or a bench in the foyer would add room.
 - **The pantry** is small (3'11" x 3'6"); the north band is 3'6" deep rather than the 4' asked
   for (see 4 above).
 - The pipes of the upstairs bath come down through the powder room under it (the old pipe chase
@@ -786,6 +792,9 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
   edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
+- **Staircases**: a turn is a landing; there are no winders, curved or flared flights. The handrail
+  of each flight dies into a newel at a turn (no goosenecks or easings); the round rail is drawn as
+  a 2" square bar; stringers are not drawn apart from the carcass (closed and open draw alike).
 - **Not drawn yet**: a guard round the hole a flight cuts in the floor above (draw a floor opening
   round the stair well instead; it has one), handrails on a wall,
   exterior steps other than a flight (an outside stair is a flight on the lowest level, open and,

@@ -10,6 +10,7 @@
 import { getLevelElevations } from '../src/derive/levels';
 import { roofBearing, roofHeightAt } from '../src/derive/roofs';
 import { columnDefaults } from '../src/derive/site';
+import { getStaircaseLayout, heightAt } from '../src/derive/staircase';
 import { COLUMN_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
@@ -977,8 +978,12 @@ function proposed(ids: ExistingIds): void {
     flight({ origin: { x: STAIR.landingWest, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: STAIR.east - STAIR.landingWest, base: 9 * R, rise: R, risers: 1 }),
     flight({ origin: { x: (STAIR.landingWest + STAIR.east) / 2, y: STAIR.south }, direction: 90, width: STAIR.east - STAIR.landingWest, run: 4 * TREAD, base: 10 * R, rise: 4 * R, risers: 4, railings: { right: true } }),
   ];
-  // The four pieces are one staircase (Level.staircases), selected, moved and styled together.
-  if (!store().groupStairs(fId, pieces, { name: 'Grand stair' })) throw new Error('staircase rejected');
+  // The four pieces are one staircase (Level.staircases), selected, moved and styled together: oak
+  // treads with a 1" nosing over white risers, closed stringers, box newels and a round 36" rail
+  // (the defaults, model/stairStyle.ts), framed underneath so the space under the landing and the
+  // top flight is a room, and a bullnose round the starting newel on the platform.
+  const grand = store().groupStairs(fId, pieces, { name: 'Grand stair', underside: 'framed', startStep: 'bullnose' });
+  if (!grand) throw new Error('staircase rejected');
   const well = { x0: CL.x0 + HALF, x1: 169, y0: CL.y0 + HALF, y1: STAIR.top, bathCorner: 86 };
   const wellOutline = [
     { x: well.x0, y: well.y0 },
@@ -988,6 +993,26 @@ function proposed(ids: ExistingIds): void {
     { x: well.x0, y: well.y1 },
   ];
   if (!store().addFloorOpening(sId, { outline: wellOutline, railings: [false, false, true, true, false], phase: NEW })) throw new Error('floor opening rejected');
+
+  // ---- The coat closet under the stair (MK, 14 Oct 2026: the design had none). The framed
+  // underside leaves a room under the landing (61 3/4" clear) and the top flight (its soffit rising
+  // to about 7'8" at its top). The closet's west wall cannot stand under the landing's edge (x 129.5):
+  // it would meet the north wall inside the old front room's 80" window (jambs 56..136), which keeps
+  // its place in the existing view only if that wall is not split there. So the wall is at x 138.5
+  // (faces 136..141), its face at the old window's east jamb, and the closet is 2'3" x 6'7" inside
+  // (x 141..168, y 7..86). Its front wall, under the top flight at y 88.5 (faces 86..91), takes a 24"
+  // door swinging out into the hall. Each wall stands to the stair's underside over it (the west one
+  // to the landing's; the stair's panels close the slope above it, derive/staircase.ts).
+  const CLOSET = { west: 138.5, front: 88.5 };
+  partition(fId, { x: CLOSET.west, y: CL.y0 }, { x: CLOSET.west, y: CLOSET.front }, NEW);
+  partition(fId, { x: CLOSET.west, y: CLOSET.front }, { x: PART_KL, y: CLOSET.front }, NEW);
+  const under = getStaircaseLayout(getPlan(), fId, grand, 'proposed')!.undersides;
+  const quarter = (v: number) => Math.floor(v * 4) / 4;
+  const landingUnder = quarter(heightAt(under[pieces[2]]!, { x: 150, y: 28 }));
+  const frontUnder = quarter(heightAt(under[pieces[3]]!, { x: 150, y: CLOSET.front - TI / 2 }));
+  store().updateWalls(fId, [wallAt(fId, { x: CLOSET.west, y: 30 }).wallId], { heightOverride: landingUnder });
+  store().updateWalls(fId, [wallAt(fId, { x: 150, y: CLOSET.front }).wallId], { heightOverride: frontUnder });
+  add({ x: (CLOSET.west + TI / 2 + PART_KL - TI / 2) / 2, y: CLOSET.front }, { type: 'door', width: 24, height: 80, into: SOUTH, leafColor: STAINED_DOOR });
 
   // ---- Roofs, new sheet (little rust). The wing: one shed over the whole east side, 5:12 in the
   // wing roof's colour, high at the main block's east wall and down to 96" at the wing's east wall:
@@ -1145,6 +1170,7 @@ function proposed(ids: ExistingIds): void {
   label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Stair hall (proposed)', { x: 100, y: 118.5 }, NEW, PLACEHOLDER_ROOM);
+  label(fId, 'Coats (proposed)', { x: 154.5, y: 47 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Powder room (proposed)', { x: 213, y: 28 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Pantry (proposed)', { x: 287, y: 30 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PLACEHOLDER_ROOM);

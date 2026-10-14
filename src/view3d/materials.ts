@@ -255,6 +255,11 @@ export function railingMaterial(phase: Phase): MeshStandardMaterial {
   return trimLike('railing', RAILING_COLOR, phase);
 }
 
+/** A staircase's tread colour (treads, handrail, newel caps) or its paint (demolished: red, new: pulled toward green, like trim). */
+export function stairPartMaterial(mat: 'tread' | 'paint', phase: Phase, color: string): MeshStandardMaterial {
+  return trimLike(`stair-${mat}`, color, phase);
+}
+
 const partMaterials = new Map<string, MeshStandardMaterial>();
 
 function trimLike(name: string, color: string, phase: Phase): MeshStandardMaterial {

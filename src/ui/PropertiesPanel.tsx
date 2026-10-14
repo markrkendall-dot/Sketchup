@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { issuesFor, type IssueTarget } from '../derive/checks';
 import { stairChains } from '../derive/stairChain';
+import { staircaseFieldProblem, staircaseStyleOf } from '../model/stairStyle';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getFootprints } from '../derive/footprint';
 import { compassName, deckTopWords, edgeOutward, getDeckLayout } from '../derive/decks';
@@ -42,9 +43,9 @@ import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
-import type { Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Staircase, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
-import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type LengthAnchor, type RoomPatch } from '../store/planStore';
+import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type LengthAnchor, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { duplicateRoomNotice, showNotice } from './fileActions';
 import { roomNameOf, runWallMove, wallSideNames } from './wallMove';
@@ -1105,9 +1106,68 @@ function StaircaseMembership({ level, stairs }: { level: Level; stairs: Stairs }
   );
 }
 
+const STRINGER_OPTIONS: { value: StairStringer; label: string }[] = [
+  { value: 'closed', label: 'Closed (skirt boards)' },
+  { value: 'open', label: 'Open (cut stringer)' },
+];
+const UNDERSIDE_OPTIONS: { value: StairUnderside; label: string }[] = [
+  { value: 'solid', label: 'Solid to the floor' },
+  { value: 'framed', label: 'Framed (room under it)' },
+  { value: 'open', label: 'Open (stringers only)' },
+];
+const NEWEL_OPTIONS: { value: StairNewel; label: string }[] = [
+  { value: 'box', label: 'Box newels, capped' },
+  { value: 'square', label: 'Square posts' },
+];
+const HANDRAIL_OPTIONS: { value: StairHandrail; label: string }[] = [
+  { value: 'round', label: 'Round, 2" (graspable)' },
+  { value: 'board', label: 'Board, 3 1/2" (not graspable)' },
+];
+const START_OPTIONS: { value: StairStartStep; label: string }[] = [
+  { value: 'square', label: 'Square' },
+  { value: 'bullnose', label: 'Bullnose round the newel' },
+];
+
+/** A staircase's style (model/stairStyle.ts): each field at its default until set; Default clears it. */
+function StaircaseStyleFields({ level, staircase }: { level: Level; staircase: Staircase }) {
+  const updateStaircase = usePlanStore((s) => s.updateStaircase);
+  const st = staircaseStyleOf(staircase);
+  const set = (patch: StaircasePatch) => updateStaircase(level.id, staircase.id, patch);
+  const length = (key: 'nosing' | 'treadThickness' | 'handrailHeight' | 'balusterGap', label: string, hint: string) => (
+    <LengthField
+      label={label}
+      value={st[key]}
+      bound="nonnegative"
+      onCommit={(v) => {
+        if (v === null) return null;
+        const problem = staircaseFieldProblem(key, v);
+        if (problem) return problem[0].toUpperCase() + problem.slice(1) + '.';
+        set({ [key]: v });
+        return null;
+      }}
+      hint={hint}
+    />
+  );
+  return (
+    <>
+      <ColorField label="Treads" value={st.treadColor} onCommit={(treadColor) => set({ treadColor })} onReset={staircase.treadColor ? () => set({ treadColor: undefined }) : undefined} hint="Treads, handrail and newel caps." />
+      <ColorField label="Risers" value={st.riserColor} onCommit={(riserColor) => set({ riserColor })} onReset={staircase.riserColor ? () => set({ riserColor: undefined }) : undefined} hint="Risers, skirts, balusters, newels and the underside." />
+      {length('nosing', 'Nosing', 'How far each tread stands past the riser under it (3/4" to 1 1/4" on treads under 11").')}
+      {length('treadThickness', 'Tread thickness', 'The tread boards.')}
+      <SelectField label="Stringer" value={st.stringer} options={STRINGER_OPTIONS} onChange={(stringer) => set({ stringer })} />
+      <SelectField label="Underside" value={st.underside} options={UNDERSIDE_OPTIONS} onChange={(underside) => set({ underside })} />
+      <SelectField label="Newels" value={st.newel} options={NEWEL_OPTIONS} onChange={(newel) => set({ newel })} />
+      <SelectField label="Handrail" value={st.handrail} options={HANDRAIL_OPTIONS} onChange={(handrail) => set({ handrail })} />
+      {length('handrailHeight', 'Handrail height', 'Over the nosings: 34" to 38".')}
+      {length('balusterGap', 'Baluster gap', 'The most room between balusters: under 4 3/8" on a stair.')}
+      <SelectField label="First step" value={st.startStep} options={START_OPTIONS} onChange={(startStep) => set({ startStep })} />
+    </>
+  );
+}
+
 /**
- * A staircase (types.ts Staircase): its name, its pieces (each one a button that selects it alone),
- * their phase, and ungrouping. Its style is drawn from M3b of PLAN-v8 on.
+ * A staircase (types.ts Staircase): its name, phase and style, its pieces (each one a button that
+ * selects it alone), their issues, and ungrouping.
  */
 function StaircaseProps({ level, staircase }: { level: Level; staircase: Staircase }) {
   const updateStaircase = usePlanStore((s) => s.updateStaircase);
@@ -1151,6 +1211,7 @@ function StaircaseProps({ level, staircase }: { level: Level; staircase: Stairca
           onChange={(phase) => setPhase(level.id, { walls: [], openings: [], staircases: [staircase.id] }, phase)}
         />
       )}
+      <StaircaseStyleFields level={level} staircase={staircase} />
       <div className="field">
         <span className="label">Pieces</span>
       </div>

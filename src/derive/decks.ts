@@ -361,41 +361,85 @@ export function railingRuns(deck: Pick<Deck, 'outline' | 'railings'>, openings: 
   });
 }
 
+/** A railing's sizes: the deck's (DECK) by default; a staircase's guard takes its newels and rail. */
+export interface RailSizes {
+  height: number;
+  post: number;
+  postSpacing: number;
+  cap: number;
+  capThick: number;
+  /** A bottom rail the balusters stand on (the deck's), or balusters down to the floor. */
+  bottomRail: boolean;
+  baluster: number;
+  gap: number;
+}
+export const DECK_RAIL: RailSizes = {
+  height: DECK.railHeight,
+  post: DECK.railPost,
+  postSpacing: DECK.railPostSpacing,
+  cap: DECK.cap,
+  capThick: DECK.capThick,
+  bottomRail: true,
+  baluster: DECK.baluster,
+  gap: DECK.balusterGap,
+};
+
+/** A run's ends that take no post (a stair's newel stands there instead). */
+export interface RunEnds {
+  noStartPost?: boolean;
+  noEndPost?: boolean;
+}
+
 /**
- * A 36" railing along runs of an outline's edges (DECK rail sizes), standing on `top`: posts at most
- * DECK.railPostSpacing apart, a bottom rail, balusters with at most DECK.balusterGap between them and
- * a cap, mitred where the runs of two edges meet at a corner. `side` 1 puts it just inside the
- * outline (a deck's edge), -1 just outside it (the floor round a floor opening). `runs[i]`: the
- * stretches of edge i, as distances from its start.
+ * A 36" railing along runs of an outline's edges (DECK rail sizes unless `sizes` says otherwise),
+ * standing on `top`: posts at most `postSpacing` apart, a bottom rail, balusters with at most `gap`
+ * between them and a cap, mitred where the runs of two edges meet at a corner. `side` 1 puts it just
+ * inside the outline (a deck's edge), -1 just outside it (the floor round a floor opening).
+ * `runs[i]`: the stretches of edge i, as distances from its start; `ends[i][k]` drops the post at
+ * either end of run k. The caps go in `railing` too, unless `splitCaps` (then only in `capBoxes`).
  */
-export function railingParts(outline: readonly Vec2[], runs: readonly (readonly [number, number])[][], top: number, side: 1 | -1 = 1): { railing: DeckBox[]; caps: Vec2[][] } {
+export function railingParts(
+  outline: readonly Vec2[],
+  runs: readonly (readonly [number, number])[][],
+  top: number,
+  side: 1 | -1 = 1,
+  sizes: RailSizes = DECK_RAIL,
+  ends: readonly (readonly RunEnds[])[] = [],
+  splitCaps = false,
+): { railing: DeckBox[]; caps: Vec2[][]; capBoxes: DeckBox[] } {
   const n = outline.length;
   const lens = edgeLengths(outline);
   const railing: DeckBox[] = [];
   const caps: Vec2[][] = [];
-  const c = DECK.railPost / 2;
-  const capBottom = top + DECK.railHeight - DECK.capThick;
-  const capTop = top + DECK.railHeight;
+  const capBoxes: DeckBox[] = [];
+  const c = sizes.post / 2;
+  const capBottom = top + sizes.height - sizes.capThick;
+  const capTop = top + sizes.height;
   const railBottom = top + DECK.bottomRailUp;
-  const railTop = railBottom + DECK.bottomRailHeight;
+  const railTop = sizes.bottomRail ? railBottom + DECK.bottomRailHeight : top;
   for (let i = 0; i < n; i++) {
     const prev = (i - 1 + n) % n;
     const next = (i + 1) % n;
     const d = edgeDir(outline, i);
     const inward = scale(edgeOutward(outline, i), -side);
     const pointAt = (s: number, off: number) => add(add(outline[i], scale(d, s)), scale(inward, off));
-    for (const [s0, s1] of runs[i] ?? []) {
+    for (const [k0, [s0, s1]] of (runs[i] ?? []).entries()) {
+      const end = ends[i]?.[k0] ?? {};
       // A corner shared with the previous or next edge's railing: one post there, the caps mitred.
       const cornerStart = s0 <= EPS && (runs[prev] ?? []).some(([, e]) => e >= lens[prev] - EPS);
       const cornerEnd = s1 >= lens[i] - EPS && (runs[next] ?? []).some(([b]) => b <= EPS);
       const capPoly = [
         pointAt(s0, 0),
         pointAt(s1, 0),
-        cornerEnd ? insetCorner(outline, next, DECK.cap * side) : pointAt(s1, DECK.cap),
-        cornerStart ? insetCorner(outline, i, DECK.cap * side) : pointAt(s0, DECK.cap),
+        cornerEnd ? insetCorner(outline, next, sizes.cap * side) : pointAt(s1, sizes.cap),
+        cornerStart ? insetCorner(outline, i, sizes.cap * side) : pointAt(s0, sizes.cap),
       ];
-      caps.push(capPoly);
-      railing.push({ poly: capPoly, bottom: capBottom, top: capTop });
+      // A narrower cap runs centred over the posts.
+      const shift = (sizes.post - sizes.cap) / 2;
+      const capAt = shift > 1e-9 ? capPoly.map((p) => add(p, scale(inward, shift))) : capPoly;
+      caps.push(capAt);
+      capBoxes.push({ poly: capAt, bottom: capBottom, top: capTop });
+      if (!splitCaps) railing.push({ poly: capAt, bottom: capBottom, top: capTop });
       // Posts along the run: at its ends (a shared corner's post is placed by the edge it starts)
       // and evenly between, at most DECK.railPostSpacing apart.
       const a = s0 + c;
@@ -403,13 +447,14 @@ export function railingParts(outline: readonly Vec2[], runs: readonly (readonly 
       const stations: number[] = [];
       if (b - a < EPS) stations.push((s0 + s1) / 2);
       else {
-        const spans = Math.max(1, Math.ceil((b - a) / DECK.railPostSpacing - EPS));
+        const spans = Math.max(1, Math.ceil((b - a) / sizes.postSpacing - EPS));
         for (let k = 0; k <= spans; k++) stations.push(a + ((b - a) * k) / spans);
       }
       stations.forEach((s, k) => {
         if (k === stations.length - 1 && cornerEnd && stations.length > 1) return;
+        if ((k === 0 && end.noStartPost) || (k === stations.length - 1 && end.noEndPost)) return;
         const at = k === 0 && cornerStart ? insetCorner(outline, i, c * side) : pointAt(s, c);
-        railing.push({ poly: square(at, d, DECK.railPost), bottom: top, top: capBottom });
+        railing.push({ poly: square(at, d, sizes.post), bottom: top, top: capBottom });
       });
       // Bottom rail and balusters between neighbouring posts' faces.
       for (let k = 0; k + 1 < stations.length; k++) {
@@ -417,9 +462,9 @@ export function railingParts(outline: readonly Vec2[], runs: readonly (readonly 
         const g1 = stations[k + 1] - c;
         if (g1 - g0 < EPS) continue;
         const t = DECK.bottomRailThick / 2;
-        railing.push({ poly: band(outline, i, g0, g1, (c - t) * side, (c + t) * side), bottom: railBottom, top: railTop });
-        const w = DECK.baluster;
-        const count = Math.max(0, Math.ceil((g1 - g0 - DECK.balusterGap) / (DECK.balusterGap + w) - EPS));
+        if (sizes.bottomRail) railing.push({ poly: band(outline, i, g0, g1, (c - t) * side, (c + t) * side), bottom: railBottom, top: railTop });
+        const w = sizes.baluster;
+        const count = Math.max(0, Math.ceil((g1 - g0 - sizes.gap) / (sizes.gap + w) - EPS));
         const gap = (g1 - g0 - count * w) / (count + 1);
         for (let m = 0; m < count; m++) {
           const s = g0 + gap * (m + 1) + w * m + w / 2;
@@ -428,7 +473,7 @@ export function railingParts(outline: readonly Vec2[], runs: readonly (readonly 
       }
     }
   }
-  return { railing, caps };
+  return { railing, caps, capBoxes };
 }
 
 function buildLayout(deck: Deck, inp: LayoutInputs, sig: string): DeckLayout {

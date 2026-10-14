@@ -333,6 +333,13 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-width: 2.2;
 }
 
+/* A staircase's newels: small squares on the railing line. */
+.stairs .stairs-newel {
+  fill: #f4efe6;
+  stroke: #5c4434;
+  stroke-width: 1.2;
+}
+
 /* The opening a stair below cuts in this floor: "open to below". */
 .stair-hole .stair-hole-body {
   fill: rgba(31, 35, 41, 0.06);

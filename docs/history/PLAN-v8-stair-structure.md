@@ -236,3 +236,16 @@ the script (the example test checks this); `npm run build:viewer` and copy; Play
 the viewer (as done for the flue) for the stair hall in 3D (Proposed, Perspective and W), the
 Structure overlay on the plan, and a walk up the stair; the Checks panel lists exactly the pinned
 issues for the starter.
+
+## Built differently from the plan
+
+- **M2**: the floor opening a flight cuts started where the headroom from the treads' line to the
+  floor top above was 80", which left a default flight about 5' of headroom at the opening's edge.
+  It now starts where the headroom from the nosings to the underside of the floor above is 80", as
+  the code measures it (the stair checks would otherwise flag every default stair).
+- **M3a**: the staircase panel's style fields came with M3b, when the style is drawn.
+- **M3b**: the coat closet's west wall is at x 138.5 (faces 136..141), not under the landing's edge:
+  there it would meet the north wall inside the old 80" window (jambs 56..136), which keeps its place
+  in the existing view only if that wall is not split there. The closet is 2'3" x 6'7" inside, and
+  the landing's free corner keeps its post. Its label is "Coats". The round handrail is drawn as a
+  2" square bar; the bullnose is a disc of 8" round the starting newel in front of the platform.

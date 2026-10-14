@@ -67,6 +67,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(names(ls, 'existing')).toEqual(['Bath', 'Bunk', 'Guest (11\'5" adjusted)', 'Master', 'Master closet', 'Office / hall (11\'11" adjusted)']);
     expect(names(lb, 'proposed')).toEqual(['Basement (unpartitioned, est.)', 'Crawl space (proposed)', 'Crawl space under the foyer (proposed)', 'Utility (below)']);
     expect(names(lf, 'proposed')).toEqual([
+      'Coats (proposed)',
       'Foyer (proposed)',
       'Kitchen (17\'2" adjusted: re-measure)',
       'Laundry (proposed)',
@@ -96,11 +97,12 @@ describe('docs/examples/146-mick-road.json', () => {
     // its east wall and the old bath's east wall north of the new bath's wall. New: the addition,
     // its partition, the foyer, the screen porch, the north band's three walls and the laundry
     // closet's two (each splitting what it meets), the stair strip's south wall (there is none
-    // today, photo 16), the block under the addition and under the foyer, and the upstairs bath's
-    // south wall. The retaining wall's two pieces on the Basement are existing. Today's grey Kitchen
+    // today, photo 16), the coat closet's two under the stair (its west wall splits the north wall
+    // and its front wall the hall's east wall), the block under the addition and under the foyer,
+    // and the upstairs bath's south wall. The retaining wall's two pieces on the Basement are existing. Today's grey Kitchen
     // to Utility door stays as the bedroom's door (MK), so no new one is cut.
-    expect(count(all('walls'))).toEqual({ existing: 54, demo: 13, new: 26 });
-    expect(count(all('openings'))).toEqual({ existing: 16, demo: 16, new: 26 });
+    expect(count(all('walls'))).toEqual({ existing: 55, demo: 13, new: 29 });
+    expect(count(all('openings'))).toEqual({ existing: 16, demo: 16, new: 27 });
     // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
     // side and down the bank, with its landing, a deck) stays (MK). New: the grand stair's platform,
     // two flights and landing, and the master bedroom's deck; the stair hall's floor opening upstairs.
@@ -108,7 +110,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(count(all('decks'))).toEqual({ existing: 1, demo: 0, new: 1 });
     expect(count(all('floorOpenings'))).toEqual({ existing: 0, demo: 0, new: 1 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
-    expect(count(all('rooms'))).toEqual({ existing: 9, demo: 5, new: 10 });
+    expect(count(all('rooms'))).toEqual({ existing: 9, demo: 5, new: 11 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen,
     // the pantry's shelves, the stove with its stovepipe and tee, and the placeholder bath and
     // laundry fixtures, all new.
@@ -410,8 +412,8 @@ describe('docs/examples/146-mick-road.json', () => {
     }
   });
 
-  it('passes the code checks but for the grand stair\'s board handrails (until it is detailed)', () => {
-    expect(getIssues(plan).map((i) => `${i.code} ${i.target.stairs?.join(',')}`)).toEqual(['stair.handrail-grip f-s3', 'stair.handrail-grip f-s5']);
+  it('passes the code checks: guards, the grand stair and the walls of the closet under it', () => {
+    expect(getIssues(plan).map((i) => `${i.code}: ${i.message}`)).toEqual([]);
   });
 
   it('has no open wall ends but the retaining wall\'s free west end, and no orphan labels, in any view', () => {
@@ -635,6 +637,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // the pantry's swings in.
     expect(doors.map((o) => `${o.width} ${into(o)}`).sort()).toEqual([
       '24 Pantry',
+      '24 Stair hall',
       '28 Kitchen',
       '28 Master bath',
       '32 Stair hall',

@@ -16,6 +16,7 @@ import { getLevelElevations } from './levels';
 import { isVisible } from './phase';
 import { getFaces } from './rooms';
 import { groundAt } from './site';
+import { getStaircaseLayout } from './staircase';
 import { flightLinks, stairChains, stairsTop } from './stairChain';
 import { directionVector, flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsOutline, stairsPoint } from './stairs';
 
@@ -111,7 +112,10 @@ export function stairIssues(plan: Plan): Issue[] {
         const railed = !!(s.railings?.left || s.railings?.right);
         if (risers >= CODE.handrailRisers.value && !railed)
           push('stair.handrail-missing', 'handrailRisers', 'warning', s, at, `${name} has ${risers} risers and no handrail drawn (a rail fixed to a wall counts, but is not drawn).`);
-        if (railed)
+        // A flight on its own carries the deck's board as its rail; a staircase its style's rail.
+        const sc = s.staircaseId ? level.staircases?.[s.staircaseId] : undefined;
+        const board = sc ? sc.handrail === 'board' : true;
+        if (railed && board)
           push('stair.handrail-grip', 'gripMax', 'warning', s, at, `${name}: its handrail is a ${fmt(DECK.cap)} x ${fmt(DECK.capThick)} board, not a graspable rail (1 1/4" to 2" round).`);
       }
 
@@ -185,6 +189,44 @@ export function stairIssues(plan: Plan): Issue[] {
       if (gap < -CODE.uniformity.value && !toDeck.has(last.id))
         push('stair.arrival', 'uniformity', 'warning', last, centre(last), `A stairway's top is ${fmt(-gap)} above the floor above.`);
     }
+    // Staircases: their style against the code, walls rising into them, pieces not joined.
+    for (const sc of Object.values(level.staircases ?? {})) {
+      const layout = getStaircaseLayout(plan, levelId, sc.id, VIEW);
+      if (!layout) continue;
+      const pieces = layout.members.map((id) => byId.get(id)).filter((x): x is Stairs => !!x);
+      if (!pieces.some(isNew)) continue;
+      const st = layout.style;
+      const name = sc.name ? `The ${sc.name}` : 'A staircase';
+      const where = centre(pieces[0]);
+      const railed = pieces.some((p) => p.railings?.left || p.railings?.right || p.railings?.end);
+      if (railed && (st.handrailHeight < CODE.handrailMin.value - TOL || st.handrailHeight > CODE.handrailMax.value + TOL))
+        push('stair.handrail-height', 'handrailMin', 'error', pieces, where, `${name}'s handrail is ${fmt(st.handrailHeight)} over the nosings, outside ${fmt(CODE.handrailMin.value)} to ${fmt(CODE.handrailMax.value)}.`);
+      if (railed && st.balusterGap > CODE.guardOpeningStair.value + TOL)
+        push('stair.baluster-gap', 'guardOpeningStair', 'error', pieces, where, `${name}'s balusters are up to ${fmt(st.balusterGap)} apart: a ${fmt(CODE.guardOpeningStair.value)} sphere must not pass.`, 'guard');
+      const shallow = pieces.some((p) => steps.get(p.id)!.risers >= 2 && p.run / steps.get(p.id)!.risers < 11);
+      if (shallow && (st.nosing < CODE.nosingMin.value - TOL || st.nosing > CODE.nosingMax.value + TOL))
+        push('stair.nosing', 'nosingMin', 'error', pieces, where, `${name}'s nosings are ${fmt(st.nosing)}: treads under 11" want ${fmt(CODE.nosingMin.value)} to ${fmt(CODE.nosingMax.value)}.`);
+      for (const w of layout.wallsThrough) {
+        const p = byId.get(w.stairsId);
+        if (!p) continue;
+        const target = { stairs: [w.stairsId], walls: [w.wallId] };
+        out.push({
+          id: issueId('stair.wall-through', levelId, target),
+          code: 'stair.wall-through',
+          severity: 'error',
+          category: 'stair',
+          levelId,
+          at: centre(p),
+          outline: stairsOutline(p),
+          message: `A wall rises into the underside of ${sc.name ? `the ${sc.name}` : 'a staircase'}: make it at most ${fmt(Math.max(0, w.room))} high there, or frame the stair's underside.`,
+          ref: 'R318.7 (was R311.7)',
+          target,
+        });
+      }
+      if (layout.loose.length)
+        push('stair.chain-broken', 'landingDepth', 'warning', layout.loose.map((id) => byId.get(id)!).filter(Boolean), where, `${name} has ${layout.loose.length === 1 ? 'a piece' : `${layout.loose.length} pieces`} not joined to the rest (its bottom edge along another piece's edge, at that piece's top).`);
+    }
+
     // Landings: as wide as the flights they serve, 36" deep in the direction of travel.
     for (const l of links) {
       const a = byId.get(l.from)!;

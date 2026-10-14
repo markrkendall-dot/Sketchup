@@ -1207,7 +1207,11 @@ the house, the ground outside, a lower piece of stairs). Per stairway: risers wi
 other, the last one up to the floor above counted when it is about a riser (a stairway that stops
 lower reaches something not drawn); a landing (a one-riser piece) as wide as each flight it serves,
 measured across that flight's travel, and 36" deep along it. Flights that reach a deck (its
-layout's `openings`) arrive at its boards, not at the floor above.
+layout's `openings`) arrive at its boards, not at the floor above. A staircase's style is checked
+too: its handrail 34" to 38" over the nosings, a graspable one (a flight on its own, or a staircase
+with the board rail, gets `stair.handrail-grip`), balusters under the 4 3/8" sphere, nosings of
+3/4" to 1 1/4" where treads are under 11", no wall rising into its underside, and no piece left
+unjoined (`stair.chain-broken`).
 
 The UI keeps a copy: `ui/checks.ts startChecks()` (main.tsx) sets `uiStore.issues` at start and
 `CHECKS_DELAY_MS` (150 ms) after the plan stops changing, so a drag does not re-run the checks at
@@ -1235,11 +1239,50 @@ patches its style (undefined clears a field, `staircaseFieldProblem` refuses a b
 On the plan a click on a piece selects its staircase (`Selection.staircases`, `liftToStaircase`);
 dragging it moves every piece; a double-click on a piece opens the staircase
 (`uiStore.openStaircaseId`): clicks then pick its pieces alone until Esc (back to the staircase
-selected) or a click elsewhere. Its pieces draw selected with it. The panel names it, lists its
-pieces in stairway order (each a button selecting it alone), sets their phase, lists their issues
-and ungroups it; a single piece offers "Make one staircase" (of the stairway it is part of,
-`stairChains`), several selected flights the same. The style is drawn from M3b of
-PLAN-v8-stair-structure.md on.
+selected) or a click elsewhere. Its pieces draw selected with it. The panel names it, sets its
+phase and style, lists its pieces in stairway order (each a button selecting it alone) and their
+issues, and ungroups it; a single piece offers "Make one staircase" (of the stairway it is part of,
+`stairChains`), several selected flights the same.
+
+**Its parts** (`derive/staircase.ts getStaircaseLayout`, memoized per plan and by a signature of
+its pieces, style, floor to floor and the walls under it). Every part is a `StairSolid`: a plan
+polygon between two height fields (`HeightFn`, z = max(min, c + g . p): level, or a plane along a
+piece's slope), in the tread colour or the paint, in a group (stair, frame, rail); meshes.ts builds
+one geometry per group and material with `slopedPrismPositions` (`buildStaircaseParts`), and the
+pieces are not drawn on their own. The pieces, in stairway order (`stairChains` over the members):
+
+- treads `treadThickness` thick, each overhanging the riser in front of it by `nosing`, on a carcass
+  lowered by that thickness (so no faces lie on each other facing the same way); the carcass is
+  solid to the floor (`underside: 'solid'`, and any piece 12" high or less), or framed: under each
+  step down to a soffit following the nosing line `STAIRCASE.frame` (9 1/4") under the treads,
+  square to the slope, and a landing on a 9 1/4" frame with a 3 1/2" post at each corner that no
+  wall holds and no lower piece carries; `open` (or a piece's own `open`): two stringers. A piece's
+  underside (`undersides`, null when solid) is what the closet walls and the checks read.
+- walls under a piece: where a wall's footprint lies under it and stops at or below the underside,
+  a panel (`frame` group) closes the gap up to it; a wall that rises into it is in `wallsThrough`
+  (the check `stair.wall-through`).
+- rails: each railed side (a flight's left or right, a landing's left, right or `end`) is a run
+  between two newel centres half a newel in from its edge, a flight's at `-c` and `run + c` along
+  it, so a flight's newels stand on the piece below (or the floor) and on the piece above (or the
+  floor above when the stairway arrives there); newels within an inch of each other are one, so at
+  a turn both flights' rails die into one newel on the landing. A newel (5 1/2" box with a 7" cap,
+  or a 3 1/2" post) stands on the surface under its centre and rises `newelAbove` (4") over the
+  highest rail it takes. The rail (2" round drawn square, or a 3 1/2" x 1 1/2" board) runs from
+  newel face to newel face `handrailHeight` over the nosings; 1 1/4" balusters stand on the treads
+  under it at most `balusterGap` apart.
+- a bullnose (`startStep`): a disc of 8" round the starting newel (the one on or just in front of
+  the first piece, nearest its bottom edge), clipped to the front of that piece; its tread starts
+  past the piece's own nosing.
+
+A floor opening a staircase's flight arrives at takes its style (floorOpenings.ts `guardStyle`):
+its newels as the guard's posts, its rail as the cap (`rail`, in the tread colour; the rest in the
+paint), balusters on the floor (no bottom rail), at least 36" high; at a railed side of the
+arriving flight the guard's run reaches on to the stair's top newel and drops its own post there
+(`railingParts` takes `RailSizes` and per-run `RunEnds`). On the plan (`StaircaseShape`) the rails
+are heavy lines, the newels squares and the bullnose an outline; the pieces leave their own rail
+lines out. The export names the parts `Stairs`, `Stair framing` and `Stair railing` (materials
+`stair_tread_<phase>_<hex>`, `stair_paint_<phase>_<hex>`), and the styled guard `Guard` in the same
+materials.
 
 ## Derivation and memoization
 
