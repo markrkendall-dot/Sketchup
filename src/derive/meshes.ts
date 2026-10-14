@@ -1433,7 +1433,7 @@ export function stairHoles(below: Level | undefined, viewMode: ViewMode, belowFt
   const out: Vec2[][] = [];
   for (const s of Object.values(below.stairs)) {
     if (!s.cutsFloorAbove || !isVisible(s.phase, viewMode)) continue;
-    const hole = stairsHoleOutline(s, belowFtf);
+    const hole = stairsHoleOutline(s, belowFtf, below.wallHeight);
     if (hole) out.push(hole);
   }
   return out;

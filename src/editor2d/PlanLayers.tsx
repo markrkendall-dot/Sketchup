@@ -564,14 +564,15 @@ const StairHolesLayer = memo(function StairHolesLayer({ levelId }: { levelId: Id
   });
   const stairs = useLayerPlan((s) => (belowId ? s.plan.levels[belowId]?.stairs : undefined));
   const ftf = useLayerPlan((s) => (belowId ? floorToFloor(s.plan, belowId) : 0));
+  const ceiling = useLayerPlan((s) => (belowId ? (s.plan.levels[belowId]?.wallHeight ?? 0) : 0));
   const viewMode = useLayerUi((s) => s.viewMode);
   const holes = useMemo(() => {
     const out: { id: Id; start: number; outline: string; cross: string; treads: string }[] = [];
     for (const st of Object.values(stairs ?? {})) {
       if (!st.cutsFloorAbove || !isVisible(st.phase, viewMode)) continue;
-      const hole = stairsHoleOutline(st, ftf);
+      const hole = stairsHoleOutline(st, ftf, ceiling);
       if (!hole) continue;
-      const start = stairsHoleStart(st, ftf);
+      const start = stairsHoleStart(st, ftf, ceiling);
       const sym = stairsSymbol(st, flightSteps(st, ftf).risers);
       // Treads lie across the flight at increasing distance up it; keep the ones over the hole.
       const step = st.run / (sym.treads.length + 1);
@@ -579,7 +580,7 @@ const StairHolesLayer = memo(function StairHolesLayer({ levelId }: { levelId: Id
       out.push({ id: st.id, start, outline: polyPath(hole), cross: segPath([[hole[0], hole[2]], [hole[1], hole[3]]]), treads: segPath(treads) });
     }
     return out;
-  }, [stairs, ftf, viewMode]);
+  }, [stairs, ftf, ceiling, viewMode]);
   if (holes.length === 0) return null;
   return (
     <g className="layer-stair-holes" pointerEvents="none">

@@ -1195,6 +1195,7 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         </label>
       ))}
       {stairs.cutsFloorAbove && <StairsOpeningFields level={level} stairs={stairs} ftf={ftf} />}
+      <IssueNotes levelId={level.id} target={{ stairs: [stairs.id] }} />
       <ReadOnly label="Step depth">{formatLength(tread, denom)}</ReadOnly>
       <p className="panel-note">
         {base !== 0 || stairs.rise !== undefined
@@ -1214,9 +1215,9 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
 function StairsOpeningFields({ level, stairs, ftf }: { level: Level; stairs: Stairs; ftf: number }) {
   const updateStairs = usePlanStore((s) => s.updateStairs);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const byRule = headroomHoleStart(stairs, ftf);
-  const start = stairsHoleStart(stairs, ftf);
-  const hole = stairsHoleOutline(stairs, ftf);
+  const byRule = headroomHoleStart(stairs, ftf, level.wallHeight);
+  const start = stairsHoleStart(stairs, ftf, level.wallHeight);
+  const hole = stairsHoleOutline(stairs, ftf, level.wallHeight);
   return (
     <>
       <LengthField

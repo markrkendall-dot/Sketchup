@@ -91,9 +91,8 @@ Before you start, measure on paper. Then follow these steps in order.
    top level, `1` for the bottom) and use "Copy walls from level below", then move, delete or
    add walls (walls that would land on top of walls already there are skipped, and the status
    bar says how many). Stairs (`T`) go on the lower level and cut the floor above where the
-   headroom over the treads would be under 80": the opening starts at run x (floor to floor -
-   80") / floor to floor up the flight (the stair's properties change the headroom or set the
-   start). Outdoor steps: tick "Open" for treads on stringers instead of a solid flight; on the
+   headroom would be under 80", measured as the code does from the line of the nosings to the
+   underside of the floor above (the stair's properties change the headroom or set the start). Outdoor steps: tick "Open" for treads on stringers instead of a solid flight; on the
    lowest level "Starts at" may be negative, for steps that go on down a slope below its floor.
    Tick "Railing on the left" or "on the right" (as you climb) for a 36" handrail with newels and
    balusters on an open side.
@@ -222,9 +221,11 @@ Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the o
    demolished become one, with its new net area. Roofs and posts follow the view too, and walls
    rise to a roof only in the views where that roof is shown.
 5. Watch the status bar's **to check** count. The tool checks the proposed design against the 2025
-   Residential Code of New York State as it goes: today, a deck edge more than 30" above the ground
-   with no railing and a floor opening's edge with no guard (stairs and structure come next, see
-   `docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show** selects the
+   Residential Code of New York State as it goes: a deck edge more than 30" above the ground with no
+   railing, a floor opening's edge with no guard, and new stairs (risers at most 8 1/4", treads at
+   least 9", 36" wide, 6'8" of headroom from the nosings, a graspable handrail on four risers or
+   more, guards on open sides more than 30" up, matching risers and big enough landings). Structure
+   comes next (`docs/history/PLAN-v8-stair-structure.md`). Click the count for the list; **Show** selects the
    element, centres the plan on it and outlines it, and the plan marks each issue with a red
    (error) or orange (to check) disc in the Proposed and All views. The element's properties
    repeat its issues with their code sections. The code numbers live in `src/model/codeLimits.ts`:
@@ -451,8 +452,8 @@ and the plan's north angle is 0.
   spindle rail and shelves under it (photo 16), so the strip is part of the Living. The stair
   climbs **east** from about 2' in from the west wall (x 31, photos 16 and 18; the stringer reads
   about 45 degrees) to x 132, a 101" run, 33" wide (the whole 2'9" strip), under the Second Floor's
-  landing, and cuts the Second Floor's floor from 26" up the run (where the headroom drops under
-  80"), so the Master closet over its low end keeps its floor. Rooms, east-west x north-south:
+  landing, and cuts the Second Floor's floor from 7 3/4" up the run (where the headroom from the
+  nosings drops under 80"), so the Master closet over its low end keeps its floor. Rooms, east-west x north-south:
   Front room (MK's name for the old entry hall) 15'5" x 7'6", Bath 9'6" x 7'6", Kitchen 11'6" x
   17'2" (adjusted, see below), Living 13'5" x 14'0" south of the strip and 17'2" with it, Utility
   11'6" x 9'5". There are **no open wall ends** on this floor.
@@ -546,7 +547,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | First Floor rooms | measured, face to face: Front room 15'5" x 7'6", Bath 9'6" x 7'6", Living 13'5" x 14'0" (measured 14'1") south of the open stair strip, Utility 11'6" x 9'5" | Re-check any that look wrong |
 | Kitchen | 11'6" x 17'2", **adjusted: re-measure.** MK measured 16'3"; the upstairs wins, and the first-floor mistake is suspected near the bottom of the stairs | Kitchen north-south, between the lake wall and the y 99.5 wall |
 | Interior partition thickness | 5" (measured) | At a jamb |
-| Stair | 33" wide, 101" run climbing east from x 31 (about 2' in from the west wall, photos 16 and 18) to x 132 (under the upstairs landing), cuts the Second Floor floor from 26" up the run (80" headroom); open to the Living on its south side | **Distance from the west wall to the bottom riser**, run, riser count |
+| Stair | 33" wide, 101" run climbing east from x 31 (about 2' in from the west wall, photos 16 and 18) to x 132 (under the upstairs landing), cuts the Second Floor floor from 7 3/4" up the run (80" headroom from the nosings); open to the Living on its south side | **Distance from the west wall to the bottom riser**, run, riser count |
 | Bath door (First Floor) | 30" x 80" flush, at the south end of the Bath's west wall (y 54 to 84: photos 20 and 22 both put its casing 9" to 13" from the Bath's south wall), swinging into the Bath; **position is an estimate** | Jamb to the Bath's south wall |
 | Front room's pipe chase | 45 degrees across the north-east corner, behind the wood stove, hiding the upstairs Bath's pipes (photo 20, MK): 2' each way, its face from the north wall 161" east of the west wall's inside face (x 168) to the Bath's west wall 24" south of the north wall's inside face (y 31); photo 20 reads 1'6" to 2'7" | **How far it comes out along each wall** |
 | Utility fittings | wall cabinets 12" deep, 30" high, bottom at 54": three 42" on the north wall and two 24" on the west wall north of the Kitchen door; open shelves 48" x 12" x 29" under the south and east windows; mini fridge 20" x 20" x 34" on the south wall at x 424 to 444 (MK's description) | Lengths, heights, and where the fridge stands |

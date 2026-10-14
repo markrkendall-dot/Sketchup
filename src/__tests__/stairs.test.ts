@@ -172,49 +172,56 @@ describe('stairs store actions', () => {
 });
 
 describe('the opening a flight cuts in the floor above (REVIEW-2 A2)', () => {
-  it("the example stair: 108\" floor to floor, 101\" run from x 31, the opening starts 26\" up, past the 30\" closet", () => {
+  it("the example stair: 108\" floor to floor, 101\" run from x 31, the opening starts 7 3/4\" up, past the 30\" closet", () => {
     const plan = migrate(example);
     const first = plan.levels[plan.levelOrder[1]];
     const st = Object.values(first.stairs)[0];
     const ftf = floorToFloor(plan, first.id);
     expect(ftf).toBe(108);
     expect(STAIRS_HEADROOM).toBe(80);
-    expect(stairsHoleStart(st, ftf)).toBeCloseTo((101 * 28) / 108, 9);
-    expect(Math.round(stairsHoleStart(st, ftf))).toBe(26);
-    const hole = stairsHoleOutline(st, ftf)!;
+    // Headroom from the nosings (14 risers of 7 5/7", the first nosing one riser up) to the 96"
+    // ceiling, the underside of the floor above: 80" of it left 101 x (96 - 80 - R) / 108 up the run.
+    const R = 108 / 14;
+    const start = (101 * (96 - 80 - R)) / 108;
+    expect(stairsHoleStart(st, ftf, first.wallHeight)).toBeCloseTo(start, 9);
+    expect(Math.round(stairsHoleStart(st, ftf, first.wallHeight))).toBe(8);
+    const hole = stairsHoleOutline(st, ftf, first.wallHeight)!;
     // Climbing east from x 31 (its bottom riser about 2' in from the west wall): the opening runs from
-    // x 57.2 to 132, the whole 33" width.
+    // x 38.7 to 132, the whole 33" width.
     const xs = hole.map((p) => p.x);
     const ys = hole.map((p) => p.y);
-    expect(Math.min(...xs)).toBeCloseTo(31 + (101 * 28) / 108, 9);
+    expect(Math.min(...xs)).toBeCloseTo(31 + start, 9);
     expect(Math.min(...xs)).toBeGreaterThan(7 + 30); // past the closet (x 7 to 37 inside)
     expect(Math.max(...xs)).toBe(132);
     expect(Math.max(...ys) - Math.min(...ys)).toBe(33);
-    expect(polygonSignedArea(hole)).toBeCloseTo(polygonSignedArea(stairsOutline(st)) * (1 - 28 / 108), 6);
+    expect(polygonSignedArea(hole)).toBeCloseTo(polygonSignedArea(stairsOutline(st)) * (1 - start / 101), 6);
   });
 
   it('holeStart overrides the headroom rule; headroom moves it', () => {
     const s = flight({ run: 120 });
-    expect(stairsHoleStart(s, 108)).toBeCloseTo((120 * 28) / 108, 9);
-    expect(stairsHoleStart({ ...s, holeStart: 50 }, 108)).toBe(50);
-    expect(stairsHoleStart({ ...s, holeStart: 0 }, 108)).toBe(0);
-    expect(stairsHoleOutline({ ...s, holeStart: 0 }, 108)).toEqual(stairsOutline(s));
-    expect(stairsHoleStart({ ...s, headroom: 84 }, 108)).toBeCloseTo((120 * 24) / 108, 9);
-    expect(headroomHoleStart({ ...s, headroom: 84 }, 108)).toBeCloseTo((120 * 24) / 108, 9);
+    const R = 108 / 14;
+    expect(stairsHoleStart(s, 108, 96)).toBeCloseTo((120 * (96 - 80 - R)) / 108, 9);
+    expect(stairsHoleStart({ ...s, holeStart: 50 }, 108, 96)).toBe(50);
+    expect(stairsHoleStart({ ...s, holeStart: 0 }, 108, 96)).toBe(0);
+    expect(stairsHoleOutline({ ...s, holeStart: 0 }, 108, 96)).toEqual(stairsOutline(s));
+    expect(stairsHoleStart({ ...s, headroom: 76 }, 108, 96)).toBeCloseTo((120 * (96 - 76 - R)) / 108, 9);
+    expect(headroomHoleStart({ ...s, headroom: 76 }, 108, 96)).toBeCloseTo((120 * (96 - 76 - R)) / 108, 9);
+    // A higher ceiling (a thinner floor above) starts it further up.
+    expect(headroomHoleStart(s, 108, 100)).toBeCloseTo((120 * (100 - 80 - R)) / 108, 9);
     // Up the screen from y 200: the opening is the top part, y 80 to 200 - 50.
-    const ys = stairsHoleOutline({ ...s, holeStart: 50 }, 108)!.map((p) => p.y);
+    const ys = stairsHoleOutline({ ...s, holeStart: 50 }, 108, 96)!.map((p) => p.y);
     expect([Math.min(...ys), Math.max(...ys)]).toEqual([80, 150]);
   });
 
   it('an opening shorter than an inch is not cut; a flight lower than the headroom is open all the way', () => {
-    // The opening is run * headroom / floorToFloor long by the rule.
-    expect(stairsHoleOutline(flight({ headroom: 0.5 }), 108)).toBeNull();
-    expect(stairsHoleOutline(flight({ holeStart: 119.5 }), 108)).toBeNull();
-    expect(stairsHoleOutline(flight({ holeStart: 200 }), 108)).toBeNull();
-    expect(stairsHoleOutline(flight({ holeStart: 118.5 }), 108)).not.toBeNull();
-    // 72" floor to floor is less than the 80" headroom: short of headroom from the first step.
-    expect(stairsHoleStart(flight(), 72)).toBe(0);
-    expect(stairsHoleOutline(flight(), 72)).toEqual(stairsOutline(flight()));
+    // Under a 120" ceiling with next to no headroom wanted, the top of the flight has it.
+    expect(stairsHoleOutline(flight({ headroom: 0.5 }), 108, 120)).toBeNull();
+    expect(stairsHoleOutline(flight({ holeStart: 119.5 }), 108, 96)).toBeNull();
+    expect(stairsHoleOutline(flight({ holeStart: 200 }), 108, 96)).toBeNull();
+    expect(stairsHoleOutline(flight({ holeStart: 118.5 }), 108, 96)).not.toBeNull();
+    // A 60" ceiling (72" floor to floor) is less than the 80" headroom: short of it from the first step.
+    expect(stairsHoleStart(flight(), 72, 60)).toBe(0);
+    expect(stairsHoleOutline(flight(), 72, 60)).toEqual(stairsOutline(flight()));
   });
 
   it('store and migrate: headroom and holeStart are optional, validated, and clear with undefined', () => {
@@ -252,10 +259,10 @@ describe('short flights and landings: base, rise and risers', () => {
     expect(stairsBase(s)).toBe(0);
     expect(stairsRise(s, 108)).toBe(14);
     expect(flightSteps(s, 108)).toEqual({ risers: 2, rise: 7 });
-    // Its top (14") is far below 108 - 80 = 28": the floor above clears it all the way.
-    expect(headroomHoleStart(s, 108)).toBe(22);
-    expect(stairsHoleStart(s, 108)).toBe(22);
-    expect(stairsHoleOutline(s, 108)).toBeNull();
+    // Its top (14") is below 96 - 80 = 16" under a 96" ceiling: the floor above clears it all the way.
+    expect(headroomHoleStart(s, 108, 96)).toBe(22);
+    expect(stairsHoleStart(s, 108, 96)).toBe(22);
+    expect(stairsHoleOutline(s, 108, 96)).toBeNull();
     // Drawn with its own two steps: one tread line and the UP arrow.
     const sym = stairsSymbol(s, flightSteps(s, 108).risers);
     expect(sym.treads).toHaveLength(1);
@@ -268,20 +275,22 @@ describe('short flights and landings: base, rise and risers', () => {
     const sym = stairsSymbol(s, flightSteps(s, 108).risers);
     expect(sym.treads).toHaveLength(0);
     expect(sym.landing).toBe(true);
-    expect(stairsHoleOutline(s, 108)).toBeNull();
+    expect(stairsHoleOutline(s, 108, 96)).toBeNull();
   });
 
-  it('a flight from a 14" landing climbing 94" over 126": 13 risers, the opening from where the treads reach 28"', () => {
+  it('a flight from a 14" landing climbing 94" over 126": 13 risers, the opening from its bottom', () => {
     const s = flight({ run: 126, base: 14, rise: 94 });
     const steps = flightSteps(s, 108);
     expect(steps.risers).toBe(13);
     expect(steps.rise).toBeCloseTo(94 / 13, 12);
-    const d0 = stairsHoleStart(s, 108);
-    expect(14 + (94 * d0) / 126).toBeCloseTo(108 - 80, 9);
-    expect(d0).toBeCloseTo(18.766, 3);
-    expect(Math.round(d0 * 10) / 10).toBe(18.8);
+    // Its first nosing is 14 + 94 / 13 = 21.2" up: 74.8" under a 96" ceiling, short of 80" from the start.
+    expect(stairsHoleStart(s, 108, 96)).toBe(0);
+    // Under a 104" ceiling it starts where the nosings reach 24": 126 x (104 - 80 - 14 - 94 / 13) / 94.
+    const d0 = stairsHoleStart(s, 108, 104);
+    expect(d0).toBeCloseTo((126 * (104 - 80 - 14 - 94 / 13)) / 94, 9);
+    expect(14 + 94 / 13 + (94 * d0) / 126).toBeCloseTo(104 - 80, 9);
     // Up the screen from y 200: the opening runs from 200 - d0 to the top at y 74.
-    const ys = stairsHoleOutline(s, 108)!.map((p) => p.y);
+    const ys = stairsHoleOutline(s, 108, 104)!.map((p) => p.y);
     expect(Math.min(...ys)).toBe(74);
     expect(Math.max(...ys)).toBeCloseTo(200 - d0, 9);
     // The risers override wins over the 7.5" rule; an unusable one is ignored.
@@ -300,7 +309,7 @@ describe('short flights and landings: base, rise and risers', () => {
     const ftf = floorToFloor(plan, first.id);
     expect(flightSteps(st, ftf)).toEqual(stairSteps(ftf));
     expect(flightSteps(st, ftf).risers).toBe(14);
-    expect(headroomHoleStart(st, ftf)).toBe((101 * (108 - 80)) / 108);
+    expect(headroomHoleStart(st, ftf, first.wallHeight)).toBeCloseTo((101 * (96 - 80 - 108 / 14)) / 108, 9);
   });
 
   it('store: heights are validated against floor to floor, clear with undefined, one undo step each', () => {

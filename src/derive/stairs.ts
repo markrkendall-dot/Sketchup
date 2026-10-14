@@ -123,22 +123,29 @@ const MIN_HOLE = 1;
 type HoleFields = 'run' | 'headroom' | 'base' | 'rise';
 
 /**
- * Where the floor opening starts along the run by the headroom rule, ignoring any override: the
- * treads are at base + rise * d / run at distance d up the run, so headroom to the floor above drops
- * below `headroom` at d0 = run * (floorToFloor - headroom - base) / rise, clamped to [0, run]: 0
- * when even the bottom step is short of headroom, the whole run (no opening) when the top of the
- * flight is lower than floorToFloor - headroom (a short flight up to a landing, the landing itself).
+ * Where the floor opening starts along the run by the headroom rule, ignoring any override.
+ * Headroom is measured as the code measures it (R318.7.2): from the line of the nosings to the
+ * underside of the floor above, `ceiling` over this level's floor (its wall height). The nosings
+ * are one riser over the bottom of each tread's run, base + rise + climb * d / run at distance d up
+ * the run (rise one riser, climb the flight's), so the headroom drops below `headroom` at
+ * d0 = run * (ceiling - headroom - base - rise) / climb, clamped to [0, run]: 0 when even the bottom
+ * step is short of headroom, the whole run (no opening) when the top of the flight itself has the
+ * headroom (a short flight up to a landing, the landing itself).
  */
-export function headroomHoleStart(s: Pick<Stairs, HoleFields>, floorToFloor: number): number {
-  const rise = stairsRise(s, floorToFloor);
-  if (!(rise > 0)) return 0;
-  const d0 = (s.run * (floorToFloor - (s.headroom ?? STAIRS_HEADROOM) - stairsBase(s))) / rise;
+export function headroomHoleStart(s: Pick<Stairs, HoleFields | 'risers'>, floorToFloor: number, ceiling: number): number {
+  const { risers, rise } = flightSteps(s, floorToFloor);
+  const climb = rise * risers;
+  if (!(climb > 0)) return 0;
+  const clear = ceiling - (s.headroom ?? STAIRS_HEADROOM);
+  // The top tread (or landing) is level: past its nosing the headroom is over the top itself.
+  if (stairsBase(s) + climb <= clear) return s.run;
+  const d0 = (s.run * (clear - stairsBase(s) - rise)) / climb;
   return Math.min(s.run, Math.max(0, d0));
 }
 
 /** Where the floor opening starts along the run: `holeStart` when set, else the headroom rule. */
-export function stairsHoleStart(s: Pick<Stairs, HoleFields | 'holeStart'>, floorToFloor: number): number {
-  return Math.max(0, s.holeStart ?? headroomHoleStart(s, floorToFloor));
+export function stairsHoleStart(s: Pick<Stairs, HoleFields | 'risers' | 'holeStart'>, floorToFloor: number, ceiling: number): number {
+  return Math.max(0, s.holeStart ?? headroomHoleStart(s, floorToFloor, ceiling));
 }
 
 /**
@@ -148,10 +155,11 @@ export function stairsHoleStart(s: Pick<Stairs, HoleFields | 'holeStart'>, floor
  * all the way up cuts nothing). Ignores cutsFloorAbove; the caller checks it.
  */
 export function stairsHoleOutline(
-  s: Pick<Stairs, 'origin' | 'direction' | 'width' | HoleFields | 'holeStart'>,
+  s: Pick<Stairs, 'origin' | 'direction' | 'width' | HoleFields | 'risers' | 'holeStart'>,
   floorToFloor: number,
+  ceiling: number,
 ): Vec2[] | null {
-  const d0 = stairsHoleStart(s, floorToFloor);
+  const d0 = stairsHoleStart(s, floorToFloor, ceiling);
   if (d0 >= s.run - MIN_HOLE) return null;
   const f = stairsFrame(s);
   const h = s.width / 2;

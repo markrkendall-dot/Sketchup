@@ -409,11 +409,14 @@ describe('floor slabs', () => {
   it('stairs below with cutsFloorAbove cut the slab of the level above, where headroom is short', () => {
     const { plan, first } = boxPlan({});
     const withHole = getLevelMeshes(plan, first.id, 'all').floor!;
-    // 108" floor to floor, 80" headroom: the opening starts 120 * 28 / 108 up the 120" run.
-    const d0 = (120 * 28) / 108;
+    // 108" floor to floor, 14 risers, 80" from the nosings to the basement's ceiling (the slab's
+    // underside): the opening starts 120 * (ceiling - 80 - R) / 108 up the 120" run.
+    const ceil = plan.levels[plan.levelOrder[0]].wallHeight;
+    const d0 = (120 * (ceil - 80 - 108 / 14)) / 108;
     expect(upArea(withHole)).toBeCloseTo(246.5 * 246.5 - 36 * (120 - d0), 2);
-    // Floor over the low end of the flight (y 200 - 20), open over the top (y 200 - 100).
-    expect(inside(withHole, [60, -6, 180])).toBe(true);
+    // Floor over the low end of the flight (y 200 - 4), open over the top (y 200 - 100).
+    expect(d0).toBeGreaterThan(8);
+    expect(inside(withHole, [60, -6, 196])).toBe(true);
     expect(inside(withHole, [60, -6, 100])).toBe(false);
     // An override, and a raised basement ceiling (the cache follows the level below's height).
     const over = boxPlan({ holeStart: 60 });
@@ -421,7 +424,7 @@ describe('floor slabs', () => {
     const full = boxPlan({ holeStart: 0 });
     expect(upArea(getLevelMeshes(full.plan, full.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * 120, 2);
     const tall = { ...plan, levels: { ...plan.levels, [plan.levelOrder[0]]: { ...plan.levels[plan.levelOrder[0]], wallHeight: 120 } } };
-    const d1 = (120 * (132 - 80)) / 132;
+    const d1 = (120 * (120 - 80 - 132 / 18)) / 132;
     expect(upArea(getLevelMeshes(tall, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * (120 - d1), 2);
     const noCut = boxPlan({ cutsFloorAbove: false });
     expect(upArea(getLevelMeshes(noCut.plan, noCut.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5, 3);
@@ -496,7 +499,7 @@ describe('stairs', () => {
     expect(upArea(getLevelMeshes(plan, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5, 3);
   });
 
-  it('a flight on a 14" landing is solid down to the floor and its opening starts where the treads reach 28"', () => {
+  it('a flight on a 14" landing is solid down to the floor and opens the floor above from where its nosings are 80" under it', () => {
     const { plan, basement, first } = boxPlan({ run: 126, base: 14, rise: 94 });
     const g = getLevelMeshes(plan, basement.id, 'all').stairs[0].geometry;
     const d = 126 / 13;
@@ -510,8 +513,10 @@ describe('stairs', () => {
     expect(inside(g, [60, 7, 199])).toBe(true);
     expect(inside(g, [60, 14 + r / 2, 199])).toBe(true);
     expect(inside(g, [60, 14 + r * 1.5, 199])).toBe(false);
-    // The opening in the floor above: from d0 = 126 * 14 / 94 (about 18.8") to the top.
-    const d0 = (126 * (108 - 80 - 14)) / 94;
+    // The opening in the floor above: from where the nosings (one riser over the treads' line) are
+    // 80" under the basement's ceiling, to the top.
+    const ceil = basement.wallHeight;
+    const d0 = Math.max(0, (126 * (ceil - 80 - 14 - r)) / 94);
     expect(upArea(getLevelMeshes(plan, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * (126 - d0), 2);
     // A changed climb rebuilds the flight; the same flight is reused.
     const again = getLevelMeshes(plan, basement.id, 'all').stairs[0].geometry;

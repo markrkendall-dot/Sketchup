@@ -298,15 +298,19 @@ instead). Then:
 - Floor slab: each outer face polygon (reversed, positive), pushed out by half of each edge's wall
   thickness to the exterior faces (`outerFaceThickness` from rooms.ts), with holes for stairs on the
   level below that have `cutsFloorAbove` (only holes that fit strictly inside). A hole is only the
-  part of the flight where headroom is short (`stairsHoleOutline(stairs, floorToFloor)`). The
-  treads are at `base + rise * d / run` at distance d up the run (`base` default 0, `rise` default
-  `floorToFloor - base`), so the hole runs from
-  `d0 = holeStart ?? run * (floorToFloor - headroom - base) / rise`, clamped to [0, run] (headroom
-  default 80"), to the top of the run, none when that is under 1": a flight whose top is lower
-  than `floorToFloor - headroom` (two risers up to a landing, the landing) cuts nothing. The
-  starter's stair (108" floor to floor, 125" run) opens from 32" up, so the closet over its low end
-  keeps its floor; a flight from a 14" landing climbing 94" over 126" opens where
-  `14 + 94 d / 126 = 28`, about 18.8" up. The 2D view of the level above draws the same opening
+  part of the flight where headroom is short (`stairsHoleOutline(stairs, floorToFloor, ceiling)`,
+  `ceiling` the level's wall height: the underside of the floor above). Headroom is measured as the
+  code measures it (R318.7.2), from the line of the nosings: one riser `r` over the bottom of each
+  tread's run, `base + r + climb * d / run` at distance d up the run (`base` default 0, `climb` the
+  flight's, `risers * r`), so the hole runs from
+  `d0 = holeStart ?? run * (ceiling - headroom - base - r) / climb`, clamped to [0, run] (headroom
+  default 80"), to the top of the run, none when that is under 1"; a flight whose top is itself
+  `headroom` under the ceiling (two risers up to a landing, the landing) cuts nothing. (Until the
+  stair checks it was measured from the treads' line to the floor top above, which left a default
+  stair about 5' of headroom at the hole's edge.) The starter's old stair (108" floor to floor, 14
+  risers, 101" run, 96" ceiling) opens from 7 3/4" up, so the closet over its low end keeps its
+  floor; a flight from a 14" landing climbing 94" in 13 risers has its first nosing 74.8" under a
+  96" ceiling and opens from its bottom. The 2D view of the level above draws the same opening
   (dashed, with an X and the treads under it), and the stair panel has "Floor opening starts"
   (blank follows the rule, shown as the placeholder) and "Headroom". Outer faces nested in
   another component are skipped. If a level has no closed outer face, draw no slab. Where the walls
@@ -1173,6 +1177,24 @@ and 9" tread are its amendments; every entry is to be verified against the code 
 Guards (`guardChecks.ts`, from the layouts the 3D uses, in the proposed view): a deck edge with no
 railing, no wall behind it and more than `CODE.guardDrop` (30") over the ground (`edgeDrops`) is a
 warning; a floor opening's edge with no guard and no wall along it is an error.
+
+Stairs (`stairChain.ts`, `stairChecks.ts`, new pieces only: existing stairs are recorded as they
+are). `flightLinks` joins the pieces of a level into stairways: B follows A when B's bottom edge
+(`stairsOutline` points 0 and 3) lies within `LINK_TOL` (1") of any edge of A's outline and B's base
+is A's top (`stairsTop`) within 1/2" (a turn leaves a landing by its side, as the starter's flights
+leave the platform and the landing); `stairChains` follows them bottom first. Each flight (two
+risers or more) is held to the NY riser (8 1/4") and tread (9") limits, the 36" width, 151" of rise
+without a landing, a handrail on four risers or more (a warning: a rail on a wall is not drawn) and a
+graspable one (the drawn rail is a 3 1/2" board: a warning until the staircase styles); every piece
+to 6'8" of headroom, sampled every 6" across the width from the nosing line (the walking surface on a
+landing) to the underside of the floor above, except under a floor opening or a hole a flight cuts;
+and every edge that no piece of the stairway joins, no railing guards and no wall stands along is an
+error (category guard) where the surface is more than 30" over what is beside it (the floor inside
+the house, the ground outside, a lower piece of stairs). Per stairway: risers within 3/8" of each
+other, the last one up to the floor above counted when it is about a riser (a stairway that stops
+lower reaches something not drawn); a landing (a one-riser piece) as wide as each flight it serves,
+measured across that flight's travel, and 36" deep along it. Flights that reach a deck (its
+layout's `openings`) arrive at its boards, not at the floor above.
 
 The UI keeps a copy: `ui/checks.ts startChecks()` (main.tsx) sets `uiStore.issues` at start and
 `CHECKS_DELAY_MS` (150 ms) after the plan stops changing, so a drag does not re-run the checks at
