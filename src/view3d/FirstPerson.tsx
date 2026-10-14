@@ -4,8 +4,12 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Euler, PerspectiveCamera, type PointLight } from 'three';
 import { getPlan } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
+import { getLevelElevations } from '../derive/levels';
 import {
+  EYE_EASE,
+  EYE_HEIGHT,
   eyeElevation,
+  levelAtFeet,
   MAX_STEP_SECONDS,
   RUN_FACTOR,
   stepLevel,
@@ -13,7 +17,10 @@ import {
   walkLevels,
   walkStart,
   walkStartLevel,
+  walkMove,
   walkStep,
+  walkWorld,
+  surfaceAt,
 } from './walk';
 
 /** Wider than the orbit view's 50 degrees: rooms feel less like a keyhole. */
@@ -47,8 +54,10 @@ const exitWalk = () => useUiStore.getState().setCameraMode('orbit');
 
 /**
  * First-person walkthrough: drei PointerLockControls for mouse look (a click on the canvas locks
- * the pointer), WASD / arrows to walk at WALK_SPEED in the horizontal plane (Shift runs), Q / E or
- * PageDown / PageUp to change level, Esc (or losing the pointer lock) back to orbit. When the
+ * the pointer), WASD / arrows to walk at WALK_SPEED (Shift runs) on what is there: up stairs and
+ * steps, down to what is below, stopped by rails, guards and the sides of stairs (walk.ts walkMove;
+ * walls stay walk-through), the active level following the feet. Q / E or
+ * PageDown / PageUp jump a level, Esc (or losing the pointer lock) back to orbit. When the
  * browser refuses the pointer lock, dragging with the left button looks around instead. Mounted only
  * in walk mode (Controls.tsx), so it never coexists with the orbit controls; the canvas renders
  * every frame meanwhile (Scene3D sets frameloop="always").
@@ -59,6 +68,8 @@ export function FirstPerson() {
   const keys = useRef(new Set<string>());
   const lamp = useRef<PointLight>(null);
   const levelId = useRef<string | null>(null);
+  /** The feet's elevation: the eye eases to EYE_HEIGHT over it (walk.ts walkMove moves them). */
+  const feet = useRef(0);
 
   // Enter: eye height on the start level, at the start point (the picked one, the entry door, or
   // the middle of the house; walk.ts walkStart), looking the way it says.
@@ -69,7 +80,9 @@ export function FirstPerson() {
     const id = walkStartLevel(plan, ui);
     if (!id) return;
     const { at, dir } = walkStart(plan, id, ui.viewMode, levels, ui.walkFrom);
-    const y = eyeElevation(plan, id);
+    const floor = getLevelElevations(plan)[id]?.floorTop ?? 0;
+    feet.current = surfaceAt(walkWorld(plan, ui.viewMode, levels), at, floor) ?? floor;
+    const y = feet.current + EYE_HEIGHT;
     camera.position.set(at.x, y, at.y);
     camera.lookAt(at.x + dir.x, y, at.y + dir.y);
     levelId.current = id;
@@ -99,6 +112,7 @@ export function FirstPerson() {
       const next = stepLevel(walkLevels(plan, useUiStore.getState()), current, dir);
       if (!next) return;
       camera.position.y = eyeElevation(plan, next);
+      feet.current = camera.position.y - EYE_HEIGHT;
       levelId.current = next;
       useUiStore.getState().setWalkLevel(next);
     },
@@ -188,6 +202,9 @@ export function FirstPerson() {
   }, [camera, gl]);
 
   useFrame((_, delta) => {
+    // The eye eases to the feet's height (a step up, a fall, a change of level).
+    const eye = feet.current + EYE_HEIGHT;
+    if (Math.abs(camera.position.y - eye) > 0.01) camera.position.y += (eye - camera.position.y) * Math.min(1, delta * EYE_EASE);
     lamp.current?.position.copy(camera.position);
     const k = keys.current;
     if (!k.size) return;
@@ -198,8 +215,20 @@ export function FirstPerson() {
     const distance = WALK_SPEED * (has(RUN) ? RUN_FACTOR : 1) * Math.min(delta, MAX_STEP_SECONDS);
     euler.setFromQuaternion(camera.quaternion);
     const [dx, dz] = walkStep(euler.y, forward, right, distance);
-    camera.position.x += dx;
-    camera.position.z += dz;
+    // Feet on what is there: up a step, down to what is below, stopped by rails and stair sides.
+    const plan = getPlan();
+    const ui = useUiStore.getState();
+    const levels = walkLevels(plan, ui);
+    const at = { x: camera.position.x, y: camera.position.z };
+    const moved = walkMove(walkWorld(plan, ui.viewMode, levels), { at, feet: feet.current }, { x: at.x + dx, y: at.y + dz });
+    camera.position.x = moved.at.x;
+    camera.position.z = moved.at.y;
+    feet.current = moved.feet;
+    const on = levelAtFeet(plan, levels, moved.feet);
+    if (on && on !== levelId.current) {
+      levelId.current = on;
+      ui.setWalkLevel(on);
+    }
     lamp.current?.position.copy(camera.position);
   });
 

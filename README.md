@@ -292,8 +292,10 @@ Floor). **Walk** (or `F`) drops you in at eye height just inside the level's
 entry door (the first door in an outside wall), looking into the house; on a level without one, in
 the middle of the house. To start somewhere else, right-click that spot in the 2D plan (select
 tool) and choose **Walk from here** ("Clear walk start" goes back to the door). Click the view to
-look with the mouse, WASD or the arrows to move, Shift to go faster, Q/E to change level, Esc to
-leave. Walls are not solid in walk mode.
+look with the mouse, WASD or the arrows to move, Shift to go faster, Q/E to jump a level, Esc to
+leave. You walk on what is there: up stairs and steps (9" at most), down to what is below, and the
+rails, guards and the sides of stairs stop you; the level follows your feet, so walking up the
+grand stair puts you on the Second Floor. Walls are not solid in walk mode.
 
 **N**, **S**, **E** and **W** in the 3D bar show an elevation: a straight-on view of that side of
 the house, without perspective, framed to fill the view and lit from over your left shoulder, so

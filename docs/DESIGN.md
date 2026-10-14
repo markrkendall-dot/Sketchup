@@ -1512,14 +1512,25 @@ positioned over the canvas, closed by Esc, a click elsewhere, a tool or level sw
 goes away), and "Clear walk start" appears once one is set. A click on the canvas
 requests the pointer lock (our own call, so a refusal is caught; drei's document-wide click-to-lock
 is disabled with a selector that matches nothing); while unlocked, dragging with the left button
-looks around instead. WASD / arrows (by `KeyboardEvent.code`) move at 60"/s in the horizontal plane
-relative to the yaw, Shift doubles it, using `useFrame` delta (clamped to 0.25 s). Q/E or
-PageDown/PageUp step through the levels the 3D view shows, snapping the eye to that level. Esc, `F`
+looks around instead. WASD / arrows (by `KeyboardEvent.code`) move at 60"/s relative to the yaw,
+Shift doubles it, using `useFrame` delta (clamped to 0.25 s), on what is there (`walkWorld`,
+memoized per plan, view and the levels shown): surfaces to stand on (each shown level's slab
+outline less its floor openings and the holes the flights below cut, a staircase's `stair` solids,
+a lone flight tread by tread, deck boards, and the ground outside every level's outline) and
+obstacles (stair solids from their underside to their top, rails and guards kept `BODY_RADIUS` 6"
+away, lone flights' railings, deck boards and railings, floor opening guards). `walkMove` cuts a
+move into 2" pieces; each goes where nothing stands between a step (`STEP_UP`, 9") and the waist
+(`BODY_HEIGHT`, 48") over the feet and something is within a step up (`surfaceAt`: the highest),
+sliding along x or y alone when the straight way is blocked; no surface refuses the piece. So the
+feet climb stairs, fall into a stairwell, stay on the floor under a framed landing (its underside is
+above the waist) and stop at a guard. The eye eases to the feet + 66" (`EYE_EASE`), and the active
+walk level is the highest shown level whose floor is not above the feet (`levelAtFeet`). Q/E or
+PageDown/PageUp jump through the levels the 3D view shows, putting the feet on that level's floor. Esc, `F`
 or the pointer-lock `unlock` event return to orbit, restoring the orbit pose. Keys are captured on
 `window` in the capture phase while walking, so the 2D tools and hotkeys never see them (App's
 handler also ignores keys while a pointer lock is active). `frameloop="always"` while walking,
 `"demand"` otherwise. A point light follows the eye (indoors the sky and sun reach only floors).
-Crosshair and a hint ("Walls are not solid in walk mode": no collision in v1).
+Crosshair and a hint ("Walls are not solid in walk mode": the walk is for looking).
 
 **Elevations** (`uiStore.view3dPreset`: `perspective`, `north`, `south`, `east` or `west`; pure maths in
 `view3d/elevation.ts`). The sides are the plan's: north looks toward +plan y from the road side, south

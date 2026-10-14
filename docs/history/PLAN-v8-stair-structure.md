@@ -249,3 +249,20 @@ issues for the starter.
   in the existing view only if that wall is not split there. The closet is 2'3" x 6'7" inside, and
   the landing's free corner keeps its post. Its label is "Coats". The round handrail is drawn as a
   2" square bar; the bullnose is a disc of 8" round the starting newel in front of the platform.
+- **M5**: the east-west joist zones are on the First Floor only (the wing's ceiling under its shed:
+  its rafters must run that way), over the utility (existing) and north of it (new); the wing's floor
+  over the crawl space is unknown, so it is left north-south. The basement post is two 6x6s side by
+  side (5 1/2" x 11"), so it stands under both beam ends (6 3/4" apart at y 92.75 and 99.5); a single
+  6x6 centred between them is under neither. Members show on the plan always; the Structure overlay
+  (Y) adds the joists, beam labels and bearing marks. The "Structure" 3D toggle with see-through
+  slabs was left out: flush beams show where they hang below the ceiling, the rest is in the floor.
+- **M6**: exterior walls bear only where the joists over them cross them (or are not set), not all
+  of them; a wall taken out needs its load picked up only where what it carried stays (the floor
+  above, or a roof kept over it), so the old porch's walls under its removed roof raise nothing.
+  Header notes are for new openings cut into existing bearing walls (new walls are designed whole).
+  The starter run found no errors or warnings and four header notes, pinned in `example.test.ts`;
+  the Bunk's south wall upstairs is not bearing by the rule (the attic joists span 11'-2" without it),
+  so the warning the plan expected there does not appear.
+- **M7**: what the walker bumps into is between a step up and the waist (48"), not the full body:
+  so the framed landing's underside (61 3/4" up) and the closet under it do not stop a walk, as walls
+  do not.

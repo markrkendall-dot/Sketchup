@@ -1,9 +1,14 @@
+import { getDeckLayout, type DeckBox } from '../derive/decks';
+import { floorOpeningHoles, getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getLevelElevations } from '../derive/levels';
 import { getFootprints } from '../derive/footprint';
 import { levelCentroid, outwardSide } from '../derive/meshes';
-import { isOpeningVisible } from '../derive/phase';
-import { getFaces } from '../derive/rooms';
-import { add, pointInPolygon, polygonSignedArea, scale } from '../model/geometry';
+import { isOpeningVisible, isVisible } from '../derive/phase';
+import { getFaces, slabOutlines } from '../derive/rooms';
+import { groundAt } from '../derive/site';
+import { getStaircaseLayout, heightAt } from '../derive/staircase';
+import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsOutline, stairsPoint } from '../derive/stairs';
+import { add, dist, dot, pointInPolygon, polygonSignedArea, projectPointToSegment, scale, sub } from '../model/geometry';
 import type { Id, Plan, Vec2, ViewMode } from '../model/types';
 import { planBox } from './bounds';
 import { active3dLevel, visible3dLevels } from './visibility';
@@ -144,4 +149,224 @@ export function walkStep(yaw: number, forward: number, right: number, distance: 
   const c = Math.cos(yaw);
   // forward = (-sin yaw, 0, -cos yaw), right = (cos yaw, 0, -sin yaw)
   return [-s * f + c * r, -c * f - s * r];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Walking on what is there (DESIGN.md "3D", walk mode): the feet stand on the highest surface
+// within a step of them (floors less their holes, treads and landings, deck boards, the ground
+// outside), climb a step up to STEP_UP, fall to what is below, and are stopped by what stands in
+// the way between a step and the waist (stair sides, guards, rails, deck edges). Walls stay
+// walk-through, as in the orbit view's cutaway: the walk is for looking, not a collision game.
+
+/** The highest step the walker climbs, inches. */
+export const STEP_UP = 9;
+/** What the walker bumps into: anything between a step up and this over the feet, inches. */
+export const BODY_HEIGHT = 48;
+/** How close the walker comes to a rail or guard, inches. */
+export const BODY_RADIUS = 6;
+/** The longest piece a move is cut into, so a fast step does not pass through a rail, inches. */
+const SUBSTEP = 2;
+/** A lone flight's railing over its nosings, inches (DESIGN.md "Stair railings"). */
+const DECK_RAIL_HEIGHT = 36;
+/** How fast the eye follows the feet up and down (per second, as a fraction of the gap). */
+export const EYE_EASE = 12;
+
+type Height = (p: Vec2) => number;
+
+interface Shape {
+  poly: Vec2[];
+  holes?: Vec2[][];
+  /** Bounding box, for a quick miss. */
+  box: [number, number, number, number];
+}
+
+/** A surface to stand on: its top (absolute) over its outline. */
+export interface WalkSurface extends Shape {
+  top: Height;
+}
+
+/** Something in the way: from bottom to top (absolute) over its outline, kept `pad` away from. */
+export interface WalkObstacle extends Shape {
+  bottom: Height;
+  top: Height;
+  pad: number;
+}
+
+export interface WalkWorld {
+  surfaces: WalkSurface[];
+  obstacles: WalkObstacle[];
+  /** The ground's height outside the house (null inside it). */
+  ground: (p: Vec2) => number | null;
+}
+
+const shape = (poly: Vec2[], holes?: Vec2[][]): Shape => {
+  const xs = poly.map((p) => p.x);
+  const ys = poly.map((p) => p.y);
+  return { poly, ...(holes?.length ? { holes } : {}), box: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] };
+};
+const flat = (z: number): Height => () => z;
+
+function inShape(s: Shape, p: Vec2, pad = 0): boolean {
+  const [x0, y0, x1, y1] = s.box;
+  if (p.x < x0 - pad || p.x > x1 + pad || p.y < y0 - pad || p.y > y1 + pad) return false;
+  if (pointInPolygon(p, s.poly)) return !s.holes?.some((h) => pointInPolygon(p, h));
+  if (pad <= 0) return false;
+  return s.poly.some((q, i) => projectPointToSegment(p, q, s.poly[(i + 1) % s.poly.length]).distance <= pad);
+}
+
+const worldCache = new WeakMap<Plan, Map<string, WalkWorld>>();
+
+/** The surfaces and obstacles of the levels one walks on, in a view (memoized per plan). */
+export function walkWorld(plan: Plan, viewMode: ViewMode, levels: readonly Id[]): WalkWorld {
+  let byKey = worldCache.get(plan);
+  if (!byKey) worldCache.set(plan, (byKey = new Map()));
+  const key = `${viewMode}|${levels.join(',')}`;
+  const hit = byKey.get(key);
+  if (hit) return hit;
+  const elev = getLevelElevations(plan);
+  const surfaces: WalkSurface[] = [];
+  const obstacles: WalkObstacle[] = [];
+  const box = (b: DeckBox, z: number, pad = 0): WalkObstacle => ({ ...shape(b.poly, b.holes), bottom: flat(z + b.bottom), top: flat(z + b.top), pad });
+  const footprints: Vec2[][] = [];
+  for (const id of plan.levelOrder) {
+    const level = plan.levels[id];
+    if (level) footprints.push(...slabOutlines(getFaces(level, viewMode), true));
+  }
+  for (const id of levels) {
+    const level = plan.levels[id];
+    const z = elev[id]?.floorTop;
+    if (!level || z === undefined) continue;
+    // The floor, less its openings and the holes the flights below cut in it.
+    const i = plan.levelOrder.indexOf(id);
+    const below = plan.levels[plan.levelOrder[i - 1]];
+    const holes = floorOpeningHoles(plan, id, viewMode);
+    if (below) {
+      const ftf = floorToFloor(plan, below.id);
+      for (const s of Object.values(below.stairs)) {
+        if (!s.cutsFloorAbove || !isVisible(s.phase, viewMode)) continue;
+        const hole = stairsHoleOutline(s, ftf, below.wallHeight);
+        if (hole) holes.push(hole);
+      }
+    }
+    for (const poly of slabOutlines(getFaces(level, viewMode), true)) surfaces.push({ ...shape(poly, holes), top: flat(z) });
+    // Stairs: a staircase's solids as they are drawn; a flight on its own, tread by tread.
+    const ftf = floorToFloor(plan, id);
+    const seen = new Set<Id>();
+    for (const sc of Object.values(level.staircases ?? {})) {
+      const layout = getStaircaseLayout(plan, id, sc.id, viewMode);
+      if (!layout) continue;
+      for (const m of layout.members) seen.add(m);
+      for (const sol of layout.solids) {
+        const top = (p: Vec2) => z + heightAt(sol.zt, p);
+        if (sol.group === 'stair') surfaces.push({ ...shape(sol.poly), top });
+        obstacles.push({ ...shape(sol.poly), bottom: (p) => z + heightAt(sol.zb, p), top, pad: sol.group === 'rail' ? BODY_RADIUS : 0 });
+      }
+    }
+    for (const s of Object.values(level.stairs)) {
+      if (seen.has(s.id) || !isVisible(s.phase, viewMode) || s.width <= 0 || s.run <= 0) continue;
+      const { risers, rise } = flightSteps(s, ftf);
+      const base = z + stairsBase(s);
+      const f = stairsFrame(s);
+      const tread = s.run / risers;
+      const along = (p: Vec2) => dot(sub(p, f.origin), f.u);
+      const top = (p: Vec2) => base + Math.min(risers, Math.floor(Math.max(0, along(p)) / tread) + 1) * rise;
+      const outline = stairsOutline(s);
+      surfaces.push({ ...shape(outline), top });
+      obstacles.push({ ...shape(outline), bottom: flat(s.open ? base : z), top, pad: 0 });
+      for (const [side, sgn] of [['left', -1], ['right', 1]] as const) {
+        if (!s.railings?.[side]) continue;
+        const h = (sgn * s.width) / 2;
+        const rail = [stairsPoint(f, 0, h - sgn), stairsPoint(f, s.run, h - sgn), stairsPoint(f, s.run, h), stairsPoint(f, 0, h)];
+        obstacles.push({ ...shape(rail), bottom: top, top: (p) => top(p) + DECK_RAIL_HEIGHT, pad: BODY_RADIUS });
+      }
+    }
+    // Decks: their boards to stand on; their edges, railings and posts in the way.
+    for (const d of Object.values(level.decks ?? {})) {
+      if (!isVisible(d.phase, viewMode)) continue;
+      const layout = getDeckLayout(plan, id, d.id, viewMode);
+      if (!layout) continue;
+      surfaces.push({ ...shape(layout.boards.poly, layout.boards.holes), top: flat(z + layout.boards.top) });
+      obstacles.push(box(layout.boards, z));
+      for (const r of layout.railing) obstacles.push(box(r, z, BODY_RADIUS));
+    }
+    // The guards round floor openings.
+    for (const o of Object.values(level.floorOpenings ?? {})) {
+      if (!isVisible(o.phase, viewMode)) continue;
+      const layout = getFloorOpeningLayout(plan, id, o.id, viewMode);
+      for (const r of [...(layout?.railing ?? []), ...(layout?.rail ?? [])]) obstacles.push(box(r, z, BODY_RADIUS));
+    }
+  }
+  const world: WalkWorld = {
+    surfaces,
+    obstacles,
+    ground: (p) => (footprints.some((f) => pointInPolygon(p, f)) ? null : groundAt(plan, p)),
+  };
+  byKey.set(key, world);
+  return world;
+}
+
+/** The surface the feet stand on at p: the highest within STEP_UP over `feet`, or null (none). */
+export function surfaceAt(world: WalkWorld, p: Vec2, feet: number): number | null {
+  let best: number | null = null;
+  const reach = feet + STEP_UP + 1e-6;
+  const g = world.ground(p);
+  if (g !== null && g <= reach) best = g;
+  for (const s of world.surfaces) {
+    if (!inShape(s, p)) continue;
+    const t = s.top(p);
+    if (t <= reach && (best === null || t > best)) best = t;
+  }
+  return best;
+}
+
+/** Whether something stands in the way at p for feet at `feet` (between a step up and the waist). */
+export function blockedAt(world: WalkWorld, p: Vec2, feet: number): boolean {
+  const lo = feet + STEP_UP + 1e-6;
+  const hi = feet + BODY_HEIGHT;
+  return world.obstacles.some((o) => inShape(o, p, o.pad) && o.top(p) > lo && o.bottom(p) < hi);
+}
+
+export interface WalkState {
+  at: Vec2;
+  /** The feet's elevation (absolute). */
+  feet: number;
+}
+
+/**
+ * One move from `from` toward `to`, in pieces of SUBSTEP: each piece goes where it is not blocked
+ * and there is something to stand on, sliding along x or y alone when the straight way is
+ * blocked; the feet go up a step or down to what is below.
+ */
+export function walkMove(world: WalkWorld, from: WalkState, to: Vec2): WalkState {
+  let at = from.at;
+  let feet = from.feet;
+  const total = dist(at, to);
+  const n = Math.max(1, Math.ceil(total / SUBSTEP));
+  const step = scale(sub(to, at), 1 / n);
+  const tryTo = (p: Vec2): boolean => {
+    if (blockedAt(world, p, feet)) return false;
+    const s = surfaceAt(world, p, feet);
+    if (s === null) return false;
+    at = p;
+    feet = s;
+    return true;
+  };
+  for (let k = 0; k < n; k++) {
+    if (tryTo(add(at, step))) continue;
+    if (step.x && tryTo(add(at, { x: step.x, y: 0 }))) continue;
+    if (step.y && tryTo(add(at, { x: 0, y: step.y }))) continue;
+    break;
+  }
+  return { at, feet };
+}
+
+/** The level the feet are on: the highest walkable level whose floor is not above them. */
+export function levelAtFeet(plan: Plan, levels: readonly Id[], feet: number): Id | undefined {
+  const elev = getLevelElevations(plan);
+  let best: Id | undefined;
+  for (const id of levels) {
+    const z = elev[id]?.floorTop;
+    if (z !== undefined && z <= feet + 1) best = id;
+  }
+  return best ?? levels[0];
 }
