@@ -1335,14 +1335,14 @@ the island one 66 x 37 top.
 
 The proposed deck off the master bedroom is added through `deck()` (deck ids `f-d1` ...), from the
 retaining wall's east face to the wing's east face, its top at the retaining wall's (absolute -4).
-Its stair goes on down the bank south of the walkout (`BANK`, from photos 24 to 27: the ground at
--100 4' out, -196 from 12'6" out) to the lower lawn: two open flights on the Basement of 12 risers
-of 96 / 13, each climbing to an edge that is its 13th, with a 3' landing (a deck at the Basement's
-floor, -100) between them; the lower flight starts 96" below the Basement floor. Today's wooden
-stair (photos 23 to 27: a flight up along the wing's east side, its landing and a flight down the
-bank, all open) is drawn as existing work and demolished. `example.test.ts` checks the outline,
-that the top equals the wall's, the supported edges, the two posts, the openings at both flights
-and the flights' heights against the deck, the landing and the lawn.
+It has no stair of its own (MK), so its east and south railings run their full length. Today's
+wooden stair (photos 23 to 27: a flight up along the wing's east side, its landing, a deck at the
+Basement's floor, -100, and a flight down the bank south of the walkout, all open) is drawn as
+existing work and kept: the lower flight, 12 risers of 96 / 13 to the landing's edge, starts 96"
+below the Basement floor on the lower lawn (`BANK`, from photos 24 to 27: the ground at -100 4' out,
+-196 from 12'6" out). `example.test.ts` checks the deck's outline, that its top equals the wall's,
+the supported edges, the two posts and that no stair opens its railings, and that today's flights
+and landing are kept, the lower flight's heights against the landing and the lawn.
 
 ## Risks
 

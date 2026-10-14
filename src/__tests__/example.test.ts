@@ -96,11 +96,11 @@ describe('docs/examples/146-mick-road.json', () => {
     // (MK), so no new one is cut.
     expect(count(all('walls'))).toEqual({ existing: 57, demo: 7, new: 20 });
     expect(count(all('openings'))).toEqual({ existing: 18, demo: 14, new: 21 });
-    // The demolished stairs: today's flight, and the wooden stair's two flights (along the wing's east
-    // side and down the bank) with its landing (a deck); the deck's stair replaces them. New: the two
-    // short flights and the main flight, and the deck stair's two flights and their landing.
-    expect(count(all('stairs'))).toEqual({ existing: 0, demo: 3, new: 5 });
-    expect(count(all('decks'))).toEqual({ existing: 0, demo: 1, new: 2 });
+    // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
+    // side and down the bank, with its landing, a deck) stays (MK). New: the two short flights and
+    // the main flight, and the master bedroom's deck.
+    expect(count(all('stairs'))).toEqual({ existing: 2, demo: 1, new: 3 });
+    expect(count(all('decks'))).toEqual({ existing: 1, demo: 0, new: 1 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
     expect(count(all('rooms'))).toEqual({ existing: 11, demo: 3, new: 8 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen
@@ -471,7 +471,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(top('existing') - top('proposed')).toBeCloseTo(hole(holes[0]) - oldHole, 0);
   });
 
-  it("has the master bedroom's deck: from the terrace's wall to the wing's east face, flush with the wall's top, its stair down to the lawn", () => {
+  it("has the master bedroom's deck: from the terrace's wall to the wing's east face, flush with the wall's top, no stair of its own", () => {
     const [b, f] = plan.levelOrder;
     const decks = Object.values(plan.levels[f].decks);
     expect(decks).toHaveLength(1);
@@ -490,25 +490,28 @@ describe('docs/examples/146-mick-road.json', () => {
     const retaining = Object.values(plan.levels[b].walls).filter((w) => w.heightOverride !== undefined);
     expect(retaining.map((w) => elev[b].floorTop + w.heightOverride!)).toEqual([top, top]);
     // The house carries its north edge and the retaining wall its west edge; two posts (the
-    // south-east corner and the middle of the south edge); the stair opens the south railing.
+    // south-east corner and the middle of the south edge); no stair reaches it, so its railings run
+    // the full east and south edges.
     const layout = getDeckLayout(plan, f, deck.id, 'proposed')!;
     expect(layout.supported).toEqual([true, false, false, true]);
     expect(layout.posts).toHaveLength(2);
-    expect(layout.openings.map((o) => [o.edge, o.from, o.to])).toEqual([[2, 0, 36]]);
-    // The stair goes on down to the lower lawn, 8' under the walkout (MK): two open flights of 12
-    // risers of 96 / 13, each climbing to an edge that is its 13th, with a 3' landing (a deck) at the
-    // walkout's level between them.
-    const upper = plan.levels[b].stairs[layout.openings[0].stairsId];
-    expect(upper).toMatchObject({ width: 36, run: 120, risers: 12, direction: 270, phase: 'new', open: true });
-    expect(elev[b].floorTop + stairsBase(upper) + upper.rise! + 96 / 13).toBeCloseTo(top, 9);
-    const landings = Object.values(plan.levels[b].decks).filter((d) => d.phase === 'new');
+    expect(layout.openings).toEqual([]);
+    // Today's wooden stair stays beside it (MK): both flights open and existing, the upper one up
+    // from its landing at the walkout's level, the lower one climbing to the landing's south edge
+    // from the lower lawn, 8' under the walkout: 12 risers of 96 / 13, the landing's edge its 13th.
+    const basement = plan.levels[b];
+    const flights = Object.values(basement.stairs);
+    expect(flights).toHaveLength(2);
+    expect(flights.every((s) => s.phase === 'existing' && s.open)).toBe(true);
+    const landings = Object.values(basement.decks);
     expect(landings).toHaveLength(1);
     const [landing] = landings;
-    expect(landing).toMatchObject({ elevation: 0, railings: [false, true, false, true] });
-    expect(elev[b].floorTop + stairsBase(upper)).toBe(elev[b].floorTop + landing.elevation);
+    expect(landing).toMatchObject({ elevation: 0, railings: [false, true, false, false], phase: 'existing' });
     const landingLayout = getDeckLayout(plan, b, landing.id, 'proposed')!;
-    expect(landingLayout.posts).toHaveLength(4);
-    const lower = plan.levels[b].stairs[landingLayout.openings[0].stairsId];
+    expect(landingLayout.openings.map((o) => o.edge)).toEqual([2]);
+    const upper = flights.find((s) => s.id !== landingLayout.openings[0].stairsId)!;
+    expect(elev[b].floorTop + stairsBase(upper)).toBe(elev[b].floorTop + landing.elevation);
+    const lower = basement.stairs[landingLayout.openings[0].stairsId];
     expect(lower).toMatchObject({ base: -96, risers: 12, open: true });
     expect(elev[b].floorTop + lower.base! + lower.rise! + 96 / 13).toBeCloseTo(elev[b].floorTop + landing.elevation, 9);
     expect(groundAt(plan, lower.origin)).toBeCloseTo(elev[b].floorTop + lower.base!, 6);

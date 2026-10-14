@@ -558,7 +558,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Roof overhangs | main 24", wing 18", entry porch 18" | Eave to the wall face |
 | Roof thickness, eaves | 2 1/2" (corrugated sheet); open eaves, rafter tails 5 1/2" deep every 24" (photos 1 and 7); 7" rake boards | A rafter tail and the rake board |
 | Grade points | see below | Spot levels from the floor top down |
-| **The bank and the lower lawn** | level about 4' out from the walkout doors, then down 8' (MK) to the lower lawn from about 12'6" out (photos 24 to 27); the deck's stair needs 26 risers in two flights to reach it, and each 7.4" more or less is a riser and 10" of run | Where the bank starts and ends, and the lawn against the walkout doors' threshold |
+| **The bank and the lower lawn** | level about 4' out from the walkout doors, then down 8' (MK) to the lower lawn from about 12'6" out (photos 24 to 27); today's lower flight is drawn as 12 risers of 7.4" to the landing's edge, and each 7.4" more or less is a riser and 10" of run | Where the bank starts and ends, and the lawn against the walkout doors' threshold |
 
 Grade points (absolute elevation in inches; the first floor top is +2", the basement floor -100"):
 five at +1 round the porch, whose floor is about at grade (its two outer corners, the middle of its
@@ -604,7 +604,7 @@ The starter also holds the owner's proposed design (his brief of 12 Oct 2026), d
 *demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
 `proposed()`; the plans are `docs/history/PLAN-v4-proposed.md` and, for the kitchen,
 `docs/history/PLAN-v5-kitchen.md`, with the places where the built design differs from them).
-Six changes, all on the First Floor apart from the upstairs east windows over the new wing and the deck's stair:
+Six changes, all on the First Floor apart from the upstairs east windows over the new wing:
 
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
    one-storey wing down the whole east side, outside 12'1" x 26'3", under one new shed roof (5:12)
@@ -673,16 +673,10 @@ Six changes, all on the First Floor apart from the upstairs east windows over th
    8'). Its top is 6" below the bedroom floor (elevation -4), flush with the retaining wall's top,
    so you step onto it from the lake-side terrace behind the wall. The house and the wall carry its
    north and west edges; two posts stand on the walkout terrace (at the south-east corner and the
-   middle of the south edge, 8' in front of the walkout doors); railings run along the east and
-   south edges. Its stair leads south off the south edge's east end, 36" wide, open treads on
-   stringers, all the way down to the lower lawn 8' under the walkout (MK): 26 risers of 7.4" in
-   two flights of 12 (10" treads), each climbing to an edge that is its 13th, with a 3' square
-   landing between them at the walkout's level, 8' over the lawn on four posts, railed on its east
-   and west sides. The deck's railing opens where the stair arrives. It reaches 21' south of the
-   deck; the bank is an **estimate** from photos 24 to 27 (see the measurement table). Today's
-   wooden stair, both flights and its landing, is demolished (MK: the deck's stair replaces it),
-   and with it the small deck at its top (photo 3, not modelled). The flights' railings are not
-   drawn.
+   middle of the south edge, 8' in front of the walkout doors); railings run the full east and
+   south edges. The deck has no stair of its own (MK): **today's wooden stair stays** as it is,
+   4" east of the deck's east edge, from the lawn down along the wing's east side to its landing
+   at the walkout's level and on down the bank to the lower lawn.
 
 **After the work** (MK, after his garage across the road), the Proposed view shows the whole house
 re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
