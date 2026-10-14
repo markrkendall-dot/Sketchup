@@ -26,5 +26,7 @@
     (powder room and pantry), the wood stove, the laundry and the upstairs bath.
   - `PLAN-v7-exterior-flue.md`: the stove's flue routed outside the house, with the 2025
     Residential Code of New York State checklist it was laid out to.
+  - `PLAN-v8-stair-structure.md`: the plan for the grand staircase in detail, the NY stair checks,
+    walk mode on stairs, renovation wall moves, and beams, posts, footings and load-path checks.
   - `QA-FINDINGS.md`: the first hands-on QA pass and the second review's status.
   - `REVIEW-2.md`: the second review of the house and the tools, with the fixes made.
