@@ -7,7 +7,10 @@
 // laid out from the OUTSIDE faces of the walls, the way the owner's tape reads, and the centerlines
 // are set 3.5" (half of 7") inside them, which is what "Lengths to: outside face" does by hand. The
 // First Floor interior is the owner's tape measurements (face to face), set out from the inside faces.
+import { getLevelElevations } from '../src/derive/levels';
+import { roofBearing, roofHeightAt } from '../src/derive/roofs';
 import { columnDefaults } from '../src/derive/site';
+import { DEFAULT_INTERIOR_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import type { Id, Opening, Phase, Plan, Roof, Room, Vec2 } from '../src/model/types';
@@ -104,15 +107,16 @@ const FRIDGE_BLUE = '#3a5fa0';
 const KITCHEN_WINDOW_Y = 160;
 const PHASE: Phase = 'existing';
 const NEW: Phase = 'new';
-/**
- * The proposed powder room's partitions (centerlines): its west wall x 129.5 (faces 127..132, just
- * west of the hall passage's west jamb at x 132, so the existing passage keeps its place) and its
- * north wall y 45.5 (faces 43..48, along the south edge of the new stair).
- */
-const POWDER = { west: 129.5, north: 45.5 };
 /** The Kitchen/Living partition's centerline and the stair strip's south line (no wall there today). */
 const PART_KL = 170.5;
 const STAIR_SOUTH = 137.5;
+/** The First Floor's y 99.5 line: the Kitchen's north wall and the front room's south wall. */
+const FRONT_LINE = 99.5;
+/**
+ * The proposed upstairs bath: its west face (the old bath's, x 174), the old bath's east wall line
+ * (x 220.5) and the new south wall east of it (y 72.5, faces 70..75).
+ */
+const UP_BATH = { west: 174, east: 220.5, south: 72.5 };
 
 type Rect = { x0: number; x1: number; y0: number; y1: number };
 const outline = (r: Rect): Vec2[] => [
@@ -293,6 +297,7 @@ function stableIds(plan: Plan): string {
       ['k', lvl.roofs],
       ['c', lvl.fixtures],
       ['d', lvl.decks],
+      ['h', lvl.floorOpenings],
     ];
     for (const [k, rec] of kinds) Object.keys(rec).forEach((id, i) => add(id, `${pre}-${k}${i + 1}`));
   });
@@ -361,15 +366,12 @@ export function buildExamplePlan(): Plan {
   // Living, with a newel, a spindle rail and shelves under it (photos 16 and 18), so the strip is part
   // of the Living's face. PART.stairSouth only places labels and the old passages' comments.
   const PART = { kl: 170.5, line: 99.5, bathWest: 194.5, stairSouth: 137.5 };
-  // The y 99.5 line is drawn in pieces, east to west, so the two that the proposed design takes out
-  // (the Kitchen/Bath piece east of x 194.5 and the hall/strip piece west of x 129.5) are walls of
-  // their own: the same faces and openings, one extra node at x 129.5, where the proposed powder
-  // room's west wall meets the line.
+  // The y 99.5 line is drawn in pieces, east to west, where the Bath's west wall and the
+  // Kitchen/Living partition meet it.
   for (const [x0, x1] of [
     [CL.x1, PART.bathWest],
     [PART.bathWest, PART.kl],
-    [PART.kl, POWDER.west],
-    [POWDER.west, CL.x0],
+    [PART.kl, CL.x0],
   ]) {
     partition(fId, { x: x0, y: PART.line }, { x: x1, y: PART.line });
   }
@@ -533,8 +535,8 @@ export function buildExamplePlan(): Plan {
   // swinging into the Utility (no hinges show on the Kitchen side).
   addOpeningAt(fId, { x: PART.kl, y: 212 }, { type: 'passage', width: 48, height: 80, sill: 0 });
   addOpeningAt(fId, { x: PART.kl, y: 276 }, { type: 'passage', width: 48, height: 42, sill: 42 });
-  const hallPassage = addOpeningAt(fId, { x: 150, y: PART.line }, { type: 'passage', width: 36, height: 88, sill: 0 });
-  const bathDoor = addOpeningAt(fId, { x: PART.bathWest, y: 69 }, { type: 'door', width: 30, height: 80, leafColor: STAINED_DOOR, into: EAST });
+  addOpeningAt(fId, { x: 150, y: PART.line }, { type: 'passage', width: 36, height: 88, sill: 0 });
+  addOpeningAt(fId, { x: PART.bathWest, y: 69 }, { type: 'door', width: 30, height: 80, leafColor: STAINED_DOOR, into: EAST });
   addOpeningAt(fId, { x: east, y: 264 }, { type: 'door', width: 32, height: 80, lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: UTILITY_DOOR_GREY, into: EAST });
   // Second Floor doors and openings (the sketch): Bunk and Master doors 28" off the landing, closet
   // opening 24", Bath door 24" swinging out into the hall, Guest door 30" into the Guest.
@@ -547,7 +549,7 @@ export function buildExamplePlan(): Plan {
   // North face (the road, photos 06 and 07): on the first floor three casements of 2 x 3 lites west of
   // the chimney (jambs x 56..136) and two single panes east of it (the Bath's, 48" over the washer and
   // dryer, its sill just above the 40" wainscot, photo 22); upstairs two casement pairs.
-  win(fId, { x: ft(8), y: north }, 80, 56, 2, 3, { sashes: 3 });
+  const frontWindow = win(fId, { x: ft(8), y: north }, 80, 56, 2, 3, { sashes: 3 });
   const bathWindow = win(fId, { x: ft(19.5), y: north }, 48, 44, 1, 1, { sashes: 2, sill: 42 });
   win(sId, { x: ft(6.5), y: north }, 46, 44, 2, 3, { sashes: 2, sill: 36 });
   // The east one was centred x 240, which put its west jamb across the Bath's east wall (x 220.5, face
@@ -588,7 +590,8 @@ export function buildExamplePlan(): Plan {
     return { ...d, base: round2(d.base), top: round2(d.top) };
   };
   // The depth after the defaults (a new chimney is 40" deep).
-  if (!store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights(), depth: 20, color: FINISH_COLOR, cap: true })) throw new Error('chimney rejected');
+  const chimney = store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights(), depth: 20, color: FINISH_COLOR, cap: true });
+  if (!chimney) throw new Error('chimney rejected');
 
   // ---- Fixtures as they are (photos 13 to 22; sizes are estimates). The Kitchen, inside x 173..311,
   // y 102..308: knotty pine plank fronts, a light laminate counter.
@@ -644,7 +647,7 @@ export function buildExamplePlan(): Plan {
   // the pipes of the Bath upstairs (x 174..218, y 7..81), its face from the north wall's face at
   // x 168 (by the chimney, where the stovepipe's thimble is) to the Bath's west wall face at y 31,
   // 2' each way (photo 20 reads 1'6" to 2'7": an estimate). It is a full-height box, not a wall,
-  // because a wall would split the Bath's west wall where the proposed closet door (y 19..43) goes.
+  // so it splits neither the north wall nor the Bath's west wall.
   const CHASE = 24;
   const angle = { mid: { x: 192 - CHASE / 2, y: 7 + CHASE / 2 }, out: { x: -Math.SQRT1_2, y: Math.SQRT1_2 } };
   const offAngle = (d: number) => ({ x: round2(angle.mid.x + angle.out.x * d), y: round2(angle.mid.y + angle.out.y * d) });
@@ -699,7 +702,7 @@ export function buildExamplePlan(): Plan {
   label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, PLACEHOLDER_ROOM);
   label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
 
-  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingSouth, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
+  proposed({ bId, fId, sId, stair, houseDoor, livingWest, frontWindow, eastWindow, eastUpstairs, wingSouth, wingRoof, porchRoof, bathWindow, chimney, fixtures: casework });
   return getPlan();
 }
 
@@ -711,7 +714,8 @@ interface ExistingIds {
   stair: Id;
   houseDoor: Id;
   livingWest: Id;
-  hallPassage: Id;
+  /** The front room's 80" north window (x 56..136): the new stair climbs in front of it. */
+  frontWindow: Id;
   eastWindow: Id;
   /** The Second Floor's two east windows (the Office / hall's at y 98, the Guest's at y 222). */
   eastUpstairs: Id[];
@@ -719,9 +723,10 @@ interface ExistingIds {
   wingSouth: Id;
   wingRoof: Id;
   porchRoof: Id;
-  /** The old bath's door (x 194.5, at the south end of the wall, y 54..84) and its north window (x 234). */
-  bathDoor: Id;
+  /** The old bath's north window (x 234, jambs 210..258). */
   bathWindow: Id;
+  /** The masonry chimney on the north wall (a site column). */
+  chimney: Id;
   /** The existing Kitchen, Bath, front room and Utility fixtures (the old layout gives way to the new one). */
   fixtures: Id[];
 }
@@ -756,16 +761,19 @@ function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id
 }
 
 /**
- * The proposed design (MK's brief of 12 Oct 2026; docs/history/PLAN-v4-proposed.md), drawn as new
- * and demolished work on the existing house: the east wing grown north into a master suite under a
- * shed roof (transoms upstairs over it in place of the east windows), the kitchen into the old
- * bath, a new stair from a front door on the west wall up to a landing in the
- * north-west corner and east along the north wall, a powder room in the old hall, and a foyer with a
- * screen porch on the west face in place of the entry porch. Everything is demolished first, so the
- * existing openings are clamped against the proposed walls only once, and none of them moves.
+ * The proposed design (MK's briefs of 12 and 14 Oct 2026; docs/history/PLAN-v4-proposed.md and
+ * PLAN-v6-layout.md), drawn as new and demolished work on the existing house: the east wing grown
+ * north into a master suite under a shed roof (transoms upstairs over it in place of the east
+ * windows) with a laundry closet in its bath; the old front room and the Bunk over it one stair
+ * hall open through both floors, with a wrap-around stair up to a balcony; a powder room and a
+ * walk-in pantry in a band along the north wall, north of the kitchen; a wood stove in the Living's
+ * south-west corner on a stainless flue (the masonry chimney goes); a full bath across the second
+ * floor's north-east; and a foyer with a screen porch on the west face in place of the entry porch.
+ * Everything is demolished first, so the existing openings are clamped against the proposed walls
+ * only once, and none of them moves: a new wall never meets an existing one inside an opening.
  */
 function proposed(ids: ExistingIds): void {
-  const { bId, fId } = ids;
+  const { bId, fId, sId } = ids;
   const wing = centerline(WING, HALF);
   const NORTH = { x: 0, y: -1 };
   const SOUTH = { x: 0, y: 1 };
@@ -775,17 +783,16 @@ function proposed(ids: ExistingIds): void {
   const FLOOR_TOP = 2;
 
   // ---- Demolition (First Floor). The entry porch: its three walls (their screens go with them),
-  // its roof and its label. The wing's north wall, the main block's east window (it
-  // would face into the new bedroom), the wing's roof and its south window (a sliding door takes
-  // its place). The y 99.5 piece between the Kitchen and the
-  // Bath, and the one between the hall and the stair strip west of the powder room, with the hall's
-  // passage (the powder room takes its place). The stair and the house door. The Living's west
-  // window: its north shutter would sit inside the foyer, against the new door's trim, so a window
-  // without shutters replaces it. The old bath's door (at the south end of its west wall it would
-  // open from the powder room into the kitchen) and its north window (the kitchen counter runs under
-  // where it was, so a shorter one is set higher). The old fixtures: the Kitchen's casework, the
-  // Bath's, the Utility's, and the wood stove with the pipe chase behind it (the new flight runs
-  // along the north wall where they stand).
+  // its roof and its label. The wing's north wall, the main block's east window (it would face into
+  // the new bedroom), the wing's roof and its south window (a sliding door takes its place). The
+  // front room's walls: the y 99.5 line from the east wall to the west wall (with the hall's cased
+  // opening) and the old bath's west wall with its door, so the old front room, the stair strip
+  // and the old bath are one floor for the stair hall, the north band and the kitchen. The stair,
+  // the house door and the front room's north window (the new stair climbs in front of it). The
+  // Living's west window: its north shutter would sit inside the foyer, against the new door's
+  // trim, so a window without shutters replaces it. The old bath's north window (a smaller one for
+  // the powder room replaces it). The old fixtures: the Kitchen's casework, the Bath's, the
+  // Utility's, and the wood stove with the pipe chase behind it.
   demolish(fId, {
     walls: [
       { x: (pc.x0 + CL.x0) / 2, y: pc.y0 },
@@ -793,17 +800,32 @@ function proposed(ids: ExistingIds): void {
       { x: (pc.x0 + CL.x0) / 2, y: pc.y1 },
       { x: (WING.x0 + WING.x1) / 2, y: wing.y0 },
       { x: 250, y: 99.5 },
+      { x: 182, y: 99.5 },
       { x: 60, y: 99.5 },
+      { x: 194.5, y: 30 },
     ],
-    openings: [ids.eastWindow, ids.wingSouth, ids.hallPassage, ids.houseDoor, ids.livingWest, ids.bathDoor, ids.bathWindow],
+    openings: [ids.eastWindow, ids.wingSouth, ids.houseDoor, ids.livingWest, ids.frontWindow, ids.bathWindow],
     stairs: [ids.stair],
     roofs: [ids.wingRoof, ids.porchRoof],
     fixtures: ids.fixtures,
-    rooms: ['Entry porch (est.)', 'Utility', 'Bath'],
+    rooms: ['Entry porch (est.)', 'Utility', 'Bath', 'Front room'],
   });
-  // Second Floor: the two east windows. The wing's new shed roof rises to the main block's east wall
-  // past their sills (34"), so high transoms replace them (below).
-  demolish(ids.sId, { openings: ids.eastUpstairs });
+  // Second Floor: the two east windows (the wing's new shed rises past their sills, so high
+  // transoms replace them, below); the Bunk's south wall with its door (the Bunk is the upper half
+  // of the stair hall) and the stub of its east wall south of the old bath (y 83.5..99.5), so the
+  // top of the stair opens straight into the upstairs hall. The old bath's east wall goes once the
+  // new bath's wall has met it (section 9).
+  demolish(sId, {
+    walls: [
+      { x: 100, y: 99.5 },
+      { x: 171.5, y: 92 },
+    ],
+    openings: ids.eastUpstairs,
+    rooms: ['Bunk'],
+  });
+  // The site: the masonry chimney on the north wall (MK: a stainless flue serves the new stove).
+  store().setPhase(fId, { walls: [], openings: [], columns: [ids.chimney] }, 'demo');
+  if (getPlan().site.columns[ids.chimney].phase !== 'demo') throw new Error('the chimney was not marked');
 
   // ---- 1. East addition: the wing grows north to the road corner at the same depth, one wing down
   // the whole east side, outside x 318..463, y 0..315. Its north wall continues the main block's,
@@ -833,14 +855,18 @@ function proposed(ids: ExistingIds): void {
   const foyerFooting = drawWalls(bId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], TB, false, NEW);
   store().updateWalls(bId, foyerFooting, { finish: 'block', color: BLOCK_COLOR });
 
-  // ---- 4. Powder room in the old hall, south of the new flight: x 132..192, y 48..97 inside
-  // (5' x 4'1"), its west wall clear of the old hall passage's jamb.
-  partition(fId, { x: POWDER.west, y: 99.5 }, { x: POWDER.west, y: POWDER.north }, NEW);
-  partition(fId, { x: POWDER.west, y: POWDER.north }, { x: 194.5, y: POWDER.north }, NEW);
-  // The pocket between the top of the new flight and the old bath's west wall becomes a closet off
-  // the kitchen: a partition at x 171.5 (faces 169..174, the top of the flight against its west
-  // face, under the Bunk's east wall upstairs) closes it from the hall, x 174..192, y 7..43 inside.
-  partition(fId, { x: 171.5, y: CL.y0 }, { x: 171.5, y: POWDER.north }, NEW);
+  // ---- 4. The north band (MK, 14 Oct 2026: the kitchen stops short of the north wall): a powder
+  // room and, in the north-east corner, a walk-in pantry, x 173..311, y 7..49 inside (3'6"). Its
+  // south wall is at y 51.5 (faces 49..54), as far south as it can go: it crosses the old bath's west
+  // wall line, and the old bath door there (y 54..84) keeps its place in the existing view only with
+  // the wall's face at its jamb. The hall's east wall continues the Kitchen/Living partition's line
+  // (x 170.5) up to the north wall, behind the stair's landing; the powder room / pantry wall is at
+  // x 261.5 (faces 259..264), just east of the old bath's north window (jambs 210..258), which stays in
+  // its place in the existing view the same way.
+  const BAND = { south: 51.5, divide: 261.5 };
+  partition(fId, { x: PART_KL, y: CL.y0 }, { x: PART_KL, y: FRONT_LINE }, NEW);
+  partition(fId, { x: PART_KL, y: BAND.south }, { x: CL.x1, y: BAND.south }, NEW);
+  partition(fId, { x: BAND.divide, y: CL.y0 }, { x: BAND.divide, y: BAND.south }, NEW);
 
   // ---- The design keeps the entry hall apart from the Living (the brief's bands: "wall y 137.5"),
   // but the photos show no wall on the stair strip's south side today, so the proposed phase builds
@@ -848,13 +874,21 @@ function proposed(ids: ExistingIds): void {
   // in it: 36" at x 132..168 and 30" at x 7..37. One deletion leaves the entry open to the Living.
   partition(fId, { x: PART_KL, y: STAIR_SOUTH }, { x: CL.x0, y: STAIR_SOUTH }, NEW);
 
+  // ---- 7. The laundry (MK): a closet in the master bath's south-west corner, x 318..350, y 54..117.5
+  // inside, its north wall in line with the north band's (y 51.5) and its front at x 352.5, open
+  // 56" for bifold doors (drawn as a cased opening), with the washer and dryer side by side.
+  const LAUNDRY = { north: BAND.south, front: 352.5 };
+  partition(fId, { x: CL.x1, y: LAUNDRY.north }, { x: LAUNDRY.front, y: LAUNDRY.north }, NEW);
+  partition(fId, { x: LAUNDRY.front, y: LAUNDRY.north }, { x: LAUNDRY.front, y: ADD.y }, NEW);
+
   // ---- Openings, all new. Windows 2 x 3 lites per sash, sill 30 unless given.
   const add = (p: Vec2, o: OpeningSpec) => addOpeningAt(fId, p, { ...o, phase: NEW });
-  // Master suite: the bath's door in the partition, a transom north and windows east. The bedroom is
-  // reached from the kitchen through today's grey Kitchen to Utility door (y 248..280), which stays
-  // (MK chose it over a new 32" door at y 195..227). Interior leaves are stained like the old Bath
-  // door.
-  add({ x: 345, y: ADD.y }, { type: 'door', width: 28, height: 80, into: NORTH, leafColor: STAINED_DOOR });
+  // Master suite: the bath's door in the partition (east of the laundry closet), a transom north and
+  // windows east. The bedroom is reached from the kitchen through today's grey Kitchen to Utility
+  // door (y 248..280), which stays (MK chose it over a new 32" door at y 195..227). Interior leaves
+  // are stained like the old Bath door.
+  add({ x: 389, y: ADD.y }, { type: 'door', width: 28, height: 80, into: NORTH, leafColor: STAINED_DOOR });
+  add({ x: LAUNDRY.front, y: (LAUNDRY.north + 2.5 + ADD.y - 2.5) / 2 }, { type: 'passage', width: 56, height: 80, sill: 0 });
   // The bath's north window is a transom, high for privacy from the road: 46 x 18, two sashes of
   // 2 x 1 lites, sill 70 (head 88).
   add({ x: 390, y: CL.y0 }, { type: 'window', width: 46, height: 18, sill: 70, sashes: 2, lites: { cols: 2, rows: 1 } });
@@ -884,36 +918,69 @@ function proposed(ids: ExistingIds): void {
   const screenDoor = { type: 'door' as const, width: 36, height: 80, leafColor: FINISH_COLOR, glazing: 'screen' as const, trim: 0 };
   add({ x: -48, y: fy.south }, { ...screenDoor, into: SOUTH });
   add({ x: -20, y: CL.y1 }, { ...screenDoor, into: SOUTH });
-  // Powder room door from the hall.
-  add({ x: POWDER.west, y: 72 }, { type: 'door', width: 28, height: 80, into: EAST, leafColor: STAINED_DOOR });
-  // The old bath's north window again, raised over the kitchen's north counter: 42 x 36, two sashes
-  // of 2 x 3 lites, sill 44 (the counter top is at 36).
-  add({ x: ft(19.5), y: CL.y0 }, { type: 'window', width: 42, height: 36, sill: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
-  // The closet (x 174..192, y 7..43): a 24" door from the kitchen (jambs y 19..43) in place of the
-  // old bath's 30" one, swinging into the kitchen clear of the north counter (from x 221).
-  add({ x: 194.5, y: 31 }, { type: 'door', width: 24, height: 80, into: EAST, leafColor: STAINED_DOOR });
+  // The north band: the powder room's 28" door from the kitchen's north-west corner (x 200..228,
+  // east of where the band's wall crosses the old bath wall's line, x 194.5; it swings out), the
+  // pantry's 24" door at its west end (it swings in, clear of the shelves), and a small window in
+  // the powder room's north wall (24 x 30, sill 48, 2 x 2 lites, between the old bath wall's line and
+  // the band's divider).
+  add({ x: 214, y: BAND.south }, { type: 'door', width: 28, height: 80, into: SOUTH, leafColor: STAINED_DOOR });
+  add({ x: 276, y: BAND.south }, { type: 'door', width: 24, height: 80, into: NORTH, leafColor: STAINED_DOOR });
+  add({ x: 214, y: CL.y0 }, { type: 'window', width: 24, height: 30, sill: 48, lites: { cols: 2, rows: 2 } });
+  // The hall to the kitchen: a 32" cased opening in the Kitchen/Living partition at the stair
+  // strip's east end, on the line of the house door (y 118.5).
+  add({ x: PART_KL, y: 118.5 }, { type: 'passage', width: 32, height: 80, sill: 0 });
+  // The stair hall: a 24" window over the stair's bottom platform in the north wall (x 13..37, sill
+  // 36, 2 x 3 lites); safety glass, being this near the steps.
+  add({ x: 25, y: CL.y0 }, { type: 'window', width: 24, height: 48, sill: 36, lites: { cols: 2, rows: 3 } });
   // The new strip wall's two openings (above).
   add({ x: 150, y: STAIR_SOUTH }, { type: 'passage', width: 36, height: 80, sill: 0 });
   add({ x: 22, y: STAIR_SOUTH }, { type: 'passage', width: 30, height: 80, sill: 0 });
-  // Upstairs, the transoms in place of the two east windows, on the same centres (the Office / hall's
-  // y 98, the Guest's y 222): 46 x 24, two sashes of 2 x 2 lites, sill 60, so the head is at 84. The
-  // wing's shed (below) meets the wall with its top 50.9" above the Second Floor, so each sill is
-  // 9.1" over the roof and its trim 5.1".
-  for (const y of [98, 222]) {
-    addOpeningAt(ids.sId, { x: CL.x1, y }, { type: 'window', width: 46, height: 24, sill: 60, sashes: 2, lites: { cols: 2, rows: 2 }, phase: NEW });
+  // Upstairs, the transoms in place of the two east windows: 46 x 24, two sashes of 2 x 2 lites,
+  // sill 60, so the head is at 84. The wing's shed (below) meets the wall with its top 50.9" above
+  // the Second Floor, so each sill is 9.1" over the roof and its trim 5.1". The Guest's stays on its
+  // window's centre (y 222); the Office's moves to y 110, clear of the new bath's south wall.
+  for (const y of [110, 222]) {
+    addOpeningAt(sId, { x: CL.x1, y }, { type: 'window', width: 46, height: 24, sill: 60, sashes: 2, lites: { cols: 2, rows: 2 }, phase: NEW });
   }
+  // Light for the stair hall's upper half: a second casement pair in the north wall over the stair's
+  // landing (x 140, like the Bunk's at x 78), and one in the west wall over the bottom of the stair,
+  // north of the foyer's roof (y 36, 30 x 44, sill 36).
+  addOpeningAt(sId, { x: 140, y: CL.y0 }, { type: 'window', width: 46, height: 44, sill: 36, sashes: 2, lites: { cols: 2, rows: 3 }, phase: NEW });
+  addOpeningAt(sId, { x: CL.x0, y: 36 }, { type: 'window', width: 30, height: 44, sill: 36, lites: { cols: 2, rows: 3 }, phase: NEW });
 
-  // ---- 3. The stair, 36" wide: two risers north from the old hall up to a 14" landing in the
-  // north-west corner, then the main flight east along the north wall to the Bunk's east wall face
-  // upstairs (x 169). The short flight's run is 36" (two 18" treads, y 79 to 43), the shortest run
-  // the store takes. The main flight is 35.5" wide, 1/2" off the north wall's inside face, so its
-  // floor opening lies inside the Second Floor's slab (which ends at that face) and is cut.
-  const flight = (s: Omit<NewStairs, 'phase'>) => {
-    if (!store().addStairs(fId, { ...s, phase: NEW })) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
+  // ---- 3. The grand stair (MK, 14 Oct 2026): the old front room and the Bunk over it are one stair
+  // hall, x 7..168, y 7..135, open through both floors north of y 91. 108" floor to floor in 15
+  // risers of 7.2" on 10.5" treads (2R + T = 24.9"), all 42" wide but the top flight (41"), solid
+  // under, wrapping the hall's north-west, north and east sides round an open court:
+  //   - a one-riser platform in the north-west corner (x 7..43, y 7..49, top 7.2"): you step up onto
+  //     it heading north from the entry, two steps from the house door, and turn east;
+  //   - flight 1 east along the north wall, x 43..127, 8 risers to 64.8", its south side railed;
+  //   - a landing in the north-east corner, x 127..168, y 7..49, at 72";
+  //   - flight 2 south along the hall's east wall, y 49..91, 4 risers to 100.8", its west side
+  //     railed; the Second Floor's edge at y 91 is the 15th riser.
+  // The floor opening (Second Floor) cuts the slab over the whole hall north of y 91, x 7..169, so
+  // the flights cut nothing themselves; its guard runs along y 91 west of the stair's arrival (and
+  // the 5" of its east edge south of the old bath's corner, y 86..91, where the Bunk's wall is gone)
+  // and the balcony, y 91..135, leads to the bedroom door (x 150) and east into the upstairs hall.
+  const R = 108 / 15;
+  const TREAD = 10.5;
+  const flight = (s: Omit<NewStairs, 'phase' | 'cutsFloorAbove'>) => {
+    if (!store().addStairs(fId, { ...s, phase: NEW, cutsFloorAbove: false })) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
   };
-  flight({ origin: { x: 25, y: 79 }, direction: 270, width: 36, run: 36, rise: 14, risers: 2, cutsFloorAbove: false });
-  flight({ origin: { x: 25, y: 43 }, direction: 270, width: 36, run: 36, rise: 14, risers: 1, cutsFloorAbove: false });
-  flight({ origin: { x: 43, y: 25.25 }, direction: 0, width: 35.5, run: 126, base: 14, rise: 94, cutsFloorAbove: true });
+  const STAIR = { platformEast: 43, landingWest: 127, east: 168, south: 49, top: 91 };
+  flight({ origin: { x: (CL.x0 + HALF + STAIR.platformEast) / 2, y: STAIR.south }, direction: 270, width: STAIR.platformEast - (CL.x0 + HALF), run: STAIR.south - (CL.y0 + HALF), rise: R, risers: 1 });
+  flight({ origin: { x: STAIR.platformEast, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: 8 * TREAD, base: R, rise: 8 * R, risers: 8, railings: { right: true } });
+  flight({ origin: { x: STAIR.landingWest, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: STAIR.east - STAIR.landingWest, base: 9 * R, rise: R, risers: 1 });
+  flight({ origin: { x: (STAIR.landingWest + STAIR.east) / 2, y: STAIR.south }, direction: 90, width: STAIR.east - STAIR.landingWest, run: 4 * TREAD, base: 10 * R, rise: 4 * R, risers: 4, railings: { right: true } });
+  const well = { x0: CL.x0 + HALF, x1: 169, y0: CL.y0 + HALF, y1: STAIR.top, bathCorner: 86 };
+  const wellOutline = [
+    { x: well.x0, y: well.y0 },
+    { x: well.x1, y: well.y0 },
+    { x: well.x1, y: well.bathCorner },
+    { x: well.x1, y: well.y1 },
+    { x: well.x0, y: well.y1 },
+  ];
+  if (!store().addFloorOpening(sId, { outline: wellOutline, railings: [false, false, true, true, false], phase: NEW })) throw new Error('floor opening rejected');
 
   // ---- Roofs, new sheet (little rust). The wing: one shed over the whole east side, 5:12 in the
   // wing roof's colour, high at the main block's east wall and down to 96" at the wing's east wall:
@@ -949,68 +1016,122 @@ function proposed(ids: ExistingIds): void {
   // lower lawn.
   deck(fId, { outline: outline({ x0: CL.x1 + 5, x1: WING.x1, y0: WING.y1, y1: WING.y1 + ft(8) }), elevation: -6, railings: [false, true, true, false], phase: NEW });
 
-  // ---- 2. The kitchen (docs/history/PLAN-v5-kitchen.md): the main kitchen x 173..311, y 102..308
-  // inside, and the old bath's alcove x 197..311, y 7..97, open to it along y 97..102. All new;
-  // cabinet and counter colours are the level's defaults. A fixture's origin is the middle of its
-  // back edge and its direction the way its front faces (left and right as you face the front).
+  // ---- 2. The kitchen, x 173..311, y 54..308 inside (the old bath and most of the old front room's
+  // east end, south of the north band). All new; cabinet and counter colours are the level's
+  // defaults. A fixture's origin is the middle of its back edge and its direction the way its front
+  // faces (left and right as you face the front). Its north-west corner (x 173..~240, y 54..135) is
+  // the way in from the hall's cased opening, with the powder room's and the pantry's doors.
   const kitchen = (f: Omit<NewFixture, 'phase' | 'elevation'> & { elevation?: number }) => fixture(fId, { elevation: 0, ...f, phase: NEW });
   const KITCHEN_EAST = 311;
-  const ALCOVE_NORTH = 7;
   const COUNTER_HEIGHT = 34.5;
-  // The island, its fronts facing north (you stand north of it, facing the lake): the dishwasher and
-  // the sink cabinet, x 212..272, y 212..236. The top overhangs 1" at the front, 12" at the back
-  // (the seating ledge on the lake side) and 3" past each outer end (facing north, left is west), so
-  // it is one top 66 x 37, x 209..275, y 211..248: 36" walkways to the Living partition (x 173) and
-  // the east wall (x 311), 60" from the ledge to the lake wall.
+  // The island (docs/history/PLAN-v5-kitchen.md), its fronts facing north (you stand north of it,
+  // facing the lake): the dishwasher and the sink cabinet, x 212..272, y 212..236. The top overhangs
+  // 1" at the front, 12" at the back (the seating ledge on the lake side) and 3" past each outer end
+  // (facing north, left is west), so it is one top 66 x 37, x 209..275, y 211..248: 36" walkways to
+  // the Living partition (x 173) and the east wall (x 311), 60" from the ledge to the lake wall.
   const ISLAND_BACK = 236;
   kitchen({ kind: 'dishwasher', origin: { x: 224, y: ISLAND_BACK }, direction: 270, width: 24, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { front: 1, back: 12, left: 3, right: 0 } });
   kitchen({ kind: 'sink', origin: { x: 254, y: ISLAND_BACK }, direction: 270, width: 36, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { front: 1, back: 12, left: 0, right: 3 } });
   // Two stools on the lake side of the ledge, 16" square and 30" high, centred y 258.
   for (const x of [226, 258]) kitchen({ kind: 'box', origin: { x, y: 266 }, direction: 270, width: 16, depth: 16, height: 30, label: 'Stool' });
-  // The east wall, fronts facing west: a tall pantry, the refrigerator (30" deep, 6" proud of the
-  // pantries), a tall pantry, y 102..186, with a wall cabinet over the refrigerator.
+  // The east wall (the wall shared with the master suite), fronts facing west, north to south from
+  // the band's wall (y 54) and ending at y 198, north of the island's east walkway: a 24" base by
+  // the pantry, the refrigerator (30" deep, 36" wide, a wall cabinet over it), a 24" base, the
+  // 30" range with its hood (its duct goes through the east wall into the wing's ceiling and up
+  // through the wing roof, or it recirculates) and a 30" base; wall cabinets over the bases. The
+  // pantry holds what the old tall pantry cabinets did. The range carries no counter, so the bases
+  // either side have their own. Work triangle, centre to centre: refrigerator to sink about 11'3",
+  // sink to range about 7', range to refrigerator 4'9", about 23' in all.
   const eastWall = (kind: NewFixture['kind'], y: number, width: number, depth: number, height: number, elevation = 0) =>
     kitchen({ kind, origin: { x: KITCHEN_EAST, y }, direction: 180, width, depth, height, elevation });
-  eastWall('tall', 114, 24, 24, 84);
-  eastWall('fridge', 144, 36, 30, 70);
-  eastWall('tall', 174, 24, 24, 84);
-  eastWall('wall', 144, 36, 15, 15, 70);
-  // The range wall in the alcove (its east wall, the wall shared with the master bath): a base
-  // cabinet, the range, a base cabinet, y 7..97; the hood over the range and wall cabinets over the
-  // bases. The range carries no counter, so the bases have a counter each. The hood's flue runs up
-  // to the ceiling (96" above the floor top); the second floor is overhead, so its duct goes through
-  // the east wall into the master bath's ceiling and up through the wing roof (or it recirculates).
-  eastWall('base', 22, 30, 24, COUNTER_HEIGHT);
-  eastWall('range', 52, 30, 25, 36);
-  eastWall('base', 82, 30, 24, COUNTER_HEIGHT);
-  eastWall('hood', 52, 30, 18, 30, 66);
-  eastWall('wall', 22, 30, 12, 30, 54);
-  eastWall('wall', 82, 30, 12, 30, 54);
-  // The alcove's north counter, fronts facing south, x 221..287 (36 and 30), meeting the range
-  // wall's north base cabinet at the corner (one L counter), under the raised window.
-  kitchen({ kind: 'base', origin: { x: 239, y: ALCOVE_NORTH }, direction: 90, width: 36, depth: 24, height: COUNTER_HEIGHT });
-  kitchen({ kind: 'base', origin: { x: 272, y: ALCOVE_NORTH }, direction: 90, width: 30, depth: 24, height: COUNTER_HEIGHT });
+  eastWall('base', 66, 24, 24, COUNTER_HEIGHT);
+  eastWall('fridge', 96, 36, 30, 70);
+  eastWall('wall', 96, 36, 15, 15, 70);
+  eastWall('base', 126, 24, 24, COUNTER_HEIGHT);
+  eastWall('range', 153, 30, 25, 36);
+  eastWall('hood', 153, 30, 18, 30, 66);
+  eastWall('base', 183, 30, 24, COUNTER_HEIGHT);
+  eastWall('wall', 66, 24, 12, 30, 54);
+  eastWall('wall', 126, 24, 12, 30, 54);
+  eastWall('wall', 183, 30, 12, 30, 54);
 
-  // ---- Placeholder bath fixtures (MK: standard sizes until the layouts are chosen), clear of each
-  // door's swing. The powder room (x 132..192, y 48..97, door in its west wall at y 60..84): the WC
-  // against the east wall, a 24" vanity on the south wall. The master bath (x 318..456, y 7..117.5,
-  // door at x 331..359 swinging in from the partition): a 36" shower in the north-west corner, a
-  // 48" vanity on the north wall under the transom (sill 70), the WC against the east wall south of
-  // the east window (y 38..86).
+  // ---- The north band's fittings. The walk-in pantry (x 264..311, y 7..49): shelves 12" deep on
+  // its north wall and 12" on its east wall, 84" high, clear of its door's swing. The powder room
+  // (x 173..259, y 7..49, door at x 200..228 swinging out): a 30" vanity on its west wall (y 13..43)
+  // and the WC against its east wall (y 18..38), both placeholders (MK: standard sizes until the
+  // layouts are chosen).
+  const SHELVES = { kind: 'box' as const, label: 'Shelves', height: 84, frontColor: PINE };
+  kitchen({ ...SHELVES, origin: { x: (BAND.divide + 2.5 + KITCHEN_EAST) / 2, y: CL.y0 + HALF }, direction: 90, width: KITCHEN_EAST - (BAND.divide + 2.5), depth: 12 });
+  kitchen({ ...SHELVES, origin: { x: KITCHEN_EAST, y: (CL.y0 + HALF + 12 + BAND.south - 2.5) / 2 }, direction: 180, width: BAND.south - 2.5 - (CL.y0 + HALF + 12), depth: 12 });
   const WC = { kind: 'box' as const, label: 'WC', width: 20, depth: 28, height: 30, frontColor: WHITE };
-  kitchen({ ...WC, origin: { x: 192, y: 62 }, direction: 180 });
-  kitchen({ kind: 'sink', origin: { x: 175, y: 97 }, direction: 270, width: 24, depth: 18, height: 31.5 });
+  kitchen({ kind: 'sink', origin: { x: PART_KL + 2.5, y: 28 }, direction: 0, width: 30, depth: 21, height: 31.5 });
+  kitchen({ ...WC, origin: { x: BAND.divide - 2.5, y: 28 }, direction: 180 });
+
+  // ---- The master bath's placeholders (x 318..456, y 7..117.5, door at x 375..403 swinging in from
+  // the partition): a 36" shower in the north-west corner, a 48" vanity on the north wall under the
+  // transom (sill 70), the WC against the east wall south of the east window (y 38..86), and in the
+  // laundry closet the washer and the dryer, 27" each, side by side facing east.
   kitchen({ kind: 'box', label: 'Shower', origin: { x: 336, y: 7 }, direction: 90, width: 36, depth: 36, height: 78, frontColor: WHITE });
   kitchen({ kind: 'sink', origin: { x: 424, y: 7 }, direction: 90, width: 48, depth: 21, height: 34.5 });
   kitchen({ ...WC, origin: { x: 456, y: 100 }, direction: 180 });
+  kitchen({ kind: 'box', label: 'Washer', origin: { x: 318, y: 71.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  kitchen({ kind: 'box', label: 'Dryer', origin: { x: 318, y: 99.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+
+  // ---- 8. The wood stove (MK, 14 Oct 2026), in the Living's south-west corner with its back to the
+  // west wall, facing east into the room, centred y 280: a stone hearth 50" out from the wall and
+  // 40" wide (y 260..300, 18" in front of the stove, 8" each side), a 3" stone surround on the wall
+  // behind it (46" wide, to 60" up), and the stove 24" wide, 26" deep, 30" high, 6" off the surround.
+  // It is clear of the west window's trim (y 162..252) and beside the lake window's west end (that
+  // window starts 8 1/2" from the corner). Its stove's listed clearances decide the final spacing.
+  const STOVE = { y: 280 };
+  const STONE = '#7d7a73';
+  kitchen({ kind: 'box', label: 'Hearth', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 40, depth: 50, height: 1, frontColor: STONE });
+  kitchen({ kind: 'box', label: 'Stone', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 46, depth: 3, height: 59, elevation: 1, frontColor: STONE });
+  kitchen({ kind: 'box', label: 'Wood stove', origin: { x: CL.x0 + HALF + 6, y: STOVE.y }, direction: 0, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
+  // Its flue: a stainless pipe, 8" outside (an insulated 6" chimney), straight up from the stove's
+  // collar (x 19, 6" in from its back) through the bedroom upstairs, in a 24 x 20 chase on that
+  // room's west wall (y 270..290, clear of its west window at y 176..224), and out through the main
+  // roof 35" up the slope from the lake eave, with a rain cap. Its top follows the 3-2-10 rule: 3'
+  // over where it leaves the roof, and 2' over any roof within 10' (the roof 10' up the slope).
+  const FLUE = { x: CL.x0 + HALF + 12, y: STOVE.y };
+  const mainRoof = Object.values(level(sId).roofs)[0];
+  const secondTop = getLevelElevations(getPlan())[sId].floorTop;
+  const roofTop = (p: Vec2) => {
+    const under = roofHeightAt(mainRoof, roofBearing(level(sId).wallHeight, mainRoof), p);
+    if (under === null) throw new Error(`no roof over ${JSON.stringify(p)}`);
+    return secondTop + under + mainRoof.thickness;
+  };
+  const flueTop = round2(Math.max(roofTop(FLUE) + 36, roofTop({ x: FLUE.x, y: FLUE.y - ft(10) }) + 24));
+  if (!store().addColumn({ at: FLUE, kind: 'flue', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP + 31, top: flueTop, cap: true })) throw new Error('flue rejected');
+  fixture(sId, { kind: 'box', label: 'Flue chase', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 20, depth: 24, height: 96, elevation: 0, frontColor: DEFAULT_INTERIOR_COLOR, phase: NEW });
+
+  // ---- 9. The second floor's full bath (MK, 14 Oct 2026), across the north-east: the old bath
+  // (x 174..218, y 7..81) opened east across the old Office's north end, x 174..311, y 7..70 inside
+  // (11'5" x 5'3", 6'2" at the old bath's end). Its new south wall runs at y 72.5 (faces 70..75)
+  // from the old bath's east wall line to the east wall, south of where it meets the old east window
+  // (y 75..121) so that window keeps its place in the existing view; a stub of the old east wall
+  // stays between y 72.5 and the old bath's south wall. The old 24" door (x 184..208, swinging out
+  // into the hall) stays. Placeholders: a 48" vanity on the west wall, the WC on the north wall
+  // under the window (x 225..271), a 36 x 48 stall shower in the north-east corner (x 275..311, y
+  // 7..55). The Office keeps x 223..311, y 75..150 (7'4" x 6'3") with its transom.
+  partition(sId, { x: UP_BATH.east, y: UP_BATH.south }, { x: CL.x1, y: UP_BATH.south }, NEW);
+  demolish(sId, { walls: [{ x: UP_BATH.east, y: 40 }] });
+  const upstairs = (f: Omit<NewFixture, 'phase' | 'elevation'> & { elevation?: number }) => fixture(sId, { elevation: 0, ...f, phase: NEW });
+  upstairs({ kind: 'sink', origin: { x: UP_BATH.west, y: 34 }, direction: 0, width: 48, depth: 21, height: 34.5 });
+  upstairs({ ...WC, origin: { x: 248, y: CL.y0 + HALF }, direction: 90 });
+  upstairs({ kind: 'box', label: 'Shower', origin: { x: KITCHEN_EAST, y: 31 }, direction: 180, width: 48, depth: 36, height: 78, frontColor: WHITE });
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two
   // never share a face there. Placeholder finishes (MK), which also dress the faces of the old
-  // exterior walls the additions enclose; the screen porch keeps its shingle inside.
+  // exterior walls the additions enclose; the screen porch keeps its shingle inside. The upstairs
+  // Bath and Office / hall keep their labels (the hall now runs out onto the balcony round the stair
+  // hall's opening).
   label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW, PLACEHOLDER_WET);
-  label(fId, 'Powder room (proposed)', { x: 162, y: 72.5 }, NEW, PLACEHOLDER_WET);
-  label(fId, 'Closet (proposed)', { x: 183, y: 25 }, NEW, PLACEHOLDER_ROOM);
+  label(fId, 'Stair hall (proposed)', { x: 100, y: 118.5 }, NEW, PLACEHOLDER_ROOM);
+  label(fId, 'Powder room (proposed)', { x: 213, y: 28 }, NEW, PLACEHOLDER_WET);
+  label(fId, 'Pantry (proposed)', { x: 287, y: 30 }, NEW, PLACEHOLDER_ROOM);
+  label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Screen porch (proposed)', { x: -48, y: 236 }, NEW, { floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(bId, 'Crawl space (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 97 }, NEW);

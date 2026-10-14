@@ -609,8 +609,20 @@ const FloorOpeningShape = memo(function FloorOpeningShape({ levelId, openingId }
   const paths = useMemo(() => {
     if (!opening || !layout) return null;
     const o = opening.outline;
-    // The X joins opposite corners of a four-sided opening; any other outline gets its diagonals from the first corner.
-    const cross: [Vec2, Vec2][] = o.length === 4 ? [[o[0], o[2]], [o[1], o[3]]] : o.slice(2, -1).map((p) => [o[0], p]);
+    // The X joins opposite corners of a four-sided opening, else those of its bounding box.
+    const xs = o.map((p) => p.x);
+    const ys = o.map((p) => p.y);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const cross: [Vec2, Vec2][] =
+      o.length === 4
+        ? [
+            [o[0], o[2]],
+            [o[1], o[3]],
+          ]
+        : [
+            [{ x: x0, y: y0 }, { x: x1, y: y1 }],
+            [{ x: x1, y: y0 }, { x: x0, y: y1 }],
+          ];
     return { outline: polyPath(o), cross: segPath(cross), caps: layout.caps.map(polyPath).join(''), at: interiorPoint(o) };
   }, [opening, layout]);
   if (!opening || !paths || !isVisible(opening.phase, viewMode)) return null;

@@ -1353,8 +1353,9 @@ a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, gri
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
 skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, `Fascia`, `Rafters`,
 `Deck`, `Deck framing`, `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour
-other than the default), `Window`, `Door`, then a `Site` group (`Terrain`, `Chimney`, `Post`; a capped chimney's cap and arrestor are more
-`Chimney` meshes) with cloned geometry and cloned live materials
+other than the default), `Stair railing` and `Guard` (material `railing_<phase>`), `Window`, `Door`, then a `Site` group
+(`Terrain`, `Chimney`, `Flue`, `Post`; a capped chimney's cap and arrestor are more `Chimney` meshes, a capped flue's
+rain cap two more `Flue` meshes, `flue_stem_<phase>` and `flue_hood_<phase>`) with cloned geometry and cloned live materials
 (one per phase/kind, roofs `roof_<finish>_<phase>`, boards `fascia_<phase>` and tails `rafter_<phase>` (plus `_<hex>`
 in a board colour other than tan), columns `column_<kind>_<phase>` (plus `_<hex>` in a colour other than the
 default), `chimney_cap_<phase>`, `chimney_arrestor_<phase>`, `terrain`, named without spaces; no texture or
@@ -1390,11 +1391,27 @@ Utility's pine paneling on a wood floor. The Second Floor's rooms and the propos
 (`PLACEHOLDER_ROOM`, `PLACEHOLDER_WET`: off-white paint, wood boards, tile in the baths and the foyer) until the
 owner chooses; the basement has none.
 
-The proposed kitchen (docs/history/PLAN-v5-kitchen.md) is placed through `fixture()`, which throws
-when the store refuses one; fixture ids are renamed like the rest (`f-c1` ...). `example.test.ts`
-checks that every fixture lies inside the kitchen's faces in the proposed view, overlaps no wall
-footprint and shares no space with another fixture (plan and height), and that `counterRuns` gives
-the island one 66 x 37 top.
+The proposed kitchen (docs/history/PLAN-v5-kitchen.md, with the east run of PLAN-v6-layout.md) is
+placed through `fixture()`, which throws when the store refuses one; fixture ids are renamed like the
+rest (`f-c1` ...). `example.test.ts` checks that every new fixture lies inside its room's face in the
+proposed view, overlaps no wall footprint and shares no space with another fixture (plan and height),
+and that `counterRuns` gives the island one 66 x 37 top and the east run's three bases one each.
+
+The proposed layout of PLAN-v6-layout.md: the stair hall's wrap-around stair (a one-riser platform,
+a flight of 8, a one-riser landing, a flight of 4; 15 risers of 108 / 15 on 10.5" treads, railed on
+their open sides, cutting nothing) under the Second Floor's floor opening (floor opening ids `s-h1`
+...), its guard opening where the last flight arrives; the north band's walls, placed where they
+meet the old walls outside the old openings (the band's wall at y 51.5 touches the old bath door's
+jamb, its divider at x 261.5 clears the old bath window), so nothing of the existing house moves;
+the laundry closet in the master bath; the stove's boxes on the First Floor, its chase on the Second
+and its flue column (`kind: 'flue'`, capped), whose top the script sets by the 3-2-10 rule from the
+main roof (`roofHeightAt`: 3' over the roof where it leaves it, 2' over the roof 10' up the slope);
+the chimney column demolished (`setPhase` with `columns`); and the upstairs bath, whose new wall is
+drawn before the old bath's east wall is demolished, so the stub of that wall south of it stays.
+`example.test.ts` checks the stair's risers, treads and landings against the floor to floor, the
+opening's outline, supported edges and guard, the slab hole, the stove's place, the flue's top
+against the roof, the bath's and laundry's fixtures, and that no level has an open wall end or an
+orphan label in any view.
 
 The proposed deck off the master bedroom is added through `deck()` (deck ids `f-d1` ...), from the
 retaining wall's east face to the wing's east face, its top at the retaining wall's (absolute -4).

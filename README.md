@@ -458,8 +458,7 @@ and the plan's north angle is 0.
   along the north wall (labelled boxes). Front room: the north-east corner is cut off at 45
   degrees by a **pipe chase** for the Bath upstairs (photo 20; MK), its face from the north wall at
   x 168 (by the chimney, where the stovepipe goes in) to the Bath's west wall at y 31, drawn as a
-  full-height cream box 4" thick (a wall there would split the Bath's west wall where the proposed
-  closet door goes); the wood stove on its hearth stands in front of it, turned to face south-west.
+  full-height cream box 4" thick (a wall there would split the Bath's west wall); the wood stove on its hearth stands in front of it, turned to face south-west.
   Utility (MK's description, no photos, so all estimates): old wood wall cabinets on the north wall
   (three 42") and on the west wall north of the Kitchen door (two 24"), open shelves under the south
   and east windows (48" wide, 12" deep, up to the 30" sills), and a blue mini fridge on the south
@@ -614,75 +613,90 @@ with a level and a tape or a laser, and edit them in the Site tab.
 
 ### The proposed design in the starter
 
-The starter also holds the owner's proposed design (his brief of 12 Oct 2026), drawn as *new* and
-*demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
-`proposed()`; the plans are `docs/history/PLAN-v4-proposed.md` and, for the kitchen,
-`docs/history/PLAN-v5-kitchen.md`, with the places where the built design differs from them).
-Six changes, all on the First Floor apart from the upstairs east windows over the new wing:
+The starter also holds the owner's proposed design (his briefs of 12 and 14 Oct 2026), drawn as
+*new* and *demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
+`proposed()`; the plans are `docs/history/PLAN-v4-proposed.md`, `docs/history/PLAN-v5-kitchen.md`
+for the island and `docs/history/PLAN-v6-layout.md` for the stair hall, the north band, the stove
+and the upstairs bath, with the places where the built design differs from them):
 
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
    one-storey wing down the whole east side, outside 12'1" x 26'3", under one new shed roof (5:12)
    high at the main block's east wall and sloping down east to the wing's east wall: its top meets
    the main wall 50.9" above the Second Floor. That is over the sills of the two upstairs east
-   windows (34"), so they are demolished and high transoms replace them on the same centres (the
-   Office / hall's at y 98, the Guest's at y 222): 46" x 24", two sashes of 2 x 2 lites, sill 60"
-   (head 84"), 9" over the roof. A 5" partition divides the master bath (north, 11'6" x 9'2 1/2"
-   inside) from the master bedroom (11'6" x 15'5 1/2", the old Utility plus 6'). The bedroom is entered
-   from the kitchen through today's grey Kitchen to Utility door, which stays (MK chose it over a
-   new 32" door further north). The bedroom's south window becomes a 72" x 80" sliding door on the
-   same centre, over the walkout's 72" double door, two glass panels of 2 x 4 lites. There is no
-   transom over it: under the 96" ceiling it could be 12" at most with its head at the ceiling, no
-   room for a header or a casing (it would suit a ceiling vaulted up under the shed, which the
-   starter does not draw). The master bath's north window is a transom, high for privacy from the
-   road: 46" x 18", two sashes of 2 x 1 lites, sill 70" (head 88"). The wing's north wall, its
-   roof and its south window, and the main block's first-floor east window, are demolished. New 8"
-   block walls carry the new part (a crawl space). The master bath has **placeholder** fixtures: a
-   36" shower in the north-west corner, a 48" vanity under the transom and a WC on the east wall.
-2. **Kitchen.** The wall between the kitchen and the old bath is demolished, so the kitchen is an
-   L: the main kitchen (11'6" x 17'2") and the old bath as an alcove at its north-east corner. All
-   of its casework is new; today's cabinets, the bath's fixtures and the wood stove (photos 13 to
-   22) are demolished:
-   - An **island** with its fronts facing north, so whoever is at the sink faces the lake: a 24"
-     dishwasher and a 36" sink cabinet under one top 66" x 37" (5'6" x 3'1"), overhanging 3" at
-     each end and 12" on the lake side as a seating ledge, with **two stools** beyond it. It
-     leaves 36" walkways at both ends (to the Living partition and to the east wall), and 60" from
-     the ledge to the lake wall behind the stools; north of it the work aisle opens into the
-     alcove.
-   - On the east wall, the **refrigerator between two tall pantry cabinets** (24" each, 84"
-     high), with a wall cabinet over the refrigerator.
-   - In the alcove, the **range wall** on its east side: the range between two 30" base cabinets,
-     a hood over it and wall cabinets over the bases. That wall is the one shared with the master
-     bath and the second floor is overhead, so the hood's duct goes out through the wall and up
-     through the wing roof, or the hood recirculates.
-   - Along the alcove's north wall a **counter** (66" of base cabinets) meets the range wall's
-     counter at the corner. The old bath's window over it is replaced by a shorter one set higher
-     (42" x 36", sill 44").
-   - The **work triangle**, centre to centre: sink to refrigerator about 6', refrigerator to range
-     about 7'8", range to sink about 13'7", about 27' in all (a little over the usual 26').
-   - The old bath's 30" door could not open into the 23" pocket west of it, between the top of the
-     new flight and the alcove: the pocket is closed from the hall by a partition at the top of the
-     flight and becomes a **closet** off the kitchen (18" x 36" inside) with a 24" door.
+   windows (34"), so they are demolished and high transoms replace them (the Office's at y 110,
+   clear of the new bath's wall; the Guest's on its window's centre, y 222): 46" x 24", two sashes
+   of 2 x 2 lites, sill 60" (head 84"), 9" over the roof. A 5" partition divides the master bath
+   (north, 11'6" x 9'2 1/2" inside) from the master bedroom (11'6" x 15'5 1/2", the old Utility
+   plus 6'). The bedroom is entered from the kitchen through today's grey Kitchen to Utility door,
+   which stays (MK chose it over a new 32" door further north). The bedroom's south window becomes
+   a 72" x 80" sliding door on the same centre, over the walkout's 72" double door, two glass
+   panels of 2 x 4 lites, with no transom (under the 96" ceiling there is no room for one). The
+   master bath's north window is a transom, high for privacy from the road: 46" x 18", sill 70".
+   The wing's north wall, its roof and its south window, and the main block's first-floor east
+   window, are demolished. New 8" block walls carry the new part (a crawl space). The master bath
+   has **placeholder** fixtures: a 36" shower in the north-west corner, a 48" vanity under the
+   transom and a WC on the east wall; its door is east of the laundry.
+2. **Laundry** (MK): a closet in the master bath's south-west corner, 2'8" x 5'3 1/2" inside, with
+   the washer and dryer side by side (27" each) behind bifold doors (drawn as a 56" opening).
+3. **Stair hall.** The old front room, the stair strip and the Bunk over them are one stair hall,
+   13'5" x 10'8", **open through both floors** north of the balcony (a floor opening over x 7 to
+   169, y 7 to 91). The old stair, the front room's walls (the y 99.5 line and the old bath's west
+   wall) and its 80" north window are demolished; upstairs the Bunk's south wall and door and the
+   stub of its east wall go. The new **stair wraps the hall** round an open court: 15 risers of
+   7.2" on 10.5" treads, 42" wide, solid underneath:
+   - a one-riser **platform** in the north-west corner, two steps from the house door: you step up
+     onto it heading north and turn east;
+   - a flight of 8 risers **east along the north wall**, railed on its open side;
+   - a **landing** in the north-east corner at 6';
+   - a flight of 4 risers **south**, railed on its open side, arriving at the **balcony** (y 91 to
+     135), which has a guard along its edge and leads straight to the upstairs bedroom's door and
+     east into the upstairs hall.
 
-   The cabinet colour, the counter colour and the fronts are the First Floor's casework defaults:
-   change them in the Level panel (select nothing on the First Floor), or per cabinet in its panel.
-3. **Stair and front door.** The old stair and the house door at the porch are demolished. The new
-   house door (32", green) is in the west wall in the middle of the old stair strip. Inside, two
-   risers go north to a 14" landing in the north-west corner, then the flight climbs east along
-   the north wall to the Bunk's east wall upstairs, and cuts the Second Floor's floor from about
-   19" up its run. The wall between the hall and the strip, west of the powder room, is demolished,
-   so the hall, the strip and the stair are one room. The brief keeps a wall between the strip and
-   the Living, but there is none today (photo 16), so that wall (5", with a 36" opening at x 132 to
-   168 and a 30" one at x 7 to 37) is **new** work in the design.
-4. **Powder room**, 5' x 4'1", in the old hall south of the top of the flight, where the hall's
-   passage to the strip was, with **placeholder** fixtures: a WC on its east wall and a 24" vanity
-   on its south wall.
-5. **Foyer and screen porch** on the west face in place of the entry porch: an enclosed foyer
+   The house door (32", green) is in the west wall in the middle of the old stair strip, in line
+   with the foyer's front door, and a new 32" cased opening at the strip's east end leads straight
+   on into the kitchen. New windows light the hall: a 24" one over the platform, a second casement
+   pair upstairs in the north wall over the landing and one in the upstairs west wall. The wall
+   between the strip and the Living (5", with a 36" and a 30" opening) is **new** work: there is
+   none today (photo 16).
+4. **North band** (MK: the kitchen stops short of the north wall): a 3'6" band along the north wall
+   east of the stair hall holds the **powder room** (7'2" x 3'6", a 30" vanity and a WC as
+   placeholders, a 28" door from the kitchen and a small window) and, in the north-east corner, a
+   **walk-in pantry** (3'11" x 3'6", shelves on two walls, a 24" door). MK asked for about 4': the
+   band's wall cannot come further south without moving the old bath door in the drawing of the
+   house as it stands, because the model splits that wall where the band's wall meets it.
+5. **Kitchen**, 11'6" x 21'2", south of the band, the old bath included. All of its casework is
+   new; today's cabinets and the bath's fixtures (photos 13 to 22) are demolished:
+   - the **island** with its fronts facing north, so whoever is at the sink faces the lake: a 24"
+     dishwasher and a 36" sink cabinet under one top 66" x 37" with a 12" seating ledge on the lake
+     side and **two stools**; 36" walkways at both ends, 60" from the ledge to the lake wall;
+   - on the east wall (shared with the master suite), north to south: a 24" base by the pantry,
+     the **refrigerator** (a wall cabinet over it), a 24" base, the **range** with its hood (ducted
+     through the east wall into the wing's ceiling and up through the wing roof, or recirculating)
+     and a 30" base, wall cabinets over the bases;
+   - the **work triangle**, centre to centre: refrigerator to sink about 11'3", sink to range
+     about 7', range to refrigerator 4'9", about 23' in all.
+
+   The kitchen's north-west corner is the way in from the hall, with the powder room's and the
+   pantry's doors. The cabinet colour, the counter colour and the fronts are the First Floor's
+   casework defaults: change them in the Level panel, or per cabinet in its panel.
+6. **Wood stove** (MK) in the Living's **south-west corner**, its back to the west wall, facing east
+   into the room: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it,
+   clear of the west window and beside the lake window's west end. Its flue is a **stainless pipe**
+   (8", an insulated 6" chimney) straight up through the bedroom upstairs, in a 2' x 1'8" chase on
+   that room's west wall, and out through the main roof near the lake eave with a rain cap; it
+   stands 7' over the roof there, 2' higher than the roof 10' up the slope (the 3-2-10 rule). The
+   **masonry chimney** on the north wall is demolished.
+7. **Upstairs bath** (MK: a full bath with a stall shower in the north-east): the old bath opened
+   east across the Office's north end, 11'5" x 5'3" (6'2" at the old bath's end): a 48" vanity on its west wall, the WC under
+   the north window and a 36" x 48" stall shower in the north-east corner (placeholders). It keeps
+   the old bath's door; the Office keeps 7'4" x 6'3" south of it, with its transom.
+8. **Foyer and screen porch** on the west face in place of the entry porch: an enclosed foyer
    (7'10" x 8') with the 36" front door in line with the house door and a gable facing west, and
    south of it a screen porch (13'1" x 8') with screens above knee walls, two screen doors, three 8"
    timber posts in the stain and a shed roof high at the house wall. The Living's west window,
    which now looks into the porch, is replaced by the same window without shutters. The foyer
    stands on 8" block walls (a crawl space) like the east addition; the screen porch on its posts.
-6. **Deck off the master bedroom** (MK, 14 Oct 2026), about 8' deep: the wing's width from the
+9. **Deck off the master bedroom** (MK, 14 Oct 2026), about 8' deep: the wing's width from the
    retaining wall's east face to the wing's east face (x 319.5 to 463, y 315 to 411, 11'11 1/2" x
    8'). Its top is 6" below the bedroom floor (elevation -4), flush with the retaining wall's top,
    so you step onto it from the lake-side terrace behind the wall. The house and the wall carry its
@@ -715,23 +729,25 @@ Which view to use:
 
 Still open:
 
-- **The pipe chase** in the front room's north-east corner carries the pipes of the Bath upstairs
-  (MK), but the design demolishes it with the wood stove: the new flight's top and the kitchen's
-  closet (x 174 to 192, y 7 to 43) take that corner, and the closet's door (y 19 to 43) opens where
-  the chase stands. The pipes need a new route (in the closet, behind a smaller closet, or moved
-  with a new upstairs bath), or the closet gives way to the chase.
+- **The stove**: its listed clearances (to the west window's trim, to the surround) set its final
+  place; the flue's 7' above the roof needs a roof brace (it leaves the roof 35" in from the lake
+  wall's face).
+- **The dryer's vent**: up through the wing's ceiling and roof, or along the ceiling to an outside
+  wall.
+- **Coats** at the front door: there is no closet in the new layout; hooks or a bench in the foyer,
+  or a closet under the stair's landing (the stair is drawn solid there).
+- **The pantry** is small (3'11" x 3'6"); the north band is 3'6" deep rather than the 4' asked
+  for (see 4 above).
+- The pipes of the upstairs bath come down through the powder room under it (the old pipe chase
+  in the front room is gone with the stove); their route is for the plumber.
 - The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the
   foyer's gable and the porch's shed overlap with no valley).
 - **The wall between the stair strip and the Living** is new work (there is none today); delete it
   to leave the new front door opening straight into the Living.
 - How the bedroom is reached: through today's grey door from the kitchen, the only room beside it
-  (settled: MK kept it rather than cut a new door); a hall can still be added later. (The old bath's
-  door, and the pocket it opened into, are settled: the pocket is the kitchen's closet.)
-- The kitchen: the closet is shallow (18"); the stools stand clear of the ledge rather than under
-  it; the hood's duct route (out through the master bath's ceiling, or a recirculating hood) and
-  the range's distance from the sink (the triangle is a little over 26') are worth a second look.
-- Upstairs: the Bunk becomes the stair hall and needs a new layout and a railing round the stair
-  opening; neither is drawn.
+  (settled: MK kept it rather than cut a new door); a hall can still be added later.
+- The kitchen: the stools stand clear of the ledge rather than under it; the hood's duct route (out
+  through the wing's ceiling, or a recirculating hood) is worth a second look.
 - The knee braces and the timber truss in the foyer's gable are not modelled.
 - Every new size is from the plan, not measured: check them on site before ordering anything.
 - The garage from the site sketch (24' x 26', 55' west of the house and 20' from the road) is not
