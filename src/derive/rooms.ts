@@ -1,6 +1,6 @@
 import { add, lineIntersection, pointInPolygon, polygonSignedArea, scale, segmentIntersection, sub } from '../model/geometry';
 import type { Id, Level, Vec2, ViewMode } from '../model/types';
-import { isVisible } from './phase';
+import { isVisible, phasesCoexist } from './phase';
 import { polylabel } from './polylabel';
 
 // Rooms (DESIGN.md "Rooms"): planar face enumeration of the walls visible in a view mode.
@@ -22,6 +22,8 @@ export interface Face {
   nodeIds: Id[];
   /** Wall of each boundary edge nodeIds[i] -> nodeIds[i + 1]. */
   wallIds: Id[];
+  /** Whether each boundary edge runs the way its wall does (a toward b). */
+  wallForward: boolean[];
   /** Centerline polygon, same order as nodeIds. */
   polygon: Vec2[];
   /** Polygon inset by half of each bounding wall's thickness (or the centerline polygon if that fails). */
@@ -165,18 +167,32 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
   const from: Id[] = [];
   const to: Id[] = [];
   const wallOf: Id[] = [];
+  const forward: boolean[] = [];
   const angle: number[] = [];
   const thickness: number[] = [];
-  for (const w of Object.values(level.walls)) {
-    if (!isVisible(w.phase, viewMode)) continue;
-    const a = level.nodes[w.a];
-    const b = level.nodes[w.b];
-    if (!a || !b || w.a === w.b) continue;
-    from.push(w.a, w.b);
-    to.push(w.b, w.a);
+  const shown = Object.values(level.walls).filter((w) => isVisible(w.phase, viewMode) && level.nodes[w.a] && level.nodes[w.b] && w.a !== w.b);
+  // A new wall and a demolished one cross or meet without a node (normalizeLevel leaves them so, as
+  // they never stand together); where a view shows both (All), cut them there with virtual nodes.
+  const virtual = planarCuts(level, shown);
+  const at = (id: Id): Vec2 => level.nodes[id] ?? virtual.points.get(id)!;
+  const edge = (p: Id, q: Id, w: Level['walls'][string], fwd: boolean) => {
+    const a = at(p);
+    const b = at(q);
+    from.push(p, q);
+    to.push(q, p);
     wallOf.push(w.id, w.id);
+    forward.push(fwd, !fwd);
     angle.push(Math.atan2(b.y - a.y, b.x - a.x), Math.atan2(a.y - b.y, a.x - b.x));
     thickness.push(w.thickness, w.thickness);
+  };
+  for (const w of shown) {
+    const cuts = virtual.cuts.get(w.id);
+    if (!cuts) {
+      edge(w.a, w.b, w, true);
+      continue;
+    }
+    const chain = [w.a, ...cuts.map((c) => c.id), w.b];
+    for (let i = 0; i + 1 < chain.length; i++) edge(chain[i], chain[i + 1], w, true);
   }
   const H = from.length;
   const out = new Map<Id, number[]>();
@@ -228,7 +244,10 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
     }
     if (cycle.length < 3) continue;
     const nodeIds = cycle.map((e) => from[e]);
-    const polygon = nodeIds.map((id) => ({ x: level.nodes[id].x, y: level.nodes[id].y }));
+    const polygon = nodeIds.map((id) => {
+      const p = at(id);
+      return { x: p.x, y: p.y };
+    });
     const area = polygonSignedArea(polygon);
     if (area < 0) {
       if (-area >= MIN_FACE_AREA) {
@@ -252,9 +271,68 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
     let id = hashIds([...new Set(nodeIds)].sort());
     while (usedIds.has(id)) id += '_';
     usedIds.add(id);
-    faces.push({ id, nodeIds, wallIds: cycle.map((e) => wallOf[e]), polygon, netPolygon, grossArea: area, netArea });
+    faces.push({ id, nodeIds, wallIds: cycle.map((e) => wallOf[e]), wallForward: cycle.map((e) => forward[e]), polygon, netPolygon, grossArea: area, netArea });
   }
   return { faces, outerFaces, outerFaceThickness, openEnds };
+}
+
+/** Within this of a wall's centerline (and farther than it from its ends) a point cuts the wall, inches. */
+const CUT_EPS = 0.5;
+
+/**
+ * Where shown walls that never coexist (a new one and a demolished one) cross or meet: per wall, the
+ * cut points along it in order (a node of the other wall at a T, or a virtual node `~p|q` at an X),
+ * and the virtual nodes' positions. Empty unless the view shows both phases (the All view).
+ */
+function planarCuts(level: Pick<Level, 'nodes'>, shown: Level['walls'][string][]): { cuts: Map<Id, { s: number; id: Id }[]>; points: Map<Id, Vec2> } {
+  const cuts = new Map<Id, { s: number; id: Id }[]>();
+  const points = new Map<Id, Vec2>();
+  const demo = shown.filter((w) => w.phase === 'demo');
+  const fresh = shown.filter((w) => w.phase === 'new');
+  if (!demo.length || !fresh.length) return { cuts, points };
+  const add = (w: Level['walls'][string], s: number, id: Id) => {
+    const list = cuts.get(w.id) ?? [];
+    if (!list.some((c) => c.id === id)) list.push({ s, id });
+    cuts.set(w.id, list);
+  };
+  /** Where point p lies along wall w's interior, or null. */
+  const along = (w: Level['walls'][string], p: Vec2): number | null => {
+    const a = level.nodes[w.a];
+    const b = level.nodes[w.b];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const ux = (b.x - a.x) / len;
+    const uy = (b.y - a.y) / len;
+    const s = (p.x - a.x) * ux + (p.y - a.y) * uy;
+    const off = Math.abs((p.x - a.x) * uy - (p.y - a.y) * ux);
+    return off <= CUT_EPS && s > CUT_EPS && s < len - CUT_EPS ? s : null;
+  };
+  for (const d of demo) {
+    for (const n of fresh) {
+      if (phasesCoexist(d.phase, n.phase)) continue;
+      // A T: an end of one on the other's interior.
+      for (const [w, o] of [
+        [d, n],
+        [n, d],
+      ] as const) {
+        for (const id of [o.a, o.b]) {
+          const s = along(w, level.nodes[id]);
+          if (s !== null) add(w, s, id);
+        }
+      }
+      // An X: strictly inside both.
+      const hit = segmentIntersection(level.nodes[d.a], level.nodes[d.b], level.nodes[n.a], level.nodes[n.b]);
+      if (!hit) continue;
+      const sd = along(d, hit.point);
+      const sn = along(n, hit.point);
+      if (sd === null || sn === null) continue;
+      const id = `~${d.id}|${n.id}`;
+      points.set(id, hit.point);
+      add(d, sd, id);
+      add(n, sn, id);
+    }
+  }
+  for (const list of cuts.values()) list.sort((p, q) => p.s - q.s);
+  return { cuts, points };
 }
 
 /**
@@ -352,8 +430,8 @@ export function facesBesideWall(
     const n = f.nodeIds.length;
     for (let i = 0; i < n; i++) {
       if (f.wallIds[i] !== wall.id) continue;
-      if (f.nodeIds[i] === wall.a && f.nodeIds[(i + 1) % n] === wall.b) right = f;
-      else if (f.nodeIds[i] === wall.b && f.nodeIds[(i + 1) % n] === wall.a) left = f;
+      if (f.wallForward[i]) right = f;
+      else left = f;
     }
   }
   return { left, right };
@@ -378,8 +456,8 @@ export function wallSideFaces(set: FaceSet, walls: Level['walls']): Map<Id, { le
       if (!w) continue;
       let e = out.get(w.id);
       if (!e) out.set(w.id, (e = { left: null, right: null }));
-      if (f.nodeIds[i] === w.a && f.nodeIds[(i + 1) % n] === w.b) e.right = f;
-      else if (f.nodeIds[i] === w.b && f.nodeIds[(i + 1) % n] === w.a) e.left = f;
+      if (f.wallForward[i]) e.right = f;
+      else e.left = f;
     }
   }
   byWalls.set(walls, out);

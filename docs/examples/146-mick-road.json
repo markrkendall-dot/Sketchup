@@ -523,86 +523,81 @@
         },
         "f-n22": {
           "id": "f-n22",
-          "x": -62.5,
-          "y": 67.75
+          "x": -92.5,
+          "y": 154.5
         },
         "f-n23": {
           "id": "f-n23",
-          "x": -92.5,
+          "x": 3.5,
           "y": 154.5
         },
         "f-n24": {
           "id": "f-n24",
-          "x": 3.5,
-          "y": 154.5
+          "x": -92.5,
+          "y": 311.5
         },
         "f-n25": {
           "id": "f-n25",
-          "x": -92.5,
-          "y": 311.5
+          "x": 170.5,
+          "y": 3.5
         },
         "f-n26": {
           "id": "f-n26",
           "x": 170.5,
-          "y": 3.5
+          "y": 57.5
         },
         "f-n27": {
           "id": "f-n27",
-          "x": 170.5,
-          "y": 51.5
+          "x": 314.5,
+          "y": 57.5
         },
         "f-n28": {
           "id": "f-n28",
-          "x": 314.5,
-          "y": 51.5
-        },
-        "f-n29": {
-          "id": "f-n29",
-          "x": 194.5,
-          "y": 51.5
-        },
-        "f-n30": {
-          "id": "f-n30",
           "x": 261.5,
           "y": 3.5
         },
-        "f-n31": {
-          "id": "f-n31",
+        "f-n29": {
+          "id": "f-n29",
           "x": 261.5,
-          "y": 51.5
+          "y": 57.5
         },
-        "f-n32": {
-          "id": "f-n32",
+        "f-n30": {
+          "id": "f-n30",
           "x": 170.5,
           "y": 137.5
         },
-        "f-n33": {
-          "id": "f-n33",
+        "f-n31": {
+          "id": "f-n31",
           "x": 3.5,
           "y": 137.5
+        },
+        "f-n32": {
+          "id": "f-n32",
+          "x": 314.5,
+          "y": 51.5
+        },
+        "f-n33": {
+          "id": "f-n33",
+          "x": 352.5,
+          "y": 51.5
         },
         "f-n34": {
           "id": "f-n34",
           "x": 352.5,
-          "y": 51.5
+          "y": 120
         },
         "f-n35": {
           "id": "f-n35",
-          "x": 352.5,
-          "y": 120
+          "x": 138.5,
+          "y": 3.5
         },
         "f-n36": {
           "id": "f-n36",
           "x": 138.5,
-          "y": 3.5
+          "y": 88.5
         },
         "f-n37": {
           "id": "f-n37",
-          "x": 138.5,
-          "y": 88.5
-        },
-        "f-n38": {
-          "id": "f-n38",
           "x": 170.5,
           "y": 88.5
         }
@@ -611,7 +606,7 @@
         "f-w1": {
           "id": "f-w1",
           "a": "f-n1",
-          "b": "f-n36",
+          "b": "f-n35",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -621,7 +616,7 @@
         "f-w2": {
           "id": "f-w2",
           "a": "f-n2",
-          "b": "f-n28",
+          "b": "f-n32",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -641,7 +636,7 @@
         "f-w4": {
           "id": "f-w4",
           "a": "f-n4",
-          "b": "f-n24",
+          "b": "f-n23",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -701,7 +696,7 @@
         "f-w10": {
           "id": "f-w10",
           "a": "f-n8",
-          "b": "f-n22",
+          "b": "f-n9",
           "thickness": 7,
           "kind": "exterior",
           "phase": "demo",
@@ -775,7 +770,7 @@
         "f-w18": {
           "id": "f-w18",
           "a": "f-n15",
-          "b": "f-n32",
+          "b": "f-n30",
           "thickness": 5,
           "kind": "interior",
           "phase": "existing"
@@ -793,7 +788,7 @@
         "f-w20": {
           "id": "f-w20",
           "a": "f-n12",
-          "b": "f-n29",
+          "b": "f-n16",
           "thickness": 5,
           "kind": "interior",
           "phase": "demo"
@@ -801,7 +796,7 @@
         "f-w21": {
           "id": "f-w21",
           "a": "f-n16",
-          "b": "f-n30",
+          "b": "f-n28",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -831,7 +826,7 @@
         "f-w24": {
           "id": "f-w24",
           "a": "f-n18",
-          "b": "f-n35",
+          "b": "f-n34",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -859,7 +854,7 @@
         "f-w27": {
           "id": "f-w27",
           "a": "f-n20",
-          "b": "f-n22",
+          "b": "f-n21",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -878,18 +873,18 @@
         },
         "f-w29": {
           "id": "f-w29",
-          "a": "f-n22",
-          "b": "f-n9",
+          "a": "f-n21",
+          "b": "f-n22",
           "thickness": 7,
           "kind": "exterior",
-          "phase": "demo",
+          "phase": "new",
           "finish": "shingle",
           "color": "#5a3a35"
         },
         "f-w30": {
           "id": "f-w30",
           "a": "f-n22",
-          "b": "f-n21",
+          "b": "f-n23",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -898,17 +893,17 @@
         },
         "f-w31": {
           "id": "f-w31",
-          "a": "f-n21",
-          "b": "f-n23",
+          "a": "f-n23",
+          "b": "f-n31",
           "thickness": 7,
           "kind": "exterior",
-          "phase": "new",
+          "phase": "existing",
           "finish": "shingle",
           "color": "#5a3a35"
         },
         "f-w32": {
           "id": "f-w32",
-          "a": "f-n23",
+          "a": "f-n22",
           "b": "f-n24",
           "thickness": 7,
           "kind": "exterior",
@@ -919,26 +914,6 @@
         "f-w33": {
           "id": "f-w33",
           "a": "f-n24",
-          "b": "f-n33",
-          "thickness": 7,
-          "kind": "exterior",
-          "phase": "existing",
-          "finish": "shingle",
-          "color": "#5a3a35"
-        },
-        "f-w34": {
-          "id": "f-w34",
-          "a": "f-n23",
-          "b": "f-n25",
-          "thickness": 7,
-          "kind": "exterior",
-          "phase": "new",
-          "finish": "shingle",
-          "color": "#5a3a35"
-        },
-        "f-w35": {
-          "id": "f-w35",
-          "a": "f-n25",
           "b": "f-n4",
           "thickness": 7,
           "kind": "exterior",
@@ -946,17 +921,17 @@
           "finish": "shingle",
           "color": "#5a3a35"
         },
-        "f-w36": {
-          "id": "f-w36",
-          "a": "f-n26",
-          "b": "f-n27",
+        "f-w34": {
+          "id": "f-w34",
+          "a": "f-n25",
+          "b": "f-n26",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
         },
-        "f-w37": {
-          "id": "f-w37",
-          "a": "f-n26",
+        "f-w35": {
+          "id": "f-w35",
+          "a": "f-n25",
           "b": "f-n16",
           "thickness": 7,
           "kind": "exterior",
@@ -964,18 +939,36 @@
           "finish": "shingle",
           "color": "#5a3a35"
         },
-        "f-w38": {
-          "id": "f-w38",
-          "a": "f-n27",
+        "f-w36": {
+          "id": "f-w36",
+          "a": "f-n26",
           "b": "f-n29",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
         },
+        "f-w37": {
+          "id": "f-w37",
+          "a": "f-n26",
+          "b": "f-n37",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w38": {
+          "id": "f-w38",
+          "a": "f-n27",
+          "b": "f-n11",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
         "f-w39": {
           "id": "f-w39",
-          "a": "f-n27",
-          "b": "f-n38",
+          "a": "f-n28",
+          "b": "f-n29",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -983,7 +976,7 @@
         "f-w40": {
           "id": "f-w40",
           "a": "f-n28",
-          "b": "f-n11",
+          "b": "f-n2",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -993,31 +986,32 @@
         "f-w41": {
           "id": "f-w41",
           "a": "f-n29",
-          "b": "f-n16",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "demo"
-        },
-        "f-w42": {
-          "id": "f-w42",
-          "a": "f-n29",
-          "b": "f-n31",
+          "b": "f-n27",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
+        },
+        "f-w42": {
+          "id": "f-w42",
+          "a": "f-n30",
+          "b": "f-n31",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new",
+          "bearing": false
         },
         "f-w43": {
           "id": "f-w43",
           "a": "f-n30",
-          "b": "f-n31",
+          "b": "f-n13",
           "thickness": 5,
           "kind": "interior",
-          "phase": "new"
+          "phase": "existing"
         },
         "f-w44": {
           "id": "f-w44",
-          "a": "f-n30",
-          "b": "f-n2",
+          "a": "f-n31",
+          "b": "f-n14",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -1026,8 +1020,8 @@
         },
         "f-w45": {
           "id": "f-w45",
-          "a": "f-n31",
-          "b": "f-n28",
+          "a": "f-n32",
+          "b": "f-n33",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1035,85 +1029,60 @@
         "f-w46": {
           "id": "f-w46",
           "a": "f-n32",
-          "b": "f-n33",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new",
-          "bearing": false
-        },
-        "f-w47": {
-          "id": "f-w47",
-          "a": "f-n32",
-          "b": "f-n13",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "existing"
-        },
-        "f-w48": {
-          "id": "f-w48",
-          "a": "f-n33",
-          "b": "f-n14",
+          "b": "f-n27",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
           "finish": "shingle",
           "color": "#5a3a35"
         },
-        "f-w49": {
-          "id": "f-w49",
-          "a": "f-n28",
+        "f-w47": {
+          "id": "f-w47",
+          "a": "f-n33",
           "b": "f-n34",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
         },
-        "f-w50": {
-          "id": "f-w50",
+        "f-w48": {
+          "id": "f-w48",
           "a": "f-n34",
-          "b": "f-n35",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
-        },
-        "f-w51": {
-          "id": "f-w51",
-          "a": "f-n35",
           "b": "f-n19",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
         },
-        "f-w52": {
-          "id": "f-w52",
-          "a": "f-n36",
-          "b": "f-n37",
+        "f-w49": {
+          "id": "f-w49",
+          "a": "f-n35",
+          "b": "f-n36",
           "thickness": 5,
           "kind": "interior",
           "phase": "new",
           "heightOverride": 61.75
         },
-        "f-w53": {
-          "id": "f-w53",
-          "a": "f-n36",
-          "b": "f-n26",
+        "f-w50": {
+          "id": "f-w50",
+          "a": "f-n35",
+          "b": "f-n25",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
           "finish": "shingle",
           "color": "#5a3a35"
         },
-        "f-w54": {
-          "id": "f-w54",
-          "a": "f-n37",
-          "b": "f-n38",
+        "f-w51": {
+          "id": "f-w51",
+          "a": "f-n36",
+          "b": "f-n37",
           "thickness": 5,
           "kind": "interior",
           "phase": "new",
           "heightOverride": 92.25
         },
-        "f-w55": {
-          "id": "f-w55",
-          "a": "f-n38",
+        "f-w52": {
+          "id": "f-w52",
+          "a": "f-n37",
           "b": "f-n13",
           "thickness": 5,
           "kind": "interior",
@@ -1232,9 +1201,9 @@
           "id": "f-o7"
         },
         "f-o8": {
-          "wallId": "f-w29",
+          "wallId": "f-w10",
           "type": "window",
-          "offset": 10.75,
+          "offset": 75,
           "width": 18,
           "height": 44,
           "sill": 36,
@@ -1396,7 +1365,7 @@
           "id": "f-o19"
         },
         "f-o20": {
-          "wallId": "f-w51",
+          "wallId": "f-w48",
           "type": "door",
           "offset": 36.5,
           "width": 28,
@@ -1411,7 +1380,7 @@
           "id": "f-o20"
         },
         "f-o21": {
-          "wallId": "f-w50",
+          "wallId": "f-w47",
           "type": "passage",
           "offset": 34.25,
           "width": 56,
@@ -1485,7 +1454,7 @@
           "id": "f-o25"
         },
         "f-o26": {
-          "wallId": "f-w48",
+          "wallId": "f-w44",
           "type": "door",
           "offset": 19,
           "width": 32,
@@ -1505,7 +1474,7 @@
           "id": "f-o26"
         },
         "f-o27": {
-          "wallId": "f-w31",
+          "wallId": "f-w29",
           "type": "door",
           "offset": 50.75,
           "width": 36,
@@ -1555,7 +1524,7 @@
           "id": "f-o29"
         },
         "f-o30": {
-          "wallId": "f-w34",
+          "wallId": "f-w32",
           "type": "window",
           "offset": 44.5,
           "width": 56,
@@ -1567,7 +1536,7 @@
           "id": "f-o30"
         },
         "f-o31": {
-          "wallId": "f-w34",
+          "wallId": "f-w32",
           "type": "window",
           "offset": 118.5,
           "width": 56,
@@ -1579,7 +1548,7 @@
           "id": "f-o31"
         },
         "f-o32": {
-          "wallId": "f-w35",
+          "wallId": "f-w33",
           "type": "window",
           "offset": 30.5,
           "width": 44,
@@ -1591,7 +1560,7 @@
           "id": "f-o32"
         },
         "f-o33": {
-          "wallId": "f-w32",
+          "wallId": "f-w30",
           "type": "door",
           "offset": 44.5,
           "width": 36,
@@ -1608,7 +1577,7 @@
           "id": "f-o33"
         },
         "f-o34": {
-          "wallId": "f-w35",
+          "wallId": "f-w33",
           "type": "door",
           "offset": 72.5,
           "width": 36,
@@ -1625,9 +1594,9 @@
           "id": "f-o34"
         },
         "f-o35": {
-          "wallId": "f-w42",
+          "wallId": "f-w36",
           "type": "door",
-          "offset": 19.5,
+          "offset": 43.5,
           "width": 28,
           "height": 80,
           "sill": 0,
@@ -1640,7 +1609,7 @@
           "id": "f-o35"
         },
         "f-o36": {
-          "wallId": "f-w45",
+          "wallId": "f-w41",
           "type": "door",
           "offset": 14.5,
           "width": 24,
@@ -1669,7 +1638,7 @@
           "id": "f-o37"
         },
         "f-o38": {
-          "wallId": "f-w47",
+          "wallId": "f-w43",
           "type": "passage",
           "offset": 19,
           "width": 32,
@@ -1693,7 +1662,7 @@
           "id": "f-o39"
         },
         "f-o40": {
-          "wallId": "f-w46",
+          "wallId": "f-w42",
           "type": "passage",
           "offset": 20.5,
           "width": 36,
@@ -1703,7 +1672,7 @@
           "id": "f-o40"
         },
         "f-o41": {
-          "wallId": "f-w46",
+          "wallId": "f-w42",
           "type": "passage",
           "offset": 148.5,
           "width": 30,
@@ -1713,7 +1682,7 @@
           "id": "f-o41"
         },
         "f-o42": {
-          "wallId": "f-w54",
+          "wallId": "f-w51",
           "type": "door",
           "offset": 16,
           "width": 24,
@@ -1746,7 +1715,7 @@
           "name": "Bath",
           "anchor": {
             "x": 254,
-            "y": 52
+            "y": 70
           },
           "wallFinish": "paint",
           "wallColor": "#2f7a68",
@@ -2756,7 +2725,7 @@
           "kind": "base",
           "origin": {
             "x": 311,
-            "y": 66
+            "y": 72
           },
           "direction": 180,
           "width": 24,
@@ -2770,7 +2739,7 @@
           "kind": "fridge",
           "origin": {
             "x": 311,
-            "y": 96
+            "y": 102
           },
           "direction": 180,
           "width": 36,
@@ -2784,7 +2753,7 @@
           "kind": "wall",
           "origin": {
             "x": 311,
-            "y": 96
+            "y": 102
           },
           "direction": 180,
           "width": 36,
@@ -2798,7 +2767,7 @@
           "kind": "base",
           "origin": {
             "x": 311,
-            "y": 126
+            "y": 132
           },
           "direction": 180,
           "width": 24,
@@ -2812,7 +2781,7 @@
           "kind": "range",
           "origin": {
             "x": 311,
-            "y": 153
+            "y": 159
           },
           "direction": 180,
           "width": 30,
@@ -2826,7 +2795,7 @@
           "kind": "hood",
           "origin": {
             "x": 311,
-            "y": 153
+            "y": 159
           },
           "direction": 180,
           "width": 30,
@@ -2840,7 +2809,7 @@
           "kind": "base",
           "origin": {
             "x": 311,
-            "y": 183
+            "y": 189
           },
           "direction": 180,
           "width": 30,
@@ -2854,7 +2823,7 @@
           "kind": "wall",
           "origin": {
             "x": 311,
-            "y": 66
+            "y": 72
           },
           "direction": 180,
           "width": 24,
@@ -2868,7 +2837,7 @@
           "kind": "wall",
           "origin": {
             "x": 311,
-            "y": 126
+            "y": 132
           },
           "direction": 180,
           "width": 24,
@@ -2882,7 +2851,7 @@
           "kind": "wall",
           "origin": {
             "x": 311,
-            "y": 183
+            "y": 189
           },
           "direction": 180,
           "width": 30,
@@ -2915,10 +2884,10 @@
           "frontColor": "#c4884e",
           "origin": {
             "x": 311,
-            "y": 34
+            "y": 37
           },
           "direction": 180,
-          "width": 30,
+          "width": 36,
           "depth": 12,
           "phase": "new",
           "id": "f-c50"

@@ -704,13 +704,13 @@ with the places where the built design differs from them):
    pair upstairs in the north wall over the landing and one in the upstairs west wall. The wall
    between the strip and the Living (5", with a 36" and a 30" opening) is **new** work: there is
    none today (photo 16).
-4. **North band** (MK: the kitchen stops short of the north wall): a 3'6" band along the north wall
-   east of the stair hall holds the **powder room** (7'2" x 3'6", a 30" vanity and a WC as
+4. **North band** (MK: the kitchen stops short of the north wall): a 4' band along the north wall
+   east of the stair hall holds the **powder room** (7'2" x 4', a 30" vanity and a WC as
    placeholders, a 28" door from the kitchen and a small window) and, in the north-east corner, a
-   **walk-in pantry** (3'11" x 3'6", shelves on two walls, a 24" door). MK asked for about 4': the
-   band's wall cannot come further south without moving the old bath door in the drawing of the
-   house as it stands, because the model splits that wall where the band's wall meets it.
-5. **Kitchen**, 11'6" x 21'2", south of the band, the old bath included. All of its casework is
+   **walk-in pantry** (3'11" x 4', shelves on two walls, a 24" door). The band's wall crosses the
+   old bath's west wall across its door; the door keeps its place in the house as it stands, since
+   a new wall does not split a demolished one.
+5. **Kitchen**, 11'6" x 20'8", south of the band, the old bath included. All of its casework is
    new; today's cabinets and the bath's fixtures (photos 13 to 22) are demolished:
    - the **island** with its fronts facing north, so whoever is at the sink faces the lake: a 24"
      dishwasher and a 36" sink cabinet under one top 66" x 37" with a 12" seating ledge on the lake
@@ -719,8 +719,8 @@ with the places where the built design differs from them):
      the **refrigerator** (a wall cabinet over it), a 24" base, the **range** with its hood (ducted
      through the east wall into the wing's ceiling and up through the wing roof, or recirculating)
      and a 30" base, wall cabinets over the bases;
-   - the **work triangle**, centre to centre: refrigerator to sink about 11'3", sink to range
-     about 7', range to refrigerator 4'9", about 23' in all.
+   - the **work triangle**, centre to centre: refrigerator to sink about 10'9", sink to range
+     about 6'7", range to refrigerator 4'9", about 22' in all.
 
    The kitchen's north-west corner is the way in from the hall, with the powder room's and the
    pantry's doors. The cabinet colour, the counter colour and the fronts are the First Floor's
@@ -802,8 +802,6 @@ Still open:
   Floor north windows and the stair hall's upper north window.
 - **Coats**: the closet under the stair is narrow (2'3" inside, the old window's span sets its west
   wall); hooks or a bench in the foyer would add room.
-- **The pantry** is small (3'11" x 3'6"); the north band is 3'6" deep rather than the 4' asked
-  for (see 4 above).
 - The pipes of the upstairs bath come down through the powder room under it (the old pipe chase
   in the front room is gone with the stove); their route is for the plumber.
 - The porch's size and roofline: MK's reference pictures may change them (estimated 8' out, the

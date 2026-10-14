@@ -315,7 +315,7 @@ function faceSides(set: FaceSet, level: Level): Map<Id, number> {
         const wall = level.walls[f.wallIds[i]];
         if (!wall) continue;
         // The interior is on the right of the half-edge: tracing a->b puts the face on the wall's right.
-        const bit = f.nodeIds[i] === wall.a ? 2 : 1;
+        const bit = f.wallForward[i] ? 2 : 1;
         m.set(wall.id, (m.get(wall.id) ?? 0) | bit);
       }
     }

@@ -733,6 +733,8 @@ export const usePlanStore = create<PlanState>()(
                 } else if (w[key] !== value) (w as unknown as Record<string, unknown>)[key] = value;
               }
             }
+            // A wall that now stands with a wall it crosses is split there (normalizeLevel).
+            if (patch.phase !== undefined) normalizeLevel(level);
             // Thickness and phase change the corner joins, so the core intervals of neighbours.
             if (patch.thickness !== undefined || patch.phase !== undefined) clampOpenings(level);
             // A lower wall takes its openings down with it.
@@ -1423,14 +1425,20 @@ export const usePlanStore = create<PlanState>()(
               if (phase === 'existing') delete r.phase;
               else r.phase = phase;
             }
+            let wallPhase = false;
             for (const id of sel.walls) {
               const w = level.walls[id];
-              if (w && w.phase !== phase) w.phase = phase;
+              if (w && w.phase !== phase) {
+                w.phase = phase;
+                wallPhase = true;
+              }
             }
             for (const id of sel.openings) {
               const o = level.openings[id];
               if (o && o.phase !== phase) o.phase = phase;
             }
+            // A wall that now stands with a wall it crosses (a demolished one kept) is split there.
+            if (wallPhase) normalizeLevel(level);
             clampOpenings(level);
           }),
 

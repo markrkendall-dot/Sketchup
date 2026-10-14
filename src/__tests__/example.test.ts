@@ -92,17 +92,16 @@ describe('docs/examples/146-mick-road.json', () => {
       return out;
     };
     const all = <K extends 'walls' | 'openings' | 'stairs' | 'roofs' | 'rooms' | 'fixtures' | 'decks' | 'floorOpenings'>(k: K) => levels.flatMap((l) => Object.values(l[k]));
-    // Walls demolished: the old porch's three (the foyer's north wall splits its west wall in two),
-    // the wing's north wall, the three y 99.5 pieces and the old bath's west wall (in two, where the
-    // north band's wall crosses it) on the First Floor; upstairs the Bunk's south wall, the stub of
+    // Walls demolished (a new wall does not split a demolished one it meets): the old porch's two,
+    // the wing's north wall, the three y 99.5 pieces and the old bath's west wall on the First Floor; upstairs the Bunk's south wall, the stub of
     // its east wall and the old bath's east wall north of the new bath's wall. New: the addition,
     // its partition, the foyer, the screen porch, the north band's three walls and the laundry
-    // closet's two (each splitting what it meets), the stair strip's south wall (there is none
+    // closet's two (each splitting what it meets but the demolished walls), the stair strip's south wall (there is none
     // today, photo 16), the coat closet's two under the stair (its west wall splits the north wall
     // and its front wall the hall's east wall), the block under the addition and under the foyer,
     // and the upstairs bath's south wall. The retaining wall's two pieces on the Basement are existing. Today's grey Kitchen
     // to Utility door stays as the bedroom's door (MK), so no new one is cut.
-    expect(count(all('walls'))).toEqual({ existing: 55, demo: 13, new: 29 });
+    expect(count(all('walls'))).toEqual({ existing: 56, demo: 11, new: 27 });
     expect(count(all('openings'))).toEqual({ existing: 16, demo: 16, new: 27 });
     // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
     // side and down the bank, with its landing, a deck) stays (MK). New: the grand stair's platform,
@@ -468,11 +467,11 @@ describe('docs/examples/146-mick-road.json', () => {
         'Master bath': [138, 110.5],
         'Master bedroom': [138, 185.5],
         // The kitchen south of the north band, the old bath included.
-        Kitchen: [138, 254],
+        Kitchen: [138, 248],
         Living: [161, 168],
         // The north band, 3'6" deep: the powder room and the walk-in pantry.
-        'Powder room': [86, 42],
-        Pantry: [47, 42],
+        'Powder room': [86, 48],
+        Pantry: [47, 48],
         // The old front room, the stair strip and the stair in one face, up to the hall's east wall.
         'Stair hall': [161, 128],
         Foyer: [89, 79.75],
@@ -794,10 +793,10 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(top.x0 - 173).toBeGreaterThanOrEqual(36);
     expect(311 - top.x1).toBeGreaterThanOrEqual(36);
     expect(308 - top.y1).toBe(60);
-    // The east run: from the band's wall (y 54) to y 198, north of the island's east walkway.
+    // The east run: from the band's wall (y 60) to y 204, north of the island's east walkway.
     const run = fixtures.filter((x) => x.kind !== 'box' && x.elevation === 0 && bounds(fixtureOutline(x)).x1 === 311);
     expect(run.map((x) => x.kind)).toEqual(['base', 'fridge', 'base', 'range', 'base']);
-    expect([Math.min(...run.map((x) => bounds(fixtureOutline(x)).y0)), Math.max(...run.map((x) => bounds(fixtureOutline(x)).y1))]).toEqual([54, 198]);
+    expect([Math.min(...run.map((x) => bounds(fixtureOutline(x)).y0)), Math.max(...run.map((x) => bounds(fixtureOutline(x)).y1))]).toEqual([60, 204]);
     expect(Math.max(...run.map((x) => bounds(fixtureOutline(x)).y1))).toBeLessThan(top.y0);
     // The stools stand clear of the ledge, on the lake side.
     for (const s of fixtures.filter((x) => x.kind === 'box')) expect(bounds(fixtureOutline(s)).y0).toBeGreaterThan(top.y1);
@@ -836,7 +835,7 @@ describe('docs/examples/146-mick-road.json', () => {
     };
     const newDoors = Object.values(f.openings).filter((o) => o.type === 'door' && o.phase === 'new');
     expect(newDoors.some((o) => doorAt(o).x === 314.5)).toBe(false);
-    expect(newDoors.filter((o) => doorAt(o).y === 51.5).map((o) => [doorAt(o).x, o.width]).sort()).toEqual([
+    expect(newDoors.filter((o) => doorAt(o).y === 57.5).map((o) => [doorAt(o).x, o.width]).sort()).toEqual([
       [214, 28],
       [276, 24],
     ]);

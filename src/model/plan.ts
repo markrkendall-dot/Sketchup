@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
+import { phasesCoexist } from '../derive/phase';
 import { MAX_STAIRS_BELOW, stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
 import { FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
@@ -240,6 +241,9 @@ function insertCrossingNode(level: Level, skip: Set<string>): boolean {
       const Q = boxes[j];
       if (P.maxX < Q.minX || Q.maxX < P.minX || P.maxY < Q.minY || Q.maxY < P.minY) continue;
       if (p.a === q.a || p.a === q.b || p.b === q.a || p.b === q.b) continue;
+      // A new wall and a demolished one never stand together: they cross without a node (the All
+      // view joins them itself, derive/rooms.ts computeFaceGeometry).
+      if (!phasesCoexist(p.phase, q.phase)) continue;
       const key = p.id < q.id ? `${p.id}|${q.id}` : `${q.id}|${p.id}`;
       if (skip.has(key)) continue;
       const hit = segmentIntersection(P.a, P.b, Q.a, Q.b);
@@ -322,6 +326,16 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
   // (strictly inside both) and let the next pass split both at it. Each pass changes one thing, so
   // the guard grows with the size of the level.
   const skipCrossing = new Set<string>();
+  /** A node only walls that never coexist with `w` touch does not split it (a new wall ending on a demolished one). */
+  const splitsWall = (n: Id, w: Wall): boolean => {
+    let touched = false;
+    for (const o of Object.values(level.walls)) {
+      if (o.a !== n && o.b !== n) continue;
+      if (phasesCoexist(o.phase, w.phase)) return true;
+      touched = true;
+    }
+    return !touched;
+  };
   const passes = 1000 + 4 * Object.keys(level.walls).length ** 2;
   for (let guard = 0; guard < passes; guard++) {
     let split = false;
@@ -334,6 +348,7 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
         const pr = projectPointToSegment(n, a, b);
         const s = pr.tRaw * len;
         if (pr.distance > MERGE_EPS || s <= MERGE_EPS || s >= len - MERGE_EPS) continue;
+        if (!splitsWall(n.id, w)) continue;
         const tailExists = findWallBetween(level, n.id, w.b);
         const headExists = findWallBetween(level, w.a, n.id);
         const rank = survivorRank(level, w);

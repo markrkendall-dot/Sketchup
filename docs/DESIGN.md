@@ -213,6 +213,17 @@ clamped). Two walls that cross strictly inside both (farther than MERGE_EPS from
 parallel, no shared node) get a node at the crossing, which the same pass then splits both at, so
 an X becomes four walls at one node. One change per pass; the pass count is bounded by the level
 size, and a crossing that lands on an existing node is skipped rather than retried.
+Walls that never stand together (`phasesCoexist`: a new wall and a demolished one) are the one
+exception: they cross, or one ends on the other, without a node, so drawing new work across a wall
+the design takes out leaves that wall, and its doors and windows, as they are in the house as it
+stands (the crossing pass skips such pairs; a node splits a wall only if a wall standing with it
+touches the node, or none does, as at a fresh crossing node). The Existing and Proposed views never
+show both. The All view does, and `computeFaceGeometry` (derive/rooms.ts `planarCuts`) cuts such
+walls where they cross (a virtual node `~demoId|newId`) or meet at a T before tracing faces, each
+edge keeping its wall and whether it runs the wall's way (`Face.wallForward`, which the side
+lookups use); their footprints just overlap there. Changing a wall's phase (`setPhase`,
+`updateWalls`) runs `normalize()` again, so a demolished wall kept as existing is split where a new
+wall meets it.
 Simple graph, not multigraph: at most one wall between two nodes. When two walls end up between
 the same nodes (the duplicate drop, and a split whose piece already exists), the survivor is the
 `existing` one over `new`/`demo`, then the one with openings, then the one that was there first;
