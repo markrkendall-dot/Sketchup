@@ -2,7 +2,7 @@ import { Grid, Sky } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
 import { BackSide, Color, DirectionalLight, Mesh, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry, type Object3D } from 'three';
-import { fallbackElevation } from '../derive/site';
+import { lowestGround } from '../derive/site';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore, type UiState, type View3dPreset } from '../store/uiStore';
 import { focusCanvas } from '../ui/focus';
@@ -31,7 +31,7 @@ const HEMISPHERE_GROUND = '#a39f7c';
 const HEMISPHERE_INTENSITY = 2.4;
 /** Tone mapping exposure (ACES): a little above 1 lifts the shaded faces without clipping the sunlit ones. */
 const EXPOSURE = 1.1;
-/** Shadow map size (2048: a texel is under half an inch on the starter house). */
+/** Shadow map size (2048: a texel is about half an inch on the starter house). */
 const SHADOW_MAP_SIZE = 2048;
 /** Depth bias (normalized depth) and normal offset (inches) against shadow acne. */
 const SHADOW_BIAS = -0.0002;
@@ -109,12 +109,13 @@ function DebugHandle() {
 
 /**
  * 12" cells, 10' sections, an overlay on the ground ("Grid" in the 3D bar). It sits 1" above the
- * flat ground used without grade points (the bottom of the lowest slab), so it never z-fights the
- * terrain; terrain that rises above it hides it, which is what a grid under the ground should do.
+ * lowest ground (the bottom of the lowest slab, or the lowest grade point when that is lower), so it
+ * never z-fights the terrain and never floats over it; terrain that rises above it hides it, which
+ * is what a grid under the ground should do.
  */
 function GroundGrid() {
   const on = useUiStore((s) => s.show3dGrid);
-  const y = usePlanStore((s) => fallbackElevation(s.plan));
+  const y = usePlanStore((s) => lowestGround(s.plan));
   if (!on) return null;
   return (
     <Grid

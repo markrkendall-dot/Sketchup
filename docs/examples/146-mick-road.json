@@ -331,26 +331,119 @@
           "risers": 11,
           "phase": "demo",
           "cutsFloorAbove": false,
+          "open": true,
           "id": "b-s1"
         },
         "b-s2": {
           "origin": {
-            "x": 445,
-            "y": 531
+            "x": 485,
+            "y": 465
           },
+          "direction": 270,
+          "width": 36,
+          "run": 120,
+          "base": -96,
+          "rise": 88.61538461538461,
+          "risers": 12,
+          "phase": "demo",
+          "cutsFloorAbove": false,
+          "open": true,
+          "id": "b-s2"
+        },
+        "b-s3": {
           "direction": 270,
           "width": 36,
           "run": 120,
           "rise": 88.61538461538461,
           "risers": 12,
           "cutsFloorAbove": false,
+          "open": true,
+          "origin": {
+            "x": 445,
+            "y": 531
+          },
           "phase": "new",
-          "id": "b-s2"
+          "id": "b-s3"
+        },
+        "b-s4": {
+          "direction": 270,
+          "width": 36,
+          "run": 120,
+          "rise": 88.61538461538461,
+          "risers": 12,
+          "cutsFloorAbove": false,
+          "open": true,
+          "origin": {
+            "x": 445,
+            "y": 687
+          },
+          "base": -96,
+          "phase": "new",
+          "id": "b-s4"
         }
       },
       "roofs": {},
       "fixtures": {},
-      "decks": {}
+      "decks": {
+        "b-d1": {
+          "outline": [
+            {
+              "x": 467,
+              "y": 309
+            },
+            {
+              "x": 503,
+              "y": 309
+            },
+            {
+              "x": 503,
+              "y": 345
+            },
+            {
+              "x": 467,
+              "y": 345
+            }
+          ],
+          "elevation": 0,
+          "railings": [
+            false,
+            true,
+            false,
+            false
+          ],
+          "phase": "demo",
+          "id": "b-d1"
+        },
+        "b-d2": {
+          "outline": [
+            {
+              "x": 427,
+              "y": 531
+            },
+            {
+              "x": 463,
+              "y": 531
+            },
+            {
+              "x": 463,
+              "y": 567
+            },
+            {
+              "x": 427,
+              "y": 567
+            }
+          ],
+          "elevation": 0,
+          "railings": [
+            false,
+            true,
+            false,
+            true
+          ],
+          "phase": "new",
+          "id": "b-d2"
+        }
+      }
     },
     "level-f": {
       "id": "level-f",
@@ -3587,55 +3680,103 @@
           "x": 322.5,
           "y": 419
         },
-        "elevation": -100
+        "elevation": -152.71
       },
       "grade-29": {
         "id": "grade-29",
         "at": {
           "x": 390.5,
-          "y": 435
+          "y": 363
         },
         "elevation": -100
       },
       "grade-30": {
         "id": "grade-30",
         "at": {
-          "x": 354.5,
-          "y": 321
+          "x": 511,
+          "y": 363
         },
         "elevation": -100
       },
       "grade-31": {
         "id": "grade-31",
         "at": {
+          "x": 360,
+          "y": 465
+        },
+        "elevation": -196
+      },
+      "grade-32": {
+        "id": "grade-32",
+        "at": {
+          "x": 445,
+          "y": 465
+        },
+        "elevation": -196
+      },
+      "grade-33": {
+        "id": "grade-33",
+        "at": {
+          "x": 540,
+          "y": 465
+        },
+        "elevation": -196
+      },
+      "grade-34": {
+        "id": "grade-34",
+        "at": {
+          "x": 360,
+          "y": 795
+        },
+        "elevation": -196
+      },
+      "grade-35": {
+        "id": "grade-35",
+        "at": {
+          "x": 445,
+          "y": 795
+        },
+        "elevation": -196
+      },
+      "grade-36": {
+        "id": "grade-36",
+        "at": {
+          "x": 560,
+          "y": 795
+        },
+        "elevation": -196
+      },
+      "grade-37": {
+        "id": "grade-37",
+        "at": {
+          "x": 354.5,
+          "y": 321
+        },
+        "elevation": -100
+      },
+      "grade-38": {
+        "id": "grade-38",
+        "at": {
           "x": 426.5,
           "y": 321
         },
         "elevation": -100
       },
-      "grade-32": {
-        "id": "grade-32",
+      "grade-39": {
+        "id": "grade-39",
         "at": {
           "x": 79.5,
           "y": -360
         },
         "elevation": 6
       },
-      "grade-33": {
-        "id": "grade-33",
+      "grade-40": {
+        "id": "grade-40",
         "at": {
           "x": 238.5,
           "y": -360
         },
         "elevation": 6
-      },
-      "grade-34": {
-        "id": "grade-34",
-        "at": {
-          "x": 445,
-          "y": 543
-        },
-        "elevation": -100
       }
     },
     "columns": {

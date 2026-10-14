@@ -735,37 +735,78 @@ export function buildFloorFinishGeometry(net: readonly Vec2[], holes: readonly (
   return g;
 }
 
+/** Open stairs: tread thickness, and the stringers' thickness (across) and depth (square to their slope). */
+export const OPEN_TREAD = 1.5;
+export const STRINGER = { thick: 1.5, depth: 9.25 } as const;
+
 /**
  * A flight of stairs: `risers` steps, each a 1/risers slice of the run rising `rise` (the height of
  * one riser) higher than the last, the first one `base` + `rise` above the floor top. The flight is
- * solid down to the floor, so one that starts on a landing (`base` > 0) has no void under it, and a
- * landing (one riser) is a plain box. Built as one solid (the stepped side profile extruded across
- * the width) rather than separate boxes, so no internal faces show as seams.
+ * solid down to the floor (or to its base, when it starts below the floor), so one that starts on a
+ * landing (`base` > 0) has no void under it, and a landing (one riser) is a plain box. Built as one
+ * solid (the stepped side profile extruded across the width) rather than separate boxes, so no
+ * internal faces show as seams. `open` (outdoor steps) builds treads on two stringers instead,
+ * nothing under them: each tread OPEN_TREAD thick across the width between the stringers, each
+ * stringer STRINGER.thick wide and STRINGER.depth deep under the line of the tread fronts, from the
+ * bottom of the flight to its top.
  */
-export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run'>, rise: number, risers: number, base = 0): BufferGeometry {
+export function buildStairsGeometry(stairs: Pick<Stairs, 'origin' | 'direction' | 'width' | 'run'>, rise: number, risers: number, base = 0, open = false): BufferGeometry {
   const d = stairs.run / risers;
-  // Profile in (along the run, height).
-  const profile: Vec2[] = [{ x: 0, y: 0 }];
-  for (let i = 0; i < risers; i++) {
-    profile.push({ x: i * d, y: base + (i + 1) * rise }, { x: (i + 1) * d, y: base + (i + 1) * rise });
+  const w = stairs.width / 2;
+  // Each part: a profile in (along the run, height) extruded across [l0, l1] of the width.
+  const parts: [Vec2[], number, number][] = [];
+  if (open) {
+    const t = Math.min(STRINGER.thick, w / 4);
+    for (let i = 0; i < risers; i++) {
+      const top = base + (i + 1) * rise;
+      parts.push([
+        [
+          { x: i * d, y: top - OPEN_TREAD },
+          { x: (i + 1) * d, y: top - OPEN_TREAD },
+          { x: (i + 1) * d, y: top },
+          { x: i * d, y: top },
+        ],
+        -w + t,
+        w - t,
+      ]);
+    }
+    // The stringer's top runs from the bottom of the flight to its top tread's back edge; its
+    // vertical depth is STRINGER.depth measured square to that slope, and its foot is cut level
+    // where it stands (it never goes below the bottom of the flight).
+    const total = risers * rise;
+    const deep = (STRINGER.depth * Math.hypot(stairs.run, total)) / stairs.run;
+    const foot = Math.min(stairs.run, (deep * stairs.run) / total);
+    const stringer: Vec2[] = [{ x: 0, y: base }, { x: foot, y: base }];
+    if (foot < stairs.run) stringer.push({ x: stairs.run, y: base + total - deep });
+    stringer.push({ x: stairs.run, y: base + total });
+    parts.push([stringer, -w, -w + t], [stringer, w - t, w]);
+  } else {
+    const bottom = Math.min(0, base);
+    const profile: Vec2[] = [{ x: 0, y: bottom }];
+    for (let i = 0; i < risers; i++) {
+      profile.push({ x: i * d, y: base + (i + 1) * rise }, { x: (i + 1) * d, y: base + (i + 1) * rise });
+    }
+    profile.push({ x: stairs.run, y: bottom });
+    parts.push([profile, -w, w]);
   }
-  profile.push({ x: stairs.run, y: 0 });
-  // prism() extrudes along its Y slot: positions come out as (along, lateral, height).
-  const local = prism(profile, -stairs.width / 2, stairs.width / 2);
   const f = stairsFrame(stairs);
-  const src = local.getAttribute('position');
-  const out: number[] = [];
-  const map = (i: number): P3 => {
-    const p = stairsPoint(f, src.getX(i), src.getY(i));
-    return [p.x, src.getZ(i), p.y];
-  };
   // (along, lateral, height) -> (x, Y, z) is a reflection when u x v points down; keep faces outward.
   const flip = cross(f.u, f.v) > 0;
-  for (let i = 0; i < src.count; i += 3) {
-    const [a, b, c] = [map(i), map(i + 1), map(i + 2)];
-    out.push(...a, ...(flip ? c : b), ...(flip ? b : c));
+  const out: number[] = [];
+  for (const [profile, l0, l1] of parts) {
+    // prism() extrudes along its Y slot: positions come out as (along, lateral, height).
+    const local = prism(profile, l0, l1);
+    const src = local.getAttribute('position');
+    const map = (i: number): P3 => {
+      const p = stairsPoint(f, src.getX(i), src.getY(i));
+      return [p.x, src.getZ(i), p.y];
+    };
+    for (let i = 0; i < src.count; i += 3) {
+      const [a, b, c] = [map(i), map(i + 1), map(i + 2)];
+      out.push(...a, ...(flip ? c : b), ...(flip ? b : c));
+    }
+    local.dispose();
   }
-  local.dispose();
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(out, 3));
   g.computeVertexNormals();
@@ -1576,7 +1617,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const entry =
       old && old.stairs === s && old.rise === rise && old.risers === risers && old.base === base
         ? old
-        : { stairs: s, rise, risers, base, geometry: buildStairsGeometry(s, rise, risers, base) };
+        : { stairs: s, rise, risers, base, geometry: buildStairsGeometry(s, rise, risers, base, !!s.open) };
     nextStairs.set(s.id, entry);
     stairs.push({ id: s.id, geometry: entry.geometry, phase: sp(s.phase) });
   }

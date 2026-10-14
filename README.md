@@ -89,7 +89,8 @@ Before you start, measure on paper. Then follow these steps in order.
    bar says how many). Stairs (`T`) go on the lower level and cut the floor above where the
    headroom over the treads would be under 80": the opening starts at run x (floor to floor -
    80") / floor to floor up the flight (the stair's properties change the headroom or set the
-   start).
+   start). Outdoor steps: tick "Open" for treads on stringers instead of a solid flight; on the
+   lowest level "Starts at" may be negative, for steps that go on down a slope below its floor.
 9. **Load a photo as an underlay if you have one.** A scanned plan, a real-estate sketch or a
    photo of graph paper: press `U`, load the image, click "Scale by two points", click the two
    ends of a wall whose length you know and type it, then lock the image and trace over it.
@@ -469,12 +470,17 @@ and the plan's north angle is 0.
   the Basement level about 10' south of the main block, from 10' past its west face east to the
   corner of the main block and the wing, then north to it; its top is 2" over the terrace behind
   it, which sits a few inches under the first floor, so only the wing's basement walks out. Its
-  west end is free, so the Basement shows one open wall end (a red dot) by design. A wooden stair
-  climbs north along the wing's east side from the walkout's terrace (11 risers, an estimate). The
-  fence on the wall and the stair's railings are not drawn. Photo 24, from the lake road below the
-  house, shows the wall turning north at the wing, the walkout's doors and that stair from the
-  south, and the hill still falling south of the walkout toward the road.
-- Not modelled: today's small deck at the top of the wing stair (photo 3), the lot, the entry porch
+  west end is free, so the Basement shows one open wall end (a red dot) by design. The fence on
+  the wall is not drawn.
+- **The bank and the lower lawn** (photos 24 to 27, from the lake road and the lower lawn): the
+  ground in front of the walkout doors stays level only about 4' out, then a steep bank falls 8'
+  (MK) to the lower lawn, level from about 12'6" out (estimates from the photos).
+- **Today's wooden stair** (photos 23 and 25): open treads on stringers, from a landing at the
+  walkout's level beside the wing's south-east corner up north along the wing's east side to the
+  lawn (11 risers), and from the same landing on south down the bank to the lower lawn (13 risers
+  with the landing's edge); the landing is drawn as a small deck with its east railing, the
+  flights' railings are not drawn. All estimates.
+- Not modelled: the small deck at the top of today's wing stair (photo 3), the lot, the entry porch
   floor and steps, the foundation under the wing and porches (the ground meets them where the grade
   points say it does).
 
@@ -552,7 +558,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Roof overhangs | main 24", wing 18", entry porch 18" | Eave to the wall face |
 | Roof thickness, eaves | 2 1/2" (corrugated sheet); open eaves, rafter tails 5 1/2" deep every 24" (photos 1 and 7); 7" rake boards | A rafter tail and the rake board |
 | Grade points | see below | Spot levels from the floor top down |
-| **Deck stair's foot** (proposed) | the lower lawn at -100, the walkout's level, about 18' south of the wing's south face (x 445, y 543): 13 risers; photo 24 shows the hill still falling there, and each 7.4" lower adds a riser and 10" of run | The ground there against the walkout doors' threshold |
+| **The bank and the lower lawn** | level about 4' out from the walkout doors, then down 8' (MK) to the lower lawn from about 12'6" out (photos 24 to 27); the deck's stair needs 26 risers in two flights to reach it, and each 7.4" more or less is a riser and 10" of run | Where the bank starts and ends, and the lawn against the walkout doors' threshold |
 
 Grade points (absolute elevation in inches; the first floor top is +2", the basement floor -100"):
 five at +1 round the porch, whose floor is about at grade (its two outer corners, the middle of its
@@ -564,9 +570,9 @@ corner, at the retaining wall's west end against the house's line, and on the la
 end; the wing's south-east corner -100 and
 north-east corner -20, a point 6' east of the main block's east wall -6, pairs either side of the
 retaining wall (-6 on the terrace just inside it; -50, -60, -85 and -100 on the lawn just outside,
-west to east, and -100 east of its return), a point 10' south of the wing -100 (the terrace in
-front of the doors), the proposed deck stair's foot at -100 (an estimate, see the table), two at
-the walkout's threshold (-100, 6" out from the wall at the double door's jambs), and two points 30'
+west to east; east of its return -100 beside the house and -153 on the bank), the bank in front
+of the walkout (its top 4' south of the wing at -100, its foot 12'6" south at -196, and the lower
+lawn at -196 out to 40'; photos 24 to 27, the 8' drop from MK), two at the walkout's threshold (-100, 6" out from the wall at the double door's jambs), and two points 30'
 north of the house at +6 (the road is slightly higher). Measure them down from the first-floor sill
 with a level and a tape or a laser, and edit them in the Site tab.
 
@@ -668,12 +674,15 @@ Six changes, all on the First Floor apart from the upstairs east windows over th
    so you step onto it from the lake-side terrace behind the wall. The house and the wall carry its
    north and west edges; two posts stand on the walkout terrace (at the south-east corner and the
    middle of the south edge, 8' in front of the walkout doors); railings run along the east and
-   south edges. Its stair leads south off the south edge's east end, 36" wide, 13 risers of 7.4"
-   down to the lower lawn at the walkout's level (12 in the flight, 10" treads; the deck's edge is
-   the 13th), and the railing opens there. Today's wooden stair along the wing's east side is
-   demolished (MK: the deck's stair replaces it), and with it the small deck at its top (photo 3,
-   not modelled). The stair's foot is an **estimate**: photo 24 shows the hill still falling past
-   the walkout, so the ground there is probably lower (see the measurement table).
+   south edges. Its stair leads south off the south edge's east end, 36" wide, open treads on
+   stringers, all the way down to the lower lawn 8' under the walkout (MK): 26 risers of 7.4" in
+   two flights of 12 (10" treads), each climbing to an edge that is its 13th, with a 3' square
+   landing between them at the walkout's level, 8' over the lawn on four posts, railed on its east
+   and west sides. The deck's railing opens where the stair arrives. It reaches 21' south of the
+   deck; the bank is an **estimate** from photos 24 to 27 (see the measurement table). Today's
+   wooden stair, both flights and its landing, is demolished (MK: the deck's stair replaces it),
+   and with it the small deck at its top (photo 3, not modelled). The flights' railings are not
+   drawn.
 
 **After the work** (MK, after his garage across the road), the Proposed view shows the whole house
 re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
@@ -734,7 +743,8 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   show a short stub on the chimney's face.
 - **Not drawn yet**: stair railings (a stair opening or an open stair side has none; a deck's
   railing is drawn),
-  exterior steps (an outside stair is a flight on a level, as the starter's wing stair is), fences,
+  exterior steps other than a flight (an outside stair is a flight on the lowest level, open and,
+  down a slope, starting below its floor, as the starter's are), fences,
   the lot outline, porch floors and steps, foundations under additions and porches, gutters,
   ceilings, crown and baseboards, furniture, and text or dimension notes
   you place yourself. Bathroom fixtures and a wood stove are labelled boxes. A retaining wall is a

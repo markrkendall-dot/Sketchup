@@ -229,9 +229,10 @@ describe('sun shadow camera', () => {
     expect(sunShadowFit(box, [1, 0.001, 0]).far).toBeLessThan(20 * 300);
   });
 
-  it('fits the starter house with a texel under half an inch at 2048', () => {
+  it('fits the starter house with a texel under 0.6" at 2048', () => {
+    // The proposed deck's stair runs 21' south of the deck to the lower lawn, 8' under the walkout.
     const plan = migrate(example);
     const fit = sunShadowFit(planBox(plan), sunPosition(plan.site.northAngle));
-    expect((2 * fit.half) / 2048).toBeLessThan(0.5);
+    expect((2 * fit.half) / 2048).toBeLessThan(0.6);
   });
 });

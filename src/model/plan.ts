@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
-import { stairsRisersOk } from '../derive/stairs';
+import { MAX_STAIRS_BELOW, stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
 import { FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
@@ -531,7 +531,7 @@ const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
-const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers'] as const;
+const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
@@ -653,10 +653,11 @@ function migrateRooms(raw: Json): Level['rooms'] {
 
 /**
  * Keep stairs with a usable position and size; fill in phase and cutsFloorAbove when missing; keep
- * headroom (positive), holeStart (not negative), base (not negative), rise (positive) and risers (a
- * whole number from 1 to MAX_STAIRS_RISERS) only when valid.
+ * headroom (positive), holeStart (not negative), base (not negative; on the `lowest` level down to
+ * MAX_STAIRS_BELOW below the floor, outdoor steps down a slope), rise (positive), risers (a whole
+ * number from 1 to MAX_STAIRS_RISERS) and open (true or false) only when valid.
  */
-function migrateStairs(raw: Json): Level['stairs'] {
+function migrateStairs(raw: Json, lowest: boolean): Level['stairs'] {
   const out: Level['stairs'] = {};
   for (const [sid, st] of Object.entries(raw)) {
     if (!isObject(st) || !isPoint(st.origin)) continue;
@@ -671,9 +672,10 @@ function migrateStairs(raw: Json): Level['stairs'] {
     put(stairs, 'headroom', isNum(st.headroom) && st.headroom > 0 ? st.headroom : undefined);
     put(stairs, 'holeStart', isNum(st.holeStart) && st.holeStart >= 0 ? st.holeStart : undefined);
     // Optional height fields of a short flight or a landing (derive/stairs.ts stairsBase, stairsRise).
-    put(stairs, 'base', isNum(st.base) && st.base >= 0 ? st.base : undefined);
+    put(stairs, 'base', isNum(st.base) && st.base >= (lowest ? -MAX_STAIRS_BELOW : 0) ? st.base : undefined);
     put(stairs, 'rise', isNum(st.rise) && st.rise > 0 ? st.rise : undefined);
     put(stairs, 'risers', isNum(st.risers) && stairsRisersOk(st.risers) ? st.risers : undefined);
+    put(stairs, 'open', typeof st.open === 'boolean' ? st.open : undefined);
     out[sid] = stairs as unknown as Stairs;
   }
   return out;
@@ -941,7 +943,7 @@ function migrateUnderlay(raw: unknown): Underlay | undefined {
   return isValidUnderlay(u as unknown as Underlay) ? (u as unknown as Underlay) : undefined;
 }
 
-function migrateLevel(raw: unknown, id: string): Level {
+function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   if (!isObject(raw)) fail(`level ${id} is not an object`);
   const where = `level ${id}`;
   const nodes = migrateNodes(record(raw.nodes, `${where} nodes`), where);
@@ -955,7 +957,7 @@ function migrateLevel(raw: unknown, id: string): Level {
   level.walls = walls;
   level.openings = migrateOpenings(record(raw.openings, `${where} openings`), walls);
   level.rooms = migrateRooms(record(raw.rooms, `${where} rooms`));
-  level.stairs = migrateStairs(record(raw.stairs, `${where} stairs`));
+  level.stairs = migrateStairs(record(raw.stairs, `${where} stairs`), lowest);
   level.roofs = migrateRoofs(record(raw.roofs, `${where} roofs`), where);
   level.fixtures = migrateFixtures(record(raw.fixtures, `${where} fixtures`), where);
   level.decks = migrateDecks(record(raw.decks, `${where} decks`), where);
@@ -1003,7 +1005,7 @@ export function migrate(json: unknown): Plan {
     if (typeof id !== 'string') fail('levelOrder must contain level ids');
     if (!(id in rawLevels)) fail(`level ${id} is listed in levelOrder but missing`);
     if (id in levels) fail(`level ${id} is listed twice in levelOrder`);
-    levels[id] = migrateLevel(rawLevels[id], id);
+    levels[id] = migrateLevel(rawLevels[id], id, id === doc.levelOrder[0]);
   }
   const plan = pick(doc, PLAN_KEYS);
   plan.schemaVersion = SCHEMA_VERSION;

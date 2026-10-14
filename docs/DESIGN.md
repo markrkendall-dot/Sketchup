@@ -76,9 +76,11 @@ export interface Stairs {
   phase: Phase; cutsFloorAbove: boolean;
   headroom?: Inches;         // clear height the floor opening above keeps; default 80"
   holeStart?: Inches;        // where that opening starts along the run; overrides the headroom rule
-  base?: Inches;             // bottom of the flight above the floor top; default 0 (a flight on a landing)
+  base?: Inches;             // bottom of the flight above the floor top; default 0 (a flight on a landing);
+                             // negative only on the lowest level (outdoor steps on down a slope)
   rise?: Inches;             // height it climbs; default floorToFloor - base (a short flight to a landing)
   risers?: number;           // step count; default round(rise / 7.5"), at least 1 (a landing is 1)
+  open?: boolean;            // outdoor steps: treads on two stringers, nothing under them
 }
 
 export interface Underlay {
@@ -301,14 +303,20 @@ instead). Then:
   of the level below run up through the slab, the edge stops at their inside face instead (see
   "Platform framing").
 - Stairs: one solid, the stepped side profile extruded across the width, per flight
-  (`buildStairsGeometry(stairs, rise, risers, base)`): `risers` = the flight's override, else
+  (`buildStairsGeometry(stairs, rise, risers, base, open)`): `risers` = the flight's override, else
   round(rise / 7.5"), at least 1; the first step `base` + one riser up, the last at `base + rise`
-  (flush with the floor above by default). The profile is solid from the floor up, so a flight
-  that starts on a landing has a block under it, not a void, and a one-riser landing is a box. In
-  2D a flight draws its own riser count; a landing draws its outline only (no treads, no UP arrow).
-  `addStairs` / `updateStairs` refuse a base below 0, a climb not above 0, a top more than 1" above
-  the floor above, or risers that are not a whole number from 1 to 100; the panel has "Starts at",
-  "Climbs" and "Risers" (blank follows the defaults, shown as placeholders).
+  (flush with the floor above by default). The profile is solid from the floor up (from its base
+  when that is below the floor), so a flight that starts on a landing has a block under it, not a
+  void, and a one-riser landing is a box. An `open` flight (outdoor steps) is treads on stringers
+  instead: each tread 1.5" thick between the stringers, and two 1.5" stringers 9.25" deep (square
+  to their slope) under the line from the bottom of the flight to its top, their feet cut level
+  with the bottom, nothing under them; the open steps of a deck stand on the deck's landing and
+  posts. In 2D a flight draws its own riser count; a landing draws its outline only (no treads, no
+  UP arrow). `addStairs` / `updateStairs` refuse a base below 0 (on the lowest level down to 600"
+  below the floor: outdoor steps that go on down a slope past it; `migrate` drops it elsewhere), a
+  climb not above 0, a top more than 1" above the floor above, or risers that are not a whole
+  number from 1 to 100; the panel has "Starts at" (negative allowed on the lowest level), "Climbs"
+  and "Risers" (blank follows the defaults, shown as placeholders), and "Open".
 
 `getLevelMeshes(plan, levelId, viewMode)` memoizes per level and view mode, reuses each wall's
 geometry while its footprint object, wall, openings list, height and context (bands, neighbour
@@ -539,8 +547,10 @@ small negative polygon offset so along the seam it wins the depth tie with the t
 outside the terrain that edge showed as a dark line). It is rebuilt whenever the terrain geometry is.
 
 The drei grid stays as an overlay
-("Grid" checkbox in the 3D bar, `uiStore.show3dGrid`, default on) 1" above the fallback elevation: with
-grade points the terrain is above it and hides it, which is the point (no z-fighting). Under the lowest
+("Grid" checkbox in the 3D bar, `uiStore.show3dGrid`, default on) 1" above the lowest ground
+(`lowestGround`: the fallback elevation, or the lowest grade point when that is lower): the terrain is
+above it and hides it, which is the point (no z-fighting, and it never floats over a lawn that goes
+below the lowest slab). Under the lowest
 level the ground sits 2" below its slab, so the basement interior is empty. The triangulated surface never
 leaves the range of the grade points' elevations, so with every grade point at or below the First Floor
 slab's underside (the "north pair at first floor top minus 12 inches" of the renovation scenario) the
@@ -1130,7 +1140,7 @@ colour, demolished translucent like walls, new pulled toward green. Fit 3D and t
 walk start count roof overhangs and roof tops in the scene bounds.
 The terrain is the ground (the lawn over the plan plus 100', and the far ground round it out to 1000', see
 "Site and terrain"); drei `<Grid>` (12" cells, 10'
-sections) is an overlay 1" above the flat fallback ground, toggled by the "Grid" checkbox in the 3D bar. Orbit (drei OrbitControls, makeDefault,
+sections) is an overlay 1" above the lowest ground (`lowestGround`), toggled by the "Grid" checkbox in the 3D bar. Orbit (drei OrbitControls, makeDefault,
 `maxDistance` 14000" so the camera stays inside the sky box)
 framing the plan's bounding box on first mount; Fit re-frames the visible levels. Overlay toolbar:
 level checkboxes, "Only active level and below", Grid, the view buttons (Perspective, N, S, E, W),
@@ -1324,10 +1334,15 @@ footprint and shares no space with another fixture (plan and height), and that `
 the island one 66 x 37 top.
 
 The proposed deck off the master bedroom is added through `deck()` (deck ids `f-d1` ...), from the
-retaining wall's east face to the wing's east face, its top at the retaining wall's (absolute -4);
-its stair is a new flight on the Basement whose top is one riser (96 / 13) under the boards, and
-today's wing stair is demolished. `example.test.ts` checks the outline, that the top equals the
-wall's, the supported edges, the two posts, the opening at the stair and the stair's height.
+retaining wall's east face to the wing's east face, its top at the retaining wall's (absolute -4).
+Its stair goes on down the bank south of the walkout (`BANK`, from photos 24 to 27: the ground at
+-100 4' out, -196 from 12'6" out) to the lower lawn: two open flights on the Basement of 12 risers
+of 96 / 13, each climbing to an edge that is its 13th, with a 3' landing (a deck at the Basement's
+floor, -100) between them; the lower flight starts 96" below the Basement floor. Today's wooden
+stair (photos 23 to 27: a flight up along the wing's east side, its landing and a flight down the
+bank, all open) is drawn as existing work and demolished. `example.test.ts` checks the outline,
+that the top equals the wall's, the supported edges, the two posts, the openings at both flights
+and the flights' heights against the deck, the landing and the lawn.
 
 ## Risks
 

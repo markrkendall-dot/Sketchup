@@ -519,6 +519,13 @@ export function fallbackElevation(plan: Plan): number {
   return id ? (getLevelElevations(plan)[id]?.slabBottom ?? 0) : 0;
 }
 
+/** The lowest ground: the flat ground used without grade points, or the lowest grade point when it is lower. */
+export function lowestGround(plan: Plan): number {
+  let low = fallbackElevation(plan);
+  for (const g of Object.values(plan.site.gradePoints)) low = Math.min(low, g.elevation);
+  return low;
+}
+
 /** A plan with nothing in it: the terrain still gets a 20' square to surround. */
 const EMPTY_BOUNDS: Bounds = { minX: 0, minY: 0, maxX: 240, maxY: 240 };
 

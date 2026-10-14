@@ -55,6 +55,16 @@ const ROOF_WING = '#6e4b3c';
 const CONCRETE_COLOR = '#b3b0a8';
 /** The retaining wall's centerline: about 10' south of the main block, from past its west face (photo 23). */
 const RETAIN = { y: ft(26) + 3 + ft(10), west: -120 };
+/**
+ * The bank south of the walkout (photos 24 to 27, estimates): the ground stays at the walkout's -100
+ * about 4' out from the wing's south face, then falls 8' (MK) to the lower lawn at -196, which is
+ * level from about 12'6" out (today's lower flight of 12 or 13 steps runs down it).
+ */
+const BANK = { top: ft(26) + 3 + ft(4), bottom: ft(26) + 3 + 150, lawn: -196 };
+/** The ground on the bank at y (in front of the walkout). */
+const bankAt = (y: number): number => (y <= BANK.top ? -100 : y >= BANK.bottom ? BANK.lawn : round2(-100 + ((BANK.lawn + 100) * (y - BANK.top)) / (BANK.bottom - BANK.top)));
+/** A riser of the outdoor steps: 13 to each 96" (the deck to the walkout's level, the walkout's level to the lower lawn). */
+const OUTDOOR_RISER = 96 / 13;
 /** The house door's dark green (photo 08). */
 const DOOR_GREEN = '#2f4a3a';
 /** The Bath's flush stained door (photo 22) and the grey Kitchen to Utility door (photos 13 and 14). */
@@ -440,9 +450,13 @@ export function buildExamplePlan(): Plan {
   }
   for (const y of [MAIN.y1 + 16, RETAIN.y - 16]) {
     gp(CL.x1 - 8, y, -6);
-    gp(CL.x1 + 8, y, -100);
+    gp(CL.x1 + 8, y, bankAt(y));
   }
-  gp((WING.x0 + WING.x1) / 2, WING.y1 + ft(10), -100);
+  // The bank south of the walkout and the lower lawn below it (BANK; photos 24 to 27): its top 4' out
+  // at -100, its foot 12'6" out at -196, and the lawn level out to about 40'.
+  for (const x of [(WING.x0 + WING.x1) / 2, WING.x1 + ft(4)]) gp(x, BANK.top, -100);
+  for (const x of [360, 445, 540]) gp(x, BANK.bottom, BANK.lawn);
+  for (const x of [360, 445, 560]) gp(x, WING.y1 + ft(40), BANK.lawn);
   // The walkout's threshold: the ground at the basement floor in front of the double door's two
   // jambs (6" out from the wall), so the doors open onto the terrace instead of into a bank.
   gp((WING.x0 + WING.x1) / 2 - 36, WING.y1 + 6, -100);
@@ -454,11 +468,17 @@ export function buildExamplePlan(): Plan {
   // the main block and the wing, then north to it. Its west end is free (an open end on the plan).
   const retaining = drawWalls(bId, [{ x: RETAIN.west, y: RETAIN.y }, { x: CL.x1, y: RETAIN.y }, { x: CL.x1, y: CL.y1 }], 10);
   store().updateWalls(bId, retaining, { finish: 'plain', color: CONCRETE_COLOR, heightOverride: 96 });
-  // The wooden stair along the wing's east side (photo 23): from the walkout's terrace up north to the
-  // lawn at the wing's north-east corner, 36" wide, 11 risers (an estimate; railings are not drawn).
-  // Photo 24 (from the lake road below) shows it from the south.
-  const wingStair = store().addStairs(bId, { origin: { x: WING.x1 + 22, y: WING.y1 - 6 }, direction: 270, width: 36, run: 110, rise: 80, risers: 11, phase: PHASE, cutsFloorAbove: false });
+  // The wooden stair along the wing's east side (photos 23 and 25): open treads on stringers, from a
+  // landing at the walkout's level beside the wing's south-east corner up north to the lawn at the
+  // wing's north-east corner, 36" wide, 11 risers; from the same landing a lower flight goes on south
+  // down the bank to the lower lawn, 13 risers with the landing's edge (photos 24 to 27). All
+  // estimates; its railings are not drawn, the landing's east one is.
+  const wingStair = store().addStairs(bId, { origin: { x: WING.x1 + 22, y: WING.y1 - 6 }, direction: 270, width: 36, run: 110, rise: 80, risers: 11, phase: PHASE, cutsFloorAbove: false, open: true });
   if (!wingStair) throw new Error('wing stair rejected');
+  const OLD_LANDING = { x0: WING.x1 + 4, x1: WING.x1 + 40, y0: WING.y1 - 6, y1: WING.y1 + 30 };
+  const wingLanding = deck(bId, { outline: outline(OLD_LANDING), elevation: 0, railings: [false, true, false, false], phase: PHASE });
+  const wingLowerFlight = store().addStairs(bId, { origin: { x: WING.x1 + 22, y: OLD_LANDING.y1 + 120 }, direction: 270, width: 36, run: 120, base: -96, rise: 12 * OUTDOOR_RISER, risers: 12, phase: PHASE, cutsFloorAbove: false, open: true });
+  if (!wingLowerFlight) throw new Error('wing lower flight rejected');
 
   // ---- Openings. Every window and door of the outside is an estimate from the photos (README, "What to
   // replace with measurements"); lites are per sash of a window and per leaf of a door. addOpeningAt
@@ -680,7 +700,7 @@ export function buildExamplePlan(): Plan {
   label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, PLACEHOLDER_ROOM);
   label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
 
-  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingSouth, wingStair, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
+  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingSouth, wingStair, wingLanding, wingLowerFlight, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
   return getPlan();
 }
 
@@ -698,8 +718,10 @@ interface ExistingIds {
   eastUpstairs: Id[];
   /** The wing's south window (the Utility's, over the walkout doors). */
   wingSouth: Id;
-  /** The wooden stair along the wing's east side (Basement), from the walkout up to the lawn. */
+  /** Today's wooden stair (Basement): the flight along the wing's east side, its landing (a deck) and the flight down the bank. */
   wingStair: Id;
+  wingLanding: Id;
+  wingLowerFlight: Id;
   wingRoof: Id;
   porchRoof: Id;
   /** The old bath's door (x 194.5, at the south end of the wall, y 54..84) and its north window (x 234). */
@@ -714,7 +736,7 @@ interface ExistingIds {
  * by a point on their centerline, rooms by name; a demolished wall takes its openings with it.
  * Throws when something named is not there.
  */
-function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; rooms?: string[] }): void {
+function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; rooms?: string[] }): void {
   const lvl = level(levelId);
   const walls = (d.walls ?? []).map((p) => wallAt(levelId, p).wallId);
   const openings = [...(d.openings ?? []), ...Object.values(lvl.openings).filter((o) => walls.includes(o.wallId)).map((o) => o.id)];
@@ -723,7 +745,7 @@ function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id
     if (!r) throw new Error(`no room ${name} on ${lvl.name}`);
     return r.id;
   });
-  const sel = { walls, openings, stairs: d.stairs ?? [], roofs: d.roofs ?? [], fixtures: d.fixtures ?? [], rooms };
+  const sel = { walls, openings, stairs: d.stairs ?? [], roofs: d.roofs ?? [], fixtures: d.fixtures ?? [], decks: d.decks ?? [], rooms };
   store().setPhase(levelId, sel, 'demo');
   const after = level(levelId);
   const phases = [
@@ -732,6 +754,7 @@ function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id
     ...sel.stairs.map((id) => after.stairs[id]?.phase),
     ...sel.roofs.map((id) => after.roofs[id]?.phase),
     ...sel.fixtures.map((id) => after.fixtures[id]?.phase),
+    ...sel.decks.map((id) => after.decks[id]?.phase),
     ...sel.rooms.map((id) => after.rooms[id]?.phase),
   ];
   if (phases.some((p) => p !== 'demo')) throw new Error(`demolish on ${lvl.name}: something was not marked`);
@@ -786,8 +809,8 @@ function proposed(ids: ExistingIds): void {
   // Second Floor: the two east windows. The wing's new shed roof rises to the main block's east wall
   // past their sills (34"), so high transoms replace them (below).
   demolish(ids.sId, { openings: ids.eastUpstairs });
-  // Basement: the wooden stair along the wing's east side (MK: the deck's stair replaces it).
-  demolish(bId, { stairs: [ids.wingStair] });
+  // Basement: today's wooden stair, both flights and its landing (MK: the deck's stair replaces it).
+  demolish(bId, { stairs: [ids.wingStair, ids.wingLowerFlight], decks: [ids.wingLanding] });
 
   // ---- 1. East addition: the wing grows north to the road corner at the same depth, one wing down
   // the whole east side, outside x 318..463, y 0..315. Its north wall continues the main block's,
@@ -929,15 +952,19 @@ function proposed(ids: ExistingIds): void {
   // lake-side terrace (-6) behind the wall steps straight onto it (photos 02, 23 and 24). The wall
   // and the house carry its west and north edges (no posts there, no railing); railings on the east
   // and south edges, open where its stair arrives. The stair leads south off the south edge's east
-  // end, 36" wide, down to the lower lawn at -100 (the walkout's level, an estimate: photo 24 shows
-  // the hill still falling past the walkout, and each 7.4" lower adds a riser and 10" of run): 13
-  // risers of 96 / 13 = 7.4", 12 of them in the flight (10" treads) and the deck's edge the 13th.
+  // end, 36" wide, open treads on stringers, all the way down to the lower lawn (MK), 8' under the
+  // walkout (BANK): 26 risers of 7.4" in two flights with a 3' landing between them at the
+  // walkout's level (-100), 8' over the lawn. Each flight has 12 risers (10" treads) and the edge it
+  // climbs to (the deck's, the landing's) is its 13th.
   const DECK_SOUTH = WING.y1 + ft(8);
   deck(fId, { outline: outline({ x0: CL.x1 + 5, x1: WING.x1, y0: WING.y1, y1: DECK_SOUTH }), elevation: -6, railings: [false, true, true, false], phase: NEW });
-  const DECK_RISER = 96 / 13;
-  flight({ origin: { x: WING.x1 - 18, y: DECK_SOUTH + 120 }, direction: 270, width: 36, run: 120, rise: 12 * DECK_RISER, risers: 12, cutsFloorAbove: false }, bId);
-  // The lower lawn at the stair's foot (the walkout's level, an estimate; see above).
-  if (!store().addGradePoint({ at: { x: WING.x1 - 18, y: DECK_SOUTH + 132 }, elevation: -100 })) throw new Error('grade point rejected');
+  const STAIR_X = WING.x1 - 18;
+  const LANDING = { y0: DECK_SOUTH + 120, y1: DECK_SOUTH + 156 };
+  const outdoor = { direction: 270, width: 36, run: 120, rise: 12 * OUTDOOR_RISER, risers: 12, cutsFloorAbove: false, open: true } as const;
+  flight({ ...outdoor, origin: { x: STAIR_X, y: LANDING.y0 } }, bId);
+  // The landing: a 3' square deck on posts, railed on its east and west sides, open to both flights.
+  deck(bId, { outline: outline({ x0: STAIR_X - 18, x1: STAIR_X + 18, y0: LANDING.y0, y1: LANDING.y1 }), elevation: 0, railings: [false, true, false, true], phase: NEW });
+  flight({ ...outdoor, origin: { x: STAIR_X, y: LANDING.y1 + 120 }, base: -96 }, bId);
 
   // ---- 2. The kitchen (docs/history/PLAN-v5-kitchen.md): the main kitchen x 173..311, y 102..308
   // inside, and the old bath's alcove x 197..311, y 7..97, open to it along y 97..102. All new;

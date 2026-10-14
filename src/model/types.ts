@@ -121,12 +121,17 @@ export interface Stairs {
   headroom?: Inches;
   /** Where the floor opening starts, along the run from the bottom; overrides the headroom rule. */
   holeStart?: Inches;
-  /** Height of the bottom of the flight above the floor top (default 0): a flight that starts on a landing. */
+  /**
+   * Height of the bottom of the flight above the floor top (default 0): a flight that starts on a
+   * landing. On the lowest level it may be negative: outdoor steps that go on down a slope.
+   */
   base?: Inches;
   /** Height the flight climbs (default floor-to-floor minus base): a short flight up to a landing. */
   rise?: Inches;
   /** Number of risers (default round(rise / 7.5), at least 1): a landing is one riser with one deep tread. */
   risers?: number;
+  /** Open stairs (outdoor steps): treads on two stringers, nothing under them. Absent: solid down to the floor. */
+  open?: boolean;
 }
 
 export type RoofShape = 'gable' | 'shed' | 'hip' | 'flat';

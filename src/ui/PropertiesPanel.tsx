@@ -1070,6 +1070,8 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
     const i = s.plan.levelOrder.indexOf(level.id);
     return s.plan.levels[s.plan.levelOrder[i + 1]]?.name ?? null;
   });
+  // Only the lowest level's flights may start below the floor (outdoor steps down a slope).
+  const lowest = usePlanStore((s) => s.plan.levelOrder[0] === level.id);
   const base = stairsBase(stairs);
   const climb = stairsRise(stairs, ftf);
   const { risers, rise } = flightSteps(stairs, ftf);
@@ -1077,7 +1079,7 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
   const tread = stairs.run / risers;
   // Base, climb and riser count, checked together (derive/stairs.ts stairsHeightProblem).
   const setHeights = (patch: Pick<Partial<Stairs>, 'base' | 'rise' | 'risers'>): string | null => {
-    const problem = stairsHeightProblem({ ...stairs, ...patch }, ftf);
+    const problem = stairsHeightProblem({ ...stairs, ...patch }, ftf, lowest);
     if (problem) return problem[0].toUpperCase() + problem.slice(1) + ` (floor to floor here is ${formatLength(ftf, denom)}).`;
     updateStairs(level.id, stairs.id, patch);
     return null;
@@ -1119,11 +1121,15 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
       <LengthField
         label="Starts at"
         value={stairs.base}
-        bound="nonnegative"
+        bound={lowest ? 'any' : 'nonnegative'}
         allowEmpty
         placeholder={`${formatLength(0, denom)} (the floor)`}
         onCommit={(v) => setHeights({ base: v ?? undefined })}
-        hint="Height of the bottom of the flight above the floor, e.g. on a landing."
+        hint={
+          lowest
+            ? 'Height of the bottom of the flight above the floor, e.g. on a landing; negative for outdoor steps that go on down a slope.'
+            : 'Height of the bottom of the flight above the floor, e.g. on a landing.'
+        }
       />
       <LengthField
         label="Climbs"
@@ -1155,10 +1161,22 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         />
         Cuts the floor above{aboveName ? ` (${aboveName})` : ''}
       </label>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          aria-label="Open"
+          checked={!!stairs.open}
+          onChange={(e) => {
+            updateStairs(level.id, stairs.id, { open: e.target.checked ? true : undefined });
+            releaseFocus(e.currentTarget);
+          }}
+        />
+        Open (treads on stringers, for outdoor steps)
+      </label>
       {stairs.cutsFloorAbove && <StairsOpeningFields level={level} stairs={stairs} ftf={ftf} />}
       <ReadOnly label="Step depth">{formatLength(tread, denom)}</ReadOnly>
       <p className="panel-note">
-        {base > 0 || stairs.rise !== undefined
+        {base !== 0 || stairs.rise !== undefined
           ? `Climbs ${formatLength(climb, denom)}, from ${formatLength(base, denom)} to ${formatLength(base + climb, denom)} above the floor (${formatLength(ftf, denom)} floor top to floor top).`
           : `Rises ${formatLength(ftf, denom)}, floor top to floor top.`}{' '}
         Drag with the select tool to move.

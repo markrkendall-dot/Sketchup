@@ -96,10 +96,11 @@ describe('docs/examples/146-mick-road.json', () => {
     // (MK), so no new one is cut.
     expect(count(all('walls'))).toEqual({ existing: 57, demo: 7, new: 20 });
     expect(count(all('openings'))).toEqual({ existing: 18, demo: 14, new: 21 });
-    // The demolished stairs: today's flight, and the wooden stair along the wing's east side (the
-    // deck's stair replaces it). New: the two short flights and the main flight, and the deck's stair.
-    expect(count(all('stairs'))).toEqual({ existing: 0, demo: 2, new: 4 });
-    expect(count(all('decks'))).toEqual({ existing: 0, demo: 0, new: 1 });
+    // The demolished stairs: today's flight, and the wooden stair's two flights (along the wing's east
+    // side and down the bank) with its landing (a deck); the deck's stair replaces them. New: the two
+    // short flights and the main flight, and the deck stair's two flights and their landing.
+    expect(count(all('stairs'))).toEqual({ existing: 0, demo: 3, new: 5 });
+    expect(count(all('decks'))).toEqual({ existing: 0, demo: 1, new: 2 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
     expect(count(all('rooms'))).toEqual({ existing: 11, demo: 3, new: 8 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen
@@ -294,8 +295,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // The porch: screens in its four bays and a screen door.
     expect(openings.filter((o) => o.glazing === 'screen').map((o) => `${o.type} ${o.width}`).sort()).toEqual(['door 36', 'window 18', 'window 18', 'window 44', 'window 44']);
     expect(Object.values(plan.levels[plan.levelOrder[1]].rooms).some((r) => r.name === 'Entry porch (est.)')).toBe(true);
-    // 33 from the photos and MK, and the lower lawn at the deck stair's foot.
-    expect(Object.keys(plan.site.gradePoints)).toHaveLength(34);
+    // 32 from the photos and MK, and 8 for the bank below the walkout and the lower lawn (photos 24 to 27).
+    expect(Object.keys(plan.site.gradePoints)).toHaveLength(40);
     // The lake-side terrace is filled in level at -6 from the house's south face to the retaining
     // wall, and from the wall's free west end to the wing (MK); the ground along the house's other
     // faces stays within a foot of the first floor (no sag between grade points).
@@ -494,11 +495,24 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(layout.supported).toEqual([true, false, false, true]);
     expect(layout.posts).toHaveLength(2);
     expect(layout.openings.map((o) => [o.edge, o.from, o.to])).toEqual([[2, 0, 36]]);
-    // The stair: 12 risers of 96 / 13 up to 7.4" under the boards, the deck's edge the 13th.
-    const stair = plan.levels[b].stairs[layout.openings[0].stairsId];
-    expect(stair).toMatchObject({ width: 36, run: 120, risers: 12, direction: 270, phase: 'new' });
-    expect(elev[b].floorTop + stairsBase(stair) + stair.rise! + 96 / 13).toBeCloseTo(top, 9);
-    expect(groundAt(plan, stair.origin)).toBeCloseTo(-100, 6);
+    // The stair goes on down to the lower lawn, 8' under the walkout (MK): two open flights of 12
+    // risers of 96 / 13, each climbing to an edge that is its 13th, with a 3' landing (a deck) at the
+    // walkout's level between them.
+    const upper = plan.levels[b].stairs[layout.openings[0].stairsId];
+    expect(upper).toMatchObject({ width: 36, run: 120, risers: 12, direction: 270, phase: 'new', open: true });
+    expect(elev[b].floorTop + stairsBase(upper) + upper.rise! + 96 / 13).toBeCloseTo(top, 9);
+    const landings = Object.values(plan.levels[b].decks).filter((d) => d.phase === 'new');
+    expect(landings).toHaveLength(1);
+    const [landing] = landings;
+    expect(landing).toMatchObject({ elevation: 0, railings: [false, true, false, true] });
+    expect(elev[b].floorTop + stairsBase(upper)).toBe(elev[b].floorTop + landing.elevation);
+    const landingLayout = getDeckLayout(plan, b, landing.id, 'proposed')!;
+    expect(landingLayout.posts).toHaveLength(4);
+    const lower = plan.levels[b].stairs[landingLayout.openings[0].stairsId];
+    expect(lower).toMatchObject({ base: -96, risers: 12, open: true });
+    expect(elev[b].floorTop + lower.base! + lower.rise! + 96 / 13).toBeCloseTo(elev[b].floorTop + landing.elevation, 9);
+    expect(groundAt(plan, lower.origin)).toBeCloseTo(elev[b].floorTop + lower.base!, 6);
+    expect(groundAt(plan, lower.origin)).toBe(-196);
   });
 
   it('has the roofs and posts of the proposed design', () => {

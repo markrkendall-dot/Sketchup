@@ -55,14 +55,20 @@ export const stairsRise = (s: Pick<Stairs, 'base' | 'rise'>, floorToFloor: numbe
 export const flightSteps = (s: Pick<Stairs, 'base' | 'rise' | 'risers'>, floorToFloor: number): StairSteps =>
   stairSteps(stairsRise(s, floorToFloor), s.risers);
 
+/** How far below the lowest level's floor a flight may start (outdoor steps down a slope). */
+export const MAX_STAIRS_BELOW = 600;
+
 /**
  * Why the height fields of a flight cannot be used on a level `floorToFloor` high, or null: the
- * base must not be negative, the climb must be positive, the top (base + climb) at most an inch
+ * base must not be negative (on the `lowest` level it may be, down to MAX_STAIRS_BELOW: outdoor
+ * steps that go on down a slope), the climb must be positive, the top (base + climb) at most an inch
  * above the floor above, and risers a whole number from 1 to MAX_STAIRS_RISERS. Lower case, like
  * columnProblem; the panel capitalizes it.
  */
-export function stairsHeightProblem(s: Pick<Stairs, 'base' | 'rise' | 'risers'>, floorToFloor: number): string | null {
-  if (s.base !== undefined && !(Number.isFinite(s.base) && s.base >= 0)) return 'the bottom of the flight must not be below the floor';
+export function stairsHeightProblem(s: Pick<Stairs, 'base' | 'rise' | 'risers'>, floorToFloor: number, lowest = false): string | null {
+  if (s.base !== undefined && !Number.isFinite(s.base)) return 'the bottom of the flight must be a number';
+  if (s.base !== undefined && s.base < 0 && !lowest) return 'the bottom of the flight must not be below the floor (only the lowest level\'s outdoor steps may go below it)';
+  if (s.base !== undefined && s.base < -MAX_STAIRS_BELOW) return `the bottom of the flight must not be more than ${MAX_STAIRS_BELOW}" below the floor`;
   if (s.rise !== undefined && !(Number.isFinite(s.rise) && s.rise > 0)) return 'the climb must be greater than 0';
   if (s.risers !== undefined && !stairsRisersOk(s.risers)) return `risers must be a whole number from 1 to ${MAX_STAIRS_RISERS}`;
   const rise = stairsRise(s, floorToFloor);

@@ -16,6 +16,7 @@ import {
   STAIRS_HEADROOM,
   stairSteps,
 } from '../derive/stairs';
+import { buildStairsGeometry, triangleCount } from '../derive/meshes';
 import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
 import example from '../../docs/examples/146-mick-road.json';
@@ -337,5 +338,49 @@ describe('short flights and landings: base, rise and risers', () => {
     // Clearing the climb is checked too: from a base of 14" the rest of the way up is fine.
     store().updateStairs(levelId(), id, { rise: undefined });
     expect(stairsRise(level().stairs[id], 108)).toBe(94);
+  });
+});
+
+describe('outdoor stairs: below the lowest floor, open', () => {
+  const lowestId = () => store().plan.levelOrder[0];
+
+  it('a flight on the lowest level may start below its floor; on any other level it may not', () => {
+    // 13 risers from 96" below the basement floor up to the floor: outdoor steps down a slope.
+    const down = flight({ origin: { x: 100, y: 400 }, base: -96, rise: 88, risers: 12, cutsFloorAbove: false });
+    const id = store().addStairs(lowestId(), down)!;
+    expect(store().plan.levels[lowestId()].stairs[id]).toMatchObject({ base: -96, rise: 88 });
+    expect(store().addStairs(levelId(), down)).toBeNull();
+    expect(stairsHeightProblem({ base: -96 }, 108)).toMatch(/must not be below the floor/);
+    expect(stairsHeightProblem({ base: -96, rise: 88 }, 108, true)).toBeNull();
+    expect(stairsHeightProblem({ base: -601, rise: 88 }, 108, true)).toMatch(/more than 600/);
+    // A file keeps it on the lowest level and drops it elsewhere.
+    const doc = JSON.parse(JSON.stringify(store().plan));
+    const first = doc.levelOrder[1];
+    doc.levels[first].stairs.up = { ...down, id: 'up' };
+    const loaded = migrate(doc);
+    expect(loaded.levels[lowestId()].stairs[id].base).toBe(-96);
+    expect('base' in loaded.levels[first].stairs.up).toBe(false);
+  });
+
+  it('open stairs are treads on two stringers, nothing below the bottom of the flight; solid ones fill down to it', () => {
+    const s = flight({ run: 120, width: 36 });
+    const box = (g: ReturnType<typeof buildStairsGeometry>) => {
+      g.computeBoundingBox();
+      return g.boundingBox!;
+    };
+    const open = buildStairsGeometry(s, 7.5, 12, -96, true);
+    // 12 treads and 2 stringers (each a four-sided prism: 12 triangles).
+    expect(triangleCount(open)).toBe(12 * 12 + 2 * 12);
+    expect(box(open).min.y).toBeCloseTo(-96, 6);
+    expect(box(open).max.y).toBeCloseTo(-96 + 90, 6);
+    const solid = buildStairsGeometry(s, 7.5, 12, -96);
+    expect(box(solid).min.y).toBeCloseTo(-96, 6);
+    // From the floor, a solid flight still fills down to the floor.
+    expect(box(buildStairsGeometry(s, 7.5, 12, 14)).min.y).toBeCloseTo(0, 6);
+    // The store keeps the flag and clears it with undefined.
+    const id = store().addStairs(levelId(), flight({ open: true }))!;
+    expect(level().stairs[id].open).toBe(true);
+    store().updateStairs(levelId(), id, { open: undefined });
+    expect('open' in level().stairs[id]).toBe(false);
   });
 });

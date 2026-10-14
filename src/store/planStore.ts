@@ -161,14 +161,15 @@ export interface PlanState {
   deleteRooms: (levelId: Id, ids: Id[]) => void;
   /**
    * Add stairs; returns the id, or null when the size or position is not usable, or the heights are
-   * not (derive/stairs.ts stairsHeightProblem: base below the floor, a climb not above 0, a top more
-   * than 1" above the floor above, risers not a whole number from 1 to 100).
+   * not (derive/stairs.ts stairsHeightProblem: base below the floor (allowed on the lowest level, for
+   * outdoor steps down a slope), a climb not above 0, a top more than 1" above the floor above,
+   * risers not a whole number from 1 to 100).
    */
   addStairs: (levelId: Id, stairs: NewStairs) => Id | null;
   /**
    * Patch stairs; invalid sizes are rejected, the direction is normalized to [0, 360). Heights are
-   * checked like addStairs when the patch changes one. `headroom`, `holeStart`, `base`, `rise` and
-   * `risers` take undefined to clear them.
+   * checked like addStairs when the patch changes one. `headroom`, `holeStart`, `base`, `rise`,
+   * `risers` and `open` take undefined to clear them.
    */
   updateStairs: (levelId: Id, id: Id, patch: StairsPatch) => void;
   deleteStairs: (levelId: Id, ids: Id[]) => void;
@@ -761,14 +762,14 @@ export const usePlanStore = create<PlanState>()(
         addStairs: (levelId, input) => {
           let id: Id | null = null;
           editLevel(levelId, (level, plan) => {
-            if (!validStairs(input) || stairsHeightProblem(input, floorToFloor(plan, levelId))) return false;
+            if (!validStairs(input) || stairsHeightProblem(input, floorToFloor(plan, levelId), plan.levelOrder[0] === levelId)) return false;
             const stairs: Stairs = {
               ...input,
               id: input.id ?? newId(),
               origin: { x: input.origin.x, y: input.origin.y },
               direction: normalizeDegrees(input.direction),
             };
-            for (const k of ['headroom', 'holeStart', ...STAIRS_HEIGHT_KEYS] as const) if (stairs[k] === undefined) delete stairs[k];
+            for (const k of ['headroom', 'holeStart', 'open', ...STAIRS_HEIGHT_KEYS] as const) if (stairs[k] === undefined) delete stairs[k];
             level.stairs[stairs.id] = stairs;
             id = stairs.id;
           });
@@ -783,7 +784,7 @@ export const usePlanStore = create<PlanState>()(
             if (!validStairs(next, { width: patch.width !== undefined, run: patch.run !== undefined })) return false;
             // Heights are checked when they change, so an older flight can still move or change phase
             // after the level's height changed under it.
-            if (STAIRS_HEIGHT_KEYS.some((k) => k in patch) && stairsHeightProblem(next, floorToFloor(plan, levelId))) return false;
+            if (STAIRS_HEIGHT_KEYS.some((k) => k in patch) && stairsHeightProblem(next, floorToFloor(plan, levelId), plan.levelOrder[0] === levelId)) return false;
             if (patch.origin) st.origin = { x: patch.origin.x, y: patch.origin.y };
             if (patch.direction !== undefined) st.direction = normalizeDegrees(patch.direction);
             if (patch.width !== undefined) st.width = patch.width;
@@ -791,13 +792,17 @@ export const usePlanStore = create<PlanState>()(
             if (patch.phase !== undefined) st.phase = patch.phase;
             if (patch.cutsFloorAbove !== undefined) st.cutsFloorAbove = patch.cutsFloorAbove;
             // Optional fields: undefined clears them (back to the headroom rule / 80", a flight from the
-            // floor to the floor above, the 7.5" riser rule).
+            // floor to the floor above, the 7.5" riser rule, a solid flight).
             for (const k of ['headroom', 'holeStart', ...STAIRS_HEIGHT_KEYS] as const) {
               if (!(k in patch)) continue;
               const v = patch[k];
               if (v === undefined) {
                 if (k in st) delete st[k];
               } else if (st[k] !== v) st[k] = v;
+            }
+            if ('open' in patch) {
+              if (patch.open === undefined) delete st.open;
+              else if (st.open !== patch.open) st.open = patch.open;
             }
           }),
 
