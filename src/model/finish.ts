@@ -1,4 +1,4 @@
-import type { Column, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, Wall, WallFinish, WallKind } from './types';
+import type { Column, Deck, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
@@ -139,6 +139,10 @@ export const glazingOf = (o: Pick<Opening, 'glazing'>): Glazing => o.glazing ?? 
 export const isSlidingDoor = (o: Pick<Opening, 'type' | 'sliding'>): boolean => o.type === 'door' && !!o.sliding;
 /** How far a sliding door's two panels overlap at the middle (where they meet in their tracks). */
 export const SLIDING_LAP = 2;
+
+/** A deck's boards, framing and railing: weathered wood. */
+export const DECK_COLOR = '#9c7650';
+export const deckColorOf = (d: Pick<Deck, 'color'>): string => d.color ?? DECK_COLOR;
 export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColor ?? DEFAULT_LEAF_COLOR;
 
 /** Column colours by kind: brick red for a chimney, trim tan for a post. */

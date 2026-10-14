@@ -2,6 +2,8 @@ import { Box3, type BufferGeometry, type Mesh, type MeshStandardMaterial } from 
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildExampleJson } from '../../scripts/example-plan';
 import example from '../../docs/examples/146-mick-road.json';
+import { getDeckLayout } from '../derive/decks';
+import { getLevelElevations } from '../derive/levels';
 import { shutterWidth, SILL_THICKNESS } from '../derive/openings3d';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { roofBearing, roofExtremes, roofHeightAt } from '../derive/roofs';
@@ -83,7 +85,7 @@ describe('docs/examples/146-mick-road.json', () => {
       for (const x of items) out[x.phase ?? 'existing']++;
       return out;
     };
-    const all = <K extends 'walls' | 'openings' | 'stairs' | 'roofs' | 'rooms' | 'fixtures'>(k: K) => levels.flatMap((l) => Object.values(l[k]));
+    const all = <K extends 'walls' | 'openings' | 'stairs' | 'roofs' | 'rooms' | 'fixtures' | 'decks'>(k: K) => levels.flatMap((l) => Object.values(l[k]));
     // Walls: the old porch's three (the foyer's north wall splits its west wall in two), the wing's
     // north wall and the two y 99.5 pieces are demolished; the new ones are the addition, its
     // partition, the foyer, the screen porch, the powder room, the closet's west wall (which splits
@@ -94,8 +96,10 @@ describe('docs/examples/146-mick-road.json', () => {
     // (MK), so no new one is cut.
     expect(count(all('walls'))).toEqual({ existing: 57, demo: 7, new: 20 });
     expect(count(all('openings'))).toEqual({ existing: 18, demo: 14, new: 21 });
-    // The demolished stair; the wing's outside stair on the Basement stays.
-    expect(count(all('stairs'))).toEqual({ existing: 1, demo: 1, new: 3 });
+    // The demolished stairs: today's flight, and the wooden stair along the wing's east side (the
+    // deck's stair replaces it). New: the two short flights and the main flight, and the deck's stair.
+    expect(count(all('stairs'))).toEqual({ existing: 0, demo: 2, new: 4 });
+    expect(count(all('decks'))).toEqual({ existing: 0, demo: 0, new: 1 });
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
     expect(count(all('rooms'))).toEqual({ existing: 11, demo: 3, new: 8 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen
@@ -290,7 +294,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // The porch: screens in its four bays and a screen door.
     expect(openings.filter((o) => o.glazing === 'screen').map((o) => `${o.type} ${o.width}`).sort()).toEqual(['door 36', 'window 18', 'window 18', 'window 44', 'window 44']);
     expect(Object.values(plan.levels[plan.levelOrder[1]].rooms).some((r) => r.name === 'Entry porch (est.)')).toBe(true);
-    expect(Object.keys(plan.site.gradePoints)).toHaveLength(33);
+    // 33 from the photos and MK, and the lower lawn at the deck stair's foot.
+    expect(Object.keys(plan.site.gradePoints)).toHaveLength(34);
     // The lake-side terrace is filled in level at -6 from the house's south face to the retaining
     // wall, and from the wall's free west end to the wing (MK); the ground along the house's other
     // faces stays within a foot of the first floor (no sag between grade points).
@@ -463,6 +468,37 @@ describe('docs/examples/146-mick-road.json', () => {
     const hole = (h: Vec2[]) => Math.abs(polygonSignedArea(h));
     const oldHole = hole(stairHoles(f, 'existing', ftf)[0]);
     expect(top('existing') - top('proposed')).toBeCloseTo(hole(holes[0]) - oldHole, 0);
+  });
+
+  it("has the master bedroom's deck: from the terrace's wall to the wing's east face, flush with the wall's top, its stair down to the lawn", () => {
+    const [b, f] = plan.levelOrder;
+    const decks = Object.values(plan.levels[f].decks);
+    expect(decks).toHaveLength(1);
+    const [deck] = decks;
+    expect(deck).toMatchObject({ elevation: -6, railings: [false, true, true, false], phase: 'new' });
+    expect(deck.outline).toEqual([
+      { x: 319.5, y: 315 },
+      { x: 463, y: 315 },
+      { x: 463, y: 411 },
+      { x: 319.5, y: 411 },
+    ]);
+    // Its top, 6" below the bedroom floor, is the retaining wall's top (the basement floor plus 96").
+    const elev = getLevelElevations(plan);
+    const top = elev[f].floorTop + deck.elevation;
+    expect(top).toBe(-4);
+    const retaining = Object.values(plan.levels[b].walls).filter((w) => w.heightOverride !== undefined);
+    expect(retaining.map((w) => elev[b].floorTop + w.heightOverride!)).toEqual([top, top]);
+    // The house carries its north edge and the retaining wall its west edge; two posts (the
+    // south-east corner and the middle of the south edge); the stair opens the south railing.
+    const layout = getDeckLayout(plan, f, deck.id, 'proposed')!;
+    expect(layout.supported).toEqual([true, false, false, true]);
+    expect(layout.posts).toHaveLength(2);
+    expect(layout.openings.map((o) => [o.edge, o.from, o.to])).toEqual([[2, 0, 36]]);
+    // The stair: 12 risers of 96 / 13 up to 7.4" under the boards, the deck's edge the 13th.
+    const stair = plan.levels[b].stairs[layout.openings[0].stairsId];
+    expect(stair).toMatchObject({ width: 36, run: 120, risers: 12, direction: 270, phase: 'new' });
+    expect(elev[b].floorTop + stairsBase(stair) + stair.rise! + 96 / 13).toBeCloseTo(top, 9);
+    expect(groundAt(plan, stair.origin)).toBeCloseTo(-100, 6);
   });
 
   it('has the roofs and posts of the proposed design', () => {
@@ -696,7 +732,7 @@ describe('docs/examples/146-mick-road.json', () => {
     const root = buildExportScene(plan, 'all', visibility);
     const names = new Set<string>();
     root.traverse((o) => names.add(o.name.replace(/ \d+.*$/, '')));
-    for (const n of ['Roof', 'Rafters', 'Fascia', 'Chimney', 'Terrain', 'Window', 'Door', 'Floor']) expect(names, n).toContain(n);
+    for (const n of ['Roof', 'Rafters', 'Fascia', 'Chimney', 'Terrain', 'Window', 'Door', 'Floor', 'Deck', 'Deck framing', 'Deck railing']) expect(names, n).toContain(n);
     // The chimney's shaft, cap and spark arrestor.
     const site = root.children.find((c) => c.name === 'Site')!;
     expect(site.children.filter((c) => c.name === 'Chimney').map((c) => ((c as Mesh).material as MeshStandardMaterial).name)).toEqual([

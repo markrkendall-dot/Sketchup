@@ -554,6 +554,87 @@ export const PLAN_RULES = `.wall-exterior {
   stroke: rgba(113, 113, 122, 0.8);
 }
 
+/* Decks --------------------------------------------------------------------------------------- */
+
+/* Light wood with thin board joints; the railing a band; posts small dashed squares (they are
+   under the boards). */
+.deck .deck-fill {
+  fill: rgba(156, 118, 80, 0.16);
+  stroke: #7a5c48;
+  stroke-width: 1.4;
+}
+
+.deck .deck-boards {
+  fill: none;
+  stroke: rgba(122, 92, 72, 0.35);
+  stroke-width: 0.8;
+}
+
+.deck .deck-rail {
+  fill: rgba(122, 92, 72, 0.55);
+  stroke: #5c4434;
+  stroke-width: 1;
+}
+
+.deck .deck-post {
+  fill: none;
+  stroke: #5c4434;
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.deck .deck-name {
+  font-size: 12px;
+  font-weight: 650;
+  fill: #5c4434;
+}
+
+.deck .deck-top {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  fill: #6b5446;
+}
+
+.deck .deck-label text {
+  stroke: var(--canvas);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.deck.phase-new .deck-fill {
+  fill: rgba(63, 143, 95, 0.12);
+  stroke: var(--new-edge);
+}
+
+.deck.phase-new .deck-rail {
+  fill: rgba(63, 143, 95, 0.45);
+  stroke: var(--new-edge);
+}
+
+.deck.phase-demo .deck-fill {
+  fill: url(#hp-hatch-demo);
+  fill-opacity: 0.55;
+  stroke: var(--demo);
+}
+
+.deck.phase-demo .deck-rail {
+  fill: none;
+  stroke: var(--demo);
+}
+
+.deck.is-selected .deck-fill,
+.deck.is-selected .deck-rail {
+  stroke: var(--accent);
+  stroke-width: 1.8;
+}
+
+.deck-handle {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
 /* Site (grade points, columns, north) --------------------------------------------------------- */
 
 /* The first floor under the site layer: clearer than the level-below ghost. */

@@ -1272,28 +1272,34 @@ button.primary:hover:not(:disabled) {
   }
 }
 
-/* Roof tool: the outline being drawn. */
-.roof-draft-line {
+/* Roof and deck tools: the outline being drawn (a deck's in wood brown). */
+.outline-draft-line {
   fill: none;
   stroke: #9a3412;
   stroke-width: 1.75;
 }
 
-.roof-draft-close {
+.outline-draft-close {
   fill: none;
   stroke: #9a3412;
   stroke-width: 1.25;
   stroke-dasharray: 4 4;
 }
 
-.roof-draft-point {
+.outline-draft-point {
   fill: #fff;
   stroke: #9a3412;
   stroke-width: 1.5;
 }
 
-.roof-draft-point.first.closable {
+.outline-draft-point.first.closable {
   fill: #fed7aa;
+}
+
+.outline-draft.deck .outline-draft-line,
+.outline-draft.deck .outline-draft-close,
+.outline-draft.deck .outline-draft-point {
+  stroke: #7a5c48;
 }
 
 .ridge-buttons button {

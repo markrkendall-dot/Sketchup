@@ -4,13 +4,13 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
 import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
-import { getLevelMeshes, getSiteMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getLevelMeshes, getSiteMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
 import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
-import { COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import { COLUMN_COLOR, DECK_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FixtureKind, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -42,6 +42,11 @@ const roofMaterialName = (finish: RoofFinish, phase: Phase, color: string) =>
 /** `fascia_<phase>` and `rafter_<phase>` in tan, `..._<hex>` in another board colour (a demolished one is red whatever its colour). */
 const boardMaterialName = (part: 'fascia' | 'rafter', phase: Phase, color: string) =>
   phase === 'demo' || color === TRIM_COLOR ? `${part}_${phase}` : `${part}_${phase}_${color.slice(1)}`;
+/** `deck_<phase>` and `deck_frame_<phase>` in the default wood, `..._<hex>` in another colour (a demolished deck is red whatever its colour). */
+const deckMaterialName = (part: 'boards' | 'frame', phase: Phase, color: string) => {
+  const base = part === 'frame' ? 'deck_frame' : 'deck';
+  return phase === 'demo' || color === DECK_COLOR ? `${base}_${phase}` : `${base}_${phase}_${color.slice(1)}`;
+};
 const OPENING_MATERIAL: Record<FillPart, string> = { trim: 'trim', sash: 'sash', glass: 'glass', screen: 'screen', leaf: 'door_leaf', shutter: 'shutter' };
 /** The default colour of the parts that can take their own (the leaf, the trim, the sash). */
 const PART_DEFAULT: Partial<Record<FillPart, string>> = { leaf: DEFAULT_LEAF_COLOR, trim: TRIM_COLOR, sash: DEFAULT_SASH_COLOR };
@@ -74,7 +79,9 @@ const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sin
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
  * with one group per visible level at its floor-top elevation holding `Wall <n> (<kind>, <phase>)`,
  * `Floor`, `Stairs`, `Roof` (with its `Fascia` boards and, under open eaves, its `Rafters`, materials
- * `fascia_<phase>` and `rafter_<phase>`, plus `_<hex>` in a board colour other than tan), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
+ * `fascia_<phase>` and `rafter_<phase>`, plus `_<hex>` in a board colour other than tan), `Deck`, `Deck framing` (with the
+ * posts) and `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour other than
+ * the default wood), and `Window` / `Door` meshes (one per material part: `trim`, `sash`, `glass`, `screen`, `door_leaf` or `door_leaf_<hex>`, `shutter`). Colours only: no texture or normal map is exported, a textured material's flat colour (`userData.flatColor`) is. Levels with nothing to show are left out. A `Site` group (at
  * elevation 0, absolute heights) follows with the `Chimney` and `Post` meshes the view mode shows
  * (materials `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the default; a capped
  * chimney's cap and spark arrestor are more `Chimney` meshes, `chimney_cap_<phase>` and
@@ -113,7 +120,8 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
   for (const id of visible3dLevels(plan.levelOrder, levelVisibility)) {
     const level = plan.levels[id];
     const meshes = getLevelMeshes(plan, id, viewMode);
-    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length)) continue;
+    const decks = getDeckMeshes(plan, id, viewMode);
+    if (!level || (!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length)) continue;
     const group = new Group();
     group.name = level.name;
     group.position.set(0, elev[id]?.floorTop ?? 0, 0);
@@ -150,6 +158,19 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         const t = mesh('Rafters', r.rafters, material(boardMaterialName('rafter', r.phase, r.boardColor), rafterMaterial(r.phase, r.boardColor)));
         if (r.phase === 'demo') t.renderOrder = 1;
         group.add(t);
+      }
+    }
+    // Decks: the boards, the framing with its posts, the railing.
+    for (const d of decks) {
+      for (const [name, geometry, part] of [
+        ['Deck', d.boards, 'boards'],
+        ['Deck framing', d.frame, 'frame'],
+        ['Deck railing', d.railing, 'boards'],
+      ] as const) {
+        if (!geometry) continue;
+        const m = mesh(name, geometry, material(deckMaterialName(part, d.phase, d.color), deckMaterial(part, d.phase, d.color)));
+        if (d.phase === 'demo') m.renderOrder = 1;
+        group.add(m);
       }
     }
     // Windows and doors: one mesh per material part, named Window or Door.
@@ -243,7 +264,7 @@ export async function downloadExport(
 ): Promise<void> {
   const root = buildExportScene(plan, viewMode, levelVisibility);
   try {
-    if (!root.children.length) throw new Error('Nothing to export: the visible levels have no walls, floors, stairs, roofs or site elements.');
+    if (!root.children.length) throw new Error('Nothing to export: the visible levels have no walls, floors, stairs, roofs, decks or site elements.');
     const blob =
       format === 'glb'
         ? new Blob([await toGlb(root)], { type: 'model/gltf-binary' })

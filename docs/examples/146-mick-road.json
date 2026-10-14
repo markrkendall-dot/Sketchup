@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "plan-146-mick-road",
   "name": "146 Mick Road (starter, estimates flagged)",
   "levelOrder": [
@@ -329,13 +329,28 @@
           "run": 110,
           "rise": 80,
           "risers": 11,
-          "phase": "existing",
+          "phase": "demo",
           "cutsFloorAbove": false,
           "id": "b-s1"
+        },
+        "b-s2": {
+          "origin": {
+            "x": 445,
+            "y": 531
+          },
+          "direction": 270,
+          "width": 36,
+          "run": 120,
+          "rise": 88.61538461538461,
+          "risers": 12,
+          "cutsFloorAbove": false,
+          "phase": "new",
+          "id": "b-s2"
         }
       },
       "roofs": {},
-      "fixtures": {}
+      "fixtures": {},
+      "decks": {}
     },
     "level-f": {
       "id": "level-f",
@@ -2692,6 +2707,37 @@
           "id": "f-c55"
         }
       },
+      "decks": {
+        "f-d1": {
+          "outline": [
+            {
+              "x": 319.5,
+              "y": 315
+            },
+            {
+              "x": 463,
+              "y": 315
+            },
+            {
+              "x": 463,
+              "y": 411
+            },
+            {
+              "x": 319.5,
+              "y": 411
+            }
+          ],
+          "elevation": -6,
+          "railings": [
+            false,
+            true,
+            true,
+            false
+          ],
+          "phase": "new",
+          "id": "f-d1"
+        }
+      },
       "finishes": {
         "cabinetColor": "#c4884e",
         "counterColor": "#e2dccb",
@@ -3304,7 +3350,8 @@
           "id": "s-k1"
         }
       },
-      "fixtures": {}
+      "fixtures": {},
+      "decks": {}
     }
   },
   "baseFloorElevation": -100,
@@ -3581,6 +3628,14 @@
           "y": -360
         },
         "elevation": 6
+      },
+      "grade-34": {
+        "id": "grade-34",
+        "at": {
+          "x": 445,
+          "y": 543
+        },
+        "elevation": -100
       }
     },
     "columns": {

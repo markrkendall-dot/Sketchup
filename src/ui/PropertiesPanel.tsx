@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { getFootprints } from '../derive/footprint';
+import { compassName, deckTopWords, edgeOutward, getDeckLayout } from '../derive/decks';
 import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { isVisible, PHASE_LABEL } from '../derive/phase';
@@ -29,16 +30,16 @@ import {
   WALL_CABINET_HEIGHTS,
 } from '../model/casework';
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
-import { pointInPolygon } from '../model/geometry';
+import { dist, pointInPolygon, polygonSignedArea } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
-import { columnProblem, MAX_ROOF_PITCH, wallLength } from '../model/plan';
+import { columnProblem, MAX_DECK_ELEVATION, MAX_ROOF_PITCH, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
 import { DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
-import { boardColorOf, COLUMN_COLOR, columnColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
+import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
-import type { Column, Fixture, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, Deck, Fixture, FrontStyle, GradePoint, Id, Level, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
-import { pauseHistory, resumeHistory, usePlanStore, type LengthAnchor, type RoomPatch } from '../store/planStore';
+import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type LengthAnchor, type RoomPatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { duplicateRoomNotice, showNotice } from './fileActions';
 import { roomNameOf, runWallMove, wallSideNames } from './wallMove';
@@ -346,6 +347,7 @@ function SelectionActions({
   stairs,
   roofs,
   fixtures,
+  decks,
   columns,
   rooms,
 }: {
@@ -355,13 +357,14 @@ function SelectionActions({
   stairs: Stairs[];
   roofs: Roof[];
   fixtures: Fixture[];
+  decks: Deck[];
   columns: Column[];
   rooms: Room[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns, ...rooms]);
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...columns, ...rooms]);
   if (phases.length === 0 && selectionSize(selection) === 0) return null;
   const allDemo = phases.length > 0 && phases.every((p) => p === 'demo');
   const ids = {
@@ -370,6 +373,7 @@ function SelectionActions({
     stairs: stairs.map((st) => st.id),
     roofs: roofs.map((r) => r.id),
     fixtures: fixtures.map((f) => f.id),
+    decks: decks.map((d) => d.id),
     columns: columns.map((c) => c.id),
     rooms: rooms.map((r) => r.id),
   };
@@ -1517,6 +1521,93 @@ function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
   );
 }
 
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * A deck (DESIGN.md "Decks"): its top against the floor, a railing checkbox per edge (named by the
+ * way it faces, with its length and how high it stands over the ground, or that a wall backs it), a
+ * warning for an open edge more than 30" up, the colour and phase, and what it comes to.
+ */
+function DeckProps({ level, deck }: { level: Level; deck: Deck }) {
+  const updateDeck = usePlanStore((s) => s.updateDeck);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
+  const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop ?? 0);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const layout = usePlanStore((s) => getDeckLayout(s.plan, level.id, deck.id, viewMode));
+  const set = (patch: DeckPatch) => updateDeck(level.id, deck.id, patch);
+  const n = deck.outline.length;
+  const lens = deck.outline.map((p, i) => dist(p, deck.outline[(i + 1) % n]));
+  const names = deck.outline.map((_, i) => compassName(edgeOutward(deck.outline, i), northAngle));
+  const b = boundsOf(deck.outline);
+  const open = deck.outline.map((_, i) => !deck.railings[i] && !!layout && !layout.supported[i] && layout.edgeDrops[i] > GUARD_HEIGHT);
+  return (
+    <>
+      <h3>Deck</h3>
+      <LengthField
+        label="Top"
+        value={deck.elevation}
+        bound="any"
+        onCommit={(v) => {
+          if (v === null) return null;
+          if (Math.abs(v) > MAX_DECK_ELEVATION) return `Keep it within ${formatLength(MAX_DECK_ELEVATION, denom)} of the floor.`;
+          set({ elevation: v });
+          return null;
+        }}
+        hint={`Above this level's floor top; negative is below it (${deckTopWords(deck.elevation, denom)}, elevation ${formatLength(floorTop + deck.elevation, denom)}).`}
+      />
+      <div className="field">
+        <span className="label">Railings</span>
+      </div>
+      {deck.outline.map((_, i) => (
+        <label key={i} className="check-row">
+          <input
+            type="checkbox"
+            aria-label={`Railing on the ${names[i]} edge`}
+            checked={deck.railings[i]}
+            onChange={(e) => {
+              set({ railings: deck.railings.map((r, j) => (j === i ? e.target.checked : r)) });
+              releaseFocus(e.currentTarget);
+            }}
+          />
+          {capitalize(names[i])} edge, {formatLength(lens[i], denom)}
+          {layout && (layout.supported[i] ? ', against a wall' : `, ${formatLength(Math.max(0, layout.edgeDrops[i]), denom)} above the ground`)}
+        </label>
+      ))}
+      {open.some(Boolean) && (
+        <p className="panel-note warning">
+          {capitalize(names.filter((_, i) => open[i]).join(' and '))} {open.filter(Boolean).length === 1 ? 'edge is' : 'edges are'} more than 30" above the ground with no railing.
+        </p>
+      )}
+      {layout && (
+        <div className="panel-buttons">
+          <button onClick={() => set({ railings: layout.supported.map((s) => !s) })} title="A railing on every edge that no wall backs">
+            Reset railings
+          </button>
+        </div>
+      )}
+      <ColorField label="Colour" value={deckColorOf(deck)} onCommit={(color) => set({ color })} onReset={deck.color ? () => set({ color: undefined }) : undefined} hint={`Boards, framing and railing. Default ${DECK_COLOR}.`} />
+      <SelectField label="Phase" value={deck.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      {b && (
+        <ReadOnly label="Outline">
+          {n} corners, {formatLength(b.maxX - b.minX, denom)} x {formatLength(b.maxY - b.minY, denom)}, {formatArea(Math.abs(polygonSignedArea(deck.outline)))}
+        </ReadOnly>
+      )}
+      {layout && (
+        <ReadOnly label="Posts">
+          {layout.posts.length} to the ground{layout.openings.length ? `; ${layout.openings.length} ${layout.openings.length === 1 ? 'stair opening' : 'stair openings'} in the railing` : ''}
+        </ReadOnly>
+      )}
+      <p className="panel-note">
+        Drag a corner with the select tool to move it. A flight of stairs drawn up to an edge (its top within 8" below the boards) opens the railing there.
+      </p>
+    </>
+  );
+}
+
+/** A deck edge higher than this over the ground needs a railing. */
+const GUARD_HEIGHT = 30;
+
 const columnKindOptions: { value: Column['kind']; label: string }[] = [
   { value: 'chimney', label: 'Chimney' },
   { value: 'post', label: 'Post' },
@@ -1664,6 +1755,7 @@ function MixedProps({
   stairs,
   roofs,
   fixtures,
+  decks,
   columns,
   rooms,
 }: {
@@ -1674,6 +1766,7 @@ function MixedProps({
   stairs: Stairs[];
   roofs: Roof[];
   fixtures: Fixture[];
+  decks: Deck[];
   columns: Column[];
   rooms: Room[];
 }) {
@@ -1685,11 +1778,12 @@ function MixedProps({
   if (stairs.length) parts.push(`${stairs.length} stairs`);
   if (roofs.length) parts.push(`${roofs.length} ${roofs.length === 1 ? 'roof' : 'roofs'}`);
   if (fixtures.length) parts.push(`${fixtures.length} ${fixtures.length === 1 ? 'fixture' : 'fixtures'}`);
+  if (decks.length) parts.push(`${decks.length} ${decks.length === 1 ? 'deck' : 'decks'}`);
   if (columns.length) parts.push(`${columns.length} ${columns.length === 1 ? 'column' : 'columns'}`);
   if (sel.gradePoints.length) parts.push(`${sel.gradePoints.length} grade ${sel.gradePoints.length === 1 ? 'point' : 'points'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...columns, ...rooms]);
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...columns, ...rooms]);
   const onlyFixtures = fixtures.length > 0 && phases.length === fixtures.length;
   return (
     <>
@@ -1708,6 +1802,7 @@ function MixedProps({
                 stairs: stairs.map((st) => st.id),
                 roofs: roofs.map((r) => r.id),
                 fixtures: fixtures.map((f) => f.id),
+                decks: decks.map((d) => d.id),
                 columns: columns.map((c) => c.id),
                 rooms: rooms.map((r) => r.id),
               },
@@ -2227,7 +2322,7 @@ function LevelProps({ level }: { level: Level }) {
           only found where walls close a loop.
         </p>
       )}
-      <p className="panel-note">Select walls, openings, room labels, roofs or cabinets to edit them. R names a room, K draws a roof, C places cabinets.</p>
+      <p className="panel-note">Select walls, openings, room labels, roofs, decks or cabinets to edit them. R names a room, K draws a roof, J a deck, C places cabinets.</p>
     </>
   );
 }
@@ -2249,6 +2344,7 @@ export function PropertiesPanel() {
   const stairs = sel.stairs.map((id) => level.stairs[id]).filter(Boolean);
   const roofs = sel.roofs.map((id) => level.roofs[id]).filter(Boolean);
   const fixtures = sel.fixtures.map((id) => level.fixtures?.[id]).filter(Boolean);
+  const decks = sel.decks.map((id) => level.decks?.[id]).filter(Boolean);
   const gradePoints = sel.gradePoints.map((id) => site.gradePoints[id]).filter(Boolean);
   const columns = sel.columns.map((id) => site.columns[id]).filter(Boolean);
   const live: Selection = {
@@ -2259,6 +2355,7 @@ export function PropertiesPanel() {
     stairs: stairs.map((st) => st.id),
     roofs: roofs.map((r) => r.id),
     fixtures: fixtures.map((f) => f.id),
+    decks: decks.map((d) => d.id),
     gradePoints: gradePoints.map((g) => g.id),
     columns: columns.map((c) => c.id),
   };
@@ -2275,18 +2372,19 @@ export function PropertiesPanel() {
   else if (total === 1 && rooms.length === 1) body = <RoomProps key={rooms[0].id} level={level} room={rooms[0]} />;
   else if (total === 1 && stairs.length === 1) body = <StairsProps key={stairs[0].id} level={level} stairs={stairs[0]} />;
   else if (total === 1 && roofs.length === 1) body = <RoofProps key={roofs[0].id} level={level} roof={roofs[0]} />;
+  else if (total === 1 && decks.length === 1) body = <DeckProps key={decks[0].id} level={level} deck={decks[0]} />;
   else if (total === 1 && fixtures.length === 1) body = <FixtureProps key={fixtures[0].id} level={level} fixture={fixtures[0]} />;
   else if (total === 1 && gradePoints.length === 1) body = <GradePointProps key={gradePoints[0].id} point={gradePoints[0]} />;
   else if (total === 1 && columns.length === 1) body = <ColumnProps key={columns[0].id} column={columns[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} rooms={rooms} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} decks={decks} columns={columns} rooms={rooms} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} columns={columns} rooms={rooms} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={stairs} roofs={roofs} fixtures={fixtures} decks={decks} columns={columns} rooms={rooms} />}
       </div>
     </aside>
   );

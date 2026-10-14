@@ -4,8 +4,9 @@ import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonS
 import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
+import { getDeckLayout, type DeckBox, type DeckLayout } from './decks';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
@@ -999,6 +1000,76 @@ export interface StairsMesh {
   phase: Phase;
 }
 
+/** A deck's meshes (level-local): the boards, the framing with the support posts, and the railing. */
+export interface DeckMesh {
+  id: Id;
+  /** The phase as shown in the view mode (shownPhase). */
+  phase: Phase;
+  color: string;
+  boards: BufferGeometry;
+  frame: BufferGeometry;
+  railing: BufferGeometry | null;
+}
+
+/** The boxes of a deck as one geometry (prisms concatenated into one buffer). */
+export function deckBoxesGeometry(boxes: readonly DeckBox[]): BufferGeometry {
+  const pos: number[] = [];
+  for (const b of boxes) {
+    const part = prismPositions(b.poly, b.bottom, b.top, b.holes ?? [], {});
+    for (let i = 0; i < part.length; i++) pos.push(part[i]);
+  }
+  return geometryFrom(pos);
+}
+
+/**
+ * The visible decks of a level in a view mode, memoized apart from getLevelMeshes (a deck depends on
+ * the ground and on other levels' walls and stairs, which that cache does not watch): a deck's
+ * geometry is rebuilt only when its layout object changes (derive/decks.ts getDeckLayout), and the
+ * same array comes back while every deck's geometry, phase and colour are the same, so a selector
+ * on it is stable.
+ */
+export function getDeckMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): DeckMesh[] {
+  const key = `${levelId}|${viewMode}`;
+  const prev = deckResult.get(key);
+  if (prev && prev.plan === plan) return prev.result;
+  pruneCaches(plan);
+  const level = plan.levels[levelId];
+  let entries = deckCache.get(key);
+  if (!entries) deckCache.set(key, (entries = new Map()));
+  const out: DeckMesh[] = [];
+  const seen = new Set<Id>();
+  for (const deck of Object.values(level?.decks ?? {})) {
+    if (!isVisible(deck.phase, viewMode)) continue;
+    const layout = getDeckLayout(plan, levelId, deck.id, viewMode);
+    if (!layout) continue;
+    let e = entries.get(deck.id);
+    if (!e || e.layout !== layout) {
+      if (e) disposeDeckEntry(e);
+      e = {
+        layout,
+        boards: deckBoxesGeometry([layout.boards]),
+        frame: deckBoxesGeometry([...layout.frame, ...layout.posts]),
+        railing: layout.railing.length ? deckBoxesGeometry(layout.railing) : null,
+      };
+      entries.set(deck.id, e);
+    }
+    seen.add(deck.id);
+    out.push({ id: deck.id, phase: shownPhase(deck.phase, viewMode), color: deckColorOf(deck), boards: e.boards, frame: e.frame, railing: e.railing });
+  }
+  for (const [id, e] of entries) {
+    if (seen.has(id)) continue;
+    disposeDeckEntry(e);
+    entries.delete(id);
+  }
+  const same =
+    !!prev &&
+    prev.result.length === out.length &&
+    prev.result.every((m, i) => m.id === out[i].id && m.phase === out[i].phase && m.color === out[i].color && m.boards === out[i].boards && m.frame === out[i].frame && m.railing === out[i].railing);
+  const result = same ? prev.result : out;
+  deckResult.set(key, { plan, result });
+  return result;
+}
+
 export interface RoofMesh {
   id: Id;
   /** The roof slab, with the ridge cap of a metal gable or hip roof. */
@@ -1153,6 +1224,15 @@ const openingCache = new Map<string, Map<Id, OpeningEntry>>();
 const fixtureCache = new Map<string, Map<Id, FixtureEntry>>();
 const counterCache = new Map<string, CounterEntry>();
 const levelCache = new Map<string, LevelEntry>();
+/** Decks: their geometry per deck while its layout object is the same, and the last result per level. */
+interface DeckEntry {
+  layout: DeckLayout;
+  boards: BufferGeometry;
+  frame: BufferGeometry;
+  railing: BufferGeometry | null;
+}
+const deckCache = new Map<string, Map<Id, DeckEntry>>();
+const deckResult = new Map<string, { plan: Plan; result: DeckMesh[] }>();
 
 /** Value equality of nested arrays of points or numbers (faces are re-traced on any node move). */
 function sameRings<T extends Vec2 | number>(p: readonly (readonly T[])[], q: readonly (readonly T[])[]): boolean {
@@ -1242,6 +1322,18 @@ function pruneCaches(plan: Plan): void {
     counterCache.delete(key);
   }
   for (const key of levelCache.keys()) if (!alive(key)) levelCache.delete(key);
+  for (const [key, m] of deckCache) {
+    if (alive(key)) continue;
+    for (const e of m.values()) disposeDeckEntry(e);
+    deckCache.delete(key);
+  }
+  for (const key of deckResult.keys()) if (!alive(key)) deckResult.delete(key);
+}
+
+function disposeDeckEntry(e: DeckEntry): void {
+  e.boards.dispose();
+  e.frame.dispose();
+  e.railing?.dispose();
 }
 
 /** The phase a counter slab takes from the cabinets under it. */
@@ -1607,6 +1699,9 @@ export function clearMeshCache(): void {
   for (const m of openingCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
   for (const m of fixtureCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
   for (const e of counterCache.values()) for (const c of e.counters) c.geometry.dispose();
+  for (const m of deckCache.values()) for (const e of m.values()) disposeDeckEntry(e);
+  deckCache.clear();
+  deckResult.clear();
   roofCache.clear();
   openingCache.clear();
   fixtureCache.clear();

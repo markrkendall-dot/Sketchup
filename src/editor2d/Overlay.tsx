@@ -395,18 +395,18 @@ function FixtureGhost({ preview, v, denom }: { preview: FixturePreview; v: Viewp
   );
 }
 
-/** Roof tool: the corners clicked so far, the edge to the cursor and the closing edge (dashed). */
-function RoofDraft({ points, cursor, v }: { points: Vec2[]; cursor: Vec2 | null; v: Viewport }) {
+/** Roof and deck tools: the corners clicked so far, the edge to the cursor and the closing edge (dashed). */
+function OutlineDraft({ points, cursor, v, kind }: { points: Vec2[]; cursor: Vec2 | null; v: Viewport; kind: 'roof' | 'deck' }) {
   const sp = points.map((p) => worldToScreen(v, p));
   const c = cursor ? worldToScreen(v, cursor) : null;
   const line = c ? [...sp, c] : sp;
   const closable = points.length >= 3 && !!c && Math.hypot(c.x - sp[0].x, c.y - sp[0].y) <= 10;
   return (
-    <g className="roof-draft">
-      {line.length >= 2 && <polyline className="roof-draft-line" points={pts(line)} />}
-      {line.length >= 3 && !closable && <line className="roof-draft-close" x1={line[line.length - 1].x} y1={line[line.length - 1].y} x2={sp[0].x} y2={sp[0].y} />}
+    <g className={`outline-draft ${kind}`}>
+      {line.length >= 2 && <polyline className="outline-draft-line" points={pts(line)} />}
+      {line.length >= 3 && !closable && <line className="outline-draft-close" x1={line[line.length - 1].x} y1={line[line.length - 1].y} x2={sp[0].x} y2={sp[0].y} />}
       {sp.map((p, i) => (
-        <circle key={i} className={`roof-draft-point${i === 0 ? ' first' : ''}${i === 0 && closable ? ' closable' : ''}`} cx={p.x} cy={p.y} r={i === 0 ? 6 : 4} />
+        <circle key={i} className={`outline-draft-point${i === 0 ? ' first' : ''}${i === 0 && closable ? ' closable' : ''}`} cx={p.x} cy={p.y} r={i === 0 ? 6 : 4} />
       ))}
     </g>
   );
@@ -461,7 +461,7 @@ export const Overlay = memo(function Overlay() {
       )}
       {draft.openingPreview && <OpeningGhost preview={draft.openingPreview} v={v} denom={denom} />}
       {draft.stairsPreview && <StairsGhost origin={draft.stairsPreview.origin} direction={draft.stairsPreview.direction} v={v} />}
-      {tool === 'roof' && draft.roofPoints.length > 0 && <RoofDraft points={draft.roofPoints} cursor={draft.snap?.point ?? draft.cursor} v={v} />}
+      {(tool === 'roof' || tool === 'deck') && draft.outlinePoints.length > 0 && <OutlineDraft points={draft.outlinePoints} cursor={draft.snap?.point ?? draft.cursor} v={v} kind={tool} />}
       {tool === 'column' && draft.columnPreview && <ColumnGhost {...draft.columnPreview} v={v} />}
       {tool === 'fixture' && draft.fixturePreview && <FixtureGhost preview={draft.fixturePreview} v={v} denom={denom} />}
       {tool === 'gradePoint' && draft.gradePending && (

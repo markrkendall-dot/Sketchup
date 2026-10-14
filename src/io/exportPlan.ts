@@ -46,12 +46,13 @@ export interface PlanFrame {
 
 /**
  * What the level shows in a view mode, for fitting the drawing: the visible walls' outlines, the
- * roofs with their overhangs, the stairs. Null when there is nothing.
+ * roofs with their overhangs, the decks, the stairs. Null when there is nothing.
  */
 export function levelDrawingBounds(level: Level, viewMode: ViewMode): Bounds | null {
   const pts: Vec2[] = [];
   for (const fp of getFootprints(level, viewMode).values()) pts.push(...fp.poly);
   for (const r of Object.values(level.roofs ?? {})) if (isVisible(r.phase, viewMode)) pts.push(...roofOutlineWithOverhang(r));
+  for (const d of Object.values(level.decks ?? {})) if (isVisible(d.phase, viewMode)) pts.push(...d.outline);
   for (const st of Object.values(level.stairs)) if (isVisible(st.phase, viewMode)) pts.push(...stairsSymbol(st, 1).outline);
   for (const f of Object.values(level.fixtures ?? {})) if (isVisible(f.phase, viewMode)) pts.push(...fixtureExtent(f));
   return boundsOf(pts);
@@ -220,7 +221,7 @@ export async function planPng(exp: PlanExport): Promise<Blob> {
 export async function downloadPlanExport(format: 'svg' | 'png', plan: Plan, levelId: Id, viewMode: ViewMode): Promise<void> {
   const level = plan.levels[levelId];
   if (!level) throw new Error('No level to export.');
-  if (!levelDrawingBounds(level, viewMode)) throw new Error(`Nothing to export: ${level.name} has no walls, stairs or roofs in the ${VIEW_MODE_LABEL[viewMode]} view.`);
+  if (!levelDrawingBounds(level, viewMode)) throw new Error(`Nothing to export: ${level.name} has no walls, stairs, roofs or decks in the ${VIEW_MODE_LABEL[viewMode]} view.`);
   const exp = planExport(plan, levelId, viewMode);
   const name = planFileName({ name: `${plan.name} ${level.name}` }, format);
   if (format === 'svg') downloadBlob(new Blob([exp.svg], { type: 'image/svg+xml' }), name);

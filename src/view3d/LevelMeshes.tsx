@@ -1,11 +1,11 @@
 import { memo } from 'react';
 import { getLevelElevations } from '../derive/levels';
-import { getLevelMeshes, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getLevelMeshes, openingPartColor } from '../derive/meshes';
 import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { counterColorOf } from '../model/casework';
-import { caseworkMaterial, counterMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { caseworkMaterial, counterMaterial, deckMaterial, fasciaMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -21,6 +21,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   // The 3D bar's Roofs checkbox: off lifts every roof (with its fascia and rafter tails) off.
   const showRoofs = useUiStore((s) => s.show3dRoofs);
   const meshes = usePlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
+  // Decks have their own memo: they depend on the ground and other levels (derive/meshes.ts getDeckMeshes).
+  const decks = usePlanStore((s) => getDeckMeshes(s.plan, levelId, viewMode));
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
   const counterColor = usePlanStore((s) => counterColorOf(s.plan.levels[levelId]?.finishes));
   return (
@@ -64,6 +66,30 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           receiveShadow
           dispose={null}
         />
+      ))}
+      {decks.map((d) => (
+        <group key={d.id} name={`deck:${d.id}`}>
+          {(
+            [
+              ['boards', d.boards, 'boards'],
+              ['frame', d.frame, 'frame'],
+              ['railing', d.railing, 'boards'],
+            ] as const
+          ).map(([name, geometry, part]) =>
+            geometry ? (
+              <mesh
+                key={name}
+                name={`deck:${d.id}:${name}`}
+                geometry={geometry}
+                material={deckMaterial(part, d.phase, d.color)}
+                renderOrder={d.phase === 'demo' ? 1 : 0}
+                castShadow={d.phase !== 'demo'}
+                receiveShadow
+                dispose={null}
+              />
+            ) : null,
+          )}
+        </group>
       ))}
       {showRoofs && meshes.roofs.map((r) => (
         <group key={r.id}>

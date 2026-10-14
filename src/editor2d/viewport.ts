@@ -58,12 +58,13 @@ export function visibleBounds(v: Viewport, size: Size): Bounds {
 }
 
 /**
- * Fit the nodes of a level, its door swings, and its image underlay (unless `withUnderlay` is
- * false), or null if there is nothing to fit. Never zooms in past 4 px/inch.
+ * Fit the nodes of a level, its door swings, its decks, and its image underlay (unless
+ * `withUnderlay` is false), or null if there is nothing to fit. Never zooms in past 4 px/inch.
  */
 export function fitLevel(level: Level, size: Size, withUnderlay = true): Viewport | null {
   const points: Vec2[] = Object.values(level.nodes);
   if (withUnderlay && level.underlay) points.push(...underlayCorners(level.underlay));
+  for (const d of Object.values(level.decks ?? {})) points.push(...d.outline);
   // A door's swing can reach a door width beyond its wall (a front door opening outward); a
   // sliding door stays in its wall.
   for (const o of Object.values(level.openings)) {

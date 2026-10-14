@@ -3,7 +3,7 @@ import type { WallGeom } from '../derive/openings';
 import type { FixtureKind, Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | OpeningToolName;
 /** Tools that work on the site (E, C); the others edit a level and are off in site mode. */
 export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column'];
 /** Tools allowed in site mode: select, measure, the site tools. */
@@ -156,8 +156,8 @@ export interface Draft {
   stairsDirection: number;
   /** Underlay tool, scale / rotate modes: the calibration points clicked so far (world). */
   underlayPoints: Vec2[];
-  /** Roof tool: the outline corners clicked so far (world). */
-  roofPoints: Vec2[];
+  /** Roof and deck tools: the outline corners clicked so far (world). */
+  outlinePoints: Vec2[];
   /** Grade point tool: the spot clicked, waiting for its elevation (typed in the length buffer, Enter places). */
   gradePending: Vec2 | null;
   /** Column tool: what the next click places (Tab toggles). */
@@ -187,6 +187,7 @@ export interface Selection {
   stairs: Id[];
   roofs: Id[];
   fixtures: Id[];
+  decks: Id[];
   /** Site elements (plan.site), selectable in site mode. */
   gradePoints: Id[];
   columns: Id[];
@@ -416,7 +417,7 @@ export const emptyDraft = (): Draft => ({
   stairsPreview: null,
   stairsDirection: 0,
   underlayPoints: [],
-  roofPoints: [],
+  outlinePoints: [],
   gradePending: null,
   columnKind: 'chimney',
   columnPreview: null,
@@ -429,11 +430,11 @@ export const emptyDraft = (): Draft => ({
   dragReadout: null,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], gradePoints: [], columns: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], gradePoints: [], columns: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.gradePoints.length + s.columns.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.decks.length + s.gradePoints.length + s.columns.length;
 
 /** Split ratio bounds, so neither view collapses. */
 export const MIN_SPLIT = 0.2;

@@ -15,6 +15,7 @@ What it draws:
   Floor to start), with the three levels stacked in 3D and a faint ghost of the level below.
 - **Roofs** (gable, shed, hip, flat) with overhangs, fascia and rake boards or open eaves with
   rafter tails; walls under a roof rise to meet it, so a gable end is a triangle.
+- **Decks** on posts down to the ground, with railings that open where a flight of stairs arrives.
 - **The site**: spot elevations of the ground (grade points) become a terrain surface, so a walkout
   basement shows on the downhill side and is buried on the uphill side; **chimneys and posts**
   stand on it, a chimney with its cap and spark arrestor if it has them.
@@ -106,6 +107,15 @@ Once the walls are in, these make the 3D model look like the house.
   12), overhang, thickness and fascia, the finish (metal or shingle) and colour. **Fit to walls**
   sets the outline to the outer face of the level's walls when they close one ring. Small roofs
   (a porch, a wing) go on the level they sit on; their ridge and slope are set the same way.
+- **Decks (`J`).** Draw the outline like a roof's, on the level whose floor the deck steps out
+  from. A new deck's top is one step (6") below that floor; set "Top" in the properties panel
+  (negative is below the floor). An edge against a wall, on any level (the house, a retaining wall
+  on the Basement), is carried by a ledger: no posts and, by default, no railing. Every other edge
+  gets 5 1/2" posts down to the ground (from the grade points) at most 8' apart and, when ticked, a
+  36" railing; the panel names each edge by the way it faces, says how high it stands over the
+  ground, and warns about an edge more than 30" up without a railing (Reset railings puts them
+  back). Draw the deck's stair as a flight on the level below whose top reaches the deck's edge
+  (within 8" below the boards): the railing opens there. Drag a corner with the select tool.
 - **Eaves, boards and rust.** "Eaves" is a fascia board along the eaves, or open with the rafter
   tails showing under the overhang (set their depth and spacing; 5 1/2" every 24" by default); the
   rake boards up the gables stay either way. "Board colour" paints the fascia, the rake boards and
@@ -293,15 +303,15 @@ keyboard back to the plan.
 
 | Keys | Action |
 | --- | --- |
-| `S` `W` `R` `D` `N` `P` `T` `K` `U` | Select, Wall, Room, Door, Window, Passage, Stairs, Roof, Underlay |
+| `S` `W` `R` `D` `N` `P` `T` `K` `J` `U` | Select, Wall, Room, Door, Window, Passage, Stairs, Roof, Deck, Underlay |
 | `C` | Cabinet: the chosen kind follows the cursor along the nearest wall; click to place, type a width first to change it (Site tab: Column) |
 | `B` | Box: four walls; click a corner, type `12' x 10'` (or `12'` Tab `10'`), Enter |
 | `M` | Measure between two points; Esc clears |
 | `E` `C` (Site tab only) | Grade point, Column (chimney; Tab before the click for a post) |
 | digits, `'`, `"`, space, `/`, then Enter | Type a length or a distance while drawing |
-| `Enter` or click | Walls: with nothing typed, commit the wall at the cursor; roof: close the outline |
-| `Backspace` | Edit the typed length; roof: remove the last corner |
-| `Esc` | Clear the typed length, then end the wall chain / cancel the roof / clear the selection |
+| `Enter` or click | Walls: with nothing typed, commit the wall at the cursor; roof or deck: close the outline |
+| `Backspace` | Edit the typed length; roof or deck: remove the last corner |
+| `Esc` | Clear the typed length, then end the wall chain / cancel the roof or deck / clear the selection |
 | `X` | Next wall exterior or interior |
 | `Shift` (hold) | Invert ortho lock; with ortho off, 15° steps; cabinet: place away from the walls |
 | `Tab` / `Shift+Tab` | Door swing side / hinge; stairs and free cabinets turn 90°; column chimney or post |
@@ -461,9 +471,12 @@ and the plan's north angle is 0.
   it, which sits a few inches under the first floor, so only the wing's basement walks out. Its
   west end is free, so the Basement shows one open wall end (a red dot) by design. A wooden stair
   climbs north along the wing's east side from the walkout's terrace (11 risers, an estimate). The
-  fence on the wall and the stair's railings are not drawn.
-- Not modelled: the deck, the lot, the entry porch floor and steps, the foundation under the wing
-  and porches (the ground meets them where the grade points say it does).
+  fence on the wall and the stair's railings are not drawn. Photo 24, from the lake road below the
+  house, shows the wall turning north at the wing, the walkout's doors and that stair from the
+  south, and the hill still falling south of the walkout toward the road.
+- Not modelled: today's small deck at the top of the wing stair (photo 3), the lot, the entry porch
+  floor and steps, the foundation under the wing and porches (the ground meets them where the grade
+  points say it does).
 
 ### Inside finishes from the photos
 
@@ -539,6 +552,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | Roof overhangs | main 24", wing 18", entry porch 18" | Eave to the wall face |
 | Roof thickness, eaves | 2 1/2" (corrugated sheet); open eaves, rafter tails 5 1/2" deep every 24" (photos 1 and 7); 7" rake boards | A rafter tail and the rake board |
 | Grade points | see below | Spot levels from the floor top down |
+| **Deck stair's foot** (proposed) | the lower lawn at -100, the walkout's level, about 18' south of the wing's south face (x 445, y 543): 13 risers; photo 24 shows the hill still falling there, and each 7.4" lower adds a riser and 10" of run | The ground there against the walkout doors' threshold |
 
 Grade points (absolute elevation in inches; the first floor top is +2", the basement floor -100"):
 five at +1 round the porch, whose floor is about at grade (its two outer corners, the middle of its
@@ -551,7 +565,7 @@ end; the wing's south-east corner -100 and
 north-east corner -20, a point 6' east of the main block's east wall -6, pairs either side of the
 retaining wall (-6 on the terrace just inside it; -50, -60, -85 and -100 on the lawn just outside,
 west to east, and -100 east of its return), a point 10' south of the wing -100 (the terrace in
-front of the doors), two at
+front of the doors), the proposed deck stair's foot at -100 (an estimate, see the table), two at
 the walkout's threshold (-100, 6" out from the wall at the double door's jambs), and two points 30'
 north of the house at +6 (the road is slightly higher). Measure them down from the first-floor sill
 with a level and a tape or a laser, and edit them in the Site tab.
@@ -584,7 +598,7 @@ The starter also holds the owner's proposed design (his brief of 12 Oct 2026), d
 *demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
 `proposed()`; the plans are `docs/history/PLAN-v4-proposed.md` and, for the kitchen,
 `docs/history/PLAN-v5-kitchen.md`, with the places where the built design differs from them).
-Five changes, all on the First Floor apart from the upstairs east windows over the new wing:
+Six changes, all on the First Floor apart from the upstairs east windows over the new wing and the deck's stair:
 
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
    one-storey wing down the whole east side, outside 12'1" x 26'3", under one new shed roof (5:12)
@@ -648,6 +662,18 @@ Five changes, all on the First Floor apart from the upstairs east windows over t
    timber posts in the stain and a shed roof high at the house wall. The Living's west window,
    which now looks into the porch, is replaced by the same window without shutters. The foyer
    stands on 8" block walls (a crawl space) like the east addition; the screen porch on its posts.
+6. **Deck off the master bedroom** (MK, 14 Oct 2026), about 8' deep: the wing's width from the
+   retaining wall's east face to the wing's east face (x 319.5 to 463, y 315 to 411, 11'11 1/2" x
+   8'). Its top is 6" below the bedroom floor (elevation -4), flush with the retaining wall's top,
+   so you step onto it from the lake-side terrace behind the wall. The house and the wall carry its
+   north and west edges; two posts stand on the walkout terrace (at the south-east corner and the
+   middle of the south edge, 8' in front of the walkout doors); railings run along the east and
+   south edges. Its stair leads south off the south edge's east end, 36" wide, 13 risers of 7.4"
+   down to the lower lawn at the walkout's level (12 in the flight, 10" treads; the deck's edge is
+   the 13th), and the railing opens there. Today's wooden stair along the wing's east side is
+   demolished (MK: the deck's stair replaces it), and with it the small deck at its top (photo 3,
+   not modelled). The stair's foot is an **estimate**: photo 24 shows the hill still falling past
+   the walkout, so the ground there is probably lower (see the measurement table).
 
 **After the work** (MK, after his garage across the road), the Proposed view shows the whole house
 re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
@@ -672,9 +698,6 @@ Which view to use:
 
 Still open:
 
-- **A deck for the bedroom's sliding door.** It opens 8'6" above the walkout's terrace (photo 2:
-  the bump's double door is right under it), so it needs a deck or a balcony with a railing, or a
-  guard rail across it. Decks are not drawn.
 - **The pipe chase** in the front room's north-east corner carries the pipes of the Bath upstairs
   (MK), but the design demolishes it with the wood stove: the new flight's top and the kitchen's
   closet (x 174 to 192, y 7 to 43) take that corner, and the closet's door (y 19 to 43) opens where
@@ -709,7 +732,8 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
   edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
-- **Not drawn yet**: decks and railings (a stair opening or an open stair side has no railing),
+- **Not drawn yet**: stair railings (a stair opening or an open stair side has none; a deck's
+  railing is drawn),
   exterior steps (an outside stair is a flight on a level, as the starter's wing stair is), fences,
   the lot outline, porch floors and steps, foundations under additions and porches, gutters,
   ceilings, crown and baseboards, furniture, and text or dimension notes

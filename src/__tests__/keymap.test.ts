@@ -56,6 +56,7 @@ describe('KEY_BINDINGS', () => {
       [key('p'), 'passage'],
       [key('t'), 'stairs'],
       [key('k'), 'roof'],
+      [key('j'), 'deck'],
       [key('b'), 'box'],
       [key('m'), 'measure'],
       [key('u'), 'underlay'],

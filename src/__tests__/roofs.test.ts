@@ -728,7 +728,6 @@ describe('loading roofs', () => {
     };
     const plan = migrate(v1);
     expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(SCHEMA_VERSION).toBe(3);
     expect(plan.levels.l1.roofs).toEqual({});
     expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {} });
   });

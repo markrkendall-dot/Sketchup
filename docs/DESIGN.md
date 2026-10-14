@@ -118,13 +118,22 @@ export interface Fixture {
 }
 export interface LevelFinishes { cabinetColor?: string; counterColor?: string; frontStyle?: 'slab' | 'panel' }
 
+// Decks (schema version 4, see "Decks"): boards over framing on posts, a 36" railing per edge.
+export interface Deck {
+  id: Id;
+  outline: Vec2[];           // the boards' outer edge (snaps to the outside wall faces)
+  elevation: Inches;         // boards' top above the level's floor top; negative is below it
+  railings: boolean[];       // one per outline edge (outline[i] -> outline[i + 1])
+  phase: Phase; color?: string;
+}
+
 export interface Level {
   id: Id; name: string;
   wallHeight: Inches;        // floor top to underside of next floor; 96 or 108
   floorThickness: Inches;    // the slab/framing under THIS level (~12 framed, 4 slab)
   nodes: Record<Id, Node>; walls: Record<Id, Wall>; openings: Record<Id, Opening>;
   rooms: Record<Id, Room>; stairs: Record<Id, Stairs>; roofs: Record<Id, Roof>;
-  fixtures: Record<Id, Fixture>; finishes?: LevelFinishes; underlay?: Underlay;
+  fixtures: Record<Id, Fixture>; decks: Record<Id, Deck>; finishes?: LevelFinishes; underlay?: Underlay;
 }
 
 // The site (see "Site and terrain"; the file carries it from schema version 2).
@@ -151,7 +160,7 @@ export interface PlanSettings {
 // undo. migrate() ignores them in older files.
 
 export interface Plan {
-  schemaVersion: 3; id: Id; name: string;
+  schemaVersion: 4; id: Id; name: string;
   levelOrder: Id[];          // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
@@ -382,6 +391,66 @@ outline to the level's outer-face polygon when the walls close exactly one ring.
 only; at least 3", and the default 5.5" x 24" is stored as no field), "Board colour" with a reset to
 tan, and for metal "Weathering" (0 to 1). The store refuses unusable values of these fields
 (`roofOptionProblem`).
+
+## Decks (`derive/decks.ts`, `tools/deckTool.ts`)
+
+A deck belongs to a level and is a plan outline with the boards' top `elevation` above the level's
+floor top (negative: a step down) and one railing flag per edge. `derive/decks.ts` is pure (no
+three): `getDeckLayout(plan, levelId, deckId, viewMode)` gives everything the plan, the 3D meshes and
+the panel draw, level-local, in inches (`DECK`):
+
+- **Supported edges** (`deckSupportedEdges`): the point 1" outside an edge's middle lies in the
+  footprint of a wall on *any* level, visible in the view and able to be seen with the deck
+  (`phasesCoexist`), whose height (slab bottom to its top, run-through included) overlaps the
+  framing. A ledger carries the deck there: no posts and, for a new deck, no railing. So a
+  retaining wall on the Basement carries a First Floor deck whose top is at the wall's top.
+- **Boards** over the whole outline, 1.5" thick; on the plan, joints every 6" parallel to the
+  longest edge (`scanSegments`, which handles concave outlines).
+- **Framing**: a 1.5" rim, 9.25" deep, inset 1" on free edges (the boards overhang it), and 1.5"
+  joists every 16" square to the boards.
+- **Posts**: 5.5" square on the free edges only, at a corner between two free edges and evenly
+  between so none is more than 96" from the next support, 5.75" in from the edges, from 6" into the
+  ground (`groundAt`, minus the level's floor top) up to the framing; none where the ground is
+  within an inch of the framing.
+- **Stair openings** (`deckStairOpenings`): a flight on any level, visible and able to be seen with
+  the deck, whose top is 0 to 8" below (or up to 1" above) the boards and whose two top corners lie
+  within 1" of an edge, cuts the railing over its width. The deck's edge is then the flight's last
+  riser.
+- **Railings** on the flagged edges, less the openings (runs under 3.5" dropped): 36" high, 3.5"
+  posts at the run ends and at most 72" apart (one post at a corner shared by two railed runs,
+  placed by the run it starts), a 3.5" x 1.5" cap whose ends are mitred at shared corners, a 3.5" x
+  1.5" bottom rail 3" up between the posts, and 1.5" balusters with at most 4" clear between any two
+  parts.
+- **Edge drops**: per edge, the most the boards stand over the ground 1" outside it (sampled every
+  12"); the panel warns about an unsupported, unrailed edge more than 30" up.
+
+The layout is memoized by plan identity and, on a new plan, by a signature of everything it is built
+from (outline, top, railings, supports, openings, the ground under each post and outside each edge),
+so an unrelated edit returns the same object, while a grade point, a wall or flight on another level,
+a level height or the view mode builds a new one; phase and colour are not part of it.
+
+The deck tool (J) is the roof tool's outline drawing (`tools/outlineTool.ts makeOutlineTool`, shared
+with the roof tool): corners snap to the outside wall faces; it adds the deck at `DECK.defaultElevation`
+(-6) with a railing on every edge `deckSupportedEdges` does not support, in the "Draw as" phase, and
+selects it. The select tool picks a deck after fixtures and stairs and before roofs (inside the
+outline or within 2 px of it), and drags a selected deck's corners like a roof's (`outline-vertex`),
+refusing a step that would make the outline cross itself. The panel (`DeckProps`) has the top, one
+railing checkbox per edge named by the way it faces (`compassName`, true north applied) with its length
+and height over the ground (or "against a wall"), Reset railings, the colour (default weathered wood
+`#9c7650`), the phase, and the outline's size, area, posts and stair openings. The store's
+`addDeck`/`updateDeck` refuse what `deckProblem` refuses (under 3 points or no area, a top more than
+600" from the floor, railings not one per edge, a bad colour) and fit the railings to the outline
+(`normalizeRailings`: missing flags on, extra ones dropped), so moving a corner keeps them and a new
+edge gets one.
+
+On the plan (`PlanLayers.tsx DecksLayer`, over the room fills and stair holes, under the roofs) a deck
+is its outline filled light wood with the board joints, the railing caps as bands (open at a stair),
+the posts as small dashed squares and a "Deck" label with its top against the floor, in phase colours
+like a roof. In 3D, `getDeckMeshes(plan, levelId, viewMode)` (kept apart from `getLevelMeshes`, whose
+cache does not watch the site or other levels) gives per deck the boards, the framing with the posts,
+and the railing, each one buffer of concatenated prisms, rebuilt only when the deck's layout object
+changes and the same array while nothing changed; `deckMaterial` paints them in the deck's colour
+(framing 20% darker; demolished translucent red, new pulled toward green).
 
 ## Platform framing (`derive/platform.ts`)
 
@@ -948,7 +1017,7 @@ right-click.
   drags put `draft.dragReadout` ("moved 6 1/2" east") in the status bar.
 - **Hit priority** (`selectTool.hitTest`): nodes, then an opening's own rectangle (`hitOpeningRect`:
   jambs and wall faces plus 2 px), then walls, then door leaves and swings (`hitOpeningSwing`), then
-  room labels, stairs, roofs. A click (no drag) on the opening that is the whole selection selects
+  room labels, fixtures, stairs, decks, roofs. A click (no drag) on the opening that is the whole selection selects
   its wall; the status bar says "Click again for the wall" while one opening is selected.
 - **Plan export** (`io/exportPlan.ts`, loaded on first use): `PlanLayers` reads its stores through
   `editor2d/layerStores.ts` (`useLayerPlan` / `useLayerUi`, the app's stores unless a
@@ -1022,7 +1091,8 @@ wall's new footprint with the previous one by value and returns the previous obj
 geometry in effect cleanup. That previous result (and the openings-by-wall one) is kept per level
 id, not per Level object, so `pruneDerivedCaches(plan)` drops the entries of levels that are gone;
 main.tsx calls it whenever `levelOrder` changes (New, Open). `getLevelMeshes` prunes its own
-per-level-id caches, disposing geometry, on its next miss.
+per-level-id caches, disposing geometry, on its next miss (so does `getDeckMeshes`, whose deck
+geometry is keyed by the deck's layout object; see "Decks").
 
 Room dimensions (`roomDimensions(face.netPolygon)`): the net outline with collinear vertices
 merged (a T on a room's side does not break it), clockwise from the top-left corner; width x depth
@@ -1192,12 +1262,12 @@ JSON download/upload with `schemaVersion` and `migrate()`. `MIGRATIONS[n]` upgra
 document to n + 1 and they run in order (0 -> 1: entity arrays become records keyed by id, a
 missing `levelOrder` comes from the levels array, settings are filled; 1 -> 2: every level gets an
 empty `roofs` record and the plan a default `site`; 2 -> 3: every level gets an empty `fixtures`
-record). The upgraded document is
+record; 3 -> 4: every level gets an empty `decks` record). The upgraded document is
 then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
 file's order so a current file round-trips byte for byte), with defaults for missing optional
-values and broken openings, rooms, stairs and underlays dropped (a broken roof is dropped with a
-console warning naming it). New and Open replace the plan and
-clear the undo history (New confirms when the plan has walls, rooms, stairs, roofs, site elements or an image). Autosave
+values and broken openings, rooms, stairs and underlays dropped (a broken roof or deck is dropped with a
+console warning naming it; a deck's railings are fitted to its outline). New and Open replace the plan and
+clear the undo history (New confirms when the plan has walls, rooms, stairs, roofs, fixtures, decks, site elements or an image). Autosave
 to IndexedDB (idb-keyval) on every plan change (debounced), restored on load; a failed save
 (storage full, IndexedDB unavailable) shows "Autosave failed: ..." in the status bar until a later
 save works (or the next edit, below), and is never thrown. Status bar notices (`uiStore.notice`, REVIEW-2
@@ -1209,7 +1279,8 @@ edit is set after it (Open, Undo's "Undid a change on ...", the duplicate room n
 a fresh Group from `getLevelMeshes` (not the live scene, which holds lights, grid and controls):
 root named after the plan and scaled by 0.0254, one group per level the 3D view shows (empty levels
 skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, `Fascia`, `Rafters`,
-`Window`, `Door`, then a `Site` group (`Terrain`, `Chimney`, `Post`; a capped chimney's cap and arrestor are more
+`Deck`, `Deck framing`, `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour
+other than the default), `Window`, `Door`, then a `Site` group (`Terrain`, `Chimney`, `Post`; a capped chimney's cap and arrestor are more
 `Chimney` meshes) with cloned geometry and cloned live materials
 (one per phase/kind, roofs `roof_<finish>_<phase>`, boards `fascia_<phase>` and tails `rafter_<phase>` (plus `_<hex>`
 in a board colour other than tan), columns `column_<kind>_<phase>` (plus `_<hex>` in a colour other than the
@@ -1251,6 +1322,12 @@ when the store refuses one; fixture ids are renamed like the rest (`f-c1` ...). 
 checks that every fixture lies inside the kitchen's faces in the proposed view, overlaps no wall
 footprint and shares no space with another fixture (plan and height), and that `counterRuns` gives
 the island one 66 x 37 top.
+
+The proposed deck off the master bedroom is added through `deck()` (deck ids `f-d1` ...), from the
+retaining wall's east face to the wing's east face, its top at the retaining wall's (absolute -4);
+its stair is a new flight on the Basement whose top is one riser (96 / 13) under the boards, and
+today's wing stair is demolished. `example.test.ts` checks the outline, that the top equals the
+wall's, the supported edges, the two posts, the opening at the stair and the stair's height.
 
 ## Risks
 

@@ -523,8 +523,8 @@ export function fallbackElevation(plan: Plan): number {
 const EMPTY_BOUNDS: Bounds = { minX: 0, minY: 0, maxX: 240, maxY: 240 };
 
 /**
- * The plan's extent in plan coordinates: every level's nodes and roof outlines, the columns and
- * the grade points. A 20' square at the origin for an empty plan.
+ * The plan's extent in plan coordinates: every level's nodes, roof and deck outlines, the columns
+ * and the grade points. A 20' square at the origin for an empty plan.
  */
 export function siteBounds(plan: Plan): Bounds {
   const pts: Vec2[] = [];
@@ -533,6 +533,7 @@ export function siteBounds(plan: Plan): Bounds {
     if (!level) continue;
     for (const n of Object.values(level.nodes)) pts.push(n);
     for (const r of Object.values(level.roofs ?? {})) for (const p of r.outline) pts.push(p);
+    for (const d of Object.values(level.decks ?? {})) for (const p of d.outline) pts.push(p);
   }
   for (const c of Object.values(plan.site.columns)) for (const p of columnOutline(c)) pts.push(p);
   for (const g of Object.values(plan.site.gradePoints)) pts.push(g.at);

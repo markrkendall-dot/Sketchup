@@ -1,3 +1,4 @@
+import { DECK } from '../derive/decks';
 import { getLevelElevations } from '../derive/levels';
 import { roofBearing, roofExtremes, roofOutlineWithOverhang } from '../derive/roofs';
 import { chimneyPartBoxes, columnOutline, columnPeak, fallbackElevation, terrainHeightAt } from '../derive/site';
@@ -9,8 +10,9 @@ export interface Box3d {
 }
 
 /**
- * Bounding box of the given levels in three coordinates (x, Y up, plan y): the nodes and roof
- * overhangs in plan, from the lowest slab bottom to the highest ceiling or roof top, the site's
+ * Bounding box of the given levels in three coordinates (x, Y up, plan y): the nodes, roof
+ * overhangs and decks in plan, from the lowest slab bottom to the highest ceiling, roof top or deck
+ * railing, the site's
  * columns (a capped chimney's cap, 2" proud, and its spark arrestor, 12" above the top, included),
  * and the terrain's height over the house area (never its 100' margin). An empty plan gives a 20'
  * box at the origin.
@@ -43,6 +45,15 @@ export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): 
         maxZ = Math.max(maxZ, p.y);
       }
       maxY = Math.max(maxY, e.floorTop + roofExtremes(roof, roofBearing(level.wallHeight, roof)).ridge + roof.thickness);
+    }
+    for (const deck of Object.values(level.decks ?? {})) {
+      for (const p of deck.outline) {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.y);
+        maxZ = Math.max(maxZ, p.y);
+      }
+      maxY = Math.max(maxY, e.floorTop + deck.elevation + DECK.railHeight);
     }
   }
   for (const c of Object.values(plan.site.columns)) {

@@ -11,7 +11,7 @@ import { columnDefaults } from '../src/derive/site';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import type { Id, Opening, Phase, Plan, Roof, Room, Vec2 } from '../src/model/types';
-import { getPlan, usePlanStore, type NewFixture, type NewStairs } from '../src/store/planStore';
+import { getPlan, usePlanStore, type NewDeck, type NewFixture, type NewStairs } from '../src/store/planStore';
 
 const ft = (feet: number): number => feet * 12;
 const round2 = (v: number): number => Math.round(v * 100) / 100;
@@ -242,6 +242,13 @@ function roof(levelId: Id, r: Pick<Roof, 'shape' | 'outline' | 'ridgeAngle' | 'p
   return id;
 }
 
+/** Add a deck (DESIGN.md "Decks"); throws when the store refuses it. */
+function deck(levelId: Id, d: NewDeck): Id {
+  const id = store().addDeck(levelId, d);
+  if (!id) throw new Error(`deck ${JSON.stringify(d.outline)} on ${level(levelId).name} was rejected`);
+  return id;
+}
+
 /** Add a cabinet, appliance, sink or box (DESIGN.md "Casework"); throws when the store refuses it. */
 function fixture(levelId: Id, f: NewFixture): Id {
   const id = store().addFixture(levelId, f);
@@ -275,6 +282,7 @@ function stableIds(plan: Plan): string {
       ['s', lvl.stairs],
       ['k', lvl.roofs],
       ['c', lvl.fixtures],
+      ['d', lvl.decks],
     ];
     for (const [k, rec] of kinds) Object.keys(rec).forEach((id, i) => add(id, `${pre}-${k}${i + 1}`));
   });
@@ -448,7 +456,9 @@ export function buildExamplePlan(): Plan {
   store().updateWalls(bId, retaining, { finish: 'plain', color: CONCRETE_COLOR, heightOverride: 96 });
   // The wooden stair along the wing's east side (photo 23): from the walkout's terrace up north to the
   // lawn at the wing's north-east corner, 36" wide, 11 risers (an estimate; railings are not drawn).
-  if (!store().addStairs(bId, { origin: { x: WING.x1 + 22, y: WING.y1 - 6 }, direction: 270, width: 36, run: 110, rise: 80, risers: 11, phase: PHASE, cutsFloorAbove: false })) throw new Error('wing stair rejected');
+  // Photo 24 (from the lake road below) shows it from the south.
+  const wingStair = store().addStairs(bId, { origin: { x: WING.x1 + 22, y: WING.y1 - 6 }, direction: 270, width: 36, run: 110, rise: 80, risers: 11, phase: PHASE, cutsFloorAbove: false });
+  if (!wingStair) throw new Error('wing stair rejected');
 
   // ---- Openings. Every window and door of the outside is an estimate from the photos (README, "What to
   // replace with measurements"); lites are per sash of a window and per leaf of a door. addOpeningAt
@@ -670,7 +680,7 @@ export function buildExamplePlan(): Plan {
   label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, PLACEHOLDER_ROOM);
   label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
 
-  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingSouth, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
+  proposed({ bId, fId, sId, stair, houseDoor, livingWest, hallPassage, eastWindow, eastUpstairs, wingSouth, wingStair, wingRoof, porchRoof, bathDoor, bathWindow, fixtures: casework });
   return getPlan();
 }
 
@@ -688,6 +698,8 @@ interface ExistingIds {
   eastUpstairs: Id[];
   /** The wing's south window (the Utility's, over the walkout doors). */
   wingSouth: Id;
+  /** The wooden stair along the wing's east side (Basement), from the walkout up to the lawn. */
+  wingStair: Id;
   wingRoof: Id;
   porchRoof: Id;
   /** The old bath's door (x 194.5, at the south end of the wall, y 54..84) and its north window (x 234). */
@@ -774,6 +786,8 @@ function proposed(ids: ExistingIds): void {
   // Second Floor: the two east windows. The wing's new shed roof rises to the main block's east wall
   // past their sills (34"), so high transoms replace them (below).
   demolish(ids.sId, { openings: ids.eastUpstairs });
+  // Basement: the wooden stair along the wing's east side (MK: the deck's stair replaces it).
+  demolish(bId, { stairs: [ids.wingStair] });
 
   // ---- 1. East addition: the wing grows north to the road corner at the same depth, one wing down
   // the whole east side, outside x 318..463, y 0..315. Its north wall continues the main block's,
@@ -878,8 +892,8 @@ function proposed(ids: ExistingIds): void {
   // upstairs (x 169). The short flight's run is 36" (two 18" treads, y 79 to 43), the shortest run
   // the store takes. The main flight is 35.5" wide, 1/2" off the north wall's inside face, so its
   // floor opening lies inside the Second Floor's slab (which ends at that face) and is cut.
-  const flight = (s: Omit<NewStairs, 'phase'>) => {
-    if (!store().addStairs(fId, { ...s, phase: NEW })) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
+  const flight = (s: Omit<NewStairs, 'phase'>, levelId: Id = fId) => {
+    if (!store().addStairs(levelId, { ...s, phase: NEW })) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
   };
   flight({ origin: { x: 25, y: 79 }, direction: 270, width: 36, run: 36, rise: 14, risers: 2, cutsFloorAbove: false });
   flight({ origin: { x: 25, y: 43 }, direction: 270, width: 36, run: 36, rise: 14, risers: 1, cutsFloorAbove: false });
@@ -908,6 +922,22 @@ function proposed(ids: ExistingIds): void {
     const d = columnDefaults(getPlan(), 'post', at, NEW);
     if (!store().addColumn({ at, kind: 'post', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP, top: round2(d.top), color: FINISH_COLOR })) throw new Error(`post at y ${y} rejected`);
   }
+
+  // ---- 6. The deck off the master bedroom's sliding door (MK, 14 Oct 2026): about 8' deep, the
+  // wing's width from the retaining wall's east face (x 319.5) to the wing's east face (x 463). Its
+  // top is 6" below the bedroom floor (absolute -4), flush with the retaining wall's top, so the
+  // lake-side terrace (-6) behind the wall steps straight onto it (photos 02, 23 and 24). The wall
+  // and the house carry its west and north edges (no posts there, no railing); railings on the east
+  // and south edges, open where its stair arrives. The stair leads south off the south edge's east
+  // end, 36" wide, down to the lower lawn at -100 (the walkout's level, an estimate: photo 24 shows
+  // the hill still falling past the walkout, and each 7.4" lower adds a riser and 10" of run): 13
+  // risers of 96 / 13 = 7.4", 12 of them in the flight (10" treads) and the deck's edge the 13th.
+  const DECK_SOUTH = WING.y1 + ft(8);
+  deck(fId, { outline: outline({ x0: CL.x1 + 5, x1: WING.x1, y0: WING.y1, y1: DECK_SOUTH }), elevation: -6, railings: [false, true, true, false], phase: NEW });
+  const DECK_RISER = 96 / 13;
+  flight({ origin: { x: WING.x1 - 18, y: DECK_SOUTH + 120 }, direction: 270, width: 36, run: 120, rise: 12 * DECK_RISER, risers: 12, cutsFloorAbove: false }, bId);
+  // The lower lawn at the stair's foot (the walkout's level, an estimate; see above).
+  if (!store().addGradePoint({ at: { x: WING.x1 - 18, y: DECK_SOUTH + 132 }, elevation: -100 })) throw new Error('grade point rejected');
 
   // ---- 2. The kitchen (docs/history/PLAN-v5-kitchen.md): the main kitchen x 173..311, y 102..308
   // inside, and the old bath's alcove x 197..311, y 7..97, open to it along y 97..102. All new;

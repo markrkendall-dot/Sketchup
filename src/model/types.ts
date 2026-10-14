@@ -238,6 +238,24 @@ export interface Column {
   cap?: boolean;
 }
 
+/**
+ * An outdoor deck on a level (DESIGN.md "Decks"): boards over framing on posts down to the ground,
+ * with a 36" railing along the edges that have one. Edges against a wall (any level's) carry no
+ * posts: a ledger holds them.
+ */
+export interface Deck {
+  id: Id;
+  /** Plan polygon of the boards' outer edge (snaps to the outside wall faces). */
+  outline: Vec2[];
+  /** Top of the boards above the level's floor top; negative is below it (a step down). */
+  elevation: Inches;
+  /** One per outline edge (edge i runs from outline[i] to outline[i + 1]): a railing along it. */
+  railings: boolean[];
+  phase: Phase;
+  /** Hex colour `#rrggbb` of the boards, framing and railing. Absent: weathered wood (model/finish.ts). */
+  color?: string;
+}
+
 /** A spot elevation of the ground (M9). */
 export interface GradePoint {
   id: Id;
@@ -276,6 +294,8 @@ export interface Level {
   roofs: Record<Id, Roof>;
   /** Casework and fixtures (schema version 3). */
   fixtures: Record<Id, Fixture>;
+  /** Decks (schema version 4). */
+  decks: Record<Id, Deck>;
   finishes?: LevelFinishes;
   underlay?: Underlay;
 }
@@ -311,7 +331,7 @@ export interface ProposedLook {
 }
 
 export interface Plan {
-  schemaVersion: 3;
+  schemaVersion: 4;
   id: Id;
   name: string;
   levelOrder: Id[]; // bottom to top

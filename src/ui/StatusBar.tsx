@@ -67,6 +67,10 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: 'Click the roof outline corners on the outside wall faces.',
     busy: 'Click the next corner; the first one or Enter closes. Esc cancels.',
   },
+  deck: {
+    idle: 'Click the deck outline corners; they snap to the outside wall faces.',
+    busy: 'Click the next corner; the first one or Enter closes. Esc cancels.',
+  },
   // Replaced by underlayHint(); kept for the Record type.
   underlay: { idle: '', busy: '' },
   fixture: {
@@ -129,6 +133,10 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   },
   roof: {
     idle: 'Click the corners of the roof outline; they snap to the outside corners and faces of the walls. Then set the shape, ridge and slope in the properties panel (or use Fit to walls there).',
+    busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
+  },
+  deck: {
+    idle: "Click the corners of the deck; they snap to the outside corners and faces of the walls. Its top starts 6\" below the floor, with a railing on every edge not against a wall; set both in the properties panel. A flight of stairs drawn up to an edge opens the railing there.",
     busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
   },
   underlay: { idle: '', busy: '' },
@@ -239,7 +247,7 @@ export function StatusBar() {
     (s) =>
       s.draft.wallStart !== null ||
       s.draft.lengthBuffer !== '' ||
-      s.draft.roofPoints.length > 0 ||
+      s.draft.outlinePoints.length > 0 ||
       s.draft.gradePending !== null ||
       s.draft.rectStart !== null ||
       (s.draft.measure !== null && s.draft.measure.b === null),
@@ -274,6 +282,11 @@ export function StatusBar() {
   const roofCount = usePlanStore((s) => {
     let n = 0;
     for (const r of Object.values(s.plan.levels[levelId]?.roofs ?? {})) if (isVisible(r.phase, viewMode)) n++;
+    return n;
+  });
+  const deckCount = usePlanStore((s) => {
+    let n = 0;
+    for (const d of Object.values(s.plan.levels[levelId]?.decks ?? {})) if (isVisible(d.phase, viewMode)) n++;
     return n;
   });
   const fixtureCount = usePlanStore((s) => {
@@ -352,7 +365,7 @@ export function StatusBar() {
       <span className="status-view" title="View mode (V)">
         View: {VIEW_MODE_LABEL[viewMode]}
       </span>
-      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs and columns">
+      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs, decks and columns">
         Drawing: {PHASE_LABEL[drawPhase].toLowerCase()}
       </span>
       <span className="status-counts">
@@ -366,6 +379,11 @@ export function StatusBar() {
             {roofCount > 0 && (
               <>
                 , {roofCount} {roofCount === 1 ? 'roof' : 'roofs'}
+              </>
+            )}
+            {deckCount > 0 && (
+              <>
+                , {deckCount} {deckCount === 1 ? 'deck' : 'decks'}
               </>
             )}
             {fixtureCount > 0 && (

@@ -17,6 +17,7 @@ import { fixtureTool } from './fixtureTool';
 import { doorTool, passageTool, windowTool } from './openingTool';
 import { measureTool } from './measureTool';
 import { rectTool } from './rectTool';
+import { deckTool } from './deckTool';
 import { roofTool } from './roofTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
@@ -76,6 +77,7 @@ const tools: Record<ToolName, Tool> = {
   passage: passageTool,
   stairs: stairsTool,
   roof: roofTool,
+  deck: deckTool,
   underlay: underlayTool,
   fixture: fixtureTool,
   gradePoint: gradePointTool,
@@ -227,11 +229,12 @@ export function pruneSelection(): void {
   const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
   const roofs = sel.roofs.filter((id) => level.roofs[id] && isVisible(level.roofs[id].phase, vm));
   const fixtures = sel.fixtures.filter((id) => level.fixtures[id] && isVisible(level.fixtures[id].phase, vm));
+  const decks = sel.decks.filter((id) => level.decks?.[id] && isVisible(level.decks[id].phase, vm));
   const site = getPlan().site;
   const gradePoints = sel.gradePoints.filter((id) => site.gradePoints[id]);
   const columns = sel.columns.filter((id) => site.columns[id] && isVisible(site.columns[id].phase, vm));
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + gradePoints.length + columns.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, fixtures, gradePoints, columns });
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + gradePoints.length + columns.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, gradePoints, columns });
   }
   // An inline rename of a room that undo removed has nothing left to edit.
   const edit = ui.roomEdit;

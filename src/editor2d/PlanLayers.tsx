@@ -1,10 +1,11 @@
 import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
+import { deckTopWords, getDeckLayout } from '../derive/decks';
 import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
-import { faceAt, getFaces, type Face, type FaceSet } from '../derive/rooms';
+import { faceAt, getFaces, interiorPoint, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
 import { siteGhostLevelId } from '../derive/site';
 import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
@@ -424,7 +425,7 @@ const NO_RECORD: Readonly<Record<Id, unknown>> = {};
  * layer of per-entity components does not re-render (and re-create every child) when an entity
  * only changes, e.g. on every step of a corner drag. The children select their own entity.
  */
-function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures'): Id[] {
+function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stairs' | 'roofs' | 'fixtures' | 'decks'): Id[] {
   return useLayerPlan(useShallow((s) => Object.keys(s.plan.levels[levelId]?.[kind] ?? NO_RECORD)));
 }
 
@@ -619,22 +620,85 @@ const RoofShape = memo(function RoofShape({ levelId, roofId, ghost }: { levelId:
       <path className="roof-overhang" d={d.overhang} vectorEffect="non-scaling-stroke" />
       <path className="roof-outline" d={d.outline} vectorEffect="non-scaling-stroke" />
       {d.ridge && <path className="roof-ridge" d={d.ridge} vectorEffect="non-scaling-stroke" />}
-      {selected && <RoofHandles outline={roof.outline} />}
+      {selected && <OutlineHandles outline={roof.outline} className="roof-handle" />}
     </g>
   );
 });
 
-/** Corner handles of a selected roof, constant on screen (only these follow the zoom). */
-function RoofHandles({ outline }: { outline: readonly Vec2[] }) {
+/** Corner handles of a selected roof or deck, constant on screen (only these follow the zoom). */
+function OutlineHandles({ outline, className }: { outline: readonly Vec2[]; className: string }) {
   const k = useLayerUi(viewportScale);
   return (
     <>
       {outline.map((p, i) => (
-        <rect key={i} className="roof-handle" x={p.x - 4 / k} y={p.y - 4 / k} width={8 / k} height={8 / k} vectorEffect="non-scaling-stroke" />
+        <rect key={i} className={className} x={p.x - 4 / k} y={p.y - 4 / k} width={8 / k} height={8 / k} vectorEffect="non-scaling-stroke" />
       ))}
     </>
   );
 }
+
+/**
+ * A deck on the plan (DESIGN.md "Decks"): the outline filled light with the board joints, the
+ * railing caps as bands (open where a flight of stairs reaches the deck), the support posts as
+ * small dashed squares and a "Deck" label with its top against the floor; demolished hatched red,
+ * new green, like roofs. A selected deck shows handles on its corners.
+ */
+const DeckShape = memo(function DeckShape({ levelId, deckId }: { levelId: Id; deckId: Id }) {
+  const deck = useLayerPlan((s) => s.plan.levels[levelId]?.decks?.[deckId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const layout = useLayerPlan((s) => getDeckLayout(s.plan, levelId, deckId, viewMode));
+  const selected = useLayerUi((s) => s.selection.decks.includes(deckId));
+  const k = useLayerUi(viewportScale);
+  const denom = useLayerPlan((s) => s.plan.settings.precisionDenominator);
+  const paths = useMemo(
+    () =>
+      deck && layout
+        ? {
+            outline: polyPath(deck.outline),
+            boards: segPath(layout.boardLines),
+            caps: layout.caps.map(polyPath).join(''),
+            posts: layout.posts.map((p) => polyPath(p.poly)).join(''),
+            at: interiorPoint(deck.outline),
+          }
+        : null,
+    [deck, layout],
+  );
+  if (!deck || !paths || !isVisible(deck.phase, viewMode)) return null;
+  return (
+    <g className={`deck phase-${shownPhase(deck.phase, viewMode)}${selected ? ' is-selected' : ''}`} data-deck-id={deckId}>
+      <path className="deck-fill" d={paths.outline} vectorEffect="non-scaling-stroke" />
+      {paths.boards && <path className="deck-boards" d={paths.boards} vectorEffect="non-scaling-stroke" />}
+      {paths.posts && <path className="deck-post" d={paths.posts} vectorEffect="non-scaling-stroke" />}
+      {paths.caps && <path className="deck-rail" d={paths.caps} vectorEffect="non-scaling-stroke" />}
+      <g transform={`translate(${paths.at.x} ${paths.at.y}) scale(${1 / k})`} className="deck-label">
+        <text className="deck-name" textAnchor="middle" y={-7} dominantBaseline="central">
+          Deck
+        </text>
+        <text className="deck-top" textAnchor="middle" y={8} dominantBaseline="central">
+          {deckTopWords(deck.elevation, denom)}
+        </text>
+      </g>
+      {selected && <OutlineHandles outline={deck.outline} className="deck-handle" />}
+    </g>
+  );
+});
+
+/**
+ * The level's decks, over the room fills and stair holes and under the roofs (an overhang draws over
+ * the deck it shelters). Picking is done by the tools (selectTool hitTest).
+ */
+const DecksLayer = memo(function DecksLayer({ levelId }: { levelId: Id }) {
+  const ids = useEntityIds(levelId, 'decks');
+  const tool = useLayerUi((s) => s.activeTool);
+  if (ids.length === 0) return null;
+  return (
+    <g className="layer-decks" pointerEvents={tool === 'select' || tool === 'deck' ? 'auto' : 'none'}>
+      {ids.map((id) => (
+        <DeckShape key={id} levelId={levelId} deckId={id} />
+      ))}
+    </g>
+  );
+});
 
 /**
  * The level's roofs, above the room fills and below the walls. Picking is done by the tools
@@ -1135,6 +1199,7 @@ export const PlanLayers = memo(function PlanLayers({ levelId }: { levelId: Id })
       <UnderlayLayer levelId={levelId} />
       <RoomFillsLayer levelId={levelId} />
       <StairHolesLayer levelId={levelId} />
+      <DecksLayer levelId={levelId} />
       <RoofGhostLayer levelId={levelId} />
       <RoofsLayer levelId={levelId} />
       <StairsLayer levelId={levelId} />

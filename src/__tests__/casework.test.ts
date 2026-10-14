@@ -396,8 +396,7 @@ describe('casework meshes', () => {
 
 describe('fixtures in files', () => {
   it('schema 3 adds fixtures to every level; a v2 file gains empty records', () => {
-    expect(SCHEMA_VERSION).toBe(3);
-    expect(createEmptyPlan().schemaVersion).toBe(3);
+    expect(createEmptyPlan().schemaVersion).toBe(SCHEMA_VERSION);
     const v2 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 2 }));
     for (const l of Object.values(v2.levels) as Record<string, unknown>[]) delete l.fixtures;
     const up = MIGRATIONS[2](v2);

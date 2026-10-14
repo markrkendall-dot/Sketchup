@@ -55,7 +55,7 @@ export function planHasContent(plan: Plan): boolean {
     const l = plan.levels[id];
     return (
       l &&
-      (Object.keys(l.walls).length > 0 || Object.keys(l.rooms).length > 0 || Object.keys(l.stairs).length > 0 || Object.keys(l.roofs ?? {}).length > 0 || !!l.underlay)
+      (Object.keys(l.walls).length > 0 || Object.keys(l.rooms).length > 0 || Object.keys(l.stairs).length > 0 || Object.keys(l.roofs ?? {}).length > 0 || Object.keys(l.fixtures ?? {}).length > 0 || Object.keys(l.decks ?? {}).length > 0 || !!l.underlay)
     );
   });
 }
