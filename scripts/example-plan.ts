@@ -184,6 +184,13 @@ const PART_KL = 170.5;
 /** The First Floor's y 99.5 line: the Kitchen's north wall and the front room's south wall. */
 const FRONT_LINE = 99.5;
 /**
+ * The basement's three north-south girders under the First Floor's east-west joists (MK's markup, 15
+ * Oct 2026): their centerlines, estimated from the sketch (the middle one taken under PART_KL).
+ */
+const GIRDERS = [77.5, PART_KL, 259.5];
+/** A placeholder size for the girders until they are measured: a built-up three 2x8s. */
+const GIRDER = { width: 4.5, depth: 7.25, label: 'existing girder (size and place to measure)' };
+/**
  * The proposed upstairs bath: its west face (the old bath's, x 174), the old bath's east wall line
  * (x 220.5) and the new south wall east of it (y 72.5, faces 70..75).
  */
@@ -1124,8 +1131,8 @@ function proposed(ids: ExistingIds): void {
   // from the hall, the 4'5" wall and that doorway. The 16" wall south of it and the pass-through stay.
   // The partition bears (the upstairs Master/Guest partition stands on it and the two ceiling beams'
   // ends land on it), so a flush beam over the opening carries that to its ends: the studs and the
-  // (2) 6x6 at y 99.5, and a post in the 16" wall with one under it to a footing (the engineer's;
-  // the tool notes the header).
+  // (2) 6x6 at y 99.5, and studs in the 16" wall with a 6x6 under them to a footing (drawn with the
+  // structure below; the engineer sizes them).
   const KL_OPEN = { north: 102.5, south: 236 };
   add({ x: PART_KL, y: (KL_OPEN.north + KL_OPEN.south) / 2 }, { type: 'passage', width: KL_OPEN.south - KL_OPEN.north, height: level(fId).wallHeight, sill: 0 });
   // The stair hall: a 24" window over the stair's landing in the north wall (x 13..37, sill 36, 2 x
@@ -1673,8 +1680,16 @@ function proposed(ids: ExistingIds): void {
   }
 
   // ---- Structure (docs/history/PLAN-v8-stair-structure.md; estimates for MK and the engineer).
+  // MK, 15 Oct 2026 (a markup of the basement ceiling): the First Floor's joists run east-west, over
+  // three north-south girders on posts. The girders' places are read off the sketch (about 6'5",
+  // 14'2" and 21'8" from the west face; the middle one, the heaviest, taken as under the Kitchen/Living
+  // partition, which the sketch puts about 8" west of it) and their sizes and posts are still to
+  // measure, so they are drawn as existing placeholders without the posts. Which way the Second
+  // Floor's joists run (over the First Floor) is not known; the rest of this note takes them
+  // north-south, as MK said on 14 Oct 2026 of the house generally. If they run east-west instead, the
+  // y 99.5 wall bears nothing and the old bath wall (x 194.5) bears: README "Still open".
   // MK, 14 Oct 2026: the house was built in stages and its joists run north-south generally, so
-  // every level's framing is north-south. The one known exception is the wing's ceiling: its shed
+  // the upper levels' framing is north-south. The one known exception is the wing's ceiling: its shed
   // roof slopes east-west, so its rafters and ceiling joists run that way, over the utility today
   // and over the whole east side under the new shed (two zones: existing, and new north of the
   // utility). Its floor over the crawl space is left north-south (unknown). The proposed design takes
@@ -1688,7 +1703,11 @@ function proposed(ids: ExistingIds): void {
   // (5 1/2" x 11"). The header also rests on a peeled log post (MK, 15 Oct 2026) in the middle of the
   // hall, on the line of the old wall between the front room and the Living, carried down to its own
   // footing by a 6x6 in the basement.
-  for (const lid of [bId, fId, sId]) store().setLevelFraming(lid, { joists: 90 });
+  store().setLevelFraming(bId, { joists: 0 });
+  for (const lid of [fId, sId]) store().setLevelFraming(lid, { joists: 90 });
+  for (const x of GIRDERS) {
+    if (!store().addMember(bId, { kind: 'beam', a: { x, y: CL.y0 }, b: { x, y: CL.y1 }, width: GIRDER.width, depth: GIRDER.depth, mount: 'dropped', label: GIRDER.label, phase: PHASE })) throw new Error('girder rejected');
+  }
   const wingZones: [Rect, Phase][] = [
     [{ x0: WING.x0, x1: WING.x1, y0: WING.y0, y1: WING.y1 }, 'existing'],
     [{ x0: WING.x0, x1: WING.x1, y0: MAIN.y0, y1: WING.y0 }, NEW],
@@ -1713,14 +1732,19 @@ function proposed(ids: ExistingIds): void {
   };
   ceilingBeam({ x: CL.x0, y: 137.5 }, { x: 171.5, y: 137.5 });
   ceilingBeam({ x: 171.5, y: 152.5 }, { x: CL.x1, y: 152.5 });
-  // Their inner ends come down the partitions (upstairs x 171.5, below it the Kitchen/Living wall),
-  // and a 6x6 on a footing in the basement under each takes them to the ground.
-  for (const y of [137.5, 152.5]) {
-    if (!store().addMember(bId, { kind: 'post', at: { x: 171.5, y }, width: POST.width, depth: POST.width, rotation: 0, label: '6x6', phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post under a ceiling beam rejected');
+  // Their inner ends come down the upstairs partition (x 171.5) onto the Kitchen/Living wall, which
+  // the opening (y 102.5..236) cuts, so a flush beam over the opening carries them, and the
+  // partition, to its ends: the studs at y 99.5, and new studs in the middle of the 16" wall south of
+  // it. Both ends stand over the middle girder; a post on a footing under each takes them to the
+  // ground (the (2) 6x6 at y 99.5, and a 6x6 at the south end). No post stands in a room upstairs.
+  const KL_SOUTH = KL_OPEN.south + 8;
+  beam({ x: PART_KL, y: FRONT_LINE }, { x: PART_KL, y: KL_SOUTH });
+  if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: KL_SOUTH }, width: POST.width, depth: POST.width, rotation: 0, label: '6x6', phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post under the opening beam rejected');
+  // Studs under the beams' ends in the partition (two 2x4s, 3 1/2" square), down to the basement
+  // posts.
+  for (const y of [FRONT_LINE, KL_SOUTH]) {
+    if (!store().addMember(fId, { kind: 'post', at: { x: PART_KL, y }, width: 3.5, depth: 3.5, rotation: 0, label: '(2) 2x4', phase: NEW })) throw new Error('studs rejected');
   }
-  // Studs under the beams' shared end in the partition (two 2x4s, 3 1/2" square), down to the
-  // basement post.
-  if (!store().addMember(fId, { kind: 'post', at: { x: PART_KL, y: FRONT_LINE }, width: 3.5, depth: 3.5, rotation: 0, label: '(2) 2x4', phase: NEW })) throw new Error('studs rejected');
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two
   // never share a face there. The proposed floors (MK, 15 Oct 2026): whitewashed 6" pine through

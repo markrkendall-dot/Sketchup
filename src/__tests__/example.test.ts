@@ -810,9 +810,10 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(screens.every((o) => banded.some((w) => w.id === o.wallId) && o.sill === 36)).toBe(true);
   });
 
-  it('has the structure the proposed design needs: joists, the balcony header, the kitchen beam, a post on a footing', () => {
+  it('has the structure the proposed design needs: joists, the balcony header, the kitchen beam, the opening beam, posts on footings', () => {
     const [bId, fId, sId] = plan.levelOrder;
-    for (const id of [bId, fId, sId]) expect(plan.levels[id].framing).toEqual({ joists: 90 });
+    // East-west over the basement (MK's markup), north-south above (unconfirmed over the First Floor).
+    expect([bId, fId, sId].map((id) => plan.levels[id].framing)).toEqual([{ joists: 0 }, { joists: 90 }, { joists: 90 }]);
     // East-west zones under the wing's shed roof only: over the utility today, and north of it.
     const zones = Object.values(plan.levels[fId].joistZones);
     expect(zones.map((z) => [z.joists, z.phase])).toEqual([
@@ -824,13 +825,18 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([plan.levels[bId].joistZones, plan.levels[sId].joistZones]).toEqual([{}, {}]);
     const members = Object.values(plan.levels[fId].members);
     const beams = members.filter((m) => m.kind === 'beam' && !isTimber(m));
-    // The stair hall's header and the kitchen beam, both on the old wall's line (y 99.5).
+    // The stair hall's header and the kitchen beam, both on the old wall's line (y 99.5), and the beam
+    // over the Kitchen/Living opening (y 102.5..236), from their shared end into the 16" wall.
     expect(beams.map((m) => m.kind === 'beam' && [m.a, m.b, m.mount, m.phase, m.label])).toEqual([
       [{ x: 3.5, y: 99.5 }, { x: 170.5, y: 99.5 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL'],
       [{ x: 170.5, y: 99.5 }, { x: 314.5, y: 99.5 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL'],
+      [{ x: 170.5, y: 99.5 }, { x: 170.5, y: 244 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL'],
     ]);
-    // Studs under their shared end in the partition.
-    expect(members.filter((m) => m.kind === 'post' && !isTimber(m)).map((m) => m.kind === 'post' && [m.at, m.width, m.label])).toEqual([[{ x: 170.5, y: 99.5 }, 3.5, '(2) 2x4']]);
+    // Studs in the partition under the beams' ends: no post stands in a room.
+    expect(members.filter((m) => m.kind === 'post' && !isTimber(m)).map((m) => m.kind === 'post' && [m.at, m.width, m.label])).toEqual([
+      [{ x: 170.5, y: 99.5 }, 3.5, '(2) 2x4'],
+      [{ x: 170.5, y: 244 }, 3.5, '(2) 2x4'],
+    ]);
     // Upstairs, no hall: a flush beam in the ceiling framing on each of the Master's and the Guest's
     // old north walls' lines picks up the ceiling joists they carried.
     const ceiling = Object.values(plan.levels[sId].members).filter((m) => m.kind === 'beam');
@@ -860,14 +866,16 @@ describe('docs/examples/146-mick-road.json', () => {
       '10" log plate': 1,
     });
     expect(timbers.every((m) => m.profile === 'log' && m.color === '#3f2c1f' && m.phase === 'new')).toBe(true);
-    const posts = Object.values(plan.levels[bId].members);
-    // Basement posts on footings: under the beams' shared end, under the log post, and under the
-    // upstairs ceiling beams' inner ends.
-    expect(posts).toEqual([
+    // The basement: the three existing north-south girders (placeholders from MK's sketch, the middle
+    // one under the partition), then new posts on footings: under the beams' shared end, under the
+    // log post, and under the opening beam's south end, both ends on the middle girder's line.
+    expect(Object.values(plan.levels[bId].members)).toEqual([
+      ...[77.5, 170.5, 259.5].map((x) =>
+        expect.objectContaining({ kind: 'beam', a: { x, y: 3.5 }, b: { x, y: 311.5 }, mount: 'dropped', phase: 'existing', label: 'existing girder (size and place to measure)' }),
+      ),
       expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 99.5 }, width: 5.5, depth: 11, footing: { width: 24, thickness: 12 }, phase: 'new' }),
       expect.objectContaining({ kind: 'post', at: { x: 88, y: 99.5 }, width: 5.5, depth: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' }),
-      expect.objectContaining({ kind: 'post', at: { x: 171.5, y: 137.5 }, width: 5.5, depth: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' }),
-      expect.objectContaining({ kind: 'post', at: { x: 171.5, y: 152.5 }, width: 5.5, depth: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' }),
+      expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 244 }, width: 5.5, depth: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' }),
     ]);
     // No wall is marked: the tool infers them all.
     expect(Object.values(plan.levels[fId].walls).filter((w) => w.bearing !== undefined)).toEqual([]);

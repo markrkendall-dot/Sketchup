@@ -549,6 +549,11 @@ and the plan's north angle is 0.
   12'9" (adjusted), Office / hall 7'4" x 11'11" (adjusted). The Office / hall is one face with the
   landing and the stair well, with no wall between them, so its net bounding box is wide
   (x 42 to 311) and its panel lists the sides of the L. Also no open wall ends.
+- **Basement ceiling** (MK's markup, 15 Oct 2026): the First Floor's joists run east-west over
+  three north-south girders on posts, the middle one the heaviest. The girders are drawn as
+  existing placeholders, from the sketch, at about 6'5", 14'2" and 21'8" from the west face (the
+  middle one taken as under the Kitchen/Living partition; the sketch puts it about 8" west), a
+  built-up 4 1/2" x 7 1/4" until measured; their posts are not drawn yet.
 - **Basement**: no partitions yet. The main block is one area ("Basement (unpartitioned, est.)")
   and the walkout bump under the wing is labelled separately as "Utility (below)": it is closed off
   from the main block by the block's east wall in the starter, and stays a separate space until you
@@ -773,8 +778,8 @@ where the built design differs from them):
    under the transom. Its south window, its only low one since the east window became a transom, is
    **two 32" casements** in place of three of 20 1/2", so it is a way out in a fire. The old walls
    between them carried the ceiling joists, so a flush beam in the ceiling on each of their lines
-   picks them up, down the Master/Guest partition and the Kitchen/Living wall below to a 6x6 on a
-   footing in the basement under each (placeholders for the engineer).
+   picks them up, down the Master/Guest partition onto the beam over the Kitchen/Living opening
+   below (placeholders for the engineer).
 
    The house door (32", green) is in the west wall in the middle of the old stair strip, in line
    with the foyer's front door, and the strip runs straight on into the kitchen through the wide
@@ -794,7 +799,9 @@ where the built design differs from them):
      end to the south side of today's 48" Living doorway, in place of the hall's cased opening, the
      4'5" wall and that doorway; the 16" wall south of it and the pass-through stay. The wall bears
      (the upstairs Master/Guest partition stands on it and two ceiling beams' ends land on it), so a
-     flush beam over the opening carries that to its ends (see "The engineer");
+     flush beam over the opening carries that to its ends: the studs at y 99.5, and studs in the
+     middle of the 16" wall, each with a post on a footing under it in the basement, on the middle
+     girder's line. No post stands in a room (see "The engineer");
    - on the **north wall** (the pantry's): west of the pantry door a 24" base for trash and
      recycling, then a 15" base, the **range** with its hood and a 20" base into the corner, wall
      cabinets over the bases. The hood's 8" duct runs straight north through the pantry, across its
@@ -978,6 +985,9 @@ Still open, by who answers it (the design decisions are made; what follows is fo
 the engineer, the trades and the tape measure):
 
 **MK**
+- Which way the Second Floor's joists run (over the First Floor): see the old stair opening's
+  header, which way the Second Floor's subfloor or floorboards run (joists cross them), or look
+  through a ceiling light's box. It decides which walls bear (see "The engineer").
 - How is the basement reached today? No stair down to it is drawn inside the house; where are the
   water heater, the panel and the well equipment, and is an inside stair wanted?
 - The porch's size and roofline wait on MK's reference pictures (estimated 8' out; the foyer's
@@ -990,16 +1000,30 @@ the engineer, the trades and the tape measure):
 - Size the stair hall's header and the kitchen beam (both on y 99.5), the studs in the partition
   under their shared end, the basement post (two 6x6s) and its 24" x 12" footing; the 6x6 and
   footing under the peeled log post; and upstairs the two ceiling beams on the Master's and the
-  Guest's old north walls' lines (y 137.5 and y 152.5), with a 6x6 and footing in the basement
-  under each inner end. The checks find nothing missing in that load path.
-- The flush beam over the 11'1 1/2" Kitchen/Living opening: it carries the upstairs Master/Guest
-  partition and the two ceiling beams' inner ends (y 137.5 and y 152.5) to its ends, the studs and
-  the (2) 6x6 at y 99.5 and a post in the 16" wall south of the opening, with one under it to a
-  footing. The basement 6x6s planned under the ceiling beams' ends move to the opening's ends. The
-  tool draws the wall as continuous with a header (noted HDR), so it does not show this.
-- Confirm the y 99.5 wall was the bearing wall (the tool infers it: the joists would span 25'-8"
-  without it) and that the Bunk's south wall upstairs carried no more than itself (the attic joists
-  span 11'-2" without it). Survey the basement under the post.
+  Guest's old north walls' lines (y 137.5 and y 152.5). The checks find nothing missing in that
+  load path.
+- The flush beam over the 11'1 1/2" Kitchen/Living opening, 12' from y 99.5 into the 16" wall: it
+  carries the upstairs Master/Guest partition and the two ceiling beams' inner ends to its ends,
+  the studs and (2) 6x6 at y 99.5 and new studs in the 16" wall with a 6x6 and footing under them.
+  Both basement posts stand on the middle girder's line, next to or replacing its existing posts.
+- **Where posts go, and whether one has to stand in a room upstairs.** Every new beam ends on a
+  wall, with studs in it and a post on a footing straight under them in the basement (never on a
+  joist between girders, never on the slab without a footing). As drawn, no post has to stand in an
+  open room on either floor; the peeled log post is MK's choice, and whether the header can span
+  13'-11" without it is the engineer's. That holds in both cases below, so long as each beam can be
+  sized (LVL, PSL, glulam or steel; deeper, or dropped as a soffit, where flush depth is not enough)
+  to span from wall to wall.
+- **Which way the Second Floor's joists run** (over the First Floor) decides which walls come out
+  bearing. North-south (drawn): the y 99.5 wall bears and its two beams pick it up. East-west (the
+  same as the basement's): the y 99.5 wall bears nothing, and the **old bath wall (x 194.5)** bears
+  instead, for the north strip (the joists would span 25'-11" without it); it then needs a beam on
+  its line, 8', whose south end hangs on the kitchen beam at y 99.5 (no post in the kitchen). The
+  tool shows this: set the First Floor's **Joists over this level** to 0 and the checks flag the
+  wall. Confirm the Bunk's south wall upstairs carried no more than itself (the attic joists span
+  11'-2" without it). Survey the basement under the posts.
+- **While walls come out**: temporary shoring walls on both sides of a bearing wall before it is
+  cut, carried down to the basement floor (onto the girders' lines) as well, not left on the
+  first floor's joists.
 - The headers noted HDR on the structure overlay: the wide opening in the partition, the French
   doors to the porch, the two First Floor north windows and the stair hall's upper north window
   (and the bedroom's door and the Guest's window, which go in today's openings).
@@ -1035,8 +1059,11 @@ the engineer, the trades and the tape measure):
 
 **The tape measure** (before ordering anything)
 - Every new size is from the plan, not measured.
-- The joists: taken as north-south on every level (MK), east-west in the wing's ceiling under its
-  shed; the wing's floor over the crawl space is unknown.
+- The joists: east-west over the basement (MK's markup), taken as north-south on the upper levels
+  (MK), east-west in the wing's ceiling under its shed; the wing's floor over the crawl space is
+  unknown.
+- The basement girders: each one's distance from the west wall's outside face, its size (plies and
+  depth, or steel), and where its posts stand and what they are.
 - The retaining wall's line (the site sketch is not to scale) and the ground either side of it.
 
 To change the design, edit it in the app (select, move, **Mark demolish**, draw with **Draw as:
