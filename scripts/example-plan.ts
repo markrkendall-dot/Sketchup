@@ -180,6 +180,8 @@ const FRONT_LINE = 99.5;
  * (x 220.5) and the new south wall east of it (y 72.5, faces 70..75).
  */
 const UP_BATH = { west: 174, east: 220.5, south: 72.5 };
+/** The proposed master bedroom's king bed: its centre north-south, its headboard on the wing's east wall. */
+const BED_Y = 230;
 
 type Rect = { x0: number; x1: number; y0: number; y1: number };
 const outline = (r: Rect): Vec2[] => [
@@ -894,7 +896,9 @@ function proposed(ids: ExistingIds): void {
   // line that wall). The old fixtures: the Kitchen's casework, the Bath's, the
   // Utility's, and the wood stove with the pipe chase behind it. Today's grey Kitchen to Utility door
   // (3 x 3 clear lites over two panels): it becomes the master bedroom's door, so a solid one takes
-  // its place (the livability review, docs/history/PLAN-v12-livability.md). Today's 48" doorway from
+  // its place (the livability review, docs/history/PLAN-v12-livability.md). Today's casement pair in
+  // the wing's east gable end: the king bed's headboard goes there, so two narrower windows flank it
+  // (MK, 15 Oct 2026). Today's 48" doorway from
   // the Living to the Kitchen: it and the wall north of it give way to one wide opening (MK, 15 Oct
   // 2026, below).
   demolish(fId, {
@@ -908,7 +912,7 @@ function proposed(ids: ExistingIds): void {
       { x: 60, y: 99.5 },
       { x: 194.5, y: 30 },
     ],
-    openings: [ids.eastWindow, ids.wingSouth, ids.houseDoor, ids.livingWest, ids.frontWindow, ids.bathWindow, openingAt(fId, { x: CL.x1, y: 264 }), openingAt(fId, { x: PART_KL, y: 212 })],
+    openings: [ids.eastWindow, ids.wingSouth, ids.houseDoor, ids.livingWest, ids.frontWindow, ids.bathWindow, openingAt(fId, { x: CL.x1, y: 264 }), openingAt(fId, { x: PART_KL, y: 212 }), openingAt(fId, { x: wing.x1, y: (WING.y0 + WING.y1) / 2 })],
     stairs: [ids.stair],
     roofs: [ids.wingRoof, ids.porchRoof],
     fixtures: ids.fixtures,
@@ -953,13 +957,6 @@ function proposed(ids: ExistingIds): void {
   const addition = drawWalls(fId, [{ x: CL.x1, y: CL.y0 }, { x: wing.x1, y: CL.y0 }, { x: wing.x1, y: wing.y0 }], T, false, NEW);
   store().updateWalls(fId, addition, { finish: 'shingle', color: FINISH_COLOR });
   partition(fId, { x: CL.x1, y: ADD.y }, { x: wing.x1, y: ADD.y }, NEW);
-  // The bedroom's closet (the livability review: it had none), a small walk-in in its north-west
-  // corner, x 318..368, y 122.5..180.5 inside: its front wall at y 183 meets the main block's east
-  // wall south of the demolished east window (jambs 140..180), so that window keeps its place in the
-  // existing view, and its side wall (x 370.5) stays 2" clear of the bath door's jamb (375).
-  const CLOSET = { front: 183, side: 370.5 };
-  partition(fId, { x: CL.x1, y: CLOSET.front }, { x: CLOSET.side, y: CLOSET.front }, NEW);
-  partition(fId, { x: CLOSET.side, y: ADD.y }, { x: CLOSET.side, y: CLOSET.front }, NEW);
   // The foundation under it: 8" block from the main block's north-east corner to the bump's.
   const footing = drawWalls(bId, [{ x: CL.x1, y: CL.y0 }, { x: wing.x1, y: CL.y0 }, { x: wing.x1, y: wing.y0 }], TB, false, NEW);
   store().updateWalls(bId, footing, { finish: 'block', color: BLOCK_COLOR });
@@ -1016,14 +1013,18 @@ function proposed(ids: ExistingIds): void {
   // The bedroom's way in stays where today's grey door is (MK), but solid: a 32" stained door in its
   // place (the old one had clear glass looking from the dining table into the bedroom).
   add({ x: CL.x1, y: 264 }, { type: 'door', width: 32, height: 80, into: EAST, leafColor: STAINED_DOOR });
-  // The closet's 24" door at the east end of its front wall, swinging out into the bedroom.
-  add({ x: 355, y: CLOSET.front }, { type: 'door', width: 24, height: 80, into: SOUTH, leafColor: STAINED_DOOR });
   add({ x: LAUNDRY.front, y: (LAUNDRY.north + 2.5 + ADD.y - 2.5) / 2 }, { type: 'passage', width: 56, height: 80, sill: 0 });
   // The bath's north window is a transom, high for privacy from the road: 46 x 18, two sashes of
-  // 2 x 1 lites, sill 70 (head 88).
-  add({ x: 390, y: CL.y0 }, { type: 'window', width: 46, height: 18, sill: 70, sashes: 2, lites: { cols: 2, rows: 1 } });
+  // 2 x 1 lites, sill 70 (head 88), over the vanity east of the walk-in shower (x 406..452).
+  add({ x: 429, y: CL.y0 }, { type: 'window', width: 46, height: 18, sill: 70, sashes: 2, lites: { cols: 2, rows: 1 } });
   add({ x: wing.x1, y: 62 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
-  add({ x: wing.x1, y: 160 }, { type: 'window', width: 48, height: 44, sashes: 2, lites: { cols: 2, rows: 3 } });
+  // The bedroom's east windows flank the king bed (MK, 15 Oct 2026; the bed is centred y 230, its
+  // sides y 191..269): 30 x 44 casements, 2 x 3 lites, over the nightstands, centred 59" either side
+  // of the bed's centre (jambs 156..186 and 274..304). They take the place of a 48" pair at y 160
+  // and of today's casement pair in the wing's east gable end (y 251.5), which the bed would cover.
+  const flank = { type: 'window' as const, width: 30, height: 44, lites: { cols: 2, rows: 3 } };
+  add({ x: wing.x1, y: BED_Y - 59 }, flank);
+  add({ x: wing.x1, y: BED_Y + 59 }, flank);
   // The bedroom's south window becomes a 72 x 80 sliding door on the same centre, over the walkout's
   // 72" double door below, two panels of 2 x 4 lites. No transom over it: under the 96" ceiling it
   // could be 12" at most with its head at the ceiling (no room for a header or a casing).
@@ -1337,7 +1338,7 @@ function proposed(ids: ExistingIds): void {
   // The east wall (shared with the master suite), fronts facing west, north to south: a 24" corner
   // base (y 60..84, its counter mitred into the north run's), a 30" and a 24" base (to y 138); the
   // refrigerator, 36" wide and counter-depth (29", x 282..311), at y 140..176, 2" off the base for its
-  // door, its back on the master bedroom's walk-in closet (y 122.5..180.5), which deadens its hum; a
+  // door, its back partly on the master bedroom's west wardrobe (y 122.5..146.5), which deadens some of its hum; a
   // 24" base after it (y 176..200) for a landing. Wall cabinets over the bases, one over the
   // refrigerator. South of y 200 the east wall is the way to the master bedroom's door (y 248..280).
   const eastWall = (kind: NewFixture['kind'], y: number, width: number, depth: number, height: number, elevation = 0) =>
@@ -1396,17 +1397,40 @@ function proposed(ids: ExistingIds): void {
   kitchen({ kind: 'sink', origin: { x: PART_KL - TI / 2, y: POWDER_MID }, direction: 180, width: 18, depth: 12, height: 31.5 });
 
   // ---- The master bath's placeholders (x 318..456, y 7..117.5, door at x 375..403 swinging in from
-  // the partition): a 36" shower in the north-west corner, a 48" vanity on the north wall under the
-  // transom (sill 70), the WC against the east wall south of the east window (y 38..86), and in the
-  // laundry closet the washer and the dryer, 27" each, side by side facing east, 4" off the back
-  // wall for the dryer's vent, their fronts at the closet's opening (x 350).
-  kitchen({ kind: 'box', label: 'Shower', origin: { x: 336, y: 7 }, direction: 90, width: 36, depth: 36, height: 78, frontColor: WHITE });
-  kitchen({ kind: 'sink', origin: { x: 424, y: 7 }, direction: 90, width: 48, depth: 21, height: 34.5 });
+  // the partition). A walk-in shower (MK, 15 Oct 2026: walk in, large, with seating) along the north
+  // wall's west end, x 318..402, y 7..49 (7' x 3'6"), curbless and doorless: an 18" tiled bench across
+  // its west end, the laundry closet's north wall its south side as far as x 355, then a 17" fixed
+  // glass panel, and a 30" way in (x 372..402) straight ahead of the bath door; a 4" tiled wall at its
+  // east end, full height. A 48" vanity on the north wall east of it, under the transom (sill 70);
+  // the WC against the east wall south of the east window (y 38..86); and in the laundry closet the
+  // washer and the dryer, 27" each, side by side facing east, 4" off the back wall for the dryer's
+  // vent, their fronts at the closet's opening (x 350).
+  // The floor's tile is drawn east of the bench (the bench box stands on it).
+  const TILE = WHITE;
+  kitchen({ kind: 'box', label: 'Walk-in shower', origin: { x: 369, y: 7 }, direction: 90, width: 66, depth: 42, height: 1, frontColor: TILE });
+  kitchen({ kind: 'box', label: 'Bench', origin: { x: 318, y: 28 }, direction: 0, width: 42, depth: 18, height: 18, frontColor: TILE });
+  kitchen({ kind: 'box', label: 'Glass', origin: { x: 363.5, y: 49.5 }, direction: 270, width: 17, depth: 0.5, height: 78, frontColor: '#cfe2e6' });
+  kitchen({ kind: 'box', label: 'Wall', origin: { x: 402, y: 28 }, direction: 0, width: 42, depth: 4, height: 96, frontColor: TILE });
+  kitchen({ kind: 'sink', origin: { x: 430, y: 7 }, direction: 90, width: 48, depth: 21, height: 34.5 });
   kitchen({ ...WC, origin: { x: 456, y: 100 }, direction: 180 });
   kitchen({ kind: 'box', label: 'Washer', origin: { x: 322, y: 71.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
   kitchen({ kind: 'box', label: 'Dryer', origin: { x: 322, y: 99.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
-  // The bedroom closet's hanging, 24" deep along its west wall (x 318..342, y 122.5..180.5).
-  kitchen({ kind: 'box', label: 'Hanging', origin: { x: CL.x1 + HALF, y: (ADD.y + 2.5 + CLOSET.front - 2.5) / 2 }, direction: 0, width: CLOSET.front - ADD.y - 5, depth: 24, height: 84, frontColor: PINE });
+  // ---- The master bedroom (MK, 15 Oct 2026: a king bed). Built-in wardrobes, 24" deep and 84"
+  // high with pine doors, along the bath partition either side of the way to the bath door (x
+  // 372..406, 34" for its 28" door and casings): x 318..372 and x 406..456, y 122.5..146.5 (8'8" of
+  // rod; the walk-in of the livability review had 5'). The king bed, 78" x 84" with its headboard,
+  // on the wing's east wall centred y 230 (x 372..456, y 191..269): 39 1/2" from the wardrobes'
+  // fronts on its north side (the way to the bath), 39" to the south wall on its south side (the way
+  // to the sliding door), 54" from its foot to the west wall (the bedroom door's 32" swing fits).
+  // 24" nightstands either side, under the two east windows.
+  const ADD_FACE = ADD.y + 2.5;
+  kitchen({ kind: 'tall', origin: { x: 345, y: ADD_FACE }, direction: 90, width: 54, depth: 24, height: 84, frontColor: PINE });
+  kitchen({ kind: 'tall', origin: { x: 431, y: ADD_FACE }, direction: 90, width: 50, depth: 24, height: 84, frontColor: PINE });
+  const BED = { width: 78, depth: 84 };
+  kitchen({ kind: 'box', label: 'King bed', origin: { x: WING.x1 - T, y: BED_Y }, direction: 180, width: BED.width, depth: BED.depth, height: 24, frontColor: CREAM });
+  for (const side of [-1, 1]) {
+    kitchen({ kind: 'box', label: 'Nightstand', origin: { x: WING.x1 - T, y: BED_Y + side * (BED.width / 2 + 2 + 12) }, direction: 180, width: 24, depth: 18, height: 26, frontColor: PINE });
+  }
 
   // ---- Vents through walls, not the roof (MK, 14 Oct 2026). The dryer's: a 4" rigid metal duct
   // rising behind the dryer (x 318..322) to 86" and running north under the ceiling, over the
@@ -1583,13 +1607,12 @@ function proposed(ids: ExistingIds): void {
   // enclose; the screen porch keeps its shingle inside and its outdoor boards. The rooms that are
   // kept (the Kitchen, the Living, the upstairs rooms) take their new floors as proposed floors
   // (Room.proposedFloor, set with their labels above).
-  // The bedroom's label sits east of its closet (x 373..456), still north of the old Utility's face.
+  // The bedroom's label sits between the wardrobes and the bed, still north of the old Utility's face.
   label(fId, 'Master bedroom (proposed)', { x: 414, y: 160 }, NEW, PROPOSED_PINE);
   label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Powder room (proposed)', { x: 144, y: 26 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Pantry (proposed)', { x: 242, y: 34 }, NEW, PROPOSED_PINE);
   label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PROPOSED_PINE);
-  label(fId, 'Bedroom closet (proposed)', { x: 355, y: 160 }, NEW, PROPOSED_PINE);
   label(sId, 'Master wardrobe (proposed)', { x: 86, y: 114 }, NEW, PROPOSED_CARPET);
   label(sId, 'Guest closet (proposed)', { x: 235, y: 84 }, NEW, PROPOSED_CARPET);
   label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW, PROPOSED_PINE);
