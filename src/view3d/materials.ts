@@ -262,8 +262,8 @@ export function stairPartMaterial(mat: 'tread' | 'paint', phase: Phase, color: s
 }
 
 /**
- * Structure: LVL beams and posts as pale wood, footings as concrete, a round log's end grain a
- * lighter tint of its colour (logEndColor) (demolished: red, new: pulled toward green).
+ * Structure: LVL beams and posts as pale wood, footings as concrete, a round log's end grain its
+ * colour mixed toward cut wood (logEndColor) (demolished: red, new: pulled toward green).
  */
 export function memberMaterial(part: keyof typeof MEMBER_COLOR, phase: Phase, color?: string): MeshStandardMaterial {
   return trimLike(`member-${part}`, part === 'end' ? logEndColor(color) : (color ?? MEMBER_COLOR[part]), phase);

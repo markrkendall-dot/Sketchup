@@ -88,6 +88,7 @@ describe('the band in the model', () => {
       return migrate(doc).levels[lid].walls[south].band;
     };
     expect(load({ finish: 'halflog', height: 30 })).toEqual({ finish: 'halflog', height: 30 });
+    expect(load({ finish: 'riverstone', height: 36 })).toEqual({ finish: 'riverstone', height: 36 });
     expect(load({ finish: 'stone', color: 'grey', height: 30 })).toEqual({ finish: 'stone', height: 30 });
     expect(load({ finish: 'vinyl', height: 30 })).toBeUndefined();
     expect(load({ finish: 'screen', height: 30 })).toBeUndefined();
@@ -125,6 +126,16 @@ describe('the band in 3D', () => {
     expect(core.some((t) => t.n[2] < -0.99 && t.v.some(([, y]) => y < 36))).toBe(true);
     // Nothing lost: the band and the core hold more vertices than the uncut wall (the cut adds a row).
     expect(w.geometry.getAttribute('position').count + w.band!.geometry.getAttribute('position').count).toBeGreaterThan(plainCount);
+  });
+
+  it('a river-stone band without a colour: its own mesh, the wall\'s colour passed to the stones\' texture', () => {
+    const { lid, south } = house();
+    store().updateWalls(lid, [south], { band: { finish: 'riverstone', height: 36 } });
+    expect(wallOf(lid, south).band).toEqual({ finish: 'riverstone', height: 36 });
+    const w = meshOf(lid, south);
+    expect(w.finish).toBe('shingle');
+    expect(w.band).toMatchObject({ side: 'left', finish: 'riverstone', color: '#5a3a35' });
+    for (const t of triangles(w.band!.geometry)) for (const [, y] of t.v) expect(y).toBeLessThanOrEqual(36 + 1e-6);
   });
 
   it('cuts every wall of the level at the band height, so neighbours stay watertight; without a band nothing changes', () => {

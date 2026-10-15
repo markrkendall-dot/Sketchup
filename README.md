@@ -765,8 +765,10 @@ with the places where the built design differs from them):
      [Adirondack Life, the roots of rustic style](https://www.adirondacklife.com/2022/09/29/the-roots-of-rustic-style/),
      [Middlebury, Adirondack architecture](https://sites.middlebury.edu/adirondack/?p=577),
      [Houzz, a Vermont porch](https://www.houzz.com.sg/magazine/porch-of-the-week-perched-like-a-nest-in-the-vermont-mountains-stsetivw-vs~173124881).
-   - **Materials:** peeled golden logs (`#c79a5b`, the end grain a lighter tint), bark-on half-log
-     (`#5b4632`) and grey-brown fieldstone (`#8e8579`). The logs are timbers at set heights, so the
+   - **Materials:** dark stained logs and twigs (`#3f2c1f`, MK: dark rather than peeled golden),
+     their cut ends amber; a dry-stacked river-stone knee wall in the stones' own grey, tan,
+     blue-grey and rust; grey-brown fieldstone (`#8e8579`) for the piers, the stoop and the foyer's
+     base. The logs are timbers at set heights, so the
      structure checks leave them to the engineer.
    - **An open log canopy over the front door:** the foyer's gable runs on 5' west of the foyer
      (its rake at x -174), so the door has about 6'6" of cover. At its outer end two 18" fieldstone
@@ -776,9 +778,9 @@ with the places where the built design differs from them):
      beyond it. A sunburst of 3" twigs fills the gable over the tie, and a fieldstone stoop
      (60" x 72") sits under it, its top 1/2" under the threshold.
    - **The screen porch:** three 10" log posts on 16" fieldstone piers (to +12), a 10" log plate
-     along the eave line whose end shows 12" past the south corner, log knee braces, and crossed
-     2.5" twigs (an X) over the knee wall in each west bay. The porch's west and south walls are
-     bark-on half-log up to the screens' sills (36"), with the shakes above.
+     along the eave line whose end shows 12" past the south corner, and log knee braces. The
+     porch's west and south walls are a river-stone knee wall up to the screens' sills (36"), with
+     the shakes above.
    - **Stone base:** the foyer stands on 8" walls (a crawl space) like the east addition, faced in
      fieldstone; the screen porch stands on its log posts and piers.
 9. **Deck off the master bedroom** (MK, 14 Oct 2026), about 8' deep: the wing's width from the

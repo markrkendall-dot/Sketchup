@@ -18,10 +18,10 @@ export interface Node {
 
 export type WallKind = 'exterior' | 'interior';
 /** How a wall's face is dressed in 3D (DESIGN.md "Exterior appearance"). */
-export type WallFinish = 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'stone' | 'halflog' | 'plain' | 'screen';
+export type WallFinish = 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'stone' | 'riverstone' | 'halflog' | 'plain' | 'screen';
 /**
  * A lower band of a wall's outside face in another finish, up to `height` above the floor top: an
- * exterior wainscot (a stone base, a half-log knee wall).
+ * exterior wainscot (a stone base, a river-stone or half-log knee wall).
  */
 export interface WallBand {
   finish: WallFinish;

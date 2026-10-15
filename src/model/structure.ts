@@ -17,14 +17,23 @@ export const MEMBER_DEFAULTS = {
 /** Structure in 3D: LVL beams and posts as pale wood, footings as concrete, a log's end grain paler. */
 export const MEMBER_COLOR = { beam: '#d6b98c', post: '#c8a678', footing: '#a8a29e', end: '#e6d3b0' } as const;
 
-/** A log's end grain: its colour 40% of the way to white, else MEMBER_COLOR.end. */
+/** Fresh-cut wood, what a log's end grain is mixed toward. */
+export const CUT_WOOD = '#d9b98a';
+/** How far a log's end grain goes from its colour toward CUT_WOOD. */
+export const END_GRAIN_MIX = 0.6;
+
+/**
+ * A log's end grain: its colour END_GRAIN_MIX of the way to cut wood (a dark stained log shows
+ * amber ends, a peeled one honey), else MEMBER_COLOR.end.
+ */
 export function logEndColor(color?: string): string {
   if (!color || !HEX.test(color)) return MEMBER_COLOR.end;
   const n = parseInt(color.slice(1), 16);
-  const mix = (c: number) => Math.round(c + (255 - c) * 0.4);
-  const r = mix((n >> 16) & 255);
-  const g = mix((n >> 8) & 255);
-  const b = mix(n & 255);
+  const w = parseInt(CUT_WOOD.slice(1), 16);
+  const mix = (c: number, t: number) => Math.round(c + (t - c) * END_GRAIN_MIX);
+  const r = mix((n >> 16) & 255, (w >> 16) & 255);
+  const g = mix((n >> 8) & 255, (w >> 8) & 255);
+  const b = mix(n & 255, w & 255);
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 

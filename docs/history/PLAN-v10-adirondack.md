@@ -166,3 +166,8 @@ Logs are timbers at set heights (the structure checks ignore them), `profile: 'l
   stand out against the dark half-log.
 - **Tests:** the starter's sun shadow texel is now just over 1/2" (0.51"), since the canopy carries
   the foyer's roof 5' further west; the lighting test's bound is 0.52".
+- **Later (MK, 15 Oct 2026): dark logs and a river-stone knee wall.** Every log and twig is now a
+  dark stained log (`#3f2c1f`) instead of peeled golden, and a log's end grain is mixed toward cut
+  wood rather than white, so the dark logs show amber ends. The porch's half-log knee wall became a
+  dry-stacked river-stone band (a new `riverstone` wall finish) in the stones' own colours, and the
+  twig X panels, made for the half-log, were taken off.

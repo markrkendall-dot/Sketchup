@@ -8,7 +8,7 @@ import { hitTest } from '../editor2d/tools/selectTool';
 import { buildExportScene } from '../io/export3d';
 import { structureIssues } from '../derive/structureChecks';
 import { createEmptyPlan, migrate } from '../model/plan';
-import { logEndColor, MEMBER_COLOR, memberProblem } from '../model/structure';
+import { CUT_WOOD, logEndColor, MEMBER_COLOR, memberProblem } from '../model/structure';
 import type { Beam, Id, Post } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
@@ -303,10 +303,12 @@ describe('round logs', () => {
     expect(level).toEqual({ a: { x: 0, y: 100, z: 88 }, b: { x: 200, y: 100, z: 88 } });
   });
 
-  it('the end grain is a lighter tint of the colour, a Log end mesh in the export', () => {
+  it('the end grain is the colour mixed toward cut wood (amber on a dark log, honey on a peeled one), a Log end mesh in the export', () => {
     expect(logEndColor()).toBe(MEMBER_COLOR.end);
-    expect(logEndColor('#000000')).toBe('#666666');
-    expect(logEndColor('#5a3a35')).toBe('#9c8986');
+    expect(logEndColor('#000000')).toBe('#826f53');
+    expect(logEndColor('#3f2c1f')).toBe('#9b815f');
+    expect(logEndColor('#c79a5b')).toBe('#d2ad77');
+    expect(logEndColor(CUT_WOOD)).toBe(CUT_WOOD);
     store().addMember(f, { ...postOf({ profile: 'log' }), id: 'lg' });
     const root = buildExportScene(plan(), 'all', { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: f });
     const parts = ((root.children.find((c) => c.name === 'First Floor') as Group).children as Mesh[]).map((m) => `${m.name}:${(m.material as MeshStandardMaterial).name}`);

@@ -42,7 +42,7 @@ export interface Wall {
   kind: 'exterior' | 'interior';
   phase: Phase;
   heightOverride?: Inches;   // defaults to level.wallHeight
-  finish?: 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'stone' | 'halflog' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
+  finish?: 'clapboard' | 'shingle' | 'shake' | 'board' | 'block' | 'stone' | 'riverstone' | 'halflog' | 'plain' | 'screen'; color?: string; // see "Exterior appearance"
   bearing?: boolean;         // marked bearing or not; undefined = inferred (see "Structure")
   band?: { finish: WallFinish; color?: string; height: Inches }; // the outside face below height ("Exterior appearance")
 }
@@ -834,8 +834,8 @@ two cabinets whose counter is mitred), appliance details beyond a few boxes, cop
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
 All of it is optional data on existing elements (no schema bump: `migrate()` reads the fields when they are
-valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | shake | board | block | stone | halflog | plain |
-screen`; an unknown value is dropped), `Wall.color` (`#rrggbb`, lower-cased on load) and `Wall.band` (see "Lower
+valid and drops them otherwise): `Wall.finish` (`clapboard | shingle | shake | board | block | stone | riverstone | halflog |
+plain | screen`; an unknown value is dropped), `Wall.color` (`#rrggbb`, lower-cased on load) and `Wall.band` (see "Lower
 band" below), `Opening.lites {cols, rows}` (whole numbers 1 to
 12), `Opening.shutters`, `Opening.trim` (0 to 24"), `Opening.sashes` (whole number 1 to 6), `Opening.fixedCenter`,
 `Opening.glazing` (`glass | screen`), `Opening.halfLite`, `Opening.sliding`, `Opening.leafColor` (`#rrggbb`, lower-cased), `Roof.color`,
@@ -868,7 +868,12 @@ faces, per-block brightness and speckle, the top of each bed joint in the shadow
 `shingleJoints`), each stone inset by at least 3/8" of mortar and up to 1 1/4" more top and bottom so the courses
 wander, its outline a superellipse (exponent 2.2 to 3.5, `stoneDistance`), its colour the wall's colour mixed 35% toward
 one of four tones (grey, blue-grey, tan, brown, `STONE_TONES`) at 0.8 to 1.15 brightness, darker toward its rim,
-painted pixel by pixel through the same outline as its relief; mortar lighter than the stone, speckled. Half-log:
+painted pixel by pixel through the same outline as its relief; mortar lighter than the stone, speckled. River stone
+(a dry stack): rough courses 3" to 6" high that sum to the tile, each cut into stones 4" to 10" long (both by
+`shingleJoints`, so they stagger and wrap; `riverstoneFaces`), each stone inset by at least 3/16" (a 3/8" joint) and up
+to 1/4" more on every side so the gaps vary, a rounded box (exponent 2.6 to 3.6) so the stones sit close, its colour one of four natural
+tones (grey, tan, blue-grey, rust, `RIVERSTONE_TONES`) with only 15% of the wall's colour mixed in (`RIVERSTONE_TINT`),
+at 0.78 to 1.18 brightness, lit from above and darker toward its rim; the gaps near black (`RIVERSTONE_GAP`). Half-log:
 bark-on half logs in 8" courses (`halflogFaces`), each course a few percent lighter or darker, shaded toward its
 top and bottom (the round of the log), heavy bark streaks and speckle, a dark 3/4" chink line between logs in the
 shadow of the log above. Plain: no
@@ -879,7 +884,8 @@ up close and an even grey veil further off (as a wall finish: material `transpar
 **Relief**: every finish but plain and screen has a height field in inches (`sidingHeight`): clapboard tapers from
 its butt to nothing under the next board (a 0.6" step at each lap), shingles taper from a 0.4" butt, each a little
 proud or shy of its neighbours, with 0.3" deep keyways, boards have 0.2" V-grooves, block mortar is raked 0.25",
-each fieldstone is a dome 0.6" high (`RELIEF.stone * sqrt(1 - d^4)`) in mortar raked 0.25", each half log a round
+each fieldstone is a dome 0.6" high (`RELIEF.stone * sqrt(1 - d^4)`) in mortar raked 0.25", each river stone a round
+dome 1" high (`RELIEF.river`, `sqrt(1 - d^2)`) falling into gaps 0.6" deep (`RELIEF.gap`), each half log a round
 crown 1.2" high (`RELIEF.log`) with its chink line raked 0.25".
 `normalFromHeight` makes a tangent-space normal map of it with Sobel derivatives sampled modulo the tile (no seam
 line) at the true slope (strength `PX_PER_INCH`). Canvas y grows downward and the texture's v upward (flipY), so
@@ -902,7 +908,7 @@ exception is a face on the side of a room that sets interior finishes: it is spl
 "Interior finishes").
 
 **Lower band** (`Wall.band { finish, color?, height }`, `wallBandOf`): the wall's outside face below `height` in its
-own finish and colour (absent: the wall's colour), an exterior wainscot such as a stone base or a half-log knee wall.
+own finish and colour (absent: the wall's colour), an exterior wainscot such as a stone base or a river-stone or half-log knee wall.
 Any finish but screen (`BAND_FINISHES`); `migrate` drops a band without a usable finish and a height above 0 (a bad
 colour alone is dropped) and keeps it as `{ finish, color?, height }`; `updateWalls` copies it per wall with the colour
 lower-cased, clears it with `undefined` and refuses a height not above 0. The Wall panel's "Lower band" sets the
@@ -965,7 +971,7 @@ window reveals, and a default interior finish for the inside faces of rooms that
 
 **The proposed look** (`Plan.proposedLook`, types.ts `ProposedLook`): how the house looks after the work, without
 redrawing it. Optional fields: `wallFinish` and `wallColor` for every exterior wall in a siding finish
-(`SIDING_FINISHES`: shingle, shake, clapboard, board; block, stone, half-log, plain and screen walls, room-dressed
+(`SIDING_FINISHES`: shingle, shake, clapboard, board; block, stone, river stone, half-log, plain and screen walls, room-dressed
 inside faces and a wall's lower band keep theirs, so a banded wall is re-sided above its band only), `roofFinish`, `roofColor` and `boardColor` for every roof (a re-roofed roof has no weathering),
 `trimColor` and `sashColor` for every window and door (trim: casings and sills; sash: sashes, muntins and door
 frames; `OpeningMesh.trimColor`/`sashColor`, `openingMaterial` keys by them), and `shutters: false` to build the
@@ -1263,7 +1269,7 @@ out that bears in the house as it stands, wherever what it carried stays (the fl
 roof kept over it), needs a wall or beam of the proposed view on its line or within the joists'
 depth of it (R502.4), sampled every 6"; gaps of 12" or more are a warning (an error when the wall
 is marked bearing) (`structure.bearing-removed`). Each end of a new beam bears on a wall at least
-1 1/2" along the beam (3" on a block or stone wall, `isMasonryFinish`), or on a post, or on another beam (a hanger) (R502.6,
+1 1/2" along the beam (3" on a block, stone or river-stone wall, `isMasonryFinish`), or on a post, or on another beam (a hanger) (R502.6,
 `structure.beam-end`). The load from each end of a new beam and from each new post is followed
 down (`structure.load-path`, R301.1): at each level below, the wall, post or beam under the point
 (a beam passes it to its two ends); on the lowest level a wall is a foundation wall and a post needs
@@ -1411,7 +1417,8 @@ clipped). `logBetween(a, b, diameter)` builds the log upright along +Y: the body
 cylinder (`circleOutline`, `prism` without caps) with `roundNormals`, the two end discs apart
 (`prism` without sides), then turns both onto a to b with one `applyMatrix4` (a quaternion from +Y,
 then a move to a). `MemberMesh.ends` holds the discs, in `memberMaterial('end', ...)`: the end grain,
-the member's colour 40% toward white (`logEndColor`), else `MEMBER_COLOR.end`; the export names them
+the member's colour 60% toward cut wood `#d9b98a` (`logEndColor`, `CUT_WOOD`: a dark stained log shows amber
+ends, a peeled one honey), else `MEMBER_COLOR.end`; the export names them
 `Log end` (`member_end_<phase>`). On the plan a log post is a circle (`MemberShape`) and picks as one
 (`selectTool` hitTest); a log beam keeps its outline. The panel's "Round log" checkbox turns it on and
 off; a log shows Diameter in place of Width and Depth, and a log post no Rotation.

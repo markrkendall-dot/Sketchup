@@ -115,12 +115,11 @@ const PLACEHOLDER_WET = { wallFinish: 'paint', floorFinish: 'tile' } as const;
 /** The proposed shakes' brown (and the roof boards'): the dark chocolate of MK's garage. */
 const SHAKE_BROWN = '#4b3a32';
 /**
- * The Adirondack entry and screen porch (docs/history/PLAN-v10-adirondack.md): peeled golden logs
- * (their end grain is the tool's lighter tint, model/structure.ts logEndColor), bark-on half-log
- * knee walls and grey-brown fieldstone.
+ * The Adirondack entry and screen porch (docs/history/PLAN-v10-adirondack.md): dark stained logs
+ * and twigs (their end grain amber, the tool's mix toward cut wood, model/structure.ts logEndColor),
+ * a dry-stacked river-stone knee wall in the stones' own colours and grey-brown fieldstone.
  */
-const PEELED_LOG = '#c79a5b';
-const BARK = '#5b4632';
+const DARK_LOG = '#3f2c1f';
 const FIELDSTONE = '#8e8579';
 const FRIDGE_BLUE = '#3a5fa0';
 /**
@@ -882,11 +881,11 @@ function proposed(ids: ExistingIds): void {
   // The foyer is a closed, heated room: 8" under its three walls, like the east addition's (a crawl
   // space), faced in fieldstone (the Adirondack stone base; about 1" to 10" of it shows above the
   // ground, more on the south). The screen porch stands on its log posts and their stone piers
-  // (below; the porch's floor is not drawn). Its west and south walls are bark-on half-log knee
-  // walls, a 36" band up to the screens' sills, with the shakes above.
+  // (below; the porch's floor is not drawn). Its west and south walls are river-stone knee walls,
+  // a 36" band up to the screens' sills (the stones' own colours, no tint), with the shakes above.
   const foyerFooting = drawWalls(bId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], TB, false, NEW);
   store().updateWalls(bId, foyerFooting, { finish: 'stone', color: FIELDSTONE });
-  store().updateWalls(fId, porch, { band: { finish: 'halflog', color: BARK, height: 36 } });
+  store().updateWalls(fId, porch, { band: { finish: 'riverstone', height: 36 } });
 
   // ---- 4. The north band (MK, 14 Oct 2026: the kitchen stops short of the north wall): a powder
   // room and, in the north-east corner, a walk-in pantry, x 173..311, y 7..55 inside (4', as MK
@@ -1065,7 +1064,7 @@ function proposed(ids: ExistingIds): void {
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
   // ---- The Adirondack entry and screen porch (MK; docs/history/PLAN-v10-adirondack.md; sizes are
-  // estimates for MK, the engineer and the builder). Peeled logs and twigs, drawn as round timbers
+  // estimates for MK, the engineer and the builder). Dark stained logs and twigs, drawn as round timbers
   // at set heights (the structure checks do not follow them), on fieldstone piers that keep them off
   // the ground. Heights below are over the First Floor (its floor top is +2); the piers' are absolute.
   // `logBetween` takes a log's centreline from p to q (z over the floor) and sets its tops (za, zb)
@@ -1076,10 +1075,10 @@ function proposed(ids: ExistingIds): void {
     const half = (d * Math.hypot(run, q.z - p.z)) / run / 2;
     const a = { x: round2(p.x), y: round2(p.y) };
     const b = { x: round2(q.x), y: round2(q.y) };
-    if (!store().addMember(fId, { kind: 'beam', a, b, width: d, depth: d, mount: 'dropped', za: round2(p.z + half), zb: round2(q.z + half), color: PEELED_LOG, profile: 'log', label, phase: NEW })) throw new Error(`${label} rejected`);
+    if (!store().addMember(fId, { kind: 'beam', a, b, width: d, depth: d, mount: 'dropped', za: round2(p.z + half), zb: round2(q.z + half), color: DARK_LOG, profile: 'log', label, phase: NEW })) throw new Error(`${label} rejected`);
   };
   const logPost = (at: Vec2, base: number, top: number, d: number, label: string) => {
-    if (!store().addMember(fId, { kind: 'post', at, width: d, depth: d, rotation: 0, base: round2(base), top: round2(top), color: PEELED_LOG, profile: 'log', label, phase: NEW })) throw new Error(`${label} rejected`);
+    if (!store().addMember(fId, { kind: 'post', at, width: d, depth: d, rotation: 0, base: round2(base), top: round2(top), color: DARK_LOG, profile: 'log', label, phase: NEW })) throw new Error(`${label} rejected`);
   };
   /**
    * A fieldstone pier (or a stoop) centred at `at`, `w` x `d`, up to `top` (absolute), from 2" under
@@ -1162,8 +1161,7 @@ function proposed(ids: ExistingIds): void {
   // plate north of that) to 12" past the porch's south corner, so its end shows under the shed's
   // rake. The north post stops under the gable's eave, its top inside the roof's thickness. 6" log
   // knee braces at 45 degrees from the posts to the plate, 18" each way (the north post's, 21",
-  // passes under the gable's eave). Twig work: crossed 2.5" branches (an X) on the half-log knee wall
-  // in each of the two west bays, just off its face.
+  // passes under the gable's eave).
   const shed = Object.values(level(fId).roofs).find((r) => r.phase === NEW && r.shape === 'shed' && r.ridgeAngle === 180)!;
   const PX = FOYER.x0 - 1;
   const porchPosts = [164, 236, 310];
@@ -1177,12 +1175,6 @@ function proposed(ids: ExistingIds): void {
   logBetween({ x: PX, y: porchPosts[0], z: PLATE - 21 }, { x: PX, y: porchPosts[0] + 21, z: PLATE }, BRACE, '6" log brace');
   for (const [y, dir] of [[porchPosts[1], -1], [porchPosts[1], 1], [porchPosts[2], -1]]) {
     logBetween({ x: PX, y, z: PLATE - 18 }, { x: PX, y: y + dir * 18, z: PLATE }, BRACE, '6" log brace');
-  }
-  const TWIG = 2.5;
-  const TX = FOYER.x0 - TWIG / 2 - CLEAR;
-  for (const [y0, y1] of [[porchPosts[0] + LOG / 2, porchPosts[1] - LOG / 2], [porchPosts[1] + LOG / 2, porchPosts[2] - LOG / 2]]) {
-    logBetween({ x: TX, y: y0 + 3, z: 4 }, { x: TX, y: y1 - 3, z: 32 }, TWIG, '2.5" twig');
-    logBetween({ x: TX, y: y0 + 3, z: 32 }, { x: TX, y: y1 - 3, z: 4 }, TWIG, '2.5" twig');
   }
 
   // ---- The retaining wall carried on west to the property line (MK, after the site sketch, photo

@@ -6,7 +6,7 @@ import type { RoofFinish, WallFinish } from '../model/types';
 // 48" x 48" of wall, so a texel is 3/32". Wall geometry carries UVs in inches (meshes.ts
 // addWallUVs) and the texture repeats every 48", so courses run level and continuous across wall
 // pieces and openings. Every finish with relief (laps, shingle butts and keyways, V-grooves,
-// mortar joints, fieldstone and half-log crowns) also has a height field in inches, turned into a normal map. The layouts, the
+// mortar joints, fieldstone, river-stone and half-log crowns) also has a height field in inches, turned into a normal map. The layouts, the
 // height fields and the normal-map rule are pure (testable in node); only drawing needs a canvas,
 // and `sidingTextures` returns null where there is no `document` (node, tests). A chimney's brick
 // (`brickTextures`) uses the same tile. Roof textures (corrugated metal, asphalt shingle) follow at
@@ -50,6 +50,23 @@ export const STONE_JOINT = 0.75;
  */
 export const STONE_TONES = ['#8c8c88', '#7d838a', '#9a8468', '#6f5a48'] as const;
 export const STONE_TONE_MIX = 0.35;
+/**
+ * River stone (a dry-stacked knee wall): rough courses 3" to 6" high, stones 4" to 10" long in them,
+ * at least 3/8" of dark, deep joint between them.
+ */
+export const RIVERSTONE_HEIGHT = { min: 3, max: 6 } as const;
+export const RIVERSTONE_WIDTH = { min: 4, max: 10 } as const;
+export const RIVERSTONE_JOINT = 0.375;
+/** Up to this much more gap on each side of a river stone, so the joints vary. */
+export const RIVERSTONE_JITTER = 0.25;
+/**
+ * The natural tones of river stone: grey, tan, blue-grey and rust. A stone is its tone with the
+ * wall's colour mixed in by RIVERSTONE_TINT, so the stones keep their own colours.
+ */
+export const RIVERSTONE_TONES = ['#8d8b86', '#a3957d', '#79828a', '#8c6a55'] as const;
+export const RIVERSTONE_TINT = 0.15;
+/** The shadowed gaps of a dry stack: near black. */
+export const RIVERSTONE_GAP = '#1f1c1a';
 /** Half-log siding: 8" courses (6 per tile), a 3/4" chink line between logs. */
 export const HALFLOG_COURSE = 8;
 export const CHINK = 0.75;
@@ -58,9 +75,10 @@ export const SCREEN_MESH_PX = 2;
 
 /**
  * Relief in inches: a clapboard's lap step, a shingle's butt, a keyway, a V-groove, a raked mortar
- * joint, a fieldstone's crown, a half log's crown.
+ * joint, a fieldstone's crown, a river stone's dome and the depth of the gaps between them, a half
+ * log's crown.
  */
-export const RELIEF = { lap: 0.6, butt: 0.4, keyway: 0.3, groove: 0.2, mortar: 0.25, stone: 0.6, log: 1.2 } as const;
+export const RELIEF = { lap: 0.6, butt: 0.4, keyway: 0.3, groove: 0.2, mortar: 0.25, stone: 0.6, river: 1, gap: 0.6, log: 1.2 } as const;
 /** How far the normal maps bend the light (MeshStandardMaterial.normalScale). */
 export const NORMAL_SCALE = 0.6;
 /**
@@ -270,6 +288,38 @@ export function stoneFaces(): Stone[] {
   return out;
 }
 
+/**
+ * The river stones of a tile: rough courses RIVERSTONE_HEIGHT high that sum to the tile, each cut
+ * into stones RIVERSTONE_WIDTH long that sum to it (both by shingleJoints, so they stagger and
+ * wrap); each stone inset by half a joint all round and by up to 1/4" more on each side, so the
+ * gaps vary, its outline a rounded box (squarer than an ellipse, so the stones sit close as in a
+ * stack), with its own tone and brightness. Seeded, so the same every
+ * time.
+ */
+export function riverstoneFaces(): Stone[] {
+  const rand = seeded(83);
+  const m = RIVERSTONE_JOINT / 2;
+  const rows = shingleJoints(0, TILE_INCHES, rand, RIVERSTONE_HEIGHT.min, RIVERSTONE_HEIGHT.max);
+  const out: Stone[] = [];
+  rows.forEach((y, k) => {
+    const top = k + 1 < rows.length ? rows[k + 1] : rows[0] + TILE_INCHES;
+    const joints = shingleJoints(k, TILE_INCHES, rand, RIVERSTONE_WIDTH.min, RIVERSTONE_WIDTH.max);
+    joints.forEach((x, j) => {
+      const next = j + 1 < joints.length ? joints[j + 1] : joints[0] + TILE_INCHES;
+      out.push({
+        x0: x + m + rand() * RIVERSTONE_JITTER,
+        x1: next - m - rand() * RIVERSTONE_JITTER,
+        y0: y + m + rand() * RIVERSTONE_JITTER,
+        y1: top - m - rand() * RIVERSTONE_JITTER,
+        p: 2.6 + rand() * 1.0,
+        tone: Math.floor(rand() * RIVERSTONE_TONES.length),
+        shade: 0.78 + rand() * 0.4,
+      });
+    });
+  });
+  return out;
+}
+
 /** How far a point of a stone's box (fractions across and up, 0 to 1) is from its middle: under 1 inside the stone. */
 export const stoneDistance = (s: Pick<Stone, 'p'>, fx: number, fy: number): number => (Math.abs(2 * fx - 1) ** s.p + Math.abs(2 * fy - 1) ** s.p) ** (1 / s.p);
 
@@ -305,7 +355,8 @@ function heightRect(f: Float32Array, r: TileRect, h: (fx: number, fy: number) =>
  * butt to nothing under the board above, a RELIEF.lap step at every lap. Shingle: the same taper
  * per course (RELIEF.butt), each shingle a little proud or shy of its neighbours, a keyway between
  * shingles. Board: a V-groove at each joint. Block: flat faces, raked mortar joints. Stone: each
- * stone a dome RELIEF.stone high in raked mortar. Half-log: each log a round crown RELIEF.log high,
+ * stone a dome RELIEF.stone high in raked mortar. River stone: each stone a round dome RELIEF.river
+ * high, the gaps RELIEF.gap deep. Half-log: each log a round crown RELIEF.log high,
  * a raked chink line between logs.
  */
 export function sidingHeight(finish: WallFinish): Float32Array | null {
@@ -335,6 +386,14 @@ export function sidingHeight(finish: WallFinish): Float32Array | null {
       heightRect(f, s, (fx, fy) => {
         const d = stoneDistance(s, fx, fy);
         return d < 1 ? RELIEF.stone * Math.sqrt(1 - d ** 4) : -RELIEF.mortar;
+      });
+    }
+  } else if (finish === 'riverstone') {
+    f.fill(-RELIEF.gap);
+    for (const s of riverstoneFaces()) {
+      heightRect(f, s, (fx, fy) => {
+        const d = stoneDistance(s, fx, fy);
+        return d < 1 ? RELIEF.river * Math.sqrt(1 - d * d) - RELIEF.gap * (1 - Math.sqrt(1 - d * d)) ** 4 : -RELIEF.gap;
       });
     }
   } else if (finish === 'halflog') {
@@ -634,6 +693,42 @@ function drawStone(ctx: Ctx, color: string): void {
 }
 
 /**
+ * Dry-stacked river stone: near-black gaps (RIVERSTONE_GAP); each stone (riverstoneFaces) one of
+ * RIVERSTONE_TONES with a little of the colour, painted pixel by pixel through the same outline as
+ * its relief, lit from above (lighter toward its top, darker toward its foot) and darker toward its
+ * rim so it reads as a smooth, water-worn dome, with a little speckle.
+ */
+function drawRiverstone(ctx: Ctx, color: string): void {
+  const rand = seeded(89);
+  ctx.fillStyle = mix(RIVERSTONE_GAP, color, 0.1);
+  ctx.fillRect(0, 0, TEXTURE_PX, TEXTURE_PX);
+  const stones = riverstoneFaces();
+  const img = ctx.getImageData(0, 0, TEXTURE_PX, TEXTURE_PX);
+  for (const s of stones) {
+    const [r, g, b] = hexToRgb(mix(RIVERSTONE_TONES[s.tone], color, RIVERSTONE_TINT));
+    const c0 = colOf(s.x0);
+    const c1 = colOf(s.x1);
+    const top = rowOf(s.y1);
+    const bottom = rowOf(s.y0);
+    for (let row = top; row < bottom; row++) {
+      const fy = (bottom - row - 0.5) / (bottom - top);
+      for (let c = c0; c < c1; c++) {
+        const d = stoneDistance(s, (c - c0 + 0.5) / (c1 - c0), fy);
+        if (d >= 1) continue;
+        const k = s.shade * (0.55 + 0.45 * Math.sqrt(1 - d * d)) * (0.9 + 0.2 * fy);
+        const i = (wrap(row, TEXTURE_PX) * TEXTURE_PX + wrap(c, TEXTURE_PX)) * 4;
+        img.data[i] = byte(r * k);
+        img.data[i + 1] = byte(g * k);
+        img.data[i + 2] = byte(b * k);
+        img.data[i + 3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  for (const s of stones) speckle(ctx, rand, { x0: s.x0 + 1, y0: s.y0 + 1, x1: s.x1 - 1, y1: s.y1 - 1 }, Math.round((s.x1 - s.x0) * (s.y1 - s.y0) * 0.8));
+}
+
+/**
  * Bark-on half logs: each course a few percent lighter or darker, shaded row by row toward its top
  * and bottom (the round of the log), heavy streaks of bark along it and speckle; a dark chink line
  * between logs, in the shadow of the log above.
@@ -761,6 +856,7 @@ export function sidingTextures(finish: WallFinish, color: string, variant: Textu
   else if (finish === 'board') drawBoard(ctx, color);
   else if (finish === 'block') drawBlock(ctx, color);
   else if (finish === 'stone') drawStone(ctx, color);
+  else if (finish === 'riverstone') drawRiverstone(ctx, color);
   else if (finish === 'halflog') drawHalflog(ctx, color);
   else drawScreen(ctx);
   if (variant === 'new') {

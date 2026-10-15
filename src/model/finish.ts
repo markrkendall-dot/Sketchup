@@ -3,7 +3,7 @@ import type { Column, Deck, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofF
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
 
-export const WALL_FINISHES: readonly WallFinish[] = ['shingle', 'shake', 'clapboard', 'board', 'block', 'stone', 'halflog', 'plain', 'screen'];
+export const WALL_FINISHES: readonly WallFinish[] = ['shingle', 'shake', 'clapboard', 'board', 'block', 'stone', 'riverstone', 'halflog', 'plain', 'screen'];
 
 export const WALL_FINISH_LABEL: Record<WallFinish, string> = {
   shingle: 'Shingle',
@@ -12,6 +12,7 @@ export const WALL_FINISH_LABEL: Record<WallFinish, string> = {
   board: 'Vertical board',
   block: 'Concrete block',
   stone: 'Fieldstone',
+  riverstone: 'River stone',
   halflog: 'Half-log',
   plain: 'Plain',
   screen: 'Screen',
@@ -28,7 +29,7 @@ export const wallFinishOf = (w: Pick<Wall, 'kind' | 'finish'>): WallFinish => w.
 export const wallColorOf = (w: Pick<Wall, 'kind' | 'color'>): string => w.color ?? defaultWallColor(w.kind);
 
 /** Masonry finishes: a beam bears 3" on them, not 1 1/2" (derive/structureChecks.ts). */
-export const MASONRY_FINISHES: readonly WallFinish[] = ['block', 'stone'];
+export const MASONRY_FINISHES: readonly WallFinish[] = ['block', 'stone', 'riverstone'];
 export const isMasonryFinish = (f: WallFinish | undefined): boolean => !!f && MASONRY_FINISHES.includes(f);
 
 /** The finishes a lower band may take: any but screen (a see-through band over a solid wall). */
@@ -95,7 +96,7 @@ export const ROOF_COLOR: Record<RoofFinish, string> = { metal: '#6e6259', shingl
 export const ROOF_FINISHES: readonly RoofFinish[] = ['metal', 'seam', 'shingle'];
 /** Metal roofs (corrugated or standing seam): a ridge cap and a sheen. */
 export const isMetalRoof = (f: RoofFinish): boolean => f !== 'shingle';
-/** Siding finishes: the walls a proposed look re-sides (not block, stone, half-log, plain or screen). */
+/** Siding finishes: the walls a proposed look re-sides (not block, stone, river stone, half-log, plain or screen). */
 export const SIDING_FINISHES: readonly WallFinish[] = ['shingle', 'shake', 'clapboard', 'board'];
 /** The window sash (and door frame) colour by default: off-white. */
 export const DEFAULT_SASH_COLOR = '#f4f1ea';

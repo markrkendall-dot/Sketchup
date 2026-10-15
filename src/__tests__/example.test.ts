@@ -650,7 +650,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(Object.values(plan.site.columns).filter((c) => c.kind === 'post')).toEqual([]);
   });
 
-  it('has the Adirondack entry: an open log canopy on stone piers, and log posts, a plate and twig work on the screen porch', () => {
+  it('has the Adirondack entry: an open log canopy on stone piers, and log posts, a plate and a river-stone knee wall on the screen porch', () => {
     const f = plan.levels[plan.levelOrder[1]];
     const floorTop = getLevelElevations(plan)[f.id].floorTop;
     expect(floorTop).toBe(2);
@@ -676,9 +676,9 @@ describe('docs/examples/146-mick-road.json', () => {
         }
       }
     }
-    // The logs: peeled, round, timbers at set heights (the structure checks ignore them).
+    // The logs: dark stained, round, timbers at set heights (the structure checks ignore them).
     const logs = Object.values(f.members).filter((m) => m.profile === 'log');
-    expect(logs.every((m) => isTimber(m) && m.color === '#c79a5b' && m.phase === 'new' && m.width === m.depth)).toBe(true);
+    expect(logs.every((m) => isTimber(m) && m.color === '#3f2c1f' && m.phase === 'new' && m.width === m.depth)).toBe(true);
     const named = (label: string) => logs.filter((m) => m.label === label);
     // Every log post stands on a pier's top.
     const logPosts = logs.filter((m) => m.kind === 'post' && m.width === 10);
@@ -699,7 +699,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // The porch's plate runs 12" past its south corner (y 315), under the shed's rake.
     const [plate] = named('10" log plate');
     expect(plate.kind === 'beam' && plate.b.y).toBe(327);
-    expect(named('2.5" twig')).toHaveLength(4);
+    // The porch has no twig panels (they went with the half-log; the knee wall is stone).
+    expect(named('2.5" twig')).toHaveLength(0);
     // No log reaches the roof over it: the top of each beam at its ends, and each post's top, is
     // 1/4" or more under the underside of every roof over that point.
     const roofs = Object.values(f.roofs).filter((r) => r.phase === 'new');
@@ -709,10 +710,10 @@ describe('docs/examples/146-mick-road.json', () => {
         for (const [p, z] of [[m.a, m.za!], [m.b, m.zb!]] as const) expect(lowestUnder(p) - z, `${m.label} at ${JSON.stringify(p)}`).toBeGreaterThanOrEqual(0.25 - 1e-6);
       } else expect(lowestUnder(m.at) - m.top!, m.label).toBeGreaterThanOrEqual(0.25 - 1e-6);
     }
-    // The porch's west and south walls are bark-on half-log up to the screens' sills (36"), with
-    // the shakes above; the foyer's walls have no band.
+    // The porch's west and south walls are dry-stacked river stone up to the screens' sills (36"),
+    // in the stones' own colours (no tint), with the shakes above; the foyer's walls have no band.
     const banded = Object.values(f.walls).filter((w) => w.band);
-    expect(banded.map((w) => [w.phase, w.band])).toEqual(Array(2).fill(['new', { finish: 'halflog', color: '#5b4632', height: 36 }]));
+    expect(banded.map((w) => [w.phase, w.band])).toEqual(Array(2).fill(['new', { finish: 'riverstone', height: 36 }]));
     const screens = Object.values(f.openings).filter((o) => o.phase === 'new' && o.glazing === 'screen' && o.type === 'window');
     expect(screens.every((o) => banded.some((w) => w.id === o.wallId) && o.sill === 36)).toBe(true);
   });
@@ -742,7 +743,7 @@ describe('docs/examples/146-mick-road.json', () => {
     ]);
     // The Adirondack entry's logs, all timbers: the canopy's two posts, tie, two knee braces, king
     // post, two rafters, ridge log, two purlins and six twigs of its sunburst; the screen porch's
-    // three posts, plate, four knee braces and the four twigs of its two X panels.
+    // three posts, plate and four knee braces.
     const timbers = members.filter(isTimber);
     const tally: Record<string, number> = {};
     for (const m of timbers) tally[m.label ?? ''] = (tally[m.label ?? ''] ?? 0) + 1;
@@ -756,9 +757,8 @@ describe('docs/examples/146-mick-road.json', () => {
       '8" log purlin': 2,
       '3" twig': 6,
       '10" log plate': 1,
-      '2.5" twig': 4,
     });
-    expect(timbers.every((m) => m.profile === 'log' && m.color === '#c79a5b' && m.phase === 'new')).toBe(true);
+    expect(timbers.every((m) => m.profile === 'log' && m.color === '#3f2c1f' && m.phase === 'new')).toBe(true);
     const posts = Object.values(plan.levels[bId].members);
     expect(posts).toEqual([expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 96.125 }, width: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' })]);
     // No wall is marked: the tool infers them all.

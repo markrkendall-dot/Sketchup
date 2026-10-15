@@ -21,6 +21,12 @@ import {
   normalFromHeight,
   PX_PER_INCH,
   RELIEF,
+  RIVERSTONE_HEIGHT,
+  RIVERSTONE_JITTER,
+  RIVERSTONE_JOINT,
+  RIVERSTONE_TONES,
+  RIVERSTONE_WIDTH,
+  riverstoneFaces,
   seeded,
   shingleCourses,
   shingleJoints,
@@ -1024,7 +1030,7 @@ describe('fieldstone and half-log', () => {
     for (const row of [20, 200, 400]) expect(at(f, row, 0)).toBe(at(f, row, 511));
   });
 
-  it('both draw on a canvas (no fall-through to the screen) with a normal map', () => {
+  it('all three draw on a canvas (no fall-through to the screen) with a normal map', () => {
     // A minimal canvas: records fills, hands back image data.
     let fills = 0;
     let puts = 0;
@@ -1038,7 +1044,7 @@ describe('fieldstone and half-log', () => {
     };
     vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) });
     try {
-      for (const finish of ['stone', 'halflog'] as const) {
+      for (const finish of ['stone', 'riverstone', 'halflog'] as const) {
         fills = 0;
         const t = sidingTextures(finish, '#8e8579');
         expect(t?.map).toBeTruthy();
@@ -1059,7 +1065,66 @@ describe('fieldstone and half-log', () => {
     l.nodes.r = { id: 'r', x: 240, y: 120 };
     l.walls.s = { id: 's', a: 'p', b: 'q', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'stone' };
     l.walls.h = { id: 'h', a: 'q', b: 'r', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'halflog' };
+    l.walls.v = { id: 'v', a: 'r', b: 'p', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'riverstone' };
     const back = migrate(JSON.parse(JSON.stringify(plan))).levels[plan.levelOrder[1]].walls;
-    expect([back.s.finish, back.h.finish]).toEqual(['stone', 'halflog']);
+    expect([back.s.finish, back.h.finish, back.v.finish]).toEqual(['stone', 'halflog', 'riverstone']);
+  });
+});
+
+describe('river stone', () => {
+  const at = (f: Float32Array, row: number, col: number) => f[((row + TEXTURE_PX) % TEXTURE_PX) * TEXTURE_PX + ((col + TEXTURE_PX) % TEXTURE_PX)];
+
+  it('is a wall finish of its own, labelled, a band finish, not siding, and masonry', () => {
+    expect(WALL_FINISHES).toContain('riverstone');
+    expect(BAND_FINISHES).toContain('riverstone');
+    expect(SIDING_FINISHES).not.toContain('riverstone');
+    expect(WALL_FINISH_LABEL.riverstone).toBe('River stone');
+    expect(isMasonryFinish('riverstone')).toBe(true);
+    const m = wallMaterial('existing', 'exterior', 'riverstone', '#8e8579');
+    expect(m).not.toBe(wallMaterial('existing', 'exterior', 'stone', '#8e8579'));
+    expect(m.color.getHexString()).toBe('8e8579');
+  });
+
+  it('stones: 4" to 10" long and 3" to 6" high with their joints, apart from one another, in all four tones', () => {
+    const stones = riverstoneFaces();
+    expect(riverstoneFaces()).toEqual(stones);
+    // A stone's cell is the stone, its joint and up to RIVERSTONE_JITTER each side.
+    for (const s of stones) {
+      expect(s.x1 - s.x0 + RIVERSTONE_JOINT).toBeGreaterThanOrEqual(RIVERSTONE_WIDTH.min - 2 * RIVERSTONE_JITTER - 1e-9);
+      expect(s.x1 - s.x0 + RIVERSTONE_JOINT).toBeLessThanOrEqual(RIVERSTONE_WIDTH.max + 1e-9);
+      expect(s.y1 - s.y0 + RIVERSTONE_JOINT).toBeGreaterThanOrEqual(RIVERSTONE_HEIGHT.min - 2 * RIVERSTONE_JITTER - 1e-9);
+      expect(s.y1 - s.y0 + RIVERSTONE_JOINT).toBeLessThanOrEqual(RIVERSTONE_HEIGHT.max + 1e-9);
+    }
+    // No two stones' boxes overlap, round the tile's edges too (a joint or more between them).
+    const span = (a0: number, a1: number, b0: number, b1: number) =>
+      [-TILE_INCHES, 0, TILE_INCHES].some((d) => a0 < b1 + d + RIVERSTONE_JOINT - 1e-9 && b0 + d < a1 + RIVERSTONE_JOINT - 1e-9);
+    for (let i = 0; i < stones.length; i++) {
+      for (let j = i + 1; j < stones.length; j++) {
+        const [a, b] = [stones[i], stones[j]];
+        expect(span(a.x0, a.x1, b.x0, b.x1) && span(a.y0, a.y1, b.y0, b.y1), `${i} ${j}`).toBe(false);
+      }
+    }
+    // 48" of 3" to 6" courses of 4" to 10" stones: some 40 to 190 stones a tile.
+    expect(stones.length).toBeGreaterThan(40);
+    expect(stones.length).toBeLessThan(190);
+    expect(new Set(stones.map((s) => s.tone)).size).toBe(RIVERSTONE_TONES.length);
+  });
+
+  it('relief: a round dome per stone up to RELIEF.river, deep gaps between', () => {
+    const f = sidingHeight('riverstone')!;
+    expect(f).toHaveLength(TEXTURE_PX * TEXTURE_PX);
+    const max = f.reduce((m, h) => Math.max(m, h), -Infinity);
+    expect(max).toBeLessThanOrEqual(RELIEF.river + 1e-6);
+    expect(max).toBeGreaterThan(0.9 * RELIEF.river);
+    expect(f.reduce((m, h) => Math.min(m, h), Infinity)).toBeCloseTo(-RELIEF.gap, 6);
+    const gaps = f.filter((h) => h < 0).length / f.length;
+    expect(gaps).toBeGreaterThan(0.15);
+    expect(gaps).toBeLessThan(0.6);
+    // A stone is highest at its middle and falls toward its rim.
+    const s = riverstoneFaces()[0];
+    const mid = TEXTURE_PX - Math.round(((s.y0 + s.y1) / 2) * PX_PER_INCH);
+    const c = Math.round(((s.x0 + s.x1) / 2) * PX_PER_INCH);
+    expect(at(f, mid, c)).toBeGreaterThan(0.9 * RELIEF.river);
+    expect(at(f, mid, Math.round((s.x0 + 0.3) * PX_PER_INCH))).toBeLessThan(at(f, mid, c));
   });
 });
