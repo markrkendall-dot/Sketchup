@@ -620,12 +620,12 @@
         "f-n18": {
           "id": "f-n18",
           "x": 314.5,
-          "y": 120
+          "y": 135
         },
         "f-n19": {
           "id": "f-n19",
           "x": 459.5,
-          "y": 120
+          "y": 135
         },
         "f-n20": {
           "id": "f-n20",
@@ -669,36 +669,31 @@
         },
         "f-n28": {
           "id": "f-n28",
-          "x": 314.5,
-          "y": 51.5
+          "x": 352.5,
+          "y": 57.5
         },
         "f-n29": {
           "id": "f-n29",
           "x": 352.5,
-          "y": 51.5
+          "y": 135
         },
         "f-n30": {
           "id": "f-n30",
-          "x": 352.5,
-          "y": 120
+          "x": 102,
+          "y": 46.5
         },
         "f-n31": {
           "id": "f-n31",
-          "x": 102,
+          "x": 142,
           "y": 46.5
         },
         "f-n32": {
           "id": "f-n32",
-          "x": 142,
+          "x": 170.5,
           "y": 46.5
         },
         "f-n33": {
           "id": "f-n33",
-          "x": 170.5,
-          "y": 46.5
-        },
-        "f-n34": {
-          "id": "f-n34",
           "x": 102,
           "y": 3.5
         }
@@ -707,7 +702,7 @@
         "f-w1": {
           "id": "f-w1",
           "a": "f-n1",
-          "b": "f-n34",
+          "b": "f-n33",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -717,7 +712,7 @@
         "f-w2": {
           "id": "f-w2",
           "a": "f-n2",
-          "b": "f-n28",
+          "b": "f-n27",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -927,7 +922,7 @@
         "f-w24": {
           "id": "f-w24",
           "a": "f-n18",
-          "b": "f-n30",
+          "b": "f-n29",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1033,7 +1028,7 @@
         "f-w34": {
           "id": "f-w34",
           "a": "f-n25",
-          "b": "f-n33",
+          "b": "f-n32",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1076,8 +1071,8 @@
         },
         "f-w39": {
           "id": "f-w39",
-          "a": "f-n28",
-          "b": "f-n29",
+          "a": "f-n27",
+          "b": "f-n28",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1085,17 +1080,15 @@
         "f-w40": {
           "id": "f-w40",
           "a": "f-n28",
-          "b": "f-n27",
-          "thickness": 7,
-          "kind": "exterior",
-          "phase": "existing",
-          "finish": "shingle",
-          "color": "#5a3a35"
+          "b": "f-n29",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
         },
         "f-w41": {
           "id": "f-w41",
           "a": "f-n29",
-          "b": "f-n30",
+          "b": "f-n19",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1103,10 +1096,11 @@
         "f-w42": {
           "id": "f-w42",
           "a": "f-n30",
-          "b": "f-n19",
+          "b": "f-n31",
           "thickness": 5,
           "kind": "interior",
-          "phase": "new"
+          "phase": "new",
+          "heightOverride": 47.5
         },
         "f-w43": {
           "id": "f-w43",
@@ -1115,37 +1109,28 @@
           "thickness": 5,
           "kind": "interior",
           "phase": "new",
-          "heightOverride": 47.5
+          "heightOverride": 77
         },
         "f-w44": {
           "id": "f-w44",
           "a": "f-n32",
-          "b": "f-n33",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new",
-          "heightOverride": 77
-        },
-        "f-w45": {
-          "id": "f-w45",
-          "a": "f-n33",
           "b": "f-n26",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
         },
-        "f-w46": {
-          "id": "f-w46",
-          "a": "f-n34",
-          "b": "f-n31",
+        "f-w45": {
+          "id": "f-w45",
+          "a": "f-n33",
+          "b": "f-n30",
           "thickness": 5,
           "kind": "interior",
           "phase": "new",
           "heightOverride": 47.5
         },
-        "f-w47": {
-          "id": "f-w47",
-          "a": "f-n34",
+        "f-w46": {
+          "id": "f-w46",
+          "a": "f-n33",
           "b": "f-n25",
           "thickness": 7,
           "kind": "exterior",
@@ -1387,7 +1372,7 @@
         "f-o17": {
           "wallId": "f-w25",
           "type": "window",
-          "offset": 40,
+          "offset": 25,
           "width": 40,
           "height": 40,
           "sill": 42,
@@ -1430,7 +1415,7 @@
           "id": "f-o19"
         },
         "f-o20": {
-          "wallId": "f-w42",
+          "wallId": "f-w41",
           "type": "door",
           "offset": 36.5,
           "width": 28,
@@ -1460,9 +1445,9 @@
           "id": "f-o21"
         },
         "f-o22": {
-          "wallId": "f-w41",
+          "wallId": "f-w40",
           "type": "passage",
-          "offset": 34.25,
+          "offset": 38.75,
           "width": 56,
           "height": 80,
           "sill": 0,
@@ -1502,7 +1487,7 @@
         "f-o25": {
           "wallId": "f-w26",
           "type": "window",
-          "offset": 51,
+          "offset": 36,
           "width": 30,
           "height": 44,
           "sill": 30,
@@ -1730,7 +1715,7 @@
           "id": "f-o39"
         },
         "f-o40": {
-          "wallId": "f-w44",
+          "wallId": "f-w43",
           "type": "door",
           "offset": 13.5,
           "width": 24,
@@ -3172,7 +3157,7 @@
           },
           "direction": 90,
           "width": 66,
-          "depth": 42,
+          "depth": 48,
           "height": 1,
           "frontColor": "#f1efe8",
           "phase": "new",
@@ -3184,10 +3169,10 @@
           "label": "Bench",
           "origin": {
             "x": 318,
-            "y": 28
+            "y": 31
           },
           "direction": 0,
-          "width": 42,
+          "width": 48,
           "depth": 18,
           "height": 18,
           "frontColor": "#f1efe8",
@@ -3200,7 +3185,7 @@
           "label": "Glass",
           "origin": {
             "x": 363.5,
-            "y": 49.5
+            "y": 55.5
           },
           "direction": 270,
           "width": 17,
@@ -3216,10 +3201,10 @@
           "label": "Wall",
           "origin": {
             "x": 402,
-            "y": 28
+            "y": 31
           },
           "direction": 0,
-          "width": 42,
+          "width": 48,
           "depth": 4,
           "height": 96,
           "frontColor": "#f1efe8",
@@ -3259,10 +3244,10 @@
         "f-c74": {
           "elevation": 0,
           "kind": "box",
-          "label": "Washer",
+          "label": "Dryer",
           "origin": {
             "x": 322,
-            "y": 71.5
+            "y": 77.5
           },
           "direction": 0,
           "width": 27,
@@ -3275,10 +3260,10 @@
         "f-c75": {
           "elevation": 0,
           "kind": "box",
-          "label": "Dryer",
+          "label": "Washer",
           "origin": {
             "x": 322,
-            "y": 99.5
+            "y": 104.5
           },
           "direction": 0,
           "width": 27,
@@ -3292,11 +3277,11 @@
           "elevation": 0,
           "kind": "tall",
           "origin": {
-            "x": 345,
-            "y": 122.5
+            "x": 318,
+            "y": 164.5
           },
-          "direction": 90,
-          "width": 54,
+          "direction": 0,
+          "width": 53,
           "depth": 24,
           "height": 84,
           "frontColor": "#c4884e",
@@ -3307,11 +3292,11 @@
           "elevation": 0,
           "kind": "tall",
           "origin": {
-            "x": 431,
-            "y": 122.5
+            "x": 318,
+            "y": 217.5
           },
-          "direction": 90,
-          "width": 50,
+          "direction": 0,
+          "width": 53,
           "depth": 24,
           "height": 84,
           "frontColor": "#c4884e",
@@ -3372,7 +3357,7 @@
           "label": "Dryer vent",
           "origin": {
             "x": 318,
-            "y": 99.5
+            "y": 77.5
           },
           "direction": 0,
           "width": 4,
@@ -3388,10 +3373,10 @@
           "label": "Dryer vent",
           "origin": {
             "x": 318,
-            "y": 50.25
+            "y": 39.25
           },
           "direction": 0,
-          "width": 102.5,
+          "width": 80.5,
           "depth": 4,
           "height": 4,
           "frontColor": "#b9bdc1",

@@ -692,32 +692,33 @@ where the built design differs from them):
    windows (34"), so they are demolished and high transoms replace them (the Office's at y 110,
    clear of the new bath's wall; the Guest's on its window's centre, y 222): 46" x 24", two sashes
    of 2 x 2 lites, sill 60" (head 84"), 9" over the roof. A 5" partition divides the master bath
-   (north, 11'6" x 9'2 1/2" inside) from the master bedroom (11'6" x 15'5 1/2", the old Utility
-   plus 6'). The bedroom is entered from the kitchen where today's grey Kitchen to Utility door is
+   (north, 11'6" x 10'5 1/2" inside) from the master bedroom (11'6" x 14'2 1/2", the old Utility
+   plus 4'9"). The bedroom is entered from the kitchen where today's grey Kitchen to Utility door is
    (MK chose that place over a new 32" door further north), through a **solid** 32" door: the old
    one's clear lites looked from the dining table into the bedroom. It takes a **king bed** (MK, 15
-   Oct 2026), 78" x 84" with its headboard on the east wall: about 3'3" aisles on both sides (to
-   the bath and to the sliding door) and 4'6" at its foot, with nightstands under two 30" east
+   Oct 2026), 78" x 84" with its headboard on the east wall: a 4'5" aisle on its north side (to
+   the bath) and 3'3" on its south (to the sliding door), with nightstands under two 30" east
    windows that flank it (they replace a 48" pair and today's casement pair in the wing's gable
    end, which the bed would cover; the south one is a new hole in today's wall, so it needs a
-   header). For that the walk-in closet gives way to two built-in **wardrobes**, 24" deep and 84"
-   high, along the bath wall either side of the bath door (4'6" and 4'2", 8'8" of rod). The
+   header). The walk-in closet gives way to two built-in **wardrobes**, 24" deep and 84" high,
+   along the west wall at the bed's foot (8'10" of rod, 2'6" from the bed), backing onto the
+   kitchen's refrigerator, which they quiet. The
    bedroom's south window becomes
    a 72" x 80" sliding door on the same centre, over the walkout's 72" double door, two glass
    panels of 2 x 4 lites, with no transom (under the 96" ceiling there is no room for one). The
    master bath's north window is a transom, high for privacy from the road: 46" x 18", sill 70".
    The wing's north wall, its roof and its south window, and the main block's first-floor east
    window, are demolished. New 8" block walls carry the new part (a crawl space). The master bath
-   has a **walk-in shower** (MK, 15 Oct 2026) along its north wall's west end, 7' x 3'6", curbless
+   has a **walk-in shower** (MK, 15 Oct 2026) along its north wall's west end, 7' x 4', curbless
    and doorless: an 18" tiled bench across its west end, a fixed glass panel and a 30" way in
    straight ahead of the bath door, a tiled wall at its east end. Its other fixtures are
    **placeholders**: a 48" vanity east of the shower under the transom and a WC on the east wall;
    its door is east of the laundry.
-2. **Laundry** (MK): a closet in the master bath's south-west corner, 2'8" x 5'3 1/2" inside, with
-   the washer and dryer side by side (27" each) behind bifold doors (drawn as a 56" opening), 4"
+2. **Laundry** (MK): a closet in the master bath's south-west corner, 2'8" x 6'0 1/2" inside, with
+   the dryer and washer side by side (27" each, the dryer north) behind bifold doors (drawn as a 56" opening), 4"
    off the back wall for the **dryer's vent**: a 4" metal duct up behind the dryer to 86", north
    under the ceiling over the shower and out through the master bath's north wall to a vent hood
-   (about 13' with two bends, inside the code's 35' less 5' a bend: M1502.4.5.1, to verify).
+   (about 11' with two bends, inside the code's 35' less 5' a bend: M1502.4.5.1, to verify).
 3. **Stair hall.** The old front room, the stair strip and the Bunk over them are one stair hall,
    13'5" x 10'8", **open through both floors** north of the upstairs Master (a floor opening over x
    7 to 167.5, y 7 to 97). The old stair, the front room's walls (the y 99.5 line and the old bath's
@@ -784,7 +785,7 @@ where the built design differs from them):
      roof penetration;
    - on the **east wall**, shared with the master suite: base cabinets and counter from the corner
      (24", 30" and 24", the counter one L with the north run's), the **refrigerator** (36" wide,
-     counter-depth) with its back partly on the master bedroom's west wardrobe, and
+     counter-depth) with its back on the master bedroom's wardrobes, which deaden its hum, and
      a 24" base after it for a landing; wall cabinets over them all. South of them the east wall is
      the way to the master bedroom's door;
    - the **island**, moved west into the work triangle, its fronts facing north so whoever is at

@@ -106,8 +106,9 @@ describe('docs/examples/146-mick-road.json', () => {
     // (the Master's wardrobe and the Guest's closet, two walls each; the master bedroom's wardrobes
     // are built-in cabinets, not walls). The
     // retaining wall's three pieces on the Basement are existing; its two pieces carried west to the
-    // property line are new.
-    expect(count(all('walls'))).toEqual({ existing: 54, demo: 13, new: 35 });
+    // property line are new. The laundry closet's north wall meets the main block's east wall where
+    // the pantry's south wall does (y 57.5), so the two split it once.
+    expect(count(all('walls'))).toEqual({ existing: 53, demo: 13, new: 35 });
     // Upstairs, the Bunk's, the old bath's, the Master's and the Guest's doors go; the new bath's,
     // the Master's and the Guest's are off the landing. Today's grey half-lite door to the Utility
     // and the Guest's three-sash south window give way to a solid door and a two-sash window in the
@@ -519,9 +520,9 @@ describe('docs/examples/146-mick-road.json', () => {
     expectSizes(
       f,
       {
-        // The wing grown north: bath 11'6" x 9'2 1/2", bedroom 11'6" x 15'5 1/2" (the old Utility plus 6').
-        'Master bath': [138, 110.5],
-        'Master bedroom': [138, 185.5],
+        // The wing grown north: bath 11'6" x 10'5 1/2", bedroom 11'6" x 14'2 1/2" (the old Utility plus 4'9").
+        'Master bath': [138, 125.5],
+        'Master bedroom': [138, 170.5],
         // The kitchen south of the north band, the old bath included.
         Kitchen: [138, 248],
         // The Living, open to the stair hall (the old front room, the stair strip and the stair).
@@ -544,7 +545,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expectSizes(s, { 'Bath (proposed)': [88, 63], Master: [162, 206], Guest: [137, 233], 'Master closet': [30, 33], Landing: [211, 128], 'Master wardrobe': [88.5, 24], 'Guest closet': [24, 60] }, 'proposed');
     // In the All view the demolished rooms keep their faces and the new labels sit in the parts the
     // old rooms did not cover, so no face has two names.
-    expectSizes(f, { Utility: [138, 113], 'Master bedroom': [138, 65.5], 'Entry porch': [59, 57.25] }, 'all');
+    expectSizes(f, { Utility: [138, 113], 'Master bedroom': [138, 50.5], 'Entry porch': [59, 57.25] }, 'all');
   });
 
   it('has the grand stair: a step up to a landing, then one straight run up the north wall, in a hall open through both floors', () => {
@@ -944,6 +945,7 @@ describe('docs/examples/146-mick-road.json', () => {
       'Living: Stovepipe',
       'Living: Wood stove',
       'Master bath: Bench',
+      'Master bath: Dryer vent',
       'Master bath: Glass',
       'Master bath: WC',
       'Master bath: Walk-in shower',
@@ -962,7 +964,6 @@ describe('docs/examples/146-mick-road.json', () => {
       'Powder room: WC',
       'Powder room: sink',
       'Screen porch: Tee',
-      'none: Dryer vent',
       'none: Duct cap',
       'none: Vent hood',
     ]);
@@ -1007,7 +1008,7 @@ describe('docs/examples/146-mick-road.json', () => {
     const hood = fixtures.find((x) => x.kind === 'hood')!;
     expect([box(hood).x0, box(hood).x1, hood.elevation]).toEqual([237, 267, 66]);
     // The east wall (shared with the master suite), north to south: a corner base, a 30" and a 24"
-    // base, the counter-depth refrigerator partly against the bedroom's west wardrobe, a
+    // base, the counter-depth refrigerator against the bedroom's wardrobes, a
     // 24" base after it; the corner base's counter joins the north run's in one L.
     const east = fixtures.filter((x) => x.elevation === 0 && box(x).x1 === 311).sort((p, q) => box(p).y0 - box(q).y0);
     expect(east.map((x) => [x.kind, box(x).y0, box(x).y1])).toEqual([

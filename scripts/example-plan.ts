@@ -951,9 +951,12 @@ function proposed(ids: ExistingIds): void {
 
   // ---- 1. East addition: the wing grows north to the road corner at the same depth, one wing down
   // the whole east side, outside x 318..463, y 0..315. Its north wall continues the main block's,
-  // its east wall the wing's; a 5" partition at y 120 divides the master bath (north) from the master
-  // bedroom (the old Utility plus 6').
-  const ADD = { y: 120 };
+  // its east wall the wing's; a 5" partition at y 135 divides the master bath (north, 11'6" x
+  // 10'5 1/2") from the master bedroom (11'6" x 14'2 1/2", the old Utility plus 4'9"). MK, 15 Oct
+  // 2026: moved 15" south from y 120 so the bath takes a 4'-deep walk-in shower and the bedroom
+  // still takes a king bed. It meets the main block's east wall 5" north of the demolished east
+  // window's jambs (140..180), so that window keeps its place in the existing view.
+  const ADD = { y: 135 };
   const addition = drawWalls(fId, [{ x: CL.x1, y: CL.y0 }, { x: wing.x1, y: CL.y0 }, { x: wing.x1, y: wing.y0 }], T, false, NEW);
   store().updateWalls(fId, addition, { finish: 'shingle', color: FINISH_COLOR });
   partition(fId, { x: CL.x1, y: ADD.y }, { x: wing.x1, y: ADD.y }, NEW);
@@ -996,10 +999,10 @@ function proposed(ids: ExistingIds): void {
   // built (there is none today, photo 16), so the house door opens on the hall, the stair and the
   // Living together.
 
-  // ---- 7. The laundry (MK): a closet in the master bath's south-west corner, x 318..350, y 54..117.5
-  // inside, its north wall at y 51.5 and its front at x 352.5, open 56" for bifold doors (drawn as a
-  // cased opening), with the washer and dryer side by side.
-  const LAUNDRY = { north: 51.5, front: 352.5 };
+  // ---- 7. The laundry (MK): a closet in the master bath's south-west corner, x 318..350, y 60..132.5
+  // inside, its north wall at y 57.5 (the walk-in shower's south side) and its front at x 352.5, open
+  // 56" for bifold doors (drawn as a cased opening), with the washer and dryer side by side.
+  const LAUNDRY = { north: 57.5, front: 352.5 };
   partition(fId, { x: CL.x1, y: LAUNDRY.north }, { x: LAUNDRY.front, y: LAUNDRY.north }, NEW);
   partition(fId, { x: LAUNDRY.front, y: LAUNDRY.north }, { x: LAUNDRY.front, y: ADD.y }, NEW);
 
@@ -1338,7 +1341,7 @@ function proposed(ids: ExistingIds): void {
   // The east wall (shared with the master suite), fronts facing west, north to south: a 24" corner
   // base (y 60..84, its counter mitred into the north run's), a 30" and a 24" base (to y 138); the
   // refrigerator, 36" wide and counter-depth (29", x 282..311), at y 140..176, 2" off the base for its
-  // door, its back partly on the master bedroom's west wardrobe (y 122.5..146.5), which deadens some of its hum; a
+  // door, its back on the master bedroom's wardrobes (y 138..244), which deaden its hum; a
   // 24" base after it (y 176..200) for a landing. Wall cabinets over the bases, one over the
   // refrigerator. South of y 200 the east wall is the way to the master bedroom's door (y 248..280).
   const eastWall = (kind: NewFixture['kind'], y: number, width: number, depth: number, height: number, elevation = 0) =>
@@ -1396,36 +1399,40 @@ function proposed(ids: ExistingIds): void {
   kitchen({ ...WC, origin: { x: POWDER.west + TI / 2, y: POWDER_MID }, direction: 0 });
   kitchen({ kind: 'sink', origin: { x: PART_KL - TI / 2, y: POWDER_MID }, direction: 180, width: 18, depth: 12, height: 31.5 });
 
-  // ---- The master bath's placeholders (x 318..456, y 7..117.5, door at x 375..403 swinging in from
+  // ---- The master bath's placeholders (x 318..456, y 7..132.5, door at x 375..403 swinging in from
   // the partition). A walk-in shower (MK, 15 Oct 2026: walk in, large, with seating) along the north
-  // wall's west end, x 318..402, y 7..49 (7' x 3'6"), curbless and doorless: an 18" tiled bench across
+  // wall's west end, x 318..402, y 7..55 (7' x 4'), curbless and doorless: an 18" tiled bench across
   // its west end, the laundry closet's north wall its south side as far as x 355, then a 17" fixed
   // glass panel, and a 30" way in (x 372..402) straight ahead of the bath door; a 4" tiled wall at its
   // east end, full height. A 48" vanity on the north wall east of it, under the transom (sill 70);
   // the WC against the east wall south of the east window (y 38..86); and in the laundry closet the
-  // washer and the dryer, 27" each, side by side facing east, 4" off the back wall for the dryer's
-  // vent, their fronts at the closet's opening (x 350).
+  // dryer (north, nearest its vent's hood) and the washer, 27" each, side by side facing east, 4"
+  // off the back wall for the dryer's vent, their fronts at the closet's opening (x 350); 14" spare
+  // at the closet's south end for a shelf.
   // The floor's tile is drawn east of the bench (the bench box stands on it).
   const TILE = WHITE;
-  kitchen({ kind: 'box', label: 'Walk-in shower', origin: { x: 369, y: 7 }, direction: 90, width: 66, depth: 42, height: 1, frontColor: TILE });
-  kitchen({ kind: 'box', label: 'Bench', origin: { x: 318, y: 28 }, direction: 0, width: 42, depth: 18, height: 18, frontColor: TILE });
-  kitchen({ kind: 'box', label: 'Glass', origin: { x: 363.5, y: 49.5 }, direction: 270, width: 17, depth: 0.5, height: 78, frontColor: '#cfe2e6' });
-  kitchen({ kind: 'box', label: 'Wall', origin: { x: 402, y: 28 }, direction: 0, width: 42, depth: 4, height: 96, frontColor: TILE });
+  const SHOWER = { south: 55, mid: 31, depth: 48 };
+  kitchen({ kind: 'box', label: 'Walk-in shower', origin: { x: 369, y: 7 }, direction: 90, width: 66, depth: SHOWER.depth, height: 1, frontColor: TILE });
+  kitchen({ kind: 'box', label: 'Bench', origin: { x: 318, y: SHOWER.mid }, direction: 0, width: SHOWER.depth, depth: 18, height: 18, frontColor: TILE });
+  kitchen({ kind: 'box', label: 'Glass', origin: { x: 363.5, y: SHOWER.south + 0.5 }, direction: 270, width: 17, depth: 0.5, height: 78, frontColor: '#cfe2e6' });
+  kitchen({ kind: 'box', label: 'Wall', origin: { x: 402, y: SHOWER.mid }, direction: 0, width: SHOWER.depth, depth: 4, height: 96, frontColor: TILE });
   kitchen({ kind: 'sink', origin: { x: 430, y: 7 }, direction: 90, width: 48, depth: 21, height: 34.5 });
   kitchen({ ...WC, origin: { x: 456, y: 100 }, direction: 180 });
-  kitchen({ kind: 'box', label: 'Washer', origin: { x: 322, y: 71.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
-  kitchen({ kind: 'box', label: 'Dryer', origin: { x: 322, y: 99.5 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  const DRYER_Y = 77.5;
+  kitchen({ kind: 'box', label: 'Dryer', origin: { x: 322, y: DRYER_Y }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  kitchen({ kind: 'box', label: 'Washer', origin: { x: 322, y: DRYER_Y + 27 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
   // ---- The master bedroom (MK, 15 Oct 2026: a king bed). Built-in wardrobes, 24" deep and 84"
-  // high with pine doors, along the bath partition either side of the way to the bath door (x
-  // 372..406, 34" for its 28" door and casings): x 318..372 and x 406..456, y 122.5..146.5 (8'8" of
-  // rod; the walk-in of the livability review had 5'). The king bed, 78" x 84" with its headboard,
-  // on the wing's east wall centred y 230 (x 372..456, y 191..269): 39 1/2" from the wardrobes'
-  // fronts on its north side (the way to the bath), 39" to the south wall on its south side (the way
-  // to the sliding door), 54" from its foot to the west wall (the bedroom door's 32" swing fits).
-  // 24" nightstands either side, under the two east windows.
-  const ADD_FACE = ADD.y + 2.5;
-  kitchen({ kind: 'tall', origin: { x: 345, y: ADD_FACE }, direction: 90, width: 54, depth: 24, height: 84, frontColor: PINE });
-  kitchen({ kind: 'tall', origin: { x: 431, y: ADD_FACE }, direction: 90, width: 50, depth: 24, height: 84, frontColor: PINE });
+  // high with pine doors, along the west wall at the bed's foot, x 318..342, y 138..244 (two of
+  // 53", 8'10" of rod; the walk-in of the livability review had 5'): their backs on the
+  // refrigerator's (y 140..176), which they quiet, their south end 4" short of the bedroom door's
+  // jamb (248). The king bed, 78" x 84" with its headboard, on the wing's east wall centred y 230
+  // (x 372..456, y 191..269): 53 1/2" from the partition on its north side (the way to the bath),
+  // 39" to the south wall on its south side (the way to the sliding door), 30" from its foot to the
+  // wardrobes. 24" nightstands either side, under the two east windows.
+  const WARDROBE_W = { y0: 138, width: 53 };
+  for (const i of [0, 1]) {
+    kitchen({ kind: 'tall', origin: { x: CL.x1 + HALF, y: WARDROBE_W.y0 + WARDROBE_W.width * (i + 0.5) }, direction: 0, width: WARDROBE_W.width, depth: 24, height: 84, frontColor: PINE });
+  }
   const BED = { width: 78, depth: 84 };
   kitchen({ kind: 'box', label: 'King bed', origin: { x: WING.x1 - T, y: BED_Y }, direction: 180, width: BED.width, depth: BED.depth, height: 24, frontColor: CREAM });
   for (const side of [-1, 1]) {
@@ -1435,15 +1442,15 @@ function proposed(ids: ExistingIds): void {
   // ---- Vents through walls, not the roof (MK, 14 Oct 2026). The dryer's: a 4" rigid metal duct
   // rising behind the dryer (x 318..322) to 86" and running north under the ceiling, over the
   // shower, out through the master bath's north wall at x 320 to a vent hood with a damper: about
-  // 13' of duct and two 90-degree bends, well inside the 35' less 5' per bend the code allows
+  // 11' of duct and two 90-degree bends, well inside the 35' less 5' per bend the code allows
   // (M1502.4.5.1; verify against the 2025 RCNYS and the dryer's instructions). The range hood's (MK,
   // 15 Oct 2026): an 8" duct from the hood's back straight north through the pantry's wall and across
   // its ceiling (86..94", over the 84" shelves) to a wall cap on the north face: about 5', no bends.
   // The cap is 4' under the upstairs bath window's sill (3' from openings asked, M1504.3; verify).
   // Drawn as boxes (they pass through the walls).
   const METAL = COLUMN_COLOR.flue;
-  kitchen({ kind: 'box', label: 'Dryer vent', origin: { x: 318, y: 99.5 }, direction: 0, width: 4, depth: 4, elevation: 30, height: 60, frontColor: METAL });
-  kitchen({ kind: 'box', label: 'Dryer vent', origin: { x: 318, y: (101.5 + -1) / 2 }, direction: 0, width: 102.5, depth: 4, elevation: 86, height: 4, frontColor: METAL });
+  kitchen({ kind: 'box', label: 'Dryer vent', origin: { x: 318, y: DRYER_Y }, direction: 0, width: 4, depth: 4, elevation: 30, height: 60, frontColor: METAL });
+  kitchen({ kind: 'box', label: 'Dryer vent', origin: { x: 318, y: (DRYER_Y + 2 + -1) / 2 }, direction: 0, width: DRYER_Y + 2 + 1, depth: 4, elevation: 86, height: 4, frontColor: METAL });
   kitchen({ kind: 'box', label: 'Vent hood', origin: { x: 320, y: 0 }, direction: 270, width: 8, depth: 5, elevation: 84, height: 8, frontColor: METAL });
   kitchen({ kind: 'box', label: 'Hood duct', origin: { x: RANGE_X, y: KITCHEN_NORTH }, direction: 270, width: 8, depth: KITCHEN_NORTH - MAIN.y0 + 1, elevation: 86, height: 8, frontColor: METAL });
   kitchen({ kind: 'box', label: 'Duct cap', origin: { x: RANGE_X, y: MAIN.y0 }, direction: 270, width: 12, depth: 5, elevation: 84, height: 12, frontColor: METAL });
