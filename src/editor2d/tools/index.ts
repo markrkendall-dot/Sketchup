@@ -1,5 +1,6 @@
 import { isOpeningVisible, isVisible, VIEW_MODES, visibleNodeIds } from '../../derive/phase';
 import { getPlan, usePlanStore, type PlanState } from '../../store/planStore';
+import { isLayerFurniture } from '../../model/furniture';
 import {
   isSiteModeTool,
   selectionSize,
@@ -238,7 +239,7 @@ export function pruneSelection(): void {
   const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
   const roofs = sel.roofs.filter((id) => level.roofs[id] && isVisible(level.roofs[id].phase, vm));
   // Furniture leaves the selection when its layer is turned off.
-  const fixtures = sel.fixtures.filter((id) => level.fixtures[id] && isVisible(level.fixtures[id].phase, vm) && (ui.showFurniture || level.fixtures[id].kind !== 'furniture'));
+  const fixtures = sel.fixtures.filter((id) => level.fixtures[id] && isVisible(level.fixtures[id].phase, vm) && (ui.showFurniture || !isLayerFurniture(level.fixtures[id])));
   const decks = sel.decks.filter((id) => level.decks?.[id] && isVisible(level.decks[id].phase, vm));
   const floorOpenings = sel.floorOpenings.filter((id) => level.floorOpenings?.[id] && isVisible(level.floorOpenings[id].phase, vm));
   // A staircase stays selected while one of its pieces is shown.

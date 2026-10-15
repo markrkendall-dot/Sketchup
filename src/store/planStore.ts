@@ -41,6 +41,11 @@ export interface AddWallOptions {
   kind: WallKind;
   thickness: number;
   phase: Phase;
+  /**
+   * A new wall rebuilt where a demolished one stood (an old doorway closed up in a wall that is
+   * otherwise kept): it may lie along that demolished wall. Never along a wall that stays.
+   */
+  replacesDemolished?: boolean;
 }
 
 export interface AddWallResult {
@@ -109,7 +114,7 @@ export type JoistZonePatch = Partial<Omit<JoistZone, 'id'>>;
 export type FixturePatch = Partial<Omit<Fixture, 'id'>>;
 export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
 /** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
-const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric']);
+const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn']);
 export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** A level's casework defaults; undefined clears a field. */
@@ -524,8 +529,9 @@ function cleanFixture(f: Fixture): Fixture {
   if (f.kind !== 'furniture') {
     delete out.piece;
     delete out.fabric;
+    delete out.builtIn;
   }
-  for (const k of ['label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric'] as const) if (out[k] === undefined) delete out[k];
+  for (const k of ['label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn'] as const) if (out[k] === undefined) delete out[k];
   return out;
 }
 
@@ -594,7 +600,8 @@ function addWallInPlace(level: Level, aRef: Vec2 | Id, bRef: Vec2 | Id, opts: Ad
   if (!la || !lb || (la.id !== null && la.id === lb.id) || dist(la.at, lb.at) <= MERGE_EPS) return null;
   // A wall on top of a wall already there (any phase) would replace a piece of it when the level
   // is normalized: refuse it instead (docs/history/REVIEW-2.md A1).
-  if (wallOverlapping(level, la.at, lb.at)) return 'overlap';
+  const rebuilt = opts.replacesDemolished && opts.phase === 'new';
+  if (wallOverlapping(level, la.at, lb.at, rebuilt ? (w) => w.phase === 'demo' : undefined)) return 'overlap';
   const place = (l: { id: Id | null; at: Vec2 }): { id: Id; existing: boolean } => {
     if (l.id) return { id: l.id, existing: true };
     const id = newId();
@@ -1311,7 +1318,7 @@ export const usePlanStore = create<PlanState>()(
               } else (f as unknown as Record<string, unknown>)[k] = next[k];
             }
             // Fields the cleaning dropped (a piece and a fabric when the kind is no longer furniture).
-            for (const k of ['piece', 'fabric'] as const) if (next[k] === undefined) delete f[k];
+            for (const k of ['piece', 'fabric', 'builtIn'] as const) if (next[k] === undefined) delete f[k];
           }),
 
         deleteFixtures: (levelId, ids) =>

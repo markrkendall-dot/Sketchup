@@ -6,6 +6,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { fixtureExtent } from '../derive/casework';
+import { isLayerFurniture } from '../model/furniture';
 import { getFootprints } from '../derive/footprint';
 import { isVisible, VIEW_MODE_LABEL } from '../derive/phase';
 import { roofOutlineWithOverhang } from '../derive/roofs';
@@ -55,7 +56,7 @@ export function levelDrawingBounds(level: Level, viewMode: ViewMode, opts: { fur
   for (const d of Object.values(level.decks ?? {})) if (isVisible(d.phase, viewMode)) pts.push(...d.outline);
   for (const st of Object.values(level.stairs)) if (isVisible(st.phase, viewMode)) pts.push(...stairsSymbol(st, 1).outline);
   // Furniture only while its layer is on (absent: on).
-  for (const f of Object.values(level.fixtures ?? {})) if (isVisible(f.phase, viewMode) && (opts.furniture !== false || f.kind !== 'furniture')) pts.push(...fixtureExtent(f));
+  for (const f of Object.values(level.fixtures ?? {})) if (isVisible(f.phase, viewMode) && (opts.furniture !== false || !isLayerFurniture(f))) pts.push(...fixtureExtent(f));
   return boundsOf(pts);
 }
 

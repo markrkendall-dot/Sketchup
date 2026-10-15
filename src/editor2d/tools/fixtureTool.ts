@@ -132,6 +132,7 @@ const furnitureSpec: SpecOf = (ui) => {
   const extra: Partial<Fixture> = { piece };
   if (d.furnitureWood && FURNITURE[piece].uses.wood) extra.wood = d.furnitureWood;
   if (d.furnitureFabric && FURNITURE[piece].uses.fabric) extra.fabric = d.furnitureFabric;
+  if (FURNITURE[piece].builtIn) extra.builtIn = true;
   return { kind: 'furniture', piece, size: furnitureDefaults(piece, d.furnitureBed), placement: FURNITURE[piece].placement, extra, name: (width) => furnitureNameOf({ piece, width }) };
 };
 

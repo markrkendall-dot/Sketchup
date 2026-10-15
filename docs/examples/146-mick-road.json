@@ -72,12 +72,12 @@
         "b-n12": {
           "id": "b-n12",
           "x": 3.5,
-          "y": 67.75
+          "y": 49.75
         },
         "b-n13": {
           "id": "b-n13",
           "x": -92.5,
-          "y": 67.75
+          "y": 49.75
         },
         "b-n14": {
           "id": "b-n14",
@@ -630,70 +630,75 @@
         "f-n20": {
           "id": "f-n20",
           "x": 3.5,
-          "y": 67.75
+          "y": 26
         },
         "f-n21": {
           "id": "f-n21",
-          "x": -92.5,
-          "y": 67.75
+          "x": 3.5,
+          "y": 49.75
         },
         "f-n22": {
           "id": "f-n22",
           "x": -92.5,
-          "y": 154.5
+          "y": 49.75
         },
         "f-n23": {
           "id": "f-n23",
-          "x": 3.5,
+          "x": -92.5,
           "y": 154.5
         },
         "f-n24": {
           "id": "f-n24",
-          "x": -92.5,
-          "y": 311.5
+          "x": 3.5,
+          "y": 154.5
         },
         "f-n25": {
           "id": "f-n25",
-          "x": 170.5,
-          "y": 3.5
+          "x": -92.5,
+          "y": 311.5
         },
         "f-n26": {
           "id": "f-n26",
           "x": 170.5,
-          "y": 57.5
+          "y": 3.5
         },
         "f-n27": {
           "id": "f-n27",
-          "x": 314.5,
+          "x": 170.5,
           "y": 57.5
         },
         "f-n28": {
           "id": "f-n28",
-          "x": 352.5,
+          "x": 314.5,
           "y": 57.5
         },
         "f-n29": {
           "id": "f-n29",
           "x": 352.5,
-          "y": 135
+          "y": 57.5
         },
         "f-n30": {
           "id": "f-n30",
-          "x": 102,
-          "y": 46.5
+          "x": 352.5,
+          "y": 135
         },
         "f-n31": {
           "id": "f-n31",
-          "x": 142,
+          "x": 102,
           "y": 46.5
         },
         "f-n32": {
           "id": "f-n32",
-          "x": 170.5,
+          "x": 142,
           "y": 46.5
         },
         "f-n33": {
           "id": "f-n33",
+          "x": 170.5,
+          "y": 46.5
+        },
+        "f-n34": {
+          "id": "f-n34",
           "x": 102,
           "y": 3.5
         }
@@ -702,7 +707,7 @@
         "f-w1": {
           "id": "f-w1",
           "a": "f-n1",
-          "b": "f-n33",
+          "b": "f-n34",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -712,7 +717,7 @@
         "f-w2": {
           "id": "f-w2",
           "a": "f-n2",
-          "b": "f-n27",
+          "b": "f-n28",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -732,7 +737,7 @@
         "f-w4": {
           "id": "f-w4",
           "a": "f-n4",
-          "b": "f-n23",
+          "b": "f-n24",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -815,7 +820,7 @@
           "b": "f-n20",
           "thickness": 7,
           "kind": "exterior",
-          "phase": "existing",
+          "phase": "demo",
           "finish": "shingle",
           "color": "#5a3a35"
         },
@@ -922,7 +927,7 @@
         "f-w24": {
           "id": "f-w24",
           "a": "f-n18",
-          "b": "f-n29",
+          "b": "f-n30",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -950,16 +955,6 @@
         "f-w27": {
           "id": "f-w27",
           "a": "f-n20",
-          "b": "f-n21",
-          "thickness": 7,
-          "kind": "exterior",
-          "phase": "new",
-          "finish": "shingle",
-          "color": "#5a3a35"
-        },
-        "f-w28": {
-          "id": "f-w28",
-          "a": "f-n20",
           "b": "f-n1",
           "thickness": 7,
           "kind": "exterior",
@@ -967,10 +962,20 @@
           "finish": "shingle",
           "color": "#5a3a35"
         },
+        "f-w28": {
+          "id": "f-w28",
+          "a": "f-n20",
+          "b": "f-n21",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
         "f-w29": {
           "id": "f-w29",
           "a": "f-n21",
-          "b": "f-n22",
+          "b": "f-n10",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -979,8 +984,8 @@
         },
         "f-w30": {
           "id": "f-w30",
-          "a": "f-n22",
-          "b": "f-n23",
+          "a": "f-n21",
+          "b": "f-n22",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -989,7 +994,27 @@
         },
         "f-w31": {
           "id": "f-w31",
+          "a": "f-n22",
+          "b": "f-n23",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w32": {
+          "id": "f-w32",
           "a": "f-n23",
+          "b": "f-n24",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w33": {
+          "id": "f-w33",
+          "a": "f-n24",
           "b": "f-n14",
           "thickness": 7,
           "kind": "exterior",
@@ -997,10 +1022,10 @@
           "finish": "shingle",
           "color": "#5a3a35"
         },
-        "f-w32": {
-          "id": "f-w32",
-          "a": "f-n22",
-          "b": "f-n24",
+        "f-w34": {
+          "id": "f-w34",
+          "a": "f-n23",
+          "b": "f-n25",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -1011,9 +1036,9 @@
             "height": 36
           }
         },
-        "f-w33": {
-          "id": "f-w33",
-          "a": "f-n24",
+        "f-w35": {
+          "id": "f-w35",
+          "a": "f-n25",
           "b": "f-n4",
           "thickness": 7,
           "kind": "exterior",
@@ -1025,28 +1050,10 @@
             "height": 36
           }
         },
-        "f-w34": {
-          "id": "f-w34",
-          "a": "f-n25",
-          "b": "f-n32",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
-        },
-        "f-w35": {
-          "id": "f-w35",
-          "a": "f-n25",
-          "b": "f-n16",
-          "thickness": 7,
-          "kind": "exterior",
-          "phase": "existing",
-          "finish": "shingle",
-          "color": "#5a3a35"
-        },
         "f-w36": {
           "id": "f-w36",
           "a": "f-n26",
-          "b": "f-n27",
+          "b": "f-n33",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1054,25 +1061,25 @@
         "f-w37": {
           "id": "f-w37",
           "a": "f-n26",
-          "b": "f-n13",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
-        },
-        "f-w38": {
-          "id": "f-w38",
-          "a": "f-n27",
-          "b": "f-n11",
+          "b": "f-n16",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
           "finish": "shingle",
           "color": "#5a3a35"
         },
+        "f-w38": {
+          "id": "f-w38",
+          "a": "f-n27",
+          "b": "f-n28",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
         "f-w39": {
           "id": "f-w39",
           "a": "f-n27",
-          "b": "f-n28",
+          "b": "f-n13",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1080,58 +1087,76 @@
         "f-w40": {
           "id": "f-w40",
           "a": "f-n28",
-          "b": "f-n29",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
+          "b": "f-n11",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "existing",
+          "finish": "shingle",
+          "color": "#5a3a35"
         },
         "f-w41": {
           "id": "f-w41",
-          "a": "f-n29",
-          "b": "f-n19",
+          "a": "f-n28",
+          "b": "f-n29",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
         },
         "f-w42": {
           "id": "f-w42",
+          "a": "f-n29",
+          "b": "f-n30",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w43": {
+          "id": "f-w43",
           "a": "f-n30",
+          "b": "f-n19",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w44": {
+          "id": "f-w44",
+          "a": "f-n31",
+          "b": "f-n32",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new",
+          "heightOverride": 47.5
+        },
+        "f-w45": {
+          "id": "f-w45",
+          "a": "f-n32",
+          "b": "f-n33",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new",
+          "heightOverride": 77
+        },
+        "f-w46": {
+          "id": "f-w46",
+          "a": "f-n33",
+          "b": "f-n27",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w47": {
+          "id": "f-w47",
+          "a": "f-n34",
           "b": "f-n31",
           "thickness": 5,
           "kind": "interior",
           "phase": "new",
           "heightOverride": 47.5
         },
-        "f-w43": {
-          "id": "f-w43",
-          "a": "f-n31",
-          "b": "f-n32",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new",
-          "heightOverride": 77
-        },
-        "f-w44": {
-          "id": "f-w44",
-          "a": "f-n32",
+        "f-w48": {
+          "id": "f-w48",
+          "a": "f-n34",
           "b": "f-n26",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
-        },
-        "f-w45": {
-          "id": "f-w45",
-          "a": "f-n33",
-          "b": "f-n30",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new",
-          "heightOverride": 47.5
-        },
-        "f-w46": {
-          "id": "f-w46",
-          "a": "f-n33",
-          "b": "f-n25",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -1173,9 +1198,9 @@
           "id": "f-o2"
         },
         "f-o3": {
-          "wallId": "f-w28",
+          "wallId": "f-w12",
           "type": "door",
-          "offset": 19.75,
+          "offset": 44.5,
           "width": 36,
           "height": 80,
           "sill": 0,
@@ -1415,7 +1440,7 @@
           "id": "f-o19"
         },
         "f-o20": {
-          "wallId": "f-w41",
+          "wallId": "f-w43",
           "type": "door",
           "offset": 36.5,
           "width": 28,
@@ -1445,7 +1470,7 @@
           "id": "f-o21"
         },
         "f-o22": {
-          "wallId": "f-w40",
+          "wallId": "f-w42",
           "type": "passage",
           "offset": 38.75,
           "width": 56,
@@ -1532,7 +1557,7 @@
           "id": "f-o27"
         },
         "f-o28": {
-          "wallId": "f-w31",
+          "wallId": "f-w33",
           "type": "door",
           "offset": 36,
           "width": 32,
@@ -1552,9 +1577,9 @@
           "id": "f-o28"
         },
         "f-o29": {
-          "wallId": "f-w29",
+          "wallId": "f-w31",
           "type": "door",
-          "offset": 50.75,
+          "offset": 68.75,
           "width": 36,
           "height": 80,
           "sill": 0,
@@ -1572,17 +1597,18 @@
           "id": "f-o29"
         },
         "f-o30": {
-          "wallId": "f-w27",
+          "wallId": "f-w30",
           "type": "window",
-          "offset": 45.5,
-          "width": 36,
-          "height": 44,
-          "sill": 36,
+          "offset": 48,
+          "width": 60,
+          "height": 18,
+          "sill": 70,
           "phase": "new",
           "lites": {
             "cols": 2,
-            "rows": 3
+            "rows": 1
           },
+          "sashes": 2,
           "id": "f-o30"
         },
         "f-o31": {
@@ -1606,7 +1632,7 @@
           "id": "f-o31"
         },
         "f-o32": {
-          "wallId": "f-w32",
+          "wallId": "f-w34",
           "type": "window",
           "offset": 44.5,
           "width": 56,
@@ -1618,7 +1644,7 @@
           "id": "f-o32"
         },
         "f-o33": {
-          "wallId": "f-w32",
+          "wallId": "f-w34",
           "type": "window",
           "offset": 118.5,
           "width": 56,
@@ -1630,7 +1656,7 @@
           "id": "f-o33"
         },
         "f-o34": {
-          "wallId": "f-w33",
+          "wallId": "f-w35",
           "type": "window",
           "offset": 68.5,
           "width": 44,
@@ -1642,7 +1668,7 @@
           "id": "f-o34"
         },
         "f-o35": {
-          "wallId": "f-w30",
+          "wallId": "f-w32",
           "type": "door",
           "offset": 44.5,
           "width": 36,
@@ -1659,7 +1685,7 @@
           "id": "f-o35"
         },
         "f-o36": {
-          "wallId": "f-w33",
+          "wallId": "f-w35",
           "type": "door",
           "offset": 24.5,
           "width": 36,
@@ -1676,7 +1702,7 @@
           "id": "f-o36"
         },
         "f-o37": {
-          "wallId": "f-w36",
+          "wallId": "f-w38",
           "type": "door",
           "offset": 39.5,
           "width": 24,
@@ -1715,7 +1741,7 @@
           "id": "f-o39"
         },
         "f-o40": {
-          "wallId": "f-w43",
+          "wallId": "f-w45",
           "type": "door",
           "offset": 13.5,
           "width": 24,
@@ -1816,7 +1842,7 @@
           "name": "Entry porch (est.)",
           "anchor": {
             "x": -33,
-            "y": 48
+            "y": 26
           },
           "id": "f-r6",
           "phase": "demo"
@@ -2086,11 +2112,11 @@
           "outline": [
             {
               "x": -156,
-              "y": 64.25
+              "y": 46.25
             },
             {
               "x": -18,
-              "y": 64.25
+              "y": 46.25
             },
             {
               "x": -18,
@@ -2658,18 +2684,18 @@
         },
         "f-c35": {
           "kind": "furniture",
-          "piece": "bench",
+          "piece": "coatBench",
           "origin": {
-            "x": -44,
-            "y": 71.25
+            "x": -44.5,
+            "y": 53.25
           },
           "direction": 90,
-          "width": 48,
-          "depth": 16,
-          "height": 18,
+          "width": 89,
+          "depth": 18,
+          "height": 66,
           "elevation": 0,
           "phase": "new",
-          "wood": "darkLog",
+          "builtIn": true,
           "id": "f-c35"
         },
         "f-c36": {
@@ -2719,38 +2745,6 @@
           "id": "f-c38"
         },
         "f-c39": {
-          "kind": "box",
-          "label": "Hooks",
-          "origin": {
-            "x": -77,
-            "y": 71.25
-          },
-          "direction": 90,
-          "width": 24,
-          "depth": 2,
-          "height": 4,
-          "elevation": 60,
-          "frontColor": "#5a3a35",
-          "phase": "new",
-          "id": "f-c39"
-        },
-        "f-c40": {
-          "kind": "box",
-          "label": "Hooks",
-          "origin": {
-            "x": -12,
-            "y": 71.25
-          },
-          "direction": 90,
-          "width": 24,
-          "depth": 2,
-          "height": 4,
-          "elevation": 60,
-          "frontColor": "#5a3a35",
-          "phase": "new",
-          "id": "f-c40"
-        },
-        "f-c41": {
           "elevation": 0,
           "kind": "base",
           "origin": {
@@ -2762,10 +2756,10 @@
           "depth": 24,
           "height": 34.5,
           "phase": "new",
-          "id": "f-c41",
+          "id": "f-c39",
           "wood": "nordicPine"
         },
-        "f-c42": {
+        "f-c40": {
           "elevation": 54,
           "kind": "wall",
           "origin": {
@@ -2777,10 +2771,10 @@
           "depth": 12,
           "height": 30,
           "phase": "new",
-          "id": "f-c42",
+          "id": "f-c40",
           "wood": "nordicPine"
         },
-        "f-c43": {
+        "f-c41": {
           "elevation": 0,
           "kind": "base",
           "origin": {
@@ -2792,10 +2786,10 @@
           "depth": 24,
           "height": 34.5,
           "phase": "new",
-          "id": "f-c43",
+          "id": "f-c41",
           "wood": "nordicPine"
         },
-        "f-c44": {
+        "f-c42": {
           "elevation": 0,
           "kind": "range",
           "origin": {
@@ -2807,9 +2801,9 @@
           "depth": 25,
           "height": 36,
           "phase": "new",
-          "id": "f-c44"
+          "id": "f-c42"
         },
-        "f-c45": {
+        "f-c43": {
           "elevation": 66,
           "kind": "hood",
           "origin": {
@@ -2821,9 +2815,9 @@
           "depth": 18,
           "height": 30,
           "phase": "new",
-          "id": "f-c45"
+          "id": "f-c43"
         },
-        "f-c46": {
+        "f-c44": {
           "elevation": 0,
           "kind": "base",
           "origin": {
@@ -2835,10 +2829,10 @@
           "depth": 24,
           "height": 34.5,
           "phase": "new",
-          "id": "f-c46",
+          "id": "f-c44",
           "wood": "nordicPine"
         },
-        "f-c47": {
+        "f-c45": {
           "elevation": 54,
           "kind": "wall",
           "origin": {
@@ -2850,10 +2844,10 @@
           "depth": 12,
           "height": 30,
           "phase": "new",
-          "id": "f-c47",
+          "id": "f-c45",
           "wood": "nordicPine"
         },
-        "f-c48": {
+        "f-c46": {
           "elevation": 54,
           "kind": "wall",
           "origin": {
@@ -2865,10 +2859,10 @@
           "depth": 12,
           "height": 30,
           "phase": "new",
-          "id": "f-c48",
+          "id": "f-c46",
           "wood": "nordicPine"
         },
-        "f-c49": {
+        "f-c47": {
           "elevation": 0,
           "kind": "base",
           "origin": {
@@ -2877,6 +2871,36 @@
           },
           "direction": 180,
           "width": 24,
+          "depth": 24,
+          "height": 34.5,
+          "phase": "new",
+          "id": "f-c47",
+          "wood": "nordicPine"
+        },
+        "f-c48": {
+          "elevation": 54,
+          "kind": "wall",
+          "origin": {
+            "x": 311,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 24,
+          "depth": 12,
+          "height": 30,
+          "phase": "new",
+          "id": "f-c48",
+          "wood": "nordicPine"
+        },
+        "f-c49": {
+          "elevation": 0,
+          "kind": "base",
+          "origin": {
+            "x": 311,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 30,
           "depth": 24,
           "height": 34.5,
           "phase": "new",
@@ -2888,10 +2912,10 @@
           "kind": "wall",
           "origin": {
             "x": 311,
-            "y": 72
+            "y": 99
           },
           "direction": 180,
-          "width": 24,
+          "width": 30,
           "depth": 12,
           "height": 30,
           "phase": "new",
@@ -2903,10 +2927,10 @@
           "kind": "base",
           "origin": {
             "x": 311,
-            "y": 99
+            "y": 126
           },
           "direction": 180,
-          "width": 30,
+          "width": 24,
           "depth": 24,
           "height": 34.5,
           "phase": "new",
@@ -2918,10 +2942,10 @@
           "kind": "wall",
           "origin": {
             "x": 311,
-            "y": 99
+            "y": 126
           },
           "direction": 180,
-          "width": 30,
+          "width": 24,
           "depth": 12,
           "height": 30,
           "phase": "new",
@@ -2933,7 +2957,7 @@
           "kind": "base",
           "origin": {
             "x": 311,
-            "y": 126
+            "y": 188
           },
           "direction": 180,
           "width": 24,
@@ -2948,7 +2972,7 @@
           "kind": "wall",
           "origin": {
             "x": 311,
-            "y": 126
+            "y": 188
           },
           "direction": 180,
           "width": 24,
@@ -2960,36 +2984,6 @@
         },
         "f-c55": {
           "elevation": 0,
-          "kind": "base",
-          "origin": {
-            "x": 311,
-            "y": 188
-          },
-          "direction": 180,
-          "width": 24,
-          "depth": 24,
-          "height": 34.5,
-          "phase": "new",
-          "id": "f-c55",
-          "wood": "nordicPine"
-        },
-        "f-c56": {
-          "elevation": 54,
-          "kind": "wall",
-          "origin": {
-            "x": 311,
-            "y": 188
-          },
-          "direction": 180,
-          "width": 24,
-          "depth": 12,
-          "height": 30,
-          "phase": "new",
-          "id": "f-c56",
-          "wood": "nordicPine"
-        },
-        "f-c57": {
-          "elevation": 0,
           "kind": "fridge",
           "origin": {
             "x": 311,
@@ -3000,9 +2994,9 @@
           "depth": 29,
           "height": 70,
           "phase": "new",
-          "id": "f-c57"
+          "id": "f-c55"
         },
-        "f-c58": {
+        "f-c56": {
           "elevation": 70,
           "kind": "wall",
           "origin": {
@@ -3014,10 +3008,10 @@
           "depth": 15,
           "height": 15,
           "phase": "new",
-          "id": "f-c58",
+          "id": "f-c56",
           "wood": "nordicPine"
         },
-        "f-c59": {
+        "f-c57": {
           "elevation": 0,
           "kind": "dishwasher",
           "origin": {
@@ -3035,9 +3029,9 @@
             "right": 0
           },
           "phase": "new",
-          "id": "f-c59"
+          "id": "f-c57"
         },
-        "f-c60": {
+        "f-c58": {
           "elevation": 0,
           "kind": "sink",
           "origin": {
@@ -3055,10 +3049,10 @@
             "right": 1
           },
           "phase": "new",
-          "id": "f-c60",
+          "id": "f-c58",
           "wood": "nordicPine"
         },
-        "f-c61": {
+        "f-c59": {
           "kind": "furniture",
           "piece": "diningTable",
           "origin": {
@@ -3072,13 +3066,43 @@
           "elevation": 0,
           "phase": "new",
           "wood": "nordicPine",
+          "id": "f-c59"
+        },
+        "f-c60": {
+          "kind": "furniture",
+          "piece": "diningChair",
+          "origin": {
+            "x": 227,
+            "y": 204
+          },
+          "direction": 90,
+          "width": 18,
+          "depth": 18,
+          "height": 38,
+          "elevation": 0,
+          "phase": "new",
+          "id": "f-c60"
+        },
+        "f-c61": {
+          "kind": "furniture",
+          "piece": "diningChair",
+          "origin": {
+            "x": 227,
+            "y": 276
+          },
+          "direction": 270,
+          "width": 18,
+          "depth": 18,
+          "height": 38,
+          "elevation": 0,
+          "phase": "new",
           "id": "f-c61"
         },
         "f-c62": {
           "kind": "furniture",
           "piece": "diningChair",
           "origin": {
-            "x": 227,
+            "x": 257,
             "y": 204
           },
           "direction": 90,
@@ -3093,7 +3117,7 @@
           "kind": "furniture",
           "piece": "diningChair",
           "origin": {
-            "x": 227,
+            "x": 257,
             "y": 276
           },
           "direction": 270,
@@ -3105,36 +3129,6 @@
           "id": "f-c63"
         },
         "f-c64": {
-          "kind": "furniture",
-          "piece": "diningChair",
-          "origin": {
-            "x": 257,
-            "y": 204
-          },
-          "direction": 90,
-          "width": 18,
-          "depth": 18,
-          "height": 38,
-          "elevation": 0,
-          "phase": "new",
-          "id": "f-c64"
-        },
-        "f-c65": {
-          "kind": "furniture",
-          "piece": "diningChair",
-          "origin": {
-            "x": 257,
-            "y": 276
-          },
-          "direction": 270,
-          "width": 18,
-          "depth": 18,
-          "height": 38,
-          "elevation": 0,
-          "phase": "new",
-          "id": "f-c65"
-        },
-        "f-c66": {
           "kind": "furniture",
           "piece": "rug",
           "origin": {
@@ -3148,9 +3142,9 @@
           "elevation": 0,
           "phase": "new",
           "fabric": "navajo",
-          "id": "f-c66"
+          "id": "f-c64"
         },
-        "f-c67": {
+        "f-c65": {
           "kind": "furniture",
           "piece": "sofa",
           "origin": {
@@ -3163,9 +3157,9 @@
           "height": 34,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c67"
+          "id": "f-c65"
         },
-        "f-c68": {
+        "f-c66": {
           "kind": "furniture",
           "piece": "coffeeTable",
           "origin": {
@@ -3178,9 +3172,9 @@
           "height": 18,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c68"
+          "id": "f-c66"
         },
-        "f-c69": {
+        "f-c67": {
           "kind": "furniture",
           "piece": "armchair",
           "origin": {
@@ -3194,9 +3188,9 @@
           "elevation": 0,
           "phase": "new",
           "fabric": "woolPlaid",
-          "id": "f-c69"
+          "id": "f-c67"
         },
-        "f-c70": {
+        "f-c68": {
           "kind": "furniture",
           "piece": "rocker",
           "origin": {
@@ -3209,9 +3203,9 @@
           "height": 42,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c70"
+          "id": "f-c68"
         },
-        "f-c71": {
+        "f-c69": {
           "kind": "furniture",
           "piece": "bookcase",
           "origin": {
@@ -3224,9 +3218,9 @@
           "height": 72,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c71"
+          "id": "f-c69"
         },
-        "f-c72": {
+        "f-c70": {
           "kind": "furniture",
           "piece": "floorLamp",
           "origin": {
@@ -3239,9 +3233,9 @@
           "height": 60,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c72"
+          "id": "f-c70"
         },
-        "f-c73": {
+        "f-c71": {
           "kind": "furniture",
           "piece": "sideTable",
           "origin": {
@@ -3254,9 +3248,9 @@
           "height": 24,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c73"
+          "id": "f-c71"
         },
-        "f-c74": {
+        "f-c72": {
           "elevation": 0,
           "kind": "box",
           "label": "Shelves",
@@ -3270,10 +3264,10 @@
           "direction": 90,
           "width": 138,
           "phase": "new",
-          "id": "f-c74",
+          "id": "f-c72",
           "wood": "nordicPine"
         },
-        "f-c75": {
+        "f-c73": {
           "elevation": 0,
           "kind": "box",
           "label": "Shelves",
@@ -3287,10 +3281,10 @@
           "direction": 180,
           "width": 36,
           "phase": "new",
-          "id": "f-c75",
+          "id": "f-c73",
           "wood": "nordicPine"
         },
-        "f-c76": {
+        "f-c74": {
           "elevation": 0,
           "kind": "box",
           "label": "Shelves",
@@ -3304,10 +3298,10 @@
           "direction": 0,
           "width": 36,
           "phase": "new",
-          "id": "f-c76",
+          "id": "f-c74",
           "wood": "nordicPine"
         },
-        "f-c77": {
+        "f-c75": {
           "elevation": 0,
           "kind": "box",
           "label": "WC",
@@ -3321,9 +3315,9 @@
           },
           "direction": 0,
           "phase": "new",
-          "id": "f-c77"
+          "id": "f-c75"
         },
-        "f-c78": {
+        "f-c76": {
           "elevation": 0,
           "kind": "sink",
           "origin": {
@@ -3335,10 +3329,10 @@
           "depth": 12,
           "height": 31.5,
           "phase": "new",
-          "id": "f-c78",
+          "id": "f-c76",
           "wood": "nordicPine"
         },
-        "f-c79": {
+        "f-c77": {
           "elevation": 0,
           "kind": "box",
           "label": "Walk-in shower",
@@ -3352,9 +3346,9 @@
           "height": 1,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c79"
+          "id": "f-c77"
         },
-        "f-c80": {
+        "f-c78": {
           "elevation": 0,
           "kind": "box",
           "label": "Bench",
@@ -3368,9 +3362,9 @@
           "height": 18,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c80"
+          "id": "f-c78"
         },
-        "f-c81": {
+        "f-c79": {
           "elevation": 0,
           "kind": "box",
           "label": "Glass",
@@ -3384,9 +3378,9 @@
           "height": 78,
           "frontColor": "#cfe2e6",
           "phase": "new",
-          "id": "f-c81"
+          "id": "f-c79"
         },
-        "f-c82": {
+        "f-c80": {
           "elevation": 0,
           "kind": "box",
           "label": "Wall",
@@ -3400,9 +3394,9 @@
           "height": 96,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c82"
+          "id": "f-c80"
         },
-        "f-c83": {
+        "f-c81": {
           "elevation": 0,
           "kind": "sink",
           "origin": {
@@ -3414,10 +3408,10 @@
           "depth": 21,
           "height": 34.5,
           "phase": "new",
-          "id": "f-c83",
+          "id": "f-c81",
           "wood": "nordicPine"
         },
-        "f-c84": {
+        "f-c82": {
           "elevation": 0,
           "kind": "box",
           "label": "WC",
@@ -3431,9 +3425,9 @@
           },
           "direction": 180,
           "phase": "new",
-          "id": "f-c84"
+          "id": "f-c82"
         },
-        "f-c85": {
+        "f-c83": {
           "elevation": 0,
           "kind": "box",
           "label": "Dryer",
@@ -3447,9 +3441,9 @@
           "height": 38,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c85"
+          "id": "f-c83"
         },
-        "f-c86": {
+        "f-c84": {
           "elevation": 0,
           "kind": "box",
           "label": "Washer",
@@ -3463,9 +3457,9 @@
           "height": 38,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c86"
+          "id": "f-c84"
         },
-        "f-c87": {
+        "f-c85": {
           "elevation": 0,
           "kind": "tall",
           "origin": {
@@ -3478,10 +3472,10 @@
           "height": 84,
           "frontColor": "#c4884e",
           "phase": "new",
-          "id": "f-c87",
+          "id": "f-c85",
           "wood": "nordicPine"
         },
-        "f-c88": {
+        "f-c86": {
           "elevation": 0,
           "kind": "tall",
           "origin": {
@@ -3494,10 +3488,10 @@
           "height": 84,
           "frontColor": "#c4884e",
           "phase": "new",
-          "id": "f-c88",
+          "id": "f-c86",
           "wood": "nordicPine"
         },
-        "f-c89": {
+        "f-c87": {
           "kind": "furniture",
           "piece": "rug",
           "origin": {
@@ -3511,9 +3505,9 @@
           "elevation": 0,
           "phase": "new",
           "fabric": "braided",
-          "id": "f-c89"
+          "id": "f-c87"
         },
-        "f-c90": {
+        "f-c88": {
           "kind": "furniture",
           "piece": "bed",
           "origin": {
@@ -3526,9 +3520,9 @@
           "height": 48,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c90"
+          "id": "f-c88"
         },
-        "f-c91": {
+        "f-c89": {
           "kind": "furniture",
           "piece": "nightstand",
           "origin": {
@@ -3541,9 +3535,9 @@
           "height": 26,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c91"
+          "id": "f-c89"
         },
-        "f-c92": {
+        "f-c90": {
           "kind": "furniture",
           "piece": "nightstand",
           "origin": {
@@ -3556,9 +3550,9 @@
           "height": 26,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c92"
+          "id": "f-c90"
         },
-        "f-c93": {
+        "f-c91": {
           "elevation": 30,
           "kind": "box",
           "label": "Dryer vent",
@@ -3572,9 +3566,9 @@
           "height": 60,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c93"
+          "id": "f-c91"
         },
-        "f-c94": {
+        "f-c92": {
           "elevation": 86,
           "kind": "box",
           "label": "Dryer vent",
@@ -3588,9 +3582,9 @@
           "height": 4,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c94"
+          "id": "f-c92"
         },
-        "f-c95": {
+        "f-c93": {
           "elevation": 84,
           "kind": "box",
           "label": "Vent hood",
@@ -3604,9 +3598,9 @@
           "height": 8,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c95"
+          "id": "f-c93"
         },
-        "f-c96": {
+        "f-c94": {
           "elevation": 86,
           "kind": "box",
           "label": "Hood duct",
@@ -3620,9 +3614,9 @@
           "height": 8,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c96"
+          "id": "f-c94"
         },
-        "f-c97": {
+        "f-c95": {
           "elevation": 84,
           "kind": "box",
           "label": "Duct cap",
@@ -3636,9 +3630,9 @@
           "height": 12,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c97"
+          "id": "f-c95"
         },
-        "f-c98": {
+        "f-c96": {
           "kind": "box",
           "label": "Smoke",
           "origin": {
@@ -3652,9 +3646,9 @@
           "elevation": 94,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c98"
+          "id": "f-c96"
         },
-        "f-c99": {
+        "f-c97": {
           "kind": "box",
           "label": "Smoke/CO",
           "origin": {
@@ -3668,9 +3662,9 @@
           "elevation": 94,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c99"
+          "id": "f-c97"
         },
-        "f-c100": {
+        "f-c98": {
           "kind": "box",
           "label": "Smoke/CO",
           "origin": {
@@ -3684,9 +3678,9 @@
           "elevation": 94,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c100"
+          "id": "f-c98"
         },
-        "f-c101": {
+        "f-c99": {
           "elevation": 0,
           "kind": "box",
           "label": "Hearth",
@@ -3700,9 +3694,9 @@
           "height": 1,
           "frontColor": "#7d7a73",
           "phase": "new",
-          "id": "f-c101"
+          "id": "f-c99"
         },
-        "f-c102": {
+        "f-c100": {
           "elevation": 1,
           "kind": "box",
           "label": "Stone",
@@ -3716,9 +3710,9 @@
           "height": 59,
           "frontColor": "#7d7a73",
           "phase": "new",
-          "id": "f-c102"
+          "id": "f-c100"
         },
-        "f-c103": {
+        "f-c101": {
           "elevation": 1,
           "kind": "box",
           "label": "Wood stove",
@@ -3732,9 +3726,9 @@
           "height": 30,
           "frontColor": "#26241f",
           "phase": "new",
-          "id": "f-c103"
+          "id": "f-c101"
         },
-        "f-c104": {
+        "f-c102": {
           "elevation": 62,
           "kind": "box",
           "label": "Stovepipe",
@@ -3748,9 +3742,9 @@
           "height": 8,
           "frontColor": "#26241f",
           "phase": "new",
-          "id": "f-c104"
+          "id": "f-c102"
         },
-        "f-c105": {
+        "f-c103": {
           "elevation": 62,
           "kind": "box",
           "label": "Tee",
@@ -3764,7 +3758,7 @@
           "height": 8,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c105"
+          "id": "f-c103"
         }
       },
       "decks": {
@@ -3861,7 +3855,7 @@
           "kind": "post",
           "at": {
             "x": -150,
-            "y": 69.25
+            "y": 51.25
           },
           "width": 10,
           "depth": 10,
@@ -3895,7 +3889,7 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 56.25
+            "y": 38.25
           },
           "b": {
             "x": -150,
@@ -3916,11 +3910,11 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 69.25
+            "y": 51.25
           },
           "b": {
             "x": -150,
-            "y": 93.25
+            "y": 75.25
           },
           "width": 6,
           "depth": 6,
@@ -3958,17 +3952,17 @@
           "kind": "beam",
           "a": {
             "x": -94,
-            "y": 111.13
+            "y": 102.13
           },
           "b": {
             "x": -182,
-            "y": 111.13
+            "y": 102.13
           },
           "width": 10,
           "depth": 10,
           "mount": "dropped",
-          "za": 125.94,
-          "zb": 125.94,
+          "za": 131.94,
+          "zb": 131.94,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "10\" ridge log",
@@ -3979,17 +3973,17 @@
           "kind": "beam",
           "a": {
             "x": -94,
-            "y": 87.69
+            "y": 74.19
           },
           "b": {
             "x": -182,
-            "y": 87.69
+            "y": 74.19
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
-          "za": 110.52,
-          "zb": 110.52,
+          "za": 113.52,
+          "zb": 113.52,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log purlin",
@@ -4000,17 +3994,17 @@
           "kind": "beam",
           "a": {
             "x": -94,
-            "y": 134.56
+            "y": 130.06
           },
           "b": {
             "x": -182,
-            "y": 134.56
+            "y": 130.06
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
-          "za": 110.52,
-          "zb": 110.52,
+          "za": 113.52,
+          "zb": 113.52,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log purlin",
@@ -4021,17 +4015,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 69.83
+            "y": 51.83
           },
           "b": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
           "za": 89.81,
-          "zb": 117.33,
+          "zb": 123.33,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log rafter",
@@ -4042,17 +4036,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "b": {
             "x": -150,
-            "y": 82.22
+            "y": 66.92
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.56,
-          "zb": 94.82,
+          "zb": 96.62,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4063,17 +4057,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "b": {
             "x": -150,
-            "y": 92.54
+            "y": 79.49
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.93,
-          "zb": 102.07,
+          "zb": 105.37,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4084,17 +4078,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "b": {
             "x": -150,
-            "y": 102.87
+            "y": 92.07
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 89.27,
-          "zb": 111.29,
+          "zb": 116.09,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4109,13 +4103,13 @@
           },
           "b": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
           "za": 89.81,
-          "zb": 117.33,
+          "zb": 123.33,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log rafter",
@@ -4126,17 +4120,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "b": {
             "x": -150,
-            "y": 140.03
+            "y": 137.33
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.56,
-          "zb": 94.82,
+          "zb": 96.62,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4147,17 +4141,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "b": {
             "x": -150,
-            "y": 129.71
+            "y": 124.76
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.93,
-          "zb": 102.07,
+          "zb": 105.37,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4168,17 +4162,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 111.13
+            "y": 102.13
           },
           "b": {
             "x": -150,
-            "y": 119.38
+            "y": 112.18
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 89.27,
-          "zb": 111.29,
+          "zb": 116.09,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4189,13 +4183,13 @@
           "kind": "post",
           "at": {
             "x": -150,
-            "y": 111.125
+            "y": 102.125
           },
           "width": 8,
           "depth": 8,
           "rotation": 0,
           "base": 85,
-          "top": 120.94,
+          "top": 126.94,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log king post",
@@ -6120,7 +6114,7 @@
       "column-2": {
         "at": {
           "x": -150,
-          "y": 69.25
+          "y": 51.25
         },
         "kind": "pier",
         "phase": "new",

@@ -268,6 +268,35 @@ const RECIPES: Record<FurniturePiece, (b: Builder, x: Dims) => void> = {
     b.log('metal', P(0, x.D / 2, x.y0 + 1), P(0, x.D / 2, x.y1 - shade + 2), 1);
     b.log('shade', P(0, x.D / 2, x.y1 - shade), P(0, x.D / 2, x.y1), 2 * r * 0.95);
   },
+  coatBench(b, x) {
+    // A mudroom built-in: pine side panels, open boot cubbies under a 2" seat with a cushion, a
+    // beadboard back, a hook rail with iron hooks, a shelf along the top.
+    const H = x.y1 - x.y0;
+    const side = 0.75;
+    const si = x.hw - side;
+    b.box('wood', -x.hw, -si, 0, x.D, x.y0, x.y1, 'y');
+    b.box('wood', si, x.hw, 0, x.D, x.y0, x.y1, 'y');
+    const seatTop = x.y0 + Math.min(18, H * 0.3);
+    b.box('wood', -si, si, 0, x.D, seatTop - 1.5, seatTop, 's');
+    const toe = Math.min(3, (seatTop - x.y0) / 4);
+    b.box('wood', -si, si, 0, x.D - 1, x.y0, x.y0 + toe, 's');
+    const cubbies = Math.max(1, Math.round((2 * si) / 16));
+    for (let i = 1; i < cubbies; i++) {
+      const s = -si + (2 * si * i) / cubbies;
+      b.box('wood', s - 0.375, s + 0.375, 0, x.D - 1, x.y0 + toe, seatTop - 1.5, 'y');
+    }
+    const shelfD = Math.min(12, x.D);
+    b.box('wood', -si, si, 0, 0.75, seatTop, x.y1 - 1.25, 'y');
+    b.box('wood', -si, si, 0, shelfD, x.y1 - 1.25, x.y1, 's');
+    const hookY = Math.min(x.y1 - 5, x.y0 + Math.max(seatTop - x.y0 + 12, H * 0.88));
+    b.box('wood', -si, si, 0.75, 1.75, hookY - 2, hookY + 2, 's');
+    const hooks = Math.max(1, Math.floor((2 * si) / 8));
+    for (let i = 0; i < hooks; i++) {
+      const s = -si + (2 * si * (i + 0.5)) / hooks;
+      b.box('metal', s - 0.5, s + 0.5, 1.75, Math.min(x.D, 4.25), hookY - 1, hookY + 1);
+    }
+    b.box('fabric', -si, si, 0.75, x.D - 0.5, seatTop, Math.min(x.y1, seatTop + 2), 'd');
+  },
   adirondackChair(b, x) {
     const H = x.y1 - x.y0;
     const seatFront = x.y0 + Math.min(15, H * 0.4);
@@ -519,6 +548,18 @@ export function furnitureSymbol(f: Fixture): FurnitureSymbol {
     case 'bookcase':
       line(-hw + 1, 0.5, hw - 1, 0.5);
       break;
+    case 'coatBench': {
+      // The top shelf's edge and the cubby dividers under the seat.
+      const shelf = Math.min(12, D);
+      line(-hw + 0.75, shelf, hw - 0.75, shelf);
+      const si = hw - 0.75;
+      const n = Math.max(1, Math.round((2 * si) / 16));
+      for (let i = 1; i < n; i++) {
+        const s = -si + (2 * si * i) / n;
+        line(s, D - 1, s, D - 4);
+      }
+      break;
+    }
     default:
       break;
   }

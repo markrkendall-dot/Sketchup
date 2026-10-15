@@ -837,15 +837,20 @@ where the built design differs from them):
    landing. South of it the old Office is now the Guest room's alcove, with its transom.
 8. **The Adirondack entry: foyer and screen porch** on the west face in place of the entry porch
    (MK: "thoroughly Adirondack", with the ends of exposed beams showing at the entry;
-   `docs/history/PLAN-v10-adirondack.md`). An enclosed foyer (7'10" x 8') with the 36" front door in
+   `docs/history/PLAN-v10-adirondack.md`). An enclosed foyer (9'4" x 8' outside, 8'1 3/4" x 7'5"
+   inside; MK, 15 Oct 2026: its north wall, on your left as you come in, 18" closer to the
+   driveway than first drawn) with the 36" front door in
    line with the house door, under a gable facing west, and south of it a screen porch (13'1" x 8')
    with screens above knee walls, two screen doors and a shed roof high at the house wall. The
    Living's west window, which would only look into the porch, becomes **60" French doors** (two
    glazed leaves swinging into the Living), so the porch is a summer room off the Living and its way
    to the lawn and the lake. The porch's lawn door is at the west end of its south wall, clear of
    the stove's chimney in its south-east corner. For coats (there is no closet under the stair), a
-   48" bench under the foyer's north window and a rail of hooks either side of it. All sizes are
-   estimates.
+   **transom** high in the foyer's north wall facing the driveway (60" x 18", sill 70") and under
+   it a **built-in coat bench** wall to wall in Nordic pine: boot cubbies under a cushioned seat, a
+   beadboard back, iron hooks at 58", a shelf along the top 4" under the transom. The foyer's
+   north wall meets the house across today's front door, so that stretch of today's wall is shown
+   demolished and rebuilt closed (the Existing view keeps today's door). All sizes are estimates.
    - **The style, from the research** (web search summaries; the full pages could not be fetched):
      native materials throughout (whole, split or peeled logs, bark and fieldstone); rough log
      posts with twig and branch work on railings and gables; the structure left showing, with log
@@ -918,7 +923,7 @@ where the built design differs from them):
       a hickory rocker 3' from the stove, a pine bookcase between the house door and the French
       doors, an iron floor lamp and a side table;
     - the **kitchen**: the pine farm table and four hickory ladder-back chairs with cane seats;
-    - the **foyer**: a log bench under the coat hooks; the **screen porch**: two green Adirondack
+    - the **foyer**: the built-in coat bench (shown with the furniture layer off too); the **screen porch**: two green Adirondack
       chairs and a side table facing the lake;
     - the **master bedroom**: the king bed in peeled log under a point blanket, hickory nightstands,
       a braided rug at its foot;

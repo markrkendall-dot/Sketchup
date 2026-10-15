@@ -185,14 +185,21 @@ export function computeFaceGeometry(level: Pick<Level, 'nodes' | 'walls'>, viewM
     angle.push(Math.atan2(b.y - a.y, b.x - a.x), Math.atan2(a.y - b.y, a.x - b.x));
     thickness.push(w.thickness, w.thickness);
   };
-  for (const w of shown) {
+  // A wall rebuilt where a demolished one stood (an old doorway closed up) runs between the same
+  // points as the demolished wall's pieces: in the All view that piece is traced once, as the
+  // rebuilt wall's, else the doubled edge would break the faces beside it.
+  const pairKey = (p: Id, q: Id) => (p < q ? `${p}|${q}` : `${q}|${p}`);
+  const built = new Set<string>();
+  const ordered = [...shown.filter((w) => w.phase !== 'demo'), ...shown.filter((w) => w.phase === 'demo')];
+  for (const w of ordered) {
     const cuts = virtual.cuts.get(w.id);
-    if (!cuts) {
-      edge(w.a, w.b, w, true);
-      continue;
+    const chain = cuts ? [w.a, ...cuts.map((c) => c.id), w.b] : [w.a, w.b];
+    for (let i = 0; i + 1 < chain.length; i++) {
+      const key = pairKey(chain[i], chain[i + 1]);
+      if (w.phase === 'demo' && built.has(key)) continue;
+      if (w.phase !== 'demo') built.add(key);
+      edge(chain[i], chain[i + 1], w, true);
     }
-    const chain = [w.a, ...cuts.map((c) => c.id), w.b];
-    for (let i = 0; i + 1 < chain.length; i++) edge(chain[i], chain[i + 1], w, true);
   }
   const H = from.length;
   const out = new Map<Id, number[]>();

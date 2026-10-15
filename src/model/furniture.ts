@@ -7,8 +7,8 @@ import type { FixtureSize } from './casework';
 // peeled-log and hickory frames, cane seats, point-blanket stripes, buffalo check and plaid wool,
 // Navajo and braided rugs, painted Adirondack chairs.
 
-export type FurnitureCategory = 'Beds' | 'Storage' | 'Tables and desks' | 'Seating' | 'Rugs and lamps' | 'Outdoor';
-export const FURNITURE_CATEGORIES: readonly FurnitureCategory[] = ['Beds', 'Storage', 'Tables and desks', 'Seating', 'Rugs and lamps', 'Outdoor'];
+export type FurnitureCategory = 'Beds' | 'Storage' | 'Tables and desks' | 'Seating' | 'Rugs and lamps' | 'Outdoor' | 'Built-ins';
+export const FURNITURE_CATEGORIES: readonly FurnitureCategory[] = ['Beds', 'Storage', 'Tables and desks', 'Seating', 'Rugs and lamps', 'Outdoor', 'Built-ins'];
 
 export interface FurnitureSpec {
   label: string;
@@ -25,6 +25,8 @@ export interface FurnitureSpec {
   placement: 'wall' | 'free';
   /** A rug: drawn under the other pieces, picked last, and other pieces may stand on it. */
   floorLayer?: boolean;
+  /** Placed built in (Fixture.builtIn): shown whether the furniture layer is on or off. */
+  builtIn?: boolean;
 }
 
 const spec = (s: Omit<FurnitureSpec, 'uses'> & { uses?: Partial<FurnitureSpec['uses']> }): FurnitureSpec => ({
@@ -51,6 +53,7 @@ export const FURNITURE: Record<FurniturePiece, FurnitureSpec> = {
   bench: spec({ label: 'Bench', category: 'Seating', size: { width: 48, depth: 16, height: 18 }, min: { width: 18, depth: 10, height: 12 }, wood: 'hickory', placement: 'wall' }),
   rug: spec({ label: 'Rug', category: 'Rugs and lamps', size: { width: 96, depth: 60, height: 0.375 }, min: { width: 24, depth: 18, height: 0.25 }, wood: 'nordicPine', fabric: 'navajo', placement: 'free', floorLayer: true, uses: { wood: false } }),
   floorLamp: spec({ label: 'Floor lamp', category: 'Rugs and lamps', size: { width: 16, depth: 16, height: 60 }, min: { width: 10, depth: 10, height: 36 }, wood: 'darkLog', placement: 'free', uses: { wood: false } }),
+  coatBench: spec({ label: 'Coat bench', category: 'Built-ins', size: { width: 48, depth: 18, height: 66 }, min: { width: 24, depth: 12, height: 36 }, wood: 'nordicPine', fabric: 'buffaloRed', placement: 'wall', builtIn: true }),
   adirondackChair: spec({ label: 'Adirondack chair', category: 'Outdoor', size: { width: 30, depth: 34, height: 38 }, min: { width: 24, depth: 28, height: 30 }, wood: 'paintedGreen', placement: 'free', uses: { fabric: false } }),
 };
 
@@ -141,6 +144,8 @@ export function bedSizeOf(width: number): BedSize | null {
 }
 
 export const isFurniture = (kind: FixtureKind): boolean => kind === 'furniture';
+/** A loose piece of furniture: one the furniture layer (Shift+F) shows and hides (a built-in stays). */
+export const isLayerFurniture = (f: Pick<Fixture, 'kind' | 'builtIn'>): boolean => f.kind === 'furniture' && !f.builtIn;
 export const isFurniturePiece = (v: unknown): v is FurniturePiece => typeof v === 'string' && Object.prototype.hasOwnProperty.call(FURNITURE, v);
 export const isWoodId = (v: unknown): v is WoodId => typeof v === 'string' && Object.prototype.hasOwnProperty.call(WOODS, v);
 export const isFabricId = (v: unknown): v is FabricId => typeof v === 'string' && Object.prototype.hasOwnProperty.call(FABRICS, v);
@@ -162,7 +167,7 @@ export function furnitureNameOf(f: Pick<Fixture, 'piece' | 'width' | 'label'>): 
 }
 
 /** Pieces whose name the plan shows (the small ones would only clutter it). */
-const NAMED_ON_PLAN: ReadonlySet<FurniturePiece> = new Set<FurniturePiece>(['bed', 'dresser', 'chest', 'desk', 'diningTable', 'sofa', 'bookcase']);
+const NAMED_ON_PLAN: ReadonlySet<FurniturePiece> = new Set<FurniturePiece>(['bed', 'dresser', 'chest', 'desk', 'diningTable', 'sofa', 'bookcase', 'coatBench']);
 /** The plan's word for a piece: its label, else its name when it is big enough to carry one. */
 export function furniturePlanLabel(f: Pick<Fixture, 'piece' | 'width' | 'label'>): string | null {
   if (f.label?.trim()) return f.label.trim();

@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
 import { furnitureSymbol, type FurnitureSymbol } from '../derive/furniture';
-import { FURNITURE } from '../model/furniture';
+import { FURNITURE, isLayerFurniture } from '../model/furniture';
 import { deckTopWords, getDeckLayout, scanSegments } from '../derive/decks';
 import { beamOutline, postOutline } from '../derive/members';
 import { isLog, joistWords } from '../model/structure';
@@ -483,8 +483,8 @@ const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelI
   const detail = useMemo(() => (f?.kind === 'furniture' ? furnitureSymbol(f) : null), [f]);
   if (!f || !sym || !isVisible(f.phase, viewMode)) return null;
   // The furniture layer (Shift+F) off hides every piece.
-  if (f.kind === 'furniture' && !showFurniture) return null;
-  const piece = f.kind === 'furniture' && f.piece ? ` fixture-piece-${f.piece}` : '';
+  if (isLayerFurniture(f) && !showFurniture) return null;
+  const piece = f.kind === 'furniture' && f.piece ? ` fixture-piece-${f.piece}${f.builtIn ? ' fixture-built-in' : ''}` : '';
   return <FixtureGlyph sym={sym} k={k} id={fixtureId} detail={detail} className={`fixture fixture-${f.kind}${piece} phase-${shownPhase(f.phase, viewMode)}${selected ? ' is-selected' : ''}`} />;
 });
 

@@ -443,6 +443,17 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-width: 0.6;
 }
 
+.fixture-built-in .fixture-body {
+  fill: #f7f4ee;
+  stroke: #3f3f46;
+  stroke-width: 0.9;
+}
+
+.fixture-built-in .fixture-front {
+  stroke: #3f3f46;
+  stroke-width: 1.6;
+}
+
 .fixture-piece-rug .fixture-body {
   fill: #f3ece0;
   stroke-dasharray: 4 3;

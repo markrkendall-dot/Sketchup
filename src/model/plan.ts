@@ -603,7 +603,7 @@ const FENCE_KEYS = ['id', 'points', 'height', 'rails', 'postSpacing', 'phase', '
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
 const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
-const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric'] as const;
+const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn'] as const;
 const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle', 'cabinetWood'] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
 const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
@@ -1099,13 +1099,14 @@ const isOverhang = (v: unknown): v is NonNullable<Fixture['counterOverhang']> =>
  * store).
  */
 export function fixtureProblem(
-  f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang' | 'piece' | 'wood' | 'fabric'>,
+  f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang' | 'piece' | 'wood' | 'fabric' | 'builtIn'>,
 ): string | null {
   if (typeof f.kind !== 'string' || !FIXTURE_KINDS.includes(f.kind)) return `unknown kind ${String(f.kind)}`;
   if (f.kind === 'furniture' && !isFurniturePiece(f.piece)) return `furniture needs a known piece (${String(f.piece)})`;
   if (f.kind !== 'furniture' && f.piece !== undefined) return 'only furniture has a piece';
   if (f.wood !== undefined && !isWoodId(f.wood)) return `unknown wood ${String(f.wood)}`;
   if (f.fabric !== undefined && (f.kind !== 'furniture' || !isFabricId(f.fabric))) return f.kind !== 'furniture' ? 'only furniture has a fabric' : `unknown fabric ${String(f.fabric)}`;
+  if (f.builtIn !== undefined && (f.kind !== 'furniture' || typeof f.builtIn !== 'boolean')) return 'only furniture is built in or not';
   if (!isPoint(f.origin)) return 'needs a position';
   if (!isNum(f.direction)) return 'needs a direction';
   if (!isNum(f.width) || f.width <= 0 || !isNum(f.depth) || f.depth <= 0 || !isNum(f.height) || f.height <= 0) return 'width, depth and height must be positive';
@@ -1151,6 +1152,7 @@ function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
     put(fixture, 'piece', base.piece);
     put(fixture, 'wood', isWoodId(f.wood) ? f.wood : undefined);
     put(fixture, 'fabric', base.kind === 'furniture' && isFabricId(f.fabric) ? f.fabric : undefined);
+    put(fixture, 'builtIn', base.kind === 'furniture' && typeof f.builtIn === 'boolean' ? f.builtIn : undefined);
     out[fid] = fixture as unknown as Fixture;
   }
   return out;

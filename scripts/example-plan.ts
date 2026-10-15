@@ -205,11 +205,11 @@ const store = () => usePlanStore.getState();
 const level = (id: Id) => getPlan().levels[id];
 
 /** Draw a chain of exterior walls through the points (closed when `close`). Returns the wall ids. */
-function drawWalls(levelId: Id, pts: Vec2[], thickness: number, close = false, phase: Phase = PHASE): Id[] {
+function drawWalls(levelId: Id, pts: Vec2[], thickness: number, close = false, phase: Phase = PHASE, replacesDemolished = false): Id[] {
   const out: Id[] = [];
   const n = close ? pts.length : pts.length - 1;
   for (let i = 0; i < n; i++) {
-    const res = store().addWall(levelId, pts[i], pts[(i + 1) % pts.length], { kind: 'exterior', thickness, phase });
+    const res = store().addWall(levelId, pts[i], pts[(i + 1) % pts.length], { kind: 'exterior', thickness, phase, ...(replacesDemolished ? { replacesDemolished } : {}) });
     if (!res) throw new Error(`wall ${i} of ${JSON.stringify(pts)} was rejected`);
     out.push(...res.wallIds);
   }
@@ -368,7 +368,7 @@ function furnish(
   piece: FurniturePiece,
   origin: Vec2,
   direction: number,
-  opts: { bed?: BedSize; width?: number; depth?: number; height?: number; wood?: WoodId; fabric?: FabricId } = {},
+  opts: { bed?: BedSize; width?: number; depth?: number; height?: number; wood?: WoodId; fabric?: FabricId; builtIn?: boolean } = {},
 ): Id {
   const def = furnitureDefaults(piece, opts.bed);
   return fixture(levelId, {
@@ -383,6 +383,7 @@ function furnish(
     phase: NEW,
     ...(opts.wood ? { wood: opts.wood } : {}),
     ...(opts.fabric ? { fabric: opts.fabric } : {}),
+    ...(opts.builtIn ? { builtIn: true } : {}),
   });
 }
 
@@ -834,7 +835,8 @@ export function buildExamplePlan(): Plan {
   });
   // The stair strip is part of the Living (no wall on its south side), so it has no label of its own.
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
-  label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
+  // North of the proposed foyer's north wall (y 46.25..53.25), so the All view still finds its face.
+  label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: 26 });
   // Second Floor. The Office / hall is one face with the landing and the stair well.
   // Placeholder finishes (no photos of the Second Floor).
   label(sId, 'Bunk', { x: 90, y: 52 }, PHASE, PLACEHOLDER_ROOM);
@@ -1007,14 +1009,26 @@ function proposed(ids: ExistingIds): void {
   const footing = drawWalls(bId, [{ x: CL.x1, y: CL.y0 }, { x: wing.x1, y: CL.y0 }, { x: wing.x1, y: wing.y0 }], TB, false, NEW);
   store().updateWalls(bId, footing, { finish: 'block', color: BLOCK_COLOR });
 
-  // ---- 5. Foyer and screen porch on the west face, outside x -96..0. The foyer's north wall runs
-  // through the post between the old porch's screen door and its south screen (y 66..69.5) and its
-  // south wall stops north of the Living's west window (y 158..248), so the old porch's openings and
-  // the Living window keep their places in the existing view: foyer y 64.25..158 (7'10" x 8'), the
-  // screen porch y 158..315 (13'1" x 8'). The foyer's north wall crosses the old porch's west wall,
-  // which normalizeLevel splits at the crossing.
-  const FOYER = { x0: -96, y0: 64.25, y1: 158 };
+  // ---- 5. Foyer and screen porch on the west face, outside x -96..0: foyer y 46.25..158 (9'4" x
+  // 8' outside, 8'1 3/4" x 7'5" inside), the screen porch y 158..315 (13'1" x 8'). MK, 15 Oct 2026:
+  // the foyer's north wall (on your left as you come in the front door) moves 18" toward the
+  // driveway, from y 64.25 to 46.25. Its south wall stops north of the Living's west window (y
+  // 158..248), so that window keeps its place in the existing view. A new wall crosses a demolished
+  // one without a node (plan.ts splitsWall), so the old porch's walls and openings keep theirs too.
+  const FOYER = { x0: -96, y0: 46.25, y1: 158 };
   const fy = { west: FOYER.x0 + HALF, north: FOYER.y0 + HALF, south: FOYER.y1 - HALF };
+  // The foyer's north wall now meets the house across today's front door (y 30..66, demolished): a
+  // new wall ending there would split today's wall through that door. So that piece of today's west
+  // wall, y 26 to the old porch's south wall (y 92.5), goes, and a new piece closes the doorway in
+  // its place, in two parts meeting the foyer's wall (the existing view keeps today's door).
+  const DOORWAY = { north: 26, south: 92.5 };
+  const today = wallAt(fId, { x: CL.x0, y: DOORWAY.north });
+  const splitProblem = store().splitWall(fId, today.wallId, today.offset);
+  if (splitProblem) throw new Error(`west wall split: ${splitProblem}`);
+  const oldPiece = level(fId).walls[wallAt(fId, { x: CL.x0, y: (DOORWAY.north + DOORWAY.south) / 2 }).wallId];
+  demolish(fId, { walls: [{ x: CL.x0, y: (DOORWAY.north + DOORWAY.south) / 2 }] });
+  const infill = drawWalls(fId, [{ x: CL.x0, y: DOORWAY.north }, { x: CL.x0, y: fy.north }, { x: CL.x0, y: DOORWAY.south }], T, false, NEW, true);
+  store().updateWalls(fId, infill, { finish: oldPiece.finish, color: oldPiece.color, ...(oldPiece.band ? { band: oldPiece.band } : {}) });
   const foyer = drawWalls(fId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], T, false, NEW);
   const porch = drawWalls(fId, [{ x: fy.west, y: fy.south }, { x: fy.west, y: CL.y1 }, { x: CL.x0, y: CL.y1 }], T, false, NEW);
   store().updateWalls(fId, [...foyer, ...porch], { finish: 'shingle', color: FINISH_COLOR });
@@ -1079,10 +1093,11 @@ function proposed(ids: ExistingIds): void {
   // 134.5) clear the strip's partition faces at 102 and 135; green, nine lites over two panels.
   const halfLite = { lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN };
   add({ x: CL.x0, y: 118.5 }, { type: 'door', width: 32, height: 80, into: EAST, ...halfLite });
-  // The foyer: the 36" front door in its west wall in line with the house door, a window in its
-  // north wall (x -42: x -48 would put its west jamb across the old porch wall's crossing at x -62.5).
+  // The foyer: the 36" front door in its west wall in line with the house door, and a transom in its
+  // north wall facing the driveway (MK, 15 Oct 2026), centred on the foyer: 60 x 18, two sashes of
+  // 2 x 1 lites, sill 70 (head 88), high over the coat bench under it.
   add({ x: fy.west, y: 118.5 }, { type: 'door', width: 36, height: 80, into: EAST, ...halfLite });
-  add({ x: -42, y: fy.north }, { type: 'window', width: 36, height: 44, sill: 36, lites: { cols: 2, rows: 3 } });
+  add({ x: (fy.west + CL.x0) / 2, y: fy.north }, { type: 'window', width: 60, height: 18, sill: 70, sashes: 2, lites: { cols: 2, rows: 1 } });
   // In place of the Living's west window, which only looks into the screen porch, 60" French doors
   // (the livability review): the porch becomes a summer room off the Living and its way to the lawn
   // and the lake. Two glazed leaves of 3 x 5 lites swinging into the Living, y 177..237: 23" clear of
@@ -1215,18 +1230,18 @@ function proposed(ids: ExistingIds): void {
   // door (below). Its heights depend only on y, so the foyer's gable wall and its door stay as they are.
   const CANOPY_X0 = FOYER.x0 - 60;
   roof(fId, { shape: 'gable', outline: outline({ x0: CANOPY_X0, x1: ROOF_EAST, y0: FOYER.y0, y1: FOYER.y1 }), ridgeAngle: 0, pitch: 8, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
-  // Coats in the foyer (MK, 14 Oct 2026; there is no closet under the stair): a 48" bench 16" deep
-  // and 18" high under the north window (sill 36), clear of the front door's swing, and a 24" rail
-  // of hooks at 60" either side of the window. Stained like the trim.
+  // Coats in the foyer (MK, 14 and 15 Oct 2026; there is no closet under the stair): a built-in
+  // coat bench in Nordic pine along the north wall under the transom, wall to wall (x -89..0), 18"
+  // deep, 66" high (its top shelf 4" under the transom's sill): boot cubbies under a cushioned seat,
+  // a beadboard back, iron hooks at 58". Clear of the front door's swing (y 100.5..136.5).
   const foyerNorth = FOYER.y0 + T;
-  furnish(fId, 'bench', { x: -44, y: foyerNorth }, 90, { width: 48, depth: 16, height: 18, wood: 'darkLog' });
+  furnish(fId, 'coatBench', { x: (fy.west + CL.x0) / 2, y: foyerNorth }, 90, { width: CL.x0 - HALF - (fy.west + HALF), depth: 18, height: 66, builtIn: true });
   // The screen porch (MK, 15 Oct 2026): two green Adirondack chairs facing the lake (south), a side
   // table between them, x -84..-2, y 226..260: clear of the foyer's screen door swing (to y 194),
   // the way to the lawn door (x -86..-50 at the south wall) and the stove's tee (y 276..284).
   furnish(fId, 'adirondackChair', { x: -69, y: 226 }, 90);
   furnish(fId, 'sideTable', { x: -43, y: 234 }, 90, { width: 18, depth: 18, wood: 'paintedGreen' });
   furnish(fId, 'adirondackChair', { x: -17, y: 226 }, 90);
-  for (const x of [FOYER.x0 + T + 12, -12]) fixture(fId, { kind: 'box', label: 'Hooks', origin: { x, y: foyerNorth }, direction: 90, width: 24, depth: 2, height: 4, elevation: 60, frontColor: FINISH_COLOR, phase: NEW });
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
   // ---- The Adirondack entry and screen porch (MK; docs/history/PLAN-v10-adirondack.md; sizes are

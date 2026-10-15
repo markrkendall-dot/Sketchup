@@ -11,7 +11,7 @@ import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../.
 import { WALL_OVERLAP_MESSAGE } from '../../model/plan';
 import { nudgeShifts } from '../../model/offset';
 import type { Fixture, Id, Level, Member, Plan, Vec2, ViewMode } from '../../model/types';
-import { FURNITURE } from '../../model/furniture';
+import { FURNITURE, isLayerFurniture } from '../../model/furniture';
 import { formatLength } from '../../model/units';
 import { needsRenovationChoice, perpendicularShift, requestWallMove } from '../../ui/wallMove';
 import { pauseHistory, resumeHistory, usePlanStore } from '../../store/planStore';
@@ -196,7 +196,7 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   // else (the pieces standing on them come first).
   const shownFixtures = Object.values(level.fixtures ?? {})
     .reverse()
-    .filter((f) => isVisible(f.phase, viewMode) && (opts.furniture !== false || f.kind !== 'furniture'));
+    .filter((f) => isVisible(f.phase, viewMode) && (opts.furniture !== false || !isLayerFurniture(f)));
   const onFloor = (f: Fixture) => f.kind === 'furniture' && !!f.piece && !!FURNITURE[f.piece]?.floorLayer;
   const fixture = [...shownFixtures.filter((f) => !onFloor(f)), ...shownFixtures.filter(onFloor)].find((f) => hitFixture(f, p, 2 / k));
   if (fixture) return { kind: 'fixture', id: fixture.id };

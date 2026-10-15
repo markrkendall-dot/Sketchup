@@ -1237,7 +1237,7 @@ export interface FixtureMesh {
   /** A cabinet's wood after the level's default (absent: painted in frontColor). */
   wood?: WoodId;
   /** A furniture piece's piece, wood and fabric after the catalogue's defaults. */
-  furniture?: { piece: FurniturePiece; wood: WoodId; fabric: FabricId; floorLayer: boolean };
+  furniture?: { piece: FurniturePiece; wood: WoodId; fabric: FabricId; floorLayer: boolean; builtIn: boolean };
   /** One merged geometry per material part, level-local like the walls. */
   parts: { part: FixturePart; geometry: BufferGeometry }[];
 }
@@ -2270,7 +2270,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     nextFixtures.set(f.id, entry);
     if (!entry.parts.length) continue;
     const mesh: FixtureMesh = { id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts };
-    if (f.kind === 'furniture' && f.piece) mesh.furniture = { piece: f.piece, wood: pieceWoodOf(f), fabric: pieceFabricOf(f), floorLayer: !!FURNITURE[f.piece].floorLayer };
+    if (f.kind === 'furniture' && f.piece) mesh.furniture = { piece: f.piece, wood: pieceWoodOf(f), fabric: pieceFabricOf(f), floorLayer: !!FURNITURE[f.piece].floorLayer, builtIn: !!f.builtIn };
     else if (isCabinet(f.kind) || f.kind === 'wallOven' || f.kind === 'box') {
       const wood = f.wood ?? (isCabinet(f.kind) ? finishes?.cabinetWood : undefined);
       if (wood) mesh.wood = wood;

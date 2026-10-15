@@ -20,7 +20,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const viewMode = useUiStore((s) => s.viewMode);
   // The 3D bar's Roofs checkbox: off lifts every roof (with its fascia and rafter tails) off.
   const showRoofs = useUiStore((s) => s.show3dRoofs);
-  // The furniture layer (Shift+F, the 3D bar's Furniture checkbox): off hides every piece.
+  // The furniture layer (Shift+F, the 3D bar's Furniture checkbox): off hides every loose piece (built-ins stay).
   const showFurniture = useUiStore((s) => s.showFurniture);
   const meshes = usePlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
   // Decks have their own memo: they depend on the ground and other levels (derive/meshes.ts getDeckMeshes).
@@ -212,7 +212,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           )}
         </group>
       ))}
-      {meshes.fixtures.filter((f) => showFurniture || !f.furniture).map((f) => (
+      {meshes.fixtures.filter((f) => showFurniture || !f.furniture || f.furniture.builtIn).map((f) => (
         <group key={f.id} name={`fixture:${f.id}`}>
           {f.parts.map((p) => (
             <mesh

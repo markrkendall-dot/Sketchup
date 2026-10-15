@@ -1673,6 +1673,18 @@ function FurnitureProps({ level, fixture }: { level: Level; fixture: Fixture }) 
           onChange={(f) => set({ fabric: f || undefined })}
         />
       )}
+      <label className="check-row">
+        <input
+          type="checkbox"
+          aria-label="Built in"
+          checked={!!fixture.builtIn}
+          onChange={(e) => {
+            set({ builtIn: e.target.checked ? true : undefined });
+            releaseFocus(e.currentTarget);
+          }}
+        />
+        Built in (shows with the furniture layer off)
+      </label>
       <ReadOnly label="Made in">
         {spec.uses.wood ? WOODS[pieceWoodOf(fixture)].label : ''}
         {spec.uses.wood && spec.uses.fabric ? ', ' : ''}

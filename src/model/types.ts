@@ -277,7 +277,8 @@ export type FurniturePiece =
   | 'trunk'
   | 'adirondackChair'
   | 'floorLamp'
-  | 'rug';
+  | 'rug'
+  | 'coatBench';
 /** A catalogue wood (model/furniture.ts WOODS): a colour and a grain. */
 export type WoodId = 'nordicPine' | 'hickory' | 'peeledLog' | 'darkLog' | 'fumedOak' | 'paintedGreen' | 'paintedRed' | 'paintedCream';
 /** A catalogue fabric (model/furniture.ts FABRICS): a pattern and its colours. */
@@ -318,6 +319,11 @@ export interface Fixture {
   wood?: WoodId;
   /** Furniture only: the upholstery, blanket or rug. Absent: the piece's own. */
   fabric?: FabricId;
+  /**
+   * Furniture only: built into the house (a coat bench, built-in shelves), so it shows whether the
+   * furniture layer is on or off. Absent: loose furniture.
+   */
+  builtIn?: boolean;
 }
 
 /** Per-level defaults for casework (DESIGN.md "Casework"); every field optional. */

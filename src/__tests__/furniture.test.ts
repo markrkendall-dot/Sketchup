@@ -150,7 +150,8 @@ describe('furniture in the plan', () => {
       a: { ...piece('bed'), id: 'a', wood: 'hickory', fabric: 'buffaloRed' },
       b: { ...piece('bed'), id: 'b', piece: 'hammock' },
       c: { ...piece('sofa'), id: 'c', wood: 'teak', fabric: 'chintz' },
-      d: { ...piece('desk'), id: 'd', kind: 'base', piece: 'desk', fabric: 'canvas', wood: 'nordicPine' },
+      d: { ...piece('desk'), id: 'd', kind: 'base', piece: 'desk', fabric: 'canvas', wood: 'nordicPine', builtIn: true },
+      e: { ...piece('coatBench'), id: 'e', builtIn: true },
     };
     const warn = console.warn;
     console.warn = () => {};
@@ -165,6 +166,9 @@ describe('furniture in the plan', () => {
     expect(out.d).toMatchObject({ kind: 'base', wood: 'nordicPine' });
     expect(out.d.piece).toBeUndefined();
     expect(out.d.fabric).toBeUndefined();
+    expect(out.d.builtIn).toBeUndefined();
+    // A piece keeps its built-in flag.
+    expect(out.e).toMatchObject({ piece: 'coatBench', builtIn: true });
   });
 
   it('the store refuses furniture without a piece, and a fixture turned into a cabinet loses its piece', () => {
@@ -195,6 +199,26 @@ describe('the furniture layer', () => {
   afterAll(() => {
     useUiStore.getState().setShowFurniture(true);
     clearMeshCache();
+  });
+
+  it('keeps a built-in piece shown, pickable and exported with the layer off', () => {
+    const bench = store().addFixture(lid, piece('coatBench', { origin: { x: 500, y: 470 }, builtIn: true }))!;
+    const loose = store().addFixture(lid, piece('diningChair', { origin: { x: 700, y: 470 } }))!;
+    const plan = store().plan;
+    const level = plan.levels[lid];
+    expect(hitTest(level, { x: 500, y: 480 }, 1, 'all', { furniture: false })).toEqual({ kind: 'fixture', id: bench });
+    expect(hitTest(level, { x: 700, y: 480 }, 1, 'all', { furniture: false })).toBeNull();
+    const svg = planSvg(plan, lid, 'all', { furniture: false });
+    expect(svg).toContain('fixture-piece-coatBench fixture-built-in');
+    expect(svg).not.toContain('fixture-piece-diningChair');
+    const root = buildExportScene(plan, 'all', { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: lid, showFurniture: false });
+    const names: string[] = [];
+    root.traverse((o) => names.push(o.name));
+    disposeExportScene(root);
+    expect(names).toContain('Furniture (coatBench)');
+    expect(names).not.toContain('Furniture (diningChair)');
+    expect(getLevelMeshes(plan, lid, 'all').fixtures.find((m) => m.id === bench)?.furniture?.builtIn).toBe(true);
+    void loose;
   });
 
   it('toggles, and the Furniture tool turns it on', () => {

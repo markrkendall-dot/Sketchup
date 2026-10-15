@@ -266,7 +266,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     // Casework: one mesh per material part of each fixture, then the counter slabs.
     // Furniture only while its layer is on (absent: on).
     for (const f of meshes.fixtures) {
-      if (f.furniture && levelVisibility.showFurniture === false) continue;
+      if (f.furniture && !f.furniture.builtIn && levelVisibility.showFurniture === false) continue;
       for (const p of f.parts) {
         const m = mesh(fixtureMeshName(f.kind, f.furniture?.piece), p.geometry, material(fixtureMaterialName(f, p.part), fixturePartMaterial(f, p.part)));
         if (f.phase === 'demo') m.renderOrder = 1;

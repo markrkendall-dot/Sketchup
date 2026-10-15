@@ -108,8 +108,11 @@ describe('docs/examples/146-mick-road.json', () => {
     // are built-in cabinets, not walls). The
     // retaining wall's three pieces on the Basement are existing; its two pieces carried west to the
     // property line are new. The laundry closet's north wall meets the main block's east wall where
-    // the pantry's south wall does (y 57.5), so the two split it once.
-    expect(count(all('walls'))).toEqual({ existing: 53, demo: 13, new: 35 });
+    // the pantry's south wall does (y 57.5), so the two split it once. The foyer's north wall (MK, 15
+    // Oct 2026: 18" toward the driveway) meets the house across today's front door, so that piece
+    // of today's west wall (y 26..92.5) is demolished and rebuilt closed, in two pieces either side
+    // of the foyer's wall: one existing piece fewer, one demolished and two new more.
+    expect(count(all('walls'))).toEqual({ existing: 52, demo: 14, new: 37 });
     // Upstairs, the Bunk's, the old bath's, the Master's and the Guest's doors go; the new bath's,
     // the Master's and the Guest's are off the landing. Today's grey half-lite door to the Utility
     // and the Guest's three-sash south window give way to a solid door and a two-sash window in the
@@ -136,7 +139,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // screen porch, a rug in the master bedroom, 5 in the upstairs west room (two full beds, a
     // nightstand, a dresser, a rug) and 7 in the east room (a queen bed, two nightstands, a desk and
     // its chair, a dresser, a rug).
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 90 });
+    // The foyer's coat bench (built in) replaces its loose bench and two hook rails: two fewer.
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 88 });
     // The masonry chimney is demolished; the stove's connector and its flue are new, and six
     // fieldstone piers: two under the entry canopy's log posts, its stoop, and one under each of the
     // screen porch's three log posts.
@@ -534,7 +538,8 @@ describe('docs/examples/146-mick-road.json', () => {
         // The north band, 4' deep, all walk-in pantry; the powder room under the stair's high end.
         'Powder room': [63.5, 37],
         Pantry: [138, 48],
-        Foyer: [89, 79.75],
+        // 18" deeper toward the driveway (MK, 15 Oct 2026).
+        Foyer: [89, 97.75],
         'Screen porch': [89, 150],
       },
       'proposed',
@@ -549,7 +554,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expectSizes(s, { 'Bath (proposed)': [88, 63], Master: [162, 206], Guest: [137, 233], 'Master closet': [30, 33], Landing: [211, 128], 'Master wardrobe': [88.5, 24], 'Guest closet': [24, 60] }, 'proposed');
     // In the All view the demolished rooms keep their faces and the new labels sit in the parts the
     // old rooms did not cover, so no face has two names.
-    expectSizes(f, { Utility: [138, 113], 'Master bedroom': [138, 50.5], 'Entry porch': [59, 57.25] }, 'all');
+    expectSizes(f, { Utility: [138, 113], 'Master bedroom': [138, 50.5], 'Entry porch': [59, 39.25] }, 'all');
   });
 
   it('has the grand stair: a step up to a landing, then one straight run up the north wall, in a hall open through both floors', () => {
@@ -672,7 +677,7 @@ describe('docs/examples/146-mick-road.json', () => {
       // The foyer's gable faces west and runs on 60" past the foyer (x -96) as the open log canopy
       // over the front door; the porch's shed is high at the house wall. All three outlines stop
       // 18" short of the wall, so the overhang ends at its outside face.
-      ['gable', [-156, -18, 64.25, 158], 0, 8, 18],
+      ['gable', [-156, -18, 46.25, 158], 0, 8, 18],
       ['shed', [-96, -18, 158, 315], 180, 4, 18],
     ]);
     // The wing's shed is 96" above the first floor at the wing's east wall and 96 + 145 x 5/12 at
@@ -712,6 +717,31 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(Object.values(plan.site.columns).filter((c) => c.kind === 'post')).toEqual([]);
   });
 
+  it('has the foyer 18" deeper toward the driveway, a transom in its north wall and a coat bench under it (MK, 15 Oct 2026)', () => {
+    const f = plan.levels[plan.levelOrder[1]];
+    const at = (o: Opening) => {
+      const w = f.walls[o.wallId];
+      const a = f.nodes[w.a];
+      const b = f.nodes[w.b];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      return { x: a.x + ((b.x - a.x) * o.offset) / len, y: a.y + ((b.y - a.y) * o.offset) / len };
+    };
+    // The transom: on the foyer's north wall (y 49.75), centred on the foyer, high over the bench.
+    const transom = Object.values(f.openings).find((o) => o.phase === 'new' && o.type === 'window' && Math.abs(at(o).y - 49.75) < 1e-9)!;
+    expect([at(transom).x, transom.width, transom.height, transom.sill, transom.sashes]).toEqual([-44.5, 60, 18, 70, 2]);
+    // The built-in coat bench, wall to wall along the north wall's inside face (y 53.25), its top
+    // 4" under the transom's sill, and shown with the furniture layer off.
+    const bench = Object.values(f.fixtures).find((x) => x.piece === 'coatBench')!;
+    expect(bench.builtIn).toBe(true);
+    expect([bench.origin, bench.width, bench.depth, bench.height]).toEqual([{ x: -44.5, y: 53.25 }, 89, 18, 66]);
+    expect(transom.sill - (bench.elevation + bench.height)).toBe(4);
+    // Today's front door keeps its place in the existing view, on the piece of today's wall that
+    // the foyer's wall would have split (demolished and rebuilt closed).
+    const door = Object.values(f.openings).find((o) => o.type === 'door' && o.phase === 'demo' && Math.abs(at(o).x - 3.5) < 1e-9)!;
+    expect(at(door).y).toBe(48);
+    expect(f.walls[door.wallId].phase).toBe('demo');
+  });
+
   it('has the Adirondack entry: an open log canopy on stone piers, and log posts, a plate and a river-stone knee wall on the screen porch', () => {
     const f = plan.levels[plan.levelOrder[1]];
     const floorTop = getLevelElevations(plan)[f.id].floorTop;
@@ -720,7 +750,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // Fieldstone, new: 18" square to +20 under the canopy's posts, 16" square to +12 under the
     // porch's, and the stoop, 60" x 72" in front of the door, 1/2" under its threshold.
     expect(piers.map((c) => [c.at, c.width, c.depth, c.top, c.color, c.phase])).toEqual([
-      [{ x: -150, y: 69.25 }, 18, 18, 20, '#8e8579', 'new'],
+      [{ x: -150, y: 51.25 }, 18, 18, 20, '#8e8579', 'new'],
       [{ x: -150, y: 153 }, 18, 18, 20, '#8e8579', 'new'],
       [{ x: -126, y: 118.5 }, 60, 72, 1.5, '#8e8579', 'new'],
       [{ x: -97, y: 164 }, 16, 16, 12, '#8e8579', 'new'],
@@ -753,7 +783,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // The canopy's tie runs 8" past each post's outer face; the ridge log and the purlins run from
     // the foyer's gable wall to x -182, 8" past the rake (x -174), so their ends show.
     const [tie] = named('10" log tie');
-    expect(tie.kind === 'beam' && [tie.a.y, tie.b.y]).toEqual([69.25 - 5 - 8, 153 + 5 + 8]);
+    expect(tie.kind === 'beam' && [tie.a.y, tie.b.y]).toEqual([51.25 - 5 - 8, 153 + 5 + 8]);
     for (const m of [...named('10" ridge log'), ...named('8" log purlin')]) {
       expect(m.kind === 'beam' && [m.a.x, m.b.x]).toEqual([-94, -182]);
     }
@@ -996,9 +1026,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // Adirondack chairs and a side table on the screen porch; a braided rug at the king bed's foot.
     const nameOf = (x: (typeof allNew)[number]) => (x.kind === 'furniture' ? furnitureNameOf(x) : (x.label ?? x.kind));
     expect(allNew.filter((x) => roomOf(x) !== 'Kitchen').map((x) => `${roomOf(x)}: ${nameOf(x)}`).sort()).toEqual([
-      'Foyer: Bench',
-      'Foyer: Hooks',
-      'Foyer: Hooks',
+      'Foyer: Coat bench',
       'Laundry: Dryer',
       'Laundry: Dryer vent',
       'Laundry: Washer',
@@ -1217,7 +1245,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // carry a counter each; the master bedroom's two wardrobes, king bed and two nightstands, the
     // foyer's bench and hooks, the five pieces of the two vents and three alarms; and the furniture
     // added since (the Living's eight pieces, the screen porch's three, the bedroom's rug).
-    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([71, 7]);
+    // (The foyer's coat bench in place of its bench and two hook rails: two fewer.)
+    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([69, 7]);
   });
 
   it('has the wood stove in the Living\'s south-west corner on a stainless flue outside the house that clears the roof by the 3-2-10 rule, and no chimney', () => {

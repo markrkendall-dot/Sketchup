@@ -254,7 +254,12 @@ the draft message "A wall is already there. Select it and Mark demolish, or draw
 beside it." `copyWallsFromLevel` skips such walls (it returns `{copied, skipped}`, the level bar
 reports the skipped count), and `moveNode(s)` / `setWallLength` refuse a step that would create a
 new overlap (the select tool keeps the nodes at the last accepted position and shows the message;
-its drag starts the undo step on the first step that changes the plan).
+its drag starts the undo step on the first step that changes the plan). The one exception is a
+wall rebuilt where a demolished one stood (an old doorway closed up where a new wall meets the
+house across it): `addWall` with `replacesDemolished` and phase `new` may lie along demolished
+walls (never along one that stays). Its pieces never run between the same two nodes as the
+demolished wall, and in the All view `computeFaceGeometry` traces a demolished edge that a shown
+wall already covers between the same two points once, as the rebuilt wall's.
 
 ## Corner joins (`derive/footprint.ts`)
 
@@ -942,7 +947,10 @@ store strips a piece and a fabric from a fixture turned into a cabinet.
 **Catalogue.** `FURNITURE` gives each piece a label, a category, a stock and a smallest size, its
 default wood and fabric, whether it shows them, and its placement: `wall` (backs onto the nearest
 wall face, like a cabinet) or `free` (centred on the cursor); a rug is `floorLayer` (drawn first,
-picked last, exempt from the starter's overlap test). Beds come at a mattress size (`BED_SIZES`,
+picked last, exempt from the starter's overlap test). A built-in (`Fixture.builtIn`, placed so by
+default for the Built-ins category: the `coatBench`, boot cubbies under a cushioned seat, a
+beadboard back, a hook rail and a top shelf) belongs to the house, not the furniture layer: it is
+shown, picked and exported whether the layer is on or off (`isLayerFurniture`). Beds come at a mattress size (`BED_SIZES`,
 twin to king) plus a 2" frame round it (`bedOverall`); `bedSizeOf` reads one back from a width,
 and `furnitureNameOf` names a piece ("Queen bed").
 
