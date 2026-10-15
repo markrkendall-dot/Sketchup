@@ -22,6 +22,7 @@ import { clearMeshCache, getLevelMeshes, stairHoles } from '../derive/meshes';
 import { buildExportScene, disposeExportScene } from '../io/export3d';
 import { trimOf } from '../model/finish';
 import { migrate } from '../model/plan';
+import { FURNITURE, furnitureNameOf } from '../model/furniture';
 import type { Level, Opening, Phase, Plan, Vec2, ViewMode } from '../model/types';
 
 const plan: Plan = migrate(example);
@@ -131,8 +132,11 @@ describe('docs/examples/146-mick-road.json', () => {
     // the pantry's shelves, the stove with its stovepipe and tee, and the placeholder bath and
     // laundry fixtures (the walk-in shower in four pieces), the foyer's bench and hooks, the dryer's
     // vent and the range hood's duct, the master bedroom's wardrobes, king bed and nightstands, and
-    // seven alarms, all new.
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 66 });
+    // seven alarms, all new; and the furniture (MK, 15 Oct 2026): 8 pieces in the Living, 3 on the
+    // screen porch, a rug in the master bedroom, 5 in the upstairs west room (two full beds, a
+    // nightstand, a dresser, a rug) and 7 in the east room (a queen bed, two nightstands, a desk and
+    // its chair, a dresser, a rug).
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 90 });
     // The masonry chimney is demolished; the stove's connector and its flue are new, and six
     // fieldstone piers: two under the entry canopy's log posts, its stoop, and one under each of the
     // screen porch's three log posts.
@@ -908,6 +912,62 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(north.map((o) => [at(f, o).x, o.width, o.height, o.sill, o.sashes, o.lites])).toEqual([[429, 46, 18, 70, 2, { cols: 2, rows: 1 }]]);
   });
 
+  it('furnishes upstairs (MK, 15 Oct 2026): a queen bed in the east room with a desk in its alcove, two full beds in the west room', () => {
+    const s = plan.levels[plan.levelOrder[2]];
+    const set = getFaces(s, 'proposed');
+    const pieces = Object.values(s.fixtures).filter((x) => x.kind === 'furniture');
+    const centre = (x: (typeof pieces)[number]) => {
+      const o = fixtureOutline(x);
+      return { x: o.reduce((a, p) => a + p.x, 0) / 4, y: o.reduce((a, p) => a + p.y, 0) / 4 };
+    };
+    const roomOf = (x: (typeof pieces)[number]) => {
+      const face = set.faces.find((fc) => fc.roomId && pointInPolygon(centre(x), fc.netPolygon));
+      return face ? s.rooms[face.roomId!].name.replace(/ \(.*$/, '') : 'none';
+    };
+    const named = pieces.map((x) => `${roomOf(x)}: ${furnitureNameOf(x)}`).sort();
+    expect(named).toEqual([
+      'Guest: Desk',
+      'Guest: Desk chair',
+      'Guest: Dresser',
+      'Guest: Nightstand',
+      'Guest: Nightstand',
+      'Guest: Queen bed',
+      'Guest: Rug',
+      'Master: Dresser',
+      'Master: Full bed',
+      'Master: Full bed',
+      'Master: Nightstand',
+      'Master: Rug',
+    ]);
+    const bounds = (x: (typeof pieces)[number]) => {
+      const o = fixtureOutline(x);
+      return { x0: Math.min(...o.map((p) => p.x)), x1: Math.max(...o.map((p) => p.x)), y0: Math.min(...o.map((p) => p.y)), y1: Math.max(...o.map((p) => p.y)) };
+    };
+    // The desk sits in the Guest's alcove (its nook, x 252..311, y 75..140), against the east wall
+    // under the transom, its chair before it; the queen's headboard on the east wall under the other.
+    const desk = pieces.find((x) => x.piece === 'desk')!;
+    expect(bounds(desk)).toEqual({ x0: 287, x1: 311, y0: 85, y1: 133 });
+    expect(bounds(pieces.find((x) => x.piece === 'deskChair')!).x1).toBeLessThanOrEqual(287);
+    expect(bounds(pieces.find((x) => x.piece === 'bed' && furnitureNameOf(x) === 'Queen bed')!)).toEqual({ x0: 227, x1: 311, y0: 190, y1: 254 });
+    // Inside its room, clear of the walls, and no two pieces in one place (rugs under the rest).
+    const walls = [...computeFootprints(s, 'proposed').values()].map((fp) => {
+      const xs = fp.poly.map((p) => p.x);
+      const ys = fp.poly.map((p) => p.y);
+      return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+    });
+    const overlaps = (p: { x0: number; x1: number; y0: number; y1: number }, q: typeof p) =>
+      Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0) > 1e-6 && Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0) > 1e-6;
+    for (const a of pieces) {
+      const face = set.faces.find((fc) => fc.roomId && pointInPolygon(centre(a), fc.netPolygon))!;
+      for (const c of fixtureOutline(a)) expect(pointInPolygon({ x: c.x + Math.sign(centre(a).x - c.x) * 0.01, y: c.y + Math.sign(centre(a).y - c.y) * 0.01 }, face.netPolygon), `${a.piece}`).toBe(true);
+      for (const w of walls) expect(overlaps(bounds(a), w), `${a.piece} in a wall`).toBe(false);
+      for (const b of pieces) {
+        if (b.id <= a.id || FURNITURE[a.piece!].floorLayer || FURNITURE[b.piece!].floorLayer) continue;
+        expect(overlaps(bounds(a), bounds(b)), `${a.piece} and ${b.piece}`).toBe(false);
+      }
+    }
+  });
+
   it('has the proposed kitchen: the range on the north wall, the refrigerator on the east wall, the island in the triangle, the table by the window, the pantry north of it and the powder room under the stair', () => {
     const f = plan.levels[plan.levelOrder[1]];
     // The proposed kitchen's casework is new; today's fixtures (photos 13 to 22) are all demolished.
@@ -931,16 +991,27 @@ describe('docs/examples/146-mick-road.json', () => {
     // stovepipe into the wall, and the flue's tee outside in the screen porch.
     // The coats bench and hooks in the foyer; the vents (the dryer's riser in the laundry, its run
     // over the master bath and its hood outside; the range hood's duct across the pantry and its cap
-    // outside); the alarms.
-    expect(allNew.filter((x) => roomOf(x) !== 'Kitchen').map((x) => `${roomOf(x)}: ${x.label ?? x.kind}`).sort()).toEqual([
+    // outside); the alarms. The furniture (MK, 15 Oct 2026): in the Living a log sofa, an armchair,
+    // a rocker, a coffee table, a side table, a bookcase, a floor lamp on a Navajo rug; two
+    // Adirondack chairs and a side table on the screen porch; a braided rug at the king bed's foot.
+    const nameOf = (x: (typeof allNew)[number]) => (x.kind === 'furniture' ? furnitureNameOf(x) : (x.label ?? x.kind));
+    expect(allNew.filter((x) => roomOf(x) !== 'Kitchen').map((x) => `${roomOf(x)}: ${nameOf(x)}`).sort()).toEqual([
       'Foyer: Bench',
       'Foyer: Hooks',
       'Foyer: Hooks',
       'Laundry: Dryer',
       'Laundry: Dryer vent',
       'Laundry: Washer',
+      'Living: Armchair',
+      'Living: Bookcase',
+      'Living: Coffee table',
+      'Living: Floor lamp',
       'Living: Hearth',
+      'Living: Rocking chair',
+      'Living: Rug',
+      'Living: Side table',
       'Living: Smoke/CO',
+      'Living: Sofa',
       'Living: Stone',
       'Living: Stovepipe',
       'Living: Wood stove',
@@ -954,6 +1025,7 @@ describe('docs/examples/146-mick-road.json', () => {
       'Master bedroom: King bed',
       'Master bedroom: Nightstand',
       'Master bedroom: Nightstand',
+      'Master bedroom: Rug',
       'Master bedroom: Smoke',
       'Master bedroom: tall',
       'Master bedroom: tall',
@@ -963,15 +1035,22 @@ describe('docs/examples/146-mick-road.json', () => {
       'Pantry: Shelves',
       'Powder room: WC',
       'Powder room: sink',
+      'Screen porch: Adirondack chair',
+      'Screen porch: Adirondack chair',
+      'Screen porch: Side table',
       'Screen porch: Tee',
       'none: Duct cap',
       'none: Vent hood',
     ]);
     const kinds: Record<string, number> = {};
     for (const x of fixtures) kinds[x.kind] = (kinds[x.kind] ?? 0) + 1;
-    expect(kinds).toEqual({ dishwasher: 1, sink: 1, box: 6, fridge: 1, wall: 8, base: 7, range: 1, hood: 1 });
+    expect(kinds).toEqual({ dishwasher: 1, sink: 1, box: 1, furniture: 5, fridge: 1, wall: 8, base: 7, range: 1, hood: 1 });
     expect(fixtures.every((x) => x.phase === 'new')).toBe(true);
-    expect(fixtures.filter((x) => x.kind === 'box').map((x) => x.label).sort()).toEqual(['Chair', 'Chair', 'Chair', 'Chair', 'Smoke/CO', 'Table']);
+    expect(fixtures.filter((x) => x.kind === 'box').map((x) => x.label)).toEqual(['Smoke/CO']);
+    // The table and its chairs are furniture: a pine farm table, hickory ladder-backs facing it.
+    expect(fixtures.filter((x) => x.kind === 'furniture').map(nameOf).sort()).toEqual(['Dining chair', 'Dining chair', 'Dining chair', 'Dining chair', 'Dining table']);
+    // The proposed cabinets are in the house's Nordic pine.
+    expect(fixtures.filter((x) => x.kind === 'base' || x.kind === 'wall' || x.kind === 'sink').every((x) => x.wood === 'nordicPine')).toBe(true);
     const bounds = (poly: Vec2[]) => {
       const xs = poly.map((p) => p.x);
       const ys = poly.map((p) => p.y);
@@ -1044,21 +1123,23 @@ describe('docs/examples/146-mick-road.json', () => {
     // The table by the lake window, centred on it (x 242), with two chairs each side: 45" from the
     // island to the north chairs, 39" past its ends to the walls (the east one is the way to the
     // master bedroom's door, y 248..280), 32" behind the south chairs to the lake wall (y 308).
-    const table = fixtures.find((x) => x.label === 'Table')!;
+    const table = fixtures.find((x) => x.piece === 'diningTable')!;
     expect(box(table)).toEqual({ x0: 212, x1: 272, y0: 222, y1: 258 });
-    const chairs = fixtures.filter((x) => x.label === 'Chair').map(box);
+    const chairs = fixtures.filter((x) => x.piece === 'diningChair').map(box);
     expect(Math.min(...chairs.map((c) => c.y0)) - top.y1).toBe(45);
     expect(308 - Math.max(...chairs.map((c) => c.y1))).toBe(32);
     expect(311 - box(table).x1).toBe(39);
 
     // Every new fixture is inside its room's face in the proposed view and overlaps no wall, and no
-    // two fixtures share any space (a plan overlap and an overlap in height).
+    // two fixtures share any space (a plan overlap and an overlap in height); a rug lies under the
+    // pieces on it.
     const walls = [...computeFootprints(f, 'proposed').values()].map((fp) => bounds(fp.poly));
     // The vents pass through the walls (that is their job); the rest stay clear.
     const through = new Set(['Dryer vent', 'Vent hood', 'Hood duct', 'Duct cap']);
     const boxes = allNew.filter((x) => !through.has(x.label ?? '')).map((x) => ({ id: x.id, face: set.faces.find((fc) => fc.roomId && pointInPolygon(centre(x), fc.netPolygon))!, ...bounds(fixtureOutline(x)), z0: x.elevation, z1: x.elevation + x.height }));
     const overlaps = (p: { x0: number; x1: number; y0: number; y1: number }, q: typeof p) =>
       Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0) > 1e-6 && Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0) > 1e-6;
+    const onFloor = (x: (typeof allNew)[number]) => x.kind === 'furniture' && !!x.piece && !!FURNITURE[x.piece].floorLayer;
     for (const b of boxes) {
       const corners = [
         { x: b.x0 + 0.01, y: b.y0 + 0.01 },
@@ -1069,7 +1150,7 @@ describe('docs/examples/146-mick-road.json', () => {
       for (const c of corners) expect(pointInPolygon(c, b.face.netPolygon), `${f.fixtures[b.id].kind} at ${JSON.stringify(c)}`).toBe(true);
       for (const w of walls) expect(overlaps(b, w), `${f.fixtures[b.id].kind} in a wall`).toBe(false);
       for (const q of boxes) {
-        if (q.id <= b.id) continue;
+        if (q.id <= b.id || onFloor(f.fixtures[b.id]) || onFloor(f.fixtures[q.id])) continue;
         const clash = overlaps(b, q) && Math.min(b.z1, q.z1) - Math.max(b.z0, q.z0) > 1e-6;
         expect(clash, `${f.fixtures[b.id].kind} and ${f.fixtures[q.id].kind}`).toBe(false);
       }
@@ -1134,8 +1215,9 @@ describe('docs/examples/146-mick-road.json', () => {
     // pantry's three shelves, the stove's five parts, and the ten placeholder bath and laundry
     // fixtures (the walk-in shower's floor, bench, glass and end wall among them), whose two vanities
     // carry a counter each; the master bedroom's two wardrobes, king bed and two nightstands, the
-    // foyer's bench and hooks, the five pieces of the two vents and three alarms.
-    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([59, 7]);
+    // foyer's bench and hooks, the five pieces of the two vents and three alarms; and the furniture
+    // added since (the Living's eight pieces, the screen porch's three, the bedroom's rug).
+    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([71, 7]);
   });
 
   it('has the wood stove in the Living\'s south-west corner on a stainless flue outside the house that clears the roof by the 3-2-10 rule, and no chimney', () => {

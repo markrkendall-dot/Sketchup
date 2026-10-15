@@ -927,6 +927,68 @@ Not done: cabinet door swings in plan, backsplashes, open shelves, corner cabine
 two cabinets whose counter is mitred), appliance details beyond a few boxes, copy and mirror of a run
 (M14). Interior wall and floor finishes (M13) are in "Interior finishes".
 
+## Furniture (`model/furniture.ts`, `derive/furniture.ts`, `view3d/proceduralTextures.ts`)
+
+**Model.** A piece of furniture is a fixture of kind `furniture` with a `piece` (the catalogue
+id: `bed`, `dresser`, `desk`, `sofa`, `rug`...) and optionally a `wood` and a `fabric` (catalogue
+ids, `WOODS` and `FABRICS`); it reuses the fixture's frame (origin the middle of its back,
+direction the way it faces), its store actions, selection, drag, duplicate and phases. A cabinet
+may carry a `wood` too (and a level `finishes.cabinetWood`), in place of its painted front colour.
+No schema bump: like `counterOverhang`, `proposedFloor` and the newer wall finishes these are an
+enum value and optional fields; an older build drops a furniture fixture with a warning and loads
+the rest. The loader drops furniture without a known piece, and a bad wood or fabric alone; the
+store strips a piece and a fabric from a fixture turned into a cabinet.
+
+**Catalogue.** `FURNITURE` gives each piece a label, a category, a stock and a smallest size, its
+default wood and fabric, whether it shows them, and its placement: `wall` (backs onto the nearest
+wall face, like a cabinet) or `free` (centred on the cursor); a rug is `floorLayer` (drawn first,
+picked last, exempt from the starter's overlap test). Beds come at a mattress size (`BED_SIZES`,
+twin to king) plus a 2" frame round it (`bedOverall`); `bedSizeOf` reads one back from a width,
+and `furnitureNameOf` names a piece ("Queen bed").
+
+**Geometry.** `furnitureSolids(f)` runs the piece's recipe, a function of its width, depth and
+height, into solids in the fixture frame: axis-aligned boxes (with a grain axis), sawn sticks
+between two points (a slat, a runner, a leaning back slat) and round logs (posts, rails,
+spindles; built with `logBetween`). A piece in a log wood is built of logs, the guide-built
+Adirondack way; in sawn wood of square stock. Every solid stays inside the footprint and the
+height (`solidExtent`; tested at the stock, smallest and doubled sizes). Parts are the material
+groups: `wood`, `fabric` (the upholstery, a bed's blanket, a rug), `linen` (mattress, sheet,
+pillows), `cane` (chair seats), `books`, `metal` (pulls, straps, the lamp) and `shade`. Meshes
+(`buildFurnitureParts`) merge each part's closed solids with normals and UVs in inches:
+`addFrameUVs` lays each box face's u along the grain, a stick's along its axis, a log's along it
+and round it. Casework boxes and stair treads get UVs the same way (`grainUVs` runs a tread's grain
+along its longest edge).
+
+**Plan.** A piece draws as its outline with a lighter, warmer stroke and its detail
+(`furnitureSymbol`): a bed's pillows and turn-down, a chair's back, a sofa's cushions, a drawer
+line, a rug's border and fringe (dashed), a lamp's shade; the big pieces carry their name
+(`furniturePlanLabel`).
+
+**Layer.** `showFurniture` (UI state, persisted as `homeplan:showFurniture`, default on; Shift+F,
+the toolbar's and the 3D bar's Furniture buttons, the viewer's Plan tab checkbox) hides every
+piece on the plan (`FixturesLayer`), from picking (`hitTest` opts, `pruneSelection`), in 3D
+(`LevelMeshes`, filtered at render like the roofs, so no cache depends on it), from the plan
+export and its frame (`planExport` opts, `levelDrawingBounds`) and from the 3D export
+(`ExportLevelVisibility.showFurniture`). The Furniture tool turns it on.
+
+**Tool.** The Furniture tool (Shift+C) is the Cabinet tool's placement (`makePlacementTool`) with
+a spec from the draft's `furniturePiece`, `furnitureBed`, `furnitureWood` and `furnitureFabric`,
+which the panel's pickers set and tool switches keep.
+
+**Textures.** `view3d/proceduralTextures.ts` computes RGBA (and a height field) straight into a
+48" tile: periodic value noise (`periodicNoise`, `fbm`) keeps every tile seamless, and the pure
+generators are testable in node. **Wood** (`woodPixels`): boards with their own tone, a flat-sawn
+ring figure whose rings arch along the board (cathedrals), latewood lines, fibres, streaks and
+knots that bend the rings round them; the wide pine floor adds its joints and grey nail heads. Pine
+is held under `PINE_MAX_WARMTH` (red minus blue) per pixel, so it reads pale and cool, never amber
+(MK: pine that does not yellow). Hickory, fumed oak, peeled and barked log and paint are the same
+model in other proportions. **Fabrics** (`fabricPixels`): a 3" buffalo check, a point blanket's
+bands, a twill tartan, canvas, leather, a Navajo weave of bands and stepped diamonds, braided rag
+rows, linen, woven cane, book spines, each under a fine weave. **Paint** (`paintPixels`): an eggshell
+stipple. `texturesFromPixels` caches each id and variant (the new-work variant blended toward green)
+with its normal map; materials (`furnitureMaterial`, `woodMaterial`, the tread and the pine floor)
+keep the flat colour for the export.
+
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 
 All of it is optional data on existing elements (no schema bump: `migrate()` reads the fields when they are
@@ -1023,7 +1085,7 @@ bump; `migrateRooms` keeps valid values and drops each malformed one): `wallFini
 and `wallColor` (a colour alone is paint; a check's colour is the check's, on the pale ground `CHECK_GROUND`), a
 `wainscot` (`{ height, finish, color? }`, a lower band in another finish up to `height`, dropped at or above the
 ceiling) and `floorFinish` (`plain | boards | tile | parquet | pine | carpet`) with `floorColor`. Each finish has a
-default colour (`ROOM_WALL_COLOR`, `FLOOR_COLOR`: wide pine whitewashed `#d8d0c2`, carpet oatmeal `#b9ae9b`);
+default colour (`ROOM_WALL_COLOR`, `FLOOR_COLOR`: wide pine, Nordic natural, `#d8d0c2`, carpet oatmeal `#b9ae9b`);
 `roomWallLookOf`, `wainscotOf` and `floorLookOf` resolve them, null when unset. An existing room may also carry a
 `proposedFloor` (`{ finish, color? }`): a new floor laid in a room the proposed design keeps. `floorLookIn(room,
 viewMode)` gives it in the Proposed view for a room whose phase is existing, else `floorLookOf`, so the Existing and
@@ -1857,7 +1919,7 @@ may overlap.
 The proposed layout of PLAN-v6-layout.md, with MK's stair of 15 Oct 2026: the stair hall's stair (a
 one-riser bottom step 10 3/8" deep, a one-riser landing in the north-west corner, then one straight
 run of 12 east along the north wall to x 167.5; 15 risers of 108 / 15 on 10 3/8" treads, railed on
-the run's open side, cutting nothing, in 2" whitewashed pine treads) under the Second Floor's floor
+the run's open side, cutting nothing, in 2" Nordic pine treads) under the Second Floor's floor
 opening (floor opening ids `s-h1` ...), its guard opening where the run arrives, the old upstairs
 bath its top landing; no upstairs hall (the Master takes the balcony, its north wall the Bunk's old
 south wall on the opening's edge; the Guest takes the Office; a flush ceiling beam on each of their

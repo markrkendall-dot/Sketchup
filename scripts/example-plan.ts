@@ -15,7 +15,9 @@ import { COLUMN_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import { MEMBER_DEFAULTS } from '../src/model/structure';
-import type { Id, Opening, Phase, Plan, Roof, Room, SiteSurface, Vec2 } from '../src/model/types';
+import type { FabricId, FurniturePiece, Id, Opening, Phase, Plan, Roof, Room, SiteSurface, Vec2, WoodId } from '../src/model/types';
+import { bedOverall, furnitureDefaults, type BedSize } from '../src/model/furniture';
+import { isCabinet } from '../src/model/casework';
 import { getPlan, usePlanStore, type NewDeck, type NewFixture, type NewStairs } from '../src/store/planStore';
 
 const ft = (feet: number): number => feet * 12;
@@ -140,15 +142,21 @@ const WOOD_FLOOR = '#a87a4c';
 const PLACEHOLDER_ROOM = { wallFinish: 'paint', floorFinish: 'boards', floorColor: WOOD_FLOOR } as const;
 const PLACEHOLDER_WET = { wallFinish: 'paint', floorFinish: 'tile' } as const;
 /**
- * The proposed floors (MK, 15 Oct 2026): 6" pine, face-nailed, whitewashed so it reads white and
- * not yellow, through the whole first floor and the upstairs hall, and on the stair's thick treads;
- * oatmeal carpet in the upstairs bedrooms; tile in the bathrooms.
+ * The proposed floors (MK, 15 Oct 2026): 6" pine, face-nailed, through the whole first floor but
+ * the baths and the laundry (tile) and the upstairs hall, and on the stair's thick treads; oatmeal
+ * carpet in the upstairs bedrooms. The pine must not turn yellow: Nordic natural, pale and cool as
+ * under a water-white (non-ambering, water-based) finish, drawn so (view3d/proceduralTextures.ts).
  */
 const PINE_FLOOR = '#d8d0c2';
 const PROPOSED_PINE = { wallFinish: 'paint', floorFinish: 'pine', floorColor: PINE_FLOOR } as const;
 /** The same floors laid in a room that is kept (Room.proposedFloor). */
 const PINE_PROPOSED = { finish: 'pine', color: PINE_FLOOR } as const;
 const CARPET_PROPOSED = { finish: 'carpet' } as const;
+/**
+ * The kept rooms' walls in the proposed design (MK, 15 Oct 2026: painted, kept light; the wood shows
+ * in the floors, the stair, the beams, the cabinets and the furniture): a warm white.
+ */
+const PAINT_PROPOSED = { finish: 'paint', color: '#ece6da' } as const;
 /** A new room carpeted like the upstairs bedrooms. */
 const PROPOSED_CARPET = { wallFinish: 'paint', floorFinish: 'carpet' } as const;
 /** The peeled log post's pale, barkless wood (MK). */
@@ -347,8 +355,35 @@ function fixture(levelId: Id, f: NewFixture): Id {
  * Name a room: a label anchored at `at`. A label of a new or demolished room shows only in the views
  * that show its phase. `finishes`: the room's interior finishes (DESIGN.md "Interior finishes").
  */
-function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE, finishes: Pick<Room, 'wallFinish' | 'wallColor' | 'wainscot' | 'floorFinish' | 'floorColor' | 'proposedFloor'> = {}): void {
+function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE, finishes: Pick<Room, 'wallFinish' | 'wallColor' | 'wainscot' | 'floorFinish' | 'floorColor' | 'proposedFloor' | 'proposedWall'> = {}): void {
   if (!store().addRoom(levelId, { name, anchor: at, ...(phase === 'existing' ? {} : { phase }), ...finishes })) throw new Error(`room ${name} rejected`);
+}
+
+/**
+ * Add a proposed piece of furniture (DESIGN.md "Furniture"): `origin` the middle of its back,
+ * `direction` the way it faces, its stock size unless given (a bed by its mattress size).
+ */
+function furnish(
+  levelId: Id,
+  piece: FurniturePiece,
+  origin: Vec2,
+  direction: number,
+  opts: { bed?: BedSize; width?: number; depth?: number; height?: number; wood?: WoodId; fabric?: FabricId } = {},
+): Id {
+  const def = furnitureDefaults(piece, opts.bed);
+  return fixture(levelId, {
+    kind: 'furniture',
+    piece,
+    origin,
+    direction,
+    width: opts.width ?? def.width,
+    depth: opts.depth ?? def.depth,
+    height: opts.height ?? def.height,
+    elevation: 0,
+    phase: NEW,
+    ...(opts.wood ? { wood: opts.wood } : {}),
+    ...(opts.fabric ? { fabric: opts.fabric } : {}),
+  });
 }
 
 /** Replace every generated id with a readable, stable one so the JSON is identical from run to run. */
@@ -787,8 +822,16 @@ export function buildExamplePlan(): Plan {
     floorFinish: 'tile',
     floorColor: VINYL_BEIGE,
     proposedFloor: PINE_PROPOSED,
+    proposedWall: PAINT_PROPOSED,
   });
-  label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, { wallFinish: 'boards', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN, proposedFloor: PINE_PROPOSED });
+  label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, {
+    wallFinish: 'boards',
+    wallColor: CREAM,
+    floorFinish: 'boards',
+    floorColor: FLOOR_RED_BROWN,
+    proposedFloor: PINE_PROPOSED,
+    proposedWall: PAINT_PROPOSED,
+  });
   // The stair strip is part of the Living (no wall on its south side), so it has no label of its own.
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
@@ -1176,7 +1219,13 @@ function proposed(ids: ExistingIds): void {
   // and 18" high under the north window (sill 36), clear of the front door's swing, and a 24" rail
   // of hooks at 60" either side of the window. Stained like the trim.
   const foyerNorth = FOYER.y0 + T;
-  fixture(fId, { kind: 'box', label: 'Bench', origin: { x: -44, y: foyerNorth }, direction: 90, width: 48, depth: 16, height: 18, elevation: 0, frontColor: FINISH_COLOR, phase: NEW });
+  furnish(fId, 'bench', { x: -44, y: foyerNorth }, 90, { width: 48, depth: 16, height: 18, wood: 'darkLog' });
+  // The screen porch (MK, 15 Oct 2026): two green Adirondack chairs facing the lake (south), a side
+  // table between them, x -84..-2, y 226..260: clear of the foyer's screen door swing (to y 194),
+  // the way to the lawn door (x -86..-50 at the south wall) and the stove's tee (y 276..284).
+  furnish(fId, 'adirondackChair', { x: -69, y: 226 }, 90);
+  furnish(fId, 'sideTable', { x: -43, y: 234 }, 90, { width: 18, depth: 18, wood: 'paintedGreen' });
+  furnish(fId, 'adirondackChair', { x: -17, y: 226 }, 90);
   for (const x of [FOYER.x0 + T + 12, -12]) fixture(fId, { kind: 'box', label: 'Hooks', origin: { x, y: foyerNorth }, direction: 90, width: 24, depth: 2, height: 4, elevation: 60, frontColor: FINISH_COLOR, phase: NEW });
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
@@ -1373,13 +1422,31 @@ function proposed(ids: ExistingIds): void {
   // The table by the lake window (MK), 60 x 36 x 30, centred on the window (x 242), x 212..272, y
   // 222..258, with two chairs on each long side (18" square, at its edges): 45" from the island to
   // the north chairs, 39" past its east end to the master bedroom's door, 32" behind the south
-  // chairs to the lake wall. It seats six with chairs at the ends.
+  // chairs to the lake wall. It seats six with chairs at the ends. A pine farm table and Old
+  // Hickory ladder-back chairs with woven cane seats, facing it.
   const TABLE = { x: 242, north: 222, south: 258 };
-  kitchen({ kind: 'box', label: 'Table', origin: { x: TABLE.x, y: TABLE.south }, direction: 270, width: 60, depth: TABLE.south - TABLE.north, height: 30, frontColor: PINE });
+  furnish(fId, 'diningTable', { x: TABLE.x, y: TABLE.south }, 270, { width: 60, depth: TABLE.south - TABLE.north, wood: 'nordicPine' });
   for (const x of [TABLE.x - 15, TABLE.x + 15]) {
-    kitchen({ kind: 'box', label: 'Chair', origin: { x, y: TABLE.north }, direction: 270, width: 18, depth: 18, height: 18, frontColor: PINE });
-    kitchen({ kind: 'box', label: 'Chair', origin: { x, y: TABLE.south }, direction: 90, width: 18, depth: 18, height: 18, frontColor: PINE });
+    furnish(fId, 'diningChair', { x, y: TABLE.north - 18 }, 90);
+    furnish(fId, 'diningChair', { x, y: TABLE.south + 18 }, 270);
   }
+
+  // ---- The Living (MK, 15 Oct 2026: furnish the house, Adirondack camp style): a log sofa in red
+  // buffalo check facing the lake window and the stove, x 58..142, y 158..194, its back to the way
+  // from the house door to the kitchen; a Navajo rug before it (x 60..156, y 196..268, clear of the
+  // hearth at x 57); a peeled-log coffee table on it; a plaid armchair facing west at the kitchen
+  // opening's south end (x 132..166, y 222..256); a hickory rocker facing the stove 36" from its
+  // front (x 75..109, y 268..292); a pine bookcase on the west wall between the house door's swing
+  // (to y 134.5) and the French doors (from y 177), y 138..174; an iron floor lamp at the sofa's west
+  // end and a side table at its east end.
+  furnish(fId, 'rug', { x: 108, y: 196 }, 90, { width: 96, depth: 72, fabric: 'navajo' });
+  furnish(fId, 'sofa', { x: 100, y: 158 }, 90);
+  furnish(fId, 'coffeeTable', { x: 108, y: 214 }, 90);
+  furnish(fId, 'armchair', { x: 166, y: 239 }, 180, { fabric: 'woolPlaid' });
+  furnish(fId, 'rocker', { x: 109, y: 280 }, 180);
+  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 156 }, 0, { width: 36 });
+  furnish(fId, 'floorLamp', { x: 48, y: 160 }, 90);
+  furnish(fId, 'sideTable', { x: 154, y: 166 }, 90);
 
   // ---- The pantry's fittings (x 173..311, y 7..55): shelves 12" deep and 84" high on its north
   // wall and on its end walls south of them, clear of its door's swing (x 198..222). The powder room
@@ -1433,11 +1500,12 @@ function proposed(ids: ExistingIds): void {
   for (const i of [0, 1]) {
     kitchen({ kind: 'tall', origin: { x: CL.x1 + HALF, y: WARDROBE_W.y0 + WARDROBE_W.width * (i + 0.5) }, direction: 0, width: WARDROBE_W.width, depth: 24, height: 84, frontColor: PINE });
   }
+  // A peeled-log king bed under a point blanket, hickory nightstands, and a braided rug at its foot
+  // (x 344..440, y 194..266) running under it.
   const BED = { width: 78, depth: 84 };
-  kitchen({ kind: 'box', label: 'King bed', origin: { x: WING.x1 - T, y: BED_Y }, direction: 180, width: BED.width, depth: BED.depth, height: 24, frontColor: CREAM });
-  for (const side of [-1, 1]) {
-    kitchen({ kind: 'box', label: 'Nightstand', origin: { x: WING.x1 - T, y: BED_Y + side * (BED.width / 2 + 2 + 12) }, direction: 180, width: 24, depth: 18, height: 26, frontColor: PINE });
-  }
+  furnish(fId, 'rug', { x: 344, y: BED_Y }, 0, { width: 72, depth: 96, fabric: 'braided' });
+  furnish(fId, 'bed', { x: WING.x1 - T, y: BED_Y }, 180, { width: BED.width, depth: BED.depth, height: 48 });
+  for (const side of [-1, 1]) furnish(fId, 'nightstand', { x: WING.x1 - T, y: BED_Y + side * (BED.width / 2 + 2 + 12) }, 180, { width: 24, depth: 18, height: 26 });
 
   // ---- Vents through walls, not the roof (MK, 14 Oct 2026). The dryer's: a 4" rigid metal duct
   // rising behind the dryer (x 318..322) to 86" and running north under the ceiling, over the
@@ -1557,6 +1625,38 @@ function proposed(ids: ExistingIds): void {
   upstairs({ kind: 'box', label: 'Shower', origin: { x: KITCHEN_EAST, y: CL.y0 + HALF + 30 }, direction: 180, width: 60, depth: 32, height: 78, frontColor: WHITE });
   upstairs({ kind: 'sink', origin: { x: 267, y: UP_BATH.south - 2.5 }, direction: 270, width: 24, depth: 18, height: 34.5 });
 
+  // ---- Upstairs furniture (MK, 15 Oct 2026). The west room (the Master): two full log beds with
+  // their headboards on the east wall (x 169), x 90..169, y 142..200 and y 224..282, a nightstand
+  // between them; a pine dresser under the west window (y 176..224, sill 48), x 7..27, y 173..227; a
+  // braided rug between (x 36..84). Clear of the door's swing (y 103..131) and the wardrobe.
+  const FULL = bedOverall('full');
+  const MASTER_EAST = UP_LANDING.west - 2.5;
+  furnish(sId, 'bed', { x: MASTER_EAST, y: 142 + FULL.width / 2 }, 180, { bed: 'full', height: 44 });
+  furnish(sId, 'nightstand', { x: MASTER_EAST, y: 212 }, 180);
+  furnish(sId, 'bed', { x: MASTER_EAST, y: 224 + FULL.width / 2 }, 180, { bed: 'full', height: 44, fabric: 'woolPlaid' });
+  furnish(sId, 'dresser', { x: CL.x0 + HALF, y: 200 }, 0);
+  furnish(sId, 'rug', { x: 36, y: 212 }, 0, { width: 72, depth: 48, fabric: 'braided' });
+  // The east room (the Guest): a queen log bed with its headboard on the east wall under the
+  // transom (sill 60), x 227..311, y 190..254, nightstands either side; in the alcove's nook (x
+  // 252..311, y 75..140) a hickory desk against the east wall under its transom, x 287..311, y
+  // 85..133, and its chair, clear of the closet's bifolds (x 252); a dresser on the west wall, x
+  // 174..194, y 186..234, clear of the door's swing (y 140..170), 33" from the bed's foot; a Navajo
+  // rug at the bed's foot.
+  furnish(sId, 'rug', { x: 196, y: 222 }, 0, { width: 96, depth: 60, fabric: 'navajo' });
+  furnish(sId, 'bed', { x: KITCHEN_EAST, y: 222 }, 180, { bed: 'queen' });
+  for (const y of [178, 266]) furnish(sId, 'nightstand', { x: KITCHEN_EAST, y }, 180);
+  furnish(sId, 'desk', { x: KITCHEN_EAST, y: 109 }, 180);
+  furnish(sId, 'deskChair', { x: 268, y: 109 }, 0);
+  furnish(sId, 'dresser', { x: UP_LANDING.west + 2.5, y: 210 }, 0, { width: 48 });
+
+  // ---- The proposed cabinets in Nordic pine (the house's pine, not the yellowed knotty pine of
+  // today's): the kitchen's, the wardrobes, the vanities, the pantry's shelves.
+  for (const lid of [fId, sId]) {
+    for (const f of Object.values(level(lid).fixtures)) {
+      if (f.phase === 'new' && (isCabinet(f.kind) || (f.kind === 'box' && f.label === 'Shelves'))) store().updateFixture(lid, f.id, { wood: 'nordicPine' });
+    }
+  }
+
   // ---- Structure (docs/history/PLAN-v8-stair-structure.md; estimates for MK and the engineer).
   // MK, 14 Oct 2026: the house was built in stages and its joists run north-south generally, so
   // every level's framing is north-south. The one known exception is the wing's ceiling: its shed
@@ -1619,7 +1719,8 @@ function proposed(ids: ExistingIds): void {
   label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Powder room (proposed)', { x: 144, y: 26 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Pantry (proposed)', { x: 242, y: 34 }, NEW, PROPOSED_PINE);
-  label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PROPOSED_PINE);
+  // The laundry keeps tile (MK, 15 Oct 2026: pine everywhere downstairs but the wet rooms).
+  label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PLACEHOLDER_WET);
   label(sId, 'Master wardrobe (proposed)', { x: 86, y: 114 }, NEW, PROPOSED_CARPET);
   label(sId, 'Guest closet (proposed)', { x: 235, y: 84 }, NEW, PROPOSED_CARPET);
   label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW, PROPOSED_PINE);

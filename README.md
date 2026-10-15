@@ -5,9 +5,9 @@ screen from tape measurements, then drawing the changes you want (moved walls, a
 porch) and seeing them in 3D. You type wall lengths the way a tape gives them (`12'6`, `150`,
 `6 1/2"`), walls join and split themselves, rooms are found and measured automatically, and the
 house stands up in 3D with its roofs, the ground it sits on, siding, windows and doors. A kitchen
-is laid out with cabinets, counters and appliances. The model exports to SketchUp. It is a focused
-tool, not a Home Designer Pro clone: no furniture or construction drawings. Everything runs in your
-browser; nothing is uploaded.
+is laid out with cabinets, counters and appliances, and the rooms furnished. The model exports to
+SketchUp. It is a focused tool, not a Home Designer Pro clone: no construction drawings. Everything
+runs in your browser; nothing is uploaded.
 
 What it draws:
 
@@ -30,7 +30,20 @@ What it draws:
   rust; a brick chimney in any colour.
 - **Kitchens**: base, wall and tall cabinets, islands, sinks, ranges, fridges, dishwashers, wall
   ovens, hoods and microwaves placed along the walls, with one counter top running over each run
-  of cabinets; slab or panel fronts in any colour.
+  of cabinets; slab or panel fronts in any colour, or in a wood.
+- **Furniture** in an Adirondack camp style, on a layer of its own (**Shift+F** shows or hides it on
+  the plan, in 3D and in the exports; also the toolbar's and the 3D bar's **Furniture** buttons).
+  The **Furniture** tool (**Shift+C**) places a piece from a catalogue: beds (twin, full, queen,
+  king), nightstands, dressers, chests, bookcases, trunks, a desk and desk chair, dining, coffee and
+  side tables, ladder-back dining chairs, a log sofa and armchair, a rocker, a bench, an Adirondack
+  chair, a floor lamp, rugs. Each is built to its size from logs or sawn stock in a wood (Nordic
+  pine, hickory, peeled log, log with bark, fumed oak, painted green, red or cream) and a fabric
+  (buffalo check, point blanket, wool plaid, canvas, leather, a Navajo or braided rug); a bed, a
+  dresser or a desk backs onto the nearest wall, a table, a chair or a rug sits where you click
+  (Shift swaps the two, Tab turns it). Select a piece to change its size, wood and fabric.
+- **Textures** drawn in the browser: pale, cool **Nordic natural pine** floors and stair treads
+  (grain and knots, never amber), the furniture's woods and fabrics, an eggshell stipple on
+  painted walls, and the siding, stone, brick and roofs.
 - **Before and after**: everything you draw is existing, new or to be demolished, and the Existing,
   Proposed and All views show each state, in 2D, in 3D and in the export.
 
@@ -727,7 +740,7 @@ where the built design differs from them):
    north wall. The new stair (MK, 15 Oct 2026) is
    **a step up to a landing, then one straight run up the north wall** with no second turn: 15
    risers of 7.2" on 10 3/8" treads, one staircase (the "Grand stair") in **thick pine treads**
-   (2", the floors' whitewashed pine) with a 1" nosing over white risers, box newels and a round
+   (2", the floors' Nordic natural pine, drawn with its grain along each tread) with a 1" nosing over white risers, box newels and a round
    handrail on white balusters, framed underneath:
    - one **step** up heading north from the hall, clear of the house door;
    - a **landing** in the north-west corner, a step higher, where you turn east;
@@ -881,13 +894,36 @@ where the built design differs from them):
     same poured concrete, its top 2" over the lawn behind it. The garage itself (24' x 26', 55' west
     of the house, 5' north of this wall) is not drawn. Walls that close no room, like this one, are
     left out of what the 3D view frames and shadows, so the house keeps its size on screen.
-12. **Floors** (MK, 15 Oct 2026): **6" pine, face-nailed** with old square cut nails, whitewashed
-    so it reads white and not yellow, through the **whole first floor** (the hall, the Living, the
-    kitchen, the foyer, the pantry, the laundry and the master bedroom) and on the stair's **top
-    landing** upstairs; **tile** in the bathrooms (the powder room, the
-    master bath and the upstairs bath); **oatmeal carpet** in the upstairs bedrooms and the master
-    closet. The screen porch keeps its outdoor boards. Rooms kept from today carry their new floor
-    as a proposed floor, so the Existing view still shows today's floors.
+12. **Floors** (MK, 15 Oct 2026): **6" pine, face-nailed** with old square cut nails, **Nordic
+    natural**: pale and cool, its grain and knots showing, never amber or yellow. Pine yellows from
+    ultraviolet light through an oil-based or amber-tinted finish; to keep it pale, use a clear,
+    "water-white" two-component water-based finish (check the label for no amber tint), or a
+    white-tinted water-based sealer first; none stops ageing entirely, but they slow it a lot. Pine
+    through **the first floor** (the hall, the Living, the kitchen, the foyer, the pantry and the
+    master bedroom) and on the stair's treads and **top landing** upstairs; **tile** in the wet
+    rooms (the powder room, the master bath and its laundry, the upstairs bath); **oatmeal carpet**
+    in the upstairs bedrooms and the master closet. The screen porch keeps its outdoor boards. Rooms
+    kept from today carry their new floor as a proposed floor, so the Existing view still shows
+    today's floors. **Walls** are painted and kept light (MK): the kept Kitchen and Living are
+    repainted a warm white in the Proposed view (`proposedWall`), the new rooms are painted. The
+    proposed **cabinets** (kitchen, island, wardrobes, vanities, pantry shelves) are in the same
+    Nordic pine.
+13. **Furniture** (MK, 15 Oct 2026; Adirondack camp style, on the furniture layer, Shift+F):
+    - the **Living**: a peeled-log sofa in red buffalo check facing the lake window and the stove,
+      a Navajo rug before it with a log coffee table, a wool-plaid armchair at the kitchen opening,
+      a hickory rocker 3' from the stove, a pine bookcase between the house door and the French
+      doors, an iron floor lamp and a side table;
+    - the **kitchen**: the pine farm table and four hickory ladder-back chairs with cane seats;
+    - the **foyer**: a log bench under the coat hooks; the **screen porch**: two green Adirondack
+      chairs and a side table facing the lake;
+    - the **master bedroom**: the king bed in peeled log under a point blanket, hickory nightstands,
+      a braided rug at its foot;
+    - upstairs, the **west room** (the Master): **two full log beds** on its east wall with a
+      nightstand between, a pine dresser under the west window, a braided rug;
+    - the **east room** (the Guest): a **queen log bed** under the east transom with nightstands, a
+      **hickory desk in the alcove** under its transom with its chair, a dresser, a Navajo rug.
+    The deck has none yet (its floor is below the bedroom's and a piece cannot sit below its
+    level's floor).
 **After the work** (MK, after his garage across the road), the Proposed view shows the whole house
 re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
 roof (`#2f4a36`) with its rake and fascia boards in the shake brown, with black windows (`#1c1c1c`)
@@ -1014,7 +1050,7 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
   exterior steps other than a flight (an outside stair is a flight on the lowest level, open and,
   down a slope, starting below its floor, as the starter's are), fences,
   the lot outline, porch floors and steps, foundations under additions and porches, gutters,
-  ceilings, crown and baseboards, furniture, and text or dimension notes
+  ceilings, crown and baseboards, furniture outside (below a level's floor), and text or dimension notes
   you place yourself. Bathroom fixtures and a wood stove are labelled boxes. A retaining wall is a
   wall on the lowest level; its free end shows as an open wall end.
 - **Cabinets** are boxes with simple fronts: no door swings on the plan, no backsplash, open

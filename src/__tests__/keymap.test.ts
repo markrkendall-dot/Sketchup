@@ -65,6 +65,8 @@ describe('KEY_BINDINGS', () => {
       [key('a'), 'surface'],
       [key('q'), 'fence'],
       [key('y'), 'Structure'],
+      [key('F', { shiftKey: true }), 'Furniture layer'],
+      [key('C', { shiftKey: true }), 'Furniture'],
       [key('1'), 'level'],
       [key('3'), 'level'],
       [key('v'), 'view'],
