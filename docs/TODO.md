@@ -2,14 +2,14 @@
 
 Changes MK wants in the proposed design, not yet made in `scripts/example-plan.ts`.
 
-- [ ] Remove the double door (the 60" French doors, y 177..237) from the Living's west wall. The
-      wall is solid there.
-- [ ] Move the wood stove from the Living's south-west corner (centred y 280) to about where the
-      pine bookcase is now (west wall, y 138..174), near the removed double door. To settle when
-      this is done:
-  - Where the bookcase goes instead.
-  - The outside flue (docs/history/PLAN-v7-exterior-flue.md): the foyer's south wall meets the
-    house wall at y 158, so the chimney's route outside has to be planned again.
-  - The hearth runs 50" out from the wall and the sofa starts at x 58, so the Living's furniture
-    may have to move.
-  - With the double door gone, the screen porch is reached only from the foyer.
+Nothing open.
+
+## Done
+
+- [x] 15 Oct 2026: the double door (60" French doors) taken out of the Living's west wall; the wall
+      is closed there and the screen porch is reached from the foyer.
+- [x] 15 Oct 2026: the wood stove moved from the Living's south-west corner to the west wall just
+      south of where the double door was, centred y 256. By the bookcase (y 156) its outside
+      chimney would have risen in front of the Master's west window upstairs, so MK chose to slide
+      it south. The bookcase stays; the rocker moved to face the stove, and the screen porch's
+      chairs moved north, clear of the chimney.

@@ -118,7 +118,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // and the Guest's three-sash south window give way to a solid door and a two-sash window in the
     // same openings. Today's 48" Living doorway gives way to the wide Kitchen/Living opening. The
     // wing's east casement pair goes for the two windows flanking the master bedroom's king bed.
-    expect(count(all('openings'))).toEqual({ existing: 9, demo: 23, new: 31 });
+    // Nothing takes the place of the Living's west window: the stove stands there (MK, 15 Oct 2026).
+    expect(count(all('openings'))).toEqual({ existing: 9, demo: 23, new: 30 });
     // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
     // side and down the bank, with its landing, a deck) stays (MK). New: the grand stair's bottom
     // step, landing and straight run, and the master bedroom's deck; the stair hall's floor opening
@@ -149,7 +150,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // and label, the wing's north wall (it has no window), the wing's roof and its south window (a
     // sliding door replaces it), the east window into the new bedroom, the front room's walls with
     // the hall passage and the old bath's door, the front room's north window (the stair climbs in
-    // front of it), the Living's west window (replaced without shutters) and the old bath's north
+    // front of it), the Living's west window (the stove's wall now) and the old bath's north
     // window (the pantry's shelves line that wall). Upstairs, the two east windows (the wing's shed
     // rises past their sills; transoms replace them) and the Bunk's door with its wall.
     const f = plan.levels[plan.levelOrder[1]];
@@ -470,7 +471,7 @@ describe('docs/examples/146-mick-road.json', () => {
     }
   });
 
-  it('passes the code checks: guards, the grand stair and the structure; nine header notes', () => {
+  it('passes the code checks: guards, the grand stair and the structure; eight header notes', () => {
     expect(getIssues(plan).filter((i) => i.severity !== 'info').map((i) => `${i.code}: ${i.message}`)).toEqual([]);
     // Headers for the engineer: the new openings cut into existing bearing walls (the west wall and
     // the Kitchen/Living partition carry the upstairs ceiling beams' ends down from above). The
@@ -479,7 +480,6 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(getIssues(plan).map((i) => [plan.levels[i.levelId].name, i.code, i.at])).toEqual([
       ['First Floor', 'structure.wall-opening', { x: 314.5, y: 264 }],
       ['First Floor', 'structure.wall-opening', { x: 3.5, y: 118.5 }],
-      ['First Floor', 'structure.wall-opening', { x: 3.5, y: 207 }],
       ['First Floor', 'structure.wall-opening', { x: 170.5, y: 169.25 }],
       ['First Floor', 'structure.wall-opening', { x: 25, y: 3.5 }],
       ['First Floor', 'structure.wall-opening', { x: 459.5, y: 289 }],
@@ -896,8 +896,7 @@ describe('docs/examples/146-mick-road.json', () => {
       return face?.roomId ? f.rooms[face.roomId].name.replace(/ \(.*$/, '') : 'outside';
     };
     // The powder room's door swings out, into the stair hall (the Living's face; clear of its WC and
-    // vanity); the pantry's swings in; the French
-    // doors from the screen porch swing into the Living.
+    // vanity); the pantry's swings in. No door from the Living to the screen porch (MK, 15 Oct 2026).
     expect(doors.map((o) => `${o.width} ${into(o)}`).sort()).toEqual([
       '24 Living',
       '24 Pantry',
@@ -907,7 +906,6 @@ describe('docs/examples/146-mick-road.json', () => {
       '36 Foyer',
       '36 Screen porch',
       '36 outside',
-      '60 Living',
     ]);
     // The bedroom's way in stays where today's grey Kitchen to Utility door is (MK), but that door,
     // three by three clear lites over two panels, gives way to a solid one swinging into the bedroom.
@@ -916,8 +914,8 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([grey.phase, solid.offset, solid.width, solid.lites, solid.halfLite]).toEqual(['demo', grey.offset, 32, undefined, undefined]);
     // Interior doors are stained, not the house door's green.
     expect(doors.filter((o) => ['Master bath', 'Pantry', 'Master bedroom'].includes(into(o)) || o.width === 24).every((o) => o.leafColor === '#8a5a34')).toBe(true);
-    // The screen porch's lawn door at the west end of its south wall, clear of the stove's chimney
-    // (x -10..-2): you no longer step through it into the chimney.
+    // The screen porch's lawn door at the west end of its south wall (the stove's chimney, which it
+    // once had to clear, is now at the porch's north-east corner).
     const lawn = doors.find((o) => into(o) === 'outside')!;
     const lw = f.walls[lawn.wallId];
     const la = f.nodes[lw.a];
@@ -1257,7 +1255,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([69, 7]);
   });
 
-  it('has the wood stove in the Living\'s south-west corner on a stainless flue outside the house that clears the roof by the 3-2-10 rule, and no chimney', () => {
+  it('has the wood stove on the Living\'s west wall on a stainless flue outside the house that clears the roof by the 3-2-10 rule, and no chimney', () => {
     const [f, s] = [plan.levels[plan.levelOrder[1]], plan.levels[plan.levelOrder[2]]];
     const named = (lvl: Level, label: string) => Object.values(lvl.fixtures).find((x) => x.label === label && x.phase === 'new')!;
     const bounds = (poly: Vec2[]) => {
@@ -1265,41 +1263,51 @@ describe('docs/examples/146-mick-road.json', () => {
       const ys = poly.map((p) => p.y);
       return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
     };
-    // Back to the west wall (its inside face x 7), facing east, centred y 280: the stove 6" off a
-    // 3" stone surround, on a hearth 18" deeper than the stove and 8" wider each side.
-    expect(bounds(fixtureOutline(named(f, 'Wood stove')))).toEqual([13, 39, 268, 292]);
-    expect(bounds(fixtureOutline(named(f, 'Stone')))).toEqual([7, 10, 257, 303]);
-    expect(bounds(fixtureOutline(named(f, 'Hearth')))).toEqual([7, 57, 260, 300]);
-    expect(f.rooms[faceAt(getFaces(f, 'proposed'), { x: 26, y: 280 })!.roomId!].name).toBe('Living');
-    // 12"+ from the trim of the French doors to the screen porch (jambs y 177..237).
-    const west = Object.values(f.openings).find((o) => o.phase === 'new' && o.type === 'door' && o.width === 60)!;
-    const ww = f.walls[west.wallId];
-    const wa = f.nodes[ww.a];
-    const southJamb = wa.y + normalize(sub(f.nodes[ww.b], wa)).y * west.offset + west.width / 2;
-    expect(268 - (southJamb + trimOf(west))).toBeGreaterThanOrEqual(12);
+    // Back to the west wall (its inside face x 7), facing east, centred y 256 just south of where the
+    // French doors were (MK, 15 Oct 2026): the stove 6" off a 3" stone surround, on a hearth 18"
+    // deeper than the stove and 8" wider each side.
+    expect(bounds(fixtureOutline(named(f, 'Wood stove')))).toEqual([13, 39, 244, 268]);
+    expect(bounds(fixtureOutline(named(f, 'Stone')))).toEqual([7, 10, 233, 279]);
+    expect(bounds(fixtureOutline(named(f, 'Hearth')))).toEqual([7, 57, 236, 276]);
+    expect(f.rooms[faceAt(getFaces(f, 'proposed'), { x: 26, y: 256 })!.roomId!].name).toBe('Living');
+    // The Living's west wall is closed: no new opening in it south of the house door.
+    const westOpenings = Object.values(f.openings).filter((o) => {
+      if (o.phase !== 'new') return false;
+      const w = f.walls[o.wallId];
+      const [a, b] = [f.nodes[w.a], f.nodes[w.b]];
+      return a.x === 3.5 && b.x === 3.5 && a.y + normalize(sub(b, a)).y * o.offset > 140;
+    });
+    expect(westOpenings).toEqual([]);
     // Inside, a black connector from the stove's top up to an elbow, and the stovepipe west into the
     // wall thimble over the stone (centre 66" up): it goes through no floor or ceiling.
     const flues = Object.values(plan.site.columns).filter((c) => c.kind === 'flue');
     expect(flues).toHaveLength(2);
     const connector = flues.find((c) => !c.cap)!;
-    expect(connector).toMatchObject({ at: { x: 19, y: 280 }, width: 8, phase: 'new', color: '#26241f', base: 2 + 31, top: 2 + 70 });
+    expect(connector).toMatchObject({ at: { x: 19, y: 256 }, width: 8, phase: 'new', color: '#26241f', base: 2 + 31, top: 2 + 70 });
     expect(connector.top).toBeLessThan(getLevelElevations(plan)[f.id].ceiling);
-    expect(bounds(fixtureOutline(named(f, 'Stovepipe')))).toEqual([7, 19, 276, 284]);
+    expect(bounds(fixtureOutline(named(f, 'Stovepipe')))).toEqual([7, 19, 252, 260]);
     expect(named(f, 'Stovepipe')).toMatchObject({ elevation: 62, height: 8 });
     // Outside, the chimney: a round stainless pipe 2" clear of the siding (the wall's outside face is
     // x 0), straight up from its tee in the screen porch, capped; no chase upstairs.
     const flue = flues.find((c) => c.cap)!;
-    expect(flue).toMatchObject({ at: { x: -6, y: 280 }, width: 8, phase: 'new', cap: true, base: 2 + 56 });
+    expect(flue).toMatchObject({ at: { x: -6, y: 256 }, width: 8, phase: 'new', cap: true, base: 2 + 56 });
     expect(-(flue.at.x + flue.width / 2)).toBe(2);
-    expect(bounds(fixtureOutline(named(f, 'Tee')))).toEqual([-6, 0, 276, 284]);
-    expect(f.rooms[faceAt(getFaces(f, 'proposed'), { x: -6, y: 280 })!.roomId!].name).toBe('Screen porch (proposed)');
+    expect(bounds(fixtureOutline(named(f, 'Tee')))).toEqual([-6, 0, 252, 260]);
+    expect(f.rooms[faceAt(getFaces(f, 'proposed'), { x: -6, y: 256 })!.roomId!].name).toBe('Screen porch (proposed)');
     expect(Object.values(s.fixtures).filter((x) => x.phase === 'new' && /chase/i.test(x.label ?? ''))).toEqual([]);
-    // 3-2-10: 3' above where it leaves the roof (the rake overhang), 2' above the roof 10' up the
-    // slope (toward the ridge).
+    // It rises up the gable wall clear of the Master's west window upstairs, its trim and its south
+    // shutter, 2" or more.
+    const upWest = Object.values(s.openings).find((o) => o.shutters && s.nodes[s.walls[o.wallId].a].x === 3.5 && s.nodes[s.walls[o.wallId].b].x === 3.5)!;
+    const uw = s.walls[upWest.wallId];
+    const ua = s.nodes[uw.a];
+    const upSouth = ua.y + normalize(sub(s.nodes[uw.b], ua)).y * upWest.offset + upWest.width / 2 + trimOf(upWest) + shutterWidth(upWest.width, upWest.sashes);
+    expect(flue.at.y - flue.width / 2 - upSouth).toBeGreaterThanOrEqual(2);
+    // 3-2-10: 3' above where it leaves the roof (the rake overhang), 2' above any roof within 10'
+    // (the ridge, y 157.5, 98 1/2" away).
     const main = Object.values(s.roofs)[0];
     const top = (p: Vec2) => getLevelElevations(plan)[s.id].floorTop + roofHeightAt(main, roofBearing(s.wallHeight, main), p)! + main.thickness;
     expect(flue.top - top(flue.at)).toBeGreaterThanOrEqual(36);
-    expect(flue.top - top({ x: flue.at.x, y: 280 - 120 })).toBeGreaterThanOrEqual(24 - 0.01);
+    for (const y of [256 - 120, 157.5]) expect(flue.top - top({ x: flue.at.x, y })).toBeGreaterThanOrEqual(24 - 0.01);
     // The masonry chimney is demolished.
     expect(Object.values(plan.site.columns).filter((c) => c.kind === 'chimney').map((c) => c.phase)).toEqual(['demo']);
   });

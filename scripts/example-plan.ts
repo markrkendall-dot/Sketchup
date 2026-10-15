@@ -919,8 +919,8 @@ function demolish(levelId: Id, d: { walls?: Vec2[]; openings?: Id[]; stairs?: Id
  * windows) with a laundry closet in its bath; the old front room and the Bunk over it one stair
  * hall open through both floors, with a straight stair up the north wall and a powder room under
  * its high end; a walk-in pantry in a band along the north wall, north of the kitchen, the range on
- * its wall venting through it; a wood stove in the Living's
- * south-west corner on a stainless flue (the masonry chimney goes); a full bath across the second
+ * its wall venting through it; a wood stove on the Living's
+ * west wall on a stainless flue (the masonry chimney goes); a full bath across the second
  * floor's north-east; and a foyer with a screen porch on the west face in place of the entry porch.
  * Everything is demolished first, so the existing openings are clamped against the proposed walls
  * only once, and none of them moves: a new wall never meets an existing one inside an opening.
@@ -944,7 +944,8 @@ function proposed(ids: ExistingIds): void {
   // and the old bath are one floor for the stair hall, the north band and the kitchen. The stair,
   // the house door and the front room's north window (the new stair climbs in front of it). The
   // Living's west window: its north shutter would sit inside the foyer, against the new door's
-  // trim, so a window without shutters replaces it. The old bath's north window (the pantry's shelves
+  // trim, and the wood stove stands in front of where it was (MK, 15 Oct 2026), so the wall is
+  // closed there. The old bath's north window (the pantry's shelves
   // line that wall). The old fixtures: the Kitchen's casework, the Bath's, the
   // Utility's, and the wood stove with the pipe chase behind it. Today's grey Kitchen to Utility door
   // (3 x 3 clear lites over two panels): it becomes the master bedroom's door, so a solid one takes
@@ -1105,15 +1106,13 @@ function proposed(ids: ExistingIds): void {
   // 2 x 1 lites, sill 70 (head 88), high over the coat bench under it.
   add({ x: fy.west, y: 118.5 }, { type: 'door', width: 36, height: 80, into: EAST, ...halfLite });
   add({ x: (fy.west + CL.x0) / 2, y: fy.north }, { type: 'window', width: 60, height: 18, sill: 70, sashes: 2, lites: { cols: 2, rows: 1 } });
-  // In place of the Living's west window, which only looks into the screen porch, 60" French doors
-  // (the livability review): the porch becomes a summer room off the Living and its way to the lawn
-  // and the lake. Two glazed leaves of 3 x 5 lites swinging into the Living, y 177..237: 23" clear of
-  // the hearth (y 260) and 43" from the stovepipe's thimble (y 280).
-  add({ x: CL.x0, y: 207 }, { type: 'door', width: 60, height: 80, sashes: 2, lites: { cols: 3, rows: 5 }, into: EAST, leafColor: DOOR_GREEN });
+  // No door from the Living to the screen porch (MK, 15 Oct 2026: the livability review's 60" French
+  // doors there are gone, and the wood stove has that wall): the porch is reached from the foyer.
   // Screen porch: screens above 36" knee walls, two 56" bays in the west wall either side of the
   // middle post and one 44" in the south wall; screen doors from the foyer and out to the lawn. The
-  // lawn door is at the south wall's west end (x -86..-50) and the screen at its east end, so you do
-  // not step through the door into the stove's chimney (x -10..-2, 24" inside the wall).
+  // lawn door is at the south wall's west end (x -86..-50) and the screen at its east end (it was
+  // put there to keep clear of the stove's chimney when the stove stood in the Living's south-west
+  // corner; the chimney is now at the porch's north-east corner, and the door stays).
   const screen = { type: 'window' as const, height: 44, sill: 36, glazing: 'screen' as const, trim: 0 };
   add({ x: fy.west, y: 199 }, { ...screen, width: 56 });
   add({ x: fy.west, y: 273 }, { ...screen, width: 56 });
@@ -1244,11 +1243,12 @@ function proposed(ids: ExistingIds): void {
   const foyerNorth = FOYER.y0 + T;
   furnish(fId, 'coatBench', { x: (fy.west + CL.x0) / 2, y: foyerNorth }, 90, { width: CL.x0 - HALF - (fy.west + HALF), depth: 18, height: 66, builtIn: true });
   // The screen porch (MK, 15 Oct 2026): two green Adirondack chairs facing the lake (south), a side
-  // table between them, x -84..-2, y 226..260: clear of the foyer's screen door swing (to y 194),
-  // the way to the lawn door (x -86..-50 at the south wall) and the stove's tee (y 276..284).
-  furnish(fId, 'adirondackChair', { x: -69, y: 226 }, 90);
-  furnish(fId, 'sideTable', { x: -43, y: 234 }, 90, { width: 18, depth: 18, wood: 'paintedGreen' });
-  furnish(fId, 'adirondackChair', { x: -17, y: 226 }, 90);
+  // table between them, x -84..-2, y 198..232: clear of the foyer's screen door swing (to y 194),
+  // the way to the lawn door (x -86..-50 at the south wall) and the stove's chimney and tee (x
+  // -10..0, y 252..260).
+  furnish(fId, 'adirondackChair', { x: -69, y: 198 }, 90);
+  furnish(fId, 'sideTable', { x: -43, y: 206 }, 90, { width: 18, depth: 18, wood: 'paintedGreen' });
+  furnish(fId, 'adirondackChair', { x: -17, y: 198 }, 90);
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
   // ---- The Adirondack entry and screen porch (MK; docs/history/PLAN-v10-adirondack.md; sizes are
@@ -1458,14 +1458,14 @@ function proposed(ids: ExistingIds): void {
   // from the house door to the kitchen; a Navajo rug before it (x 60..156, y 196..268, clear of the
   // hearth at x 57); a peeled-log coffee table on it; a plaid armchair facing west at the kitchen
   // opening's south end (x 132..166, y 222..256); a hickory rocker facing the stove 36" from its
-  // front (x 75..109, y 268..292); a pine bookcase on the west wall between the house door's swing
-  // (to y 134.5) and the French doors (from y 177), y 138..174; an iron floor lamp at the sofa's west
-  // end and a side table at its east end.
+  // front (x 75..109, y 244..268); a pine bookcase on the west wall between the house door's swing
+  // (to y 134.5) and the stove's stone (from y 233), y 138..174; an iron floor lamp at the sofa's
+  // west end and a side table at its east end.
   furnish(fId, 'rug', { x: 108, y: 196 }, 90, { width: 96, depth: 72, fabric: 'navajo' });
   furnish(fId, 'sofa', { x: 100, y: 158 }, 90);
   furnish(fId, 'coffeeTable', { x: 108, y: 214 }, 90);
   furnish(fId, 'armchair', { x: 166, y: 239 }, 180, { fabric: 'woolPlaid' });
-  furnish(fId, 'rocker', { x: 109, y: 280 }, 180);
+  furnish(fId, 'rocker', { x: 109, y: 256 }, 180);
   furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 156 }, 0, { width: 36 });
   furnish(fId, 'floorLamp', { x: 48, y: 160 }, 90);
   furnish(fId, 'sideTable', { x: 154, y: 166 }, 90);
@@ -1559,13 +1559,16 @@ function proposed(ids: ExistingIds): void {
   alarm(sId, { x: 196, y: 105 }, 'Smoke/CO');
   alarm(bId, { x: MAIN.x1 / 2, y: MAIN.y1 / 2 + 24 }, 'Smoke');
 
-  // ---- 8. The wood stove (MK, 14 Oct 2026), in the Living's south-west corner with its back to the
-  // west wall, facing east into the room, centred y 280: a stone hearth 50" out from the wall and
-  // 40" wide (y 260..300, 18" in front of the stove, 8" each side), a 3" stone surround on the wall
-  // behind it (46" wide, to 60" up), and the stove 24" wide, 26" deep, 30" high, 6" off the surround.
-  // It is clear of the west window's trim (y 162..252) and beside the lake window's west end (that
-  // window starts 8 1/2" from the corner). Its stove's listed clearances decide the final spacing.
-  const STOVE = { y: 280 };
+  // ---- 8. The wood stove (MK, 14 Oct 2026; moved north on 15 Oct 2026 from the Living's south-west
+  // corner, the French doors gone), its back to the Living's west wall, facing east into the room,
+  // centred y 256, just south of where the French doors were (y 177..237): a stone hearth 50" out
+  // from the wall and 40" wide (y 236..276, 18" in front of the stove, 8" each side), a 3" stone
+  // surround on the wall behind it (46" wide, y 233..279, to 60" up), and the stove 24" wide, 26"
+  // deep, 30" high, 6" off the surround. MK asked for it where the bookcase is (y 138..174), but the
+  // chimney outside rises up the gable wall, and north of y 256 it would pass in front of the
+  // Master's west window upstairs (y 176..224, its trim and 18" shutters to y 246); MK chose to
+  // slide the stove south. Its stove's listed clearances decide the final spacing.
+  const STOVE = { y: 256 };
   const STONE = '#7d7a73';
   kitchen({ kind: 'box', label: 'Hearth', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 40, depth: 50, height: 1, frontColor: STONE });
   kitchen({ kind: 'box', label: 'Stone', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 46, depth: 3, height: 59, elevation: 1, frontColor: STONE });
@@ -1576,10 +1579,11 @@ function proposed(ids: ExistingIds): void {
   // wall thimble over the stone (centre 66" up): it passes through no floor or ceiling, and the
   // bedroom upstairs needs no chase. Outside, an insulated 6" chimney (UL 103 HT, 8" outside) starts
   // at a tee with a cleanout below the thimble, 2" clear of the siding (x -10..-2), and rises
-  // straight (no offsets) in the screen porch's south-east corner, through the porch's shed roof by
-  // the house wall, up the gable wall and through the main roof's 24" rake overhang, with a rain cap.
-  // Its top follows the 3-2-10 rule: 3' over where it leaves the roof, and 2' over any roof within
-  // 10' (the roof 10' up the slope); that leaves 7' over the rake, braced to the roof.
+  // straight (no offsets) on the screen porch's east side (y 252..260, 6" south of the upstairs
+  // window's south shutter), through the porch's shed roof by the house wall, up the gable wall and
+  // through the main roof's 24" rake overhang 98 1/2" south of the ridge, with a rain cap. Its top follows the
+  // 3-2-10 rule: 3' over where it leaves the roof, and 2' over any roof within 10' (here the ridge),
+  // braced to the roof.
   const THIMBLE = 66;
   const COLLAR = { x: CL.x0 + HALF + 12, y: STOVE.y };
   const FLUE = { x: MAIN.x0 - 2 - 4, y: STOVE.y };
@@ -1593,7 +1597,10 @@ function proposed(ids: ExistingIds): void {
     if (under === null) throw new Error(`no roof over ${JSON.stringify(p)}`);
     return secondTop + under + mainRoof.thickness;
   };
-  const flueTop = round2(Math.max(roofTop(FLUE) + 36, roofTop({ x: FLUE.x, y: FLUE.y - ft(10) }) + 24));
+  // The highest roof within 10': the ridge (y MAIN.y1 / 2) or either end of the 10' reach, where
+  // they are over the house.
+  const near = [FLUE.y - ft(10), MAIN.y1 / 2, FLUE.y + ft(10)].filter((y) => Math.abs(y - FLUE.y) <= ft(10) && y >= MAIN.y0 && y <= MAIN.y1);
+  const flueTop = round2(Math.max(roofTop(FLUE) + 36, ...near.map((y) => roofTop({ x: FLUE.x, y }) + 24)));
   if (!store().addColumn({ at: FLUE, kind: 'flue', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP + THIMBLE - 10, top: flueTop, cap: true })) throw new Error('flue rejected');
 
   // ---- 9. The second floor's full bath (MK, 14 and 15 Oct 2026), across the north-east, east of the

@@ -824,15 +824,19 @@ where the built design differs from them):
 
    About 18'7" of counter in all. The cabinet colour, the counter colour and the fronts are the
    First Floor's casework defaults: change them in the Level panel, or per cabinet in its panel.
-6. **Wood stove** (MK) in the Living's **south-west corner**, its back to the west wall, facing east
-   into the room: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it,
-   clear of the west window and beside the lake window's west end. Its flue runs **outside the
+6. **Wood stove** (MK) on the Living's **west wall**, just south of where the French doors were
+   (moved there from the south-west corner on 15 Oct 2026), its back to the wall, facing east into
+   the room, centred 21'4" from the north wall's outside face: a stone hearth 4'2" x 3'4", a stone
+   surround behind it and the stove 6" off it. MK asked for it by the bookcase, but its chimney
+   outside would then rise in front of the Master's west window upstairs; MK chose to slide it
+   south until the chimney clears that window's shutters. Its flue runs **outside the
    house** (MK), to the 2025 Residential Code of New York State: a black double-wall stovepipe
    rises from the stove and turns west into a listed wall thimble over the stone; outside, an
    insulated **stainless chimney** (8", an insulated 6" chimney, UL 103 Type HT) rises straight from
-   a tee with a cleanout, 2" off the siding, in the screen porch's south-east corner, through the
+   a tee with a cleanout, 2" off the siding, on the screen porch's east side, through the
    porch roof, up the gable wall and through the main roof's rake overhang, with a rain cap. It
-   stands 7' over the rake, 2' higher than the roof 10' up the slope (the 3-2-10 rule). Nothing
+   comes out of the rake 8'2" south of the ridge and stands about 6' over it, 2' higher than the
+   ridge (the 3-2-10 rule). Nothing
    passes through the bedroom upstairs. The code checklist is in
    `docs/history/PLAN-v7-exterior-flue.md`. The **masonry chimney** on the north wall is
    demolished.
@@ -849,10 +853,10 @@ where the built design differs from them):
    driveway than first drawn) with the 36" front door in
    line with the house door, under a gable facing west, and south of it a screen porch (13'1" x 8')
    with screens above knee walls, two screen doors and a shed roof high at the house wall. The
-   Living's west window, which would only look into the porch, becomes **60" French doors** (two
-   glazed leaves swinging into the Living), so the porch is a summer room off the Living and its way
-   to the lawn and the lake. The porch's lawn door is at the west end of its south wall, clear of
-   the stove's chimney in its south-east corner. For coats (there is no closet under the stair), a
+   Living's west window, which would only look into the porch, goes and the wall is closed (the
+   stove stands there); the porch is reached from the foyer. (The livability review's 60" French
+   doors from the Living were taken out on 15 Oct 2026, MK.) The porch's lawn door is at the west
+   end of its south wall. For coats (there is no closet under the stair), a
    **transom** high in the foyer's north wall facing the driveway (60" x 18", sill 70") and under
    it a **built-in coat bench** wall to wall in Nordic pine: boot cubbies under a cushioned seat, a
    beadboard back, iron hooks at 58", a shelf along the top 4" under the transom. The foyer's
@@ -927,8 +931,8 @@ where the built design differs from them):
 13. **Furniture** (MK, 15 Oct 2026; Adirondack camp style, on the furniture layer, Shift+F):
     - the **Living**: a peeled-log sofa in red buffalo check facing the lake window and the stove,
       a Navajo rug before it with a log coffee table, a wool-plaid armchair at the kitchen opening,
-      a hickory rocker 3' from the stove, a pine bookcase between the house door and the French
-      doors, an iron floor lamp and a side table;
+      a hickory rocker 3' from the stove, a pine bookcase between the house door and the stove, an
+      iron floor lamp and a side table;
     - the **kitchen**: the pine farm table and four hickory ladder-back chairs with cane seats;
     - the **foyer**: the built-in coat bench (shown with the furniture layer off too); the **screen porch**: two green Adirondack
       chairs and a side table facing the lake;
@@ -957,7 +961,8 @@ daily life, and what changed:
   each bedroom now has one (items 1 and 3).
 - **A way out of the Guest room in a fire**: its south window re-sashed (item 3).
 - **The upstairs bath**: its shower could not be stepped into; re-laid out (item 7).
-- **The porch** was reached only through the foyer: French doors from the Living (item 8).
+- **The porch** was reached only through the foyer: French doors from the Living (item 8), since
+  taken out for the stove (MK, 15 Oct 2026).
 - **Privacy**: a solid door to the main-floor bedroom (item 1).
 - **Counter**: a 24" base by the pantry door (item 5); later the east wall's run (MK) took it to
   about 18'7".
@@ -1024,8 +1029,7 @@ the engineer, the trades and the tape measure):
 - **While walls come out**: temporary shoring walls on both sides of a bearing wall before it is
   cut, carried down to the basement floor (onto the girders' lines) as well, not left on the
   first floor's joists.
-- The headers noted HDR on the structure overlay: the wide opening in the partition, the French
-  doors to the porch, the two First Floor north windows and the stair hall's upper north window
+- The headers noted HDR on the structure overlay: the wide opening in the partition, the two First Floor north windows and the stair hall's upper north window
   (and the bedroom's door and the Guest's window, which go in today's openings).
 
 **MK, the engineer and the builder** (the Adirondack entry)
@@ -1034,8 +1038,8 @@ the engineer, the trades and the tape measure):
 
 **The trades and the makers' instructions**
 - The stove and its chimney: the stove's listing and the chimney maker's instructions set the
-  clearances (to the west window's trim, to the surround), the thimble, the supports and the top,
-  and win over the plan's numbers; the chimney's 7' over the rake needs a roof brace, and where it
+  clearances (to the surround, to the furniture), the thimble, the supports and the top, and win
+  over the plan's numbers; the chimney's 6' over the rake needs a roof brace, and where it
   passes the porch roof 6" from the house wall the flashing has to be worked into the wall's. See
   `docs/history/PLAN-v7-exterior-flue.md`.
 - The alarms: hard-wired and interconnected or not (exceptions in alterations), for the electrician

@@ -1917,7 +1917,8 @@ the staircase layout closes the gap over each with a panel, and the script throw
 not empty. Its door is 24" x 76", the height the underside leaves.
 
 The livability review (docs/history/PLAN-v12-livability.md) adds a closet to each bedroom, re-lays the
-upstairs bath, turns the Living's west window into French doors to the screen porch, hangs a solid door
+upstairs bath, turns the Living's west window into French doors to the screen porch (taken out again on
+15 Oct 2026 for the wood stove, MK), hangs a solid door
 in the main-floor bedroom's opening and re-sashes the Guest's south window. `example.test.ts` checks the
 bath's fixture clearances (15" to a WC's centre, 21" in front, R307.1) and that the Guest's window has
 sashes over 20" clear with a sill at most 44" (R310). Replacing a door or a window in the same opening is
@@ -1939,8 +1940,8 @@ the laundry closet in the master bath; the stove's boxes on the First Floor; and
 the house (PLAN-v7-exterior-flue.md), its black connector (an uncapped flue column from the stove's
 top, and a box into the west wall), the tee (a box in the screen porch) and its flue column outside
 the west wall (`kind: 'flue'`, capped, 2" off the siding), whose top the script sets by the 3-2-10
-rule from the main roof (`roofHeightAt`: 3' over the rake where it passes, 2' over the roof 10' up
-the slope);
+rule from the main roof (`roofHeightAt`: 3' over the rake where it passes, 2' over the highest roof
+within 10', here the ridge);
 the chimney column demolished (`setPhase` with `columns`); and the upstairs bath, whose new wall is
 drawn before the old bath's east wall is demolished, so the stub of that wall south of it stays.
 `example.test.ts` checks the stair's risers, treads and landings against the floor to floor, the
