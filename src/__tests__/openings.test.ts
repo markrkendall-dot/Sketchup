@@ -347,20 +347,42 @@ describe('opening geometry', () => {
     const sym = openingSymbol(g, { type: 'door', offset: 60, width: 36, swing: { hinge: 'a', side: 'left' } });
     expect([sym.j0, sym.j1]).toEqual([42, 78]);
     // Left of a->b along +x is -y on the plan.
-    expect(sym.leaf).toEqual([
-      { x: 42, y: -3 },
-      { x: 42, y: -39 },
+    expect(sym.leaves).toEqual([
+      [
+        { x: 42, y: -3 },
+        { x: 42, y: -39 },
+      ],
     ]);
-    expect(sym.arc).toMatchObject({ from: { x: 42, y: -39 }, to: { x: 78, y: -3 }, r: 36 });
+    expect(sym.arcs).toHaveLength(1);
+    expect(sym.arcs[0]).toMatchObject({ from: { x: 42, y: -39 }, to: { x: 78, y: -3 }, r: 36 });
     const right = openingSymbol(g, { type: 'door', offset: 60, width: 36, swing: { hinge: 'b', side: 'right' } });
-    expect(right.leaf![0]).toEqual({ x: 78, y: 3 });
-    expect(right.leaf![1]).toEqual({ x: 78, y: 39 });
+    expect(right.leaves[0][0]).toEqual({ x: 78, y: 3 });
+    expect(right.leaves[0][1]).toEqual({ x: 78, y: 39 });
+  });
+
+  it('a double door hangs a half-width leaf on each jamb, both swinging to its side, meeting in the middle', () => {
+    const sym = openingSymbol(g, { type: 'door', offset: 60, width: 60, sashes: 2, swing: { hinge: 'a', side: 'left' } });
+    expect([sym.j0, sym.j1]).toEqual([30, 90]);
+    expect(sym.leaves).toEqual([
+      [
+        { x: 30, y: -3 },
+        { x: 30, y: -33 },
+      ],
+      [
+        { x: 90, y: -3 },
+        { x: 90, y: -33 },
+      ],
+    ]);
+    expect(sym.arcs.map((a) => [a.center.x, a.to.x, a.r])).toEqual([
+      [30, 60, 30],
+      [90, 60, 30],
+    ]);
   });
 
   it('a sliding door: two panels a third of the way out either side of the centerline, overlapping 2" at the middle; no leaf or swing', () => {
     const sym = openingSymbol(g, { type: 'door', offset: 60, width: 72, swing: { hinge: 'a', side: 'left' }, sliding: true });
     expect([sym.j0, sym.j1]).toEqual([24, 96]);
-    expect([sym.leaf, sym.arc]).toEqual([null, null]);
+    expect([sym.leaves, sym.arcs]).toEqual([[], []]);
     // Left of a->b along +x is -y on the plan; the wall is 6" thick, so the tracks are 1" out.
     expect(sym.lines).toEqual([
       [

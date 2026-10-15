@@ -237,7 +237,7 @@ function OpeningGhost({ preview, v, denom }: { preview: OpeningPreview; v: Viewp
   const g = preview.geom;
   const map = (p: Vec2) => worldToScreen(v, p);
   const sym = openingSymbol(g, preview.opening);
-  const segs = [...sym.lines, ...sym.dashed, ...(sym.leaf ? [sym.leaf] : [])]
+  const segs = [...sym.lines, ...sym.dashed, ...sym.leaves]
     .map(([p, q]) => {
       const a = map(p);
       const b = map(q);
@@ -254,7 +254,9 @@ function OpeningGhost({ preview, v, denom }: { preview: OpeningPreview; v: Viewp
     <g className={cls}>
       <polygon className="opening-ghost-gap" points={pts(sym.gap.map(map))} />
       {segs && <path className="opening-ghost-line" d={segs} />}
-      {sym.arc && <path className="opening-ghost-line" d={arcPath(sym.arc, map, sym.arc.r * v.k)} />}
+      {sym.arcs.map((a, i) => (
+        <path key={i} className="opening-ghost-line" d={arcPath(a, map, a.r * v.k)} />
+      ))}
       <DimLine
         a={at(g.s0)}
         b={at(sym.j0)}

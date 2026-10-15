@@ -1132,7 +1132,9 @@ one in the outside half of the leaf's 1.75" and the other in the inside half, wi
 bottom rail round a pane with the lite grid per panel (1 x 1 by default, one pane) or a screen; `sashes` and
 `halfLite` do not apply. On the plan (`openingSymbol`) it is two lines, one per panel, a third of the wall's
 thickness out from the centerline either side, with no leaf and no swing arc; its swing is kept but not drawn, and
-the dimension labels and Fit ignore it. Passages stay open.
+the dimension labels and Fit ignore it. Passages stay open. A swinging door is drawn on the plan with its leaf
+and swing arc from the hinge jamb (`leaves`, `arcs`); a double door (`sashes` 2) with a half-width leaf and arc
+on each jamb, both to the swing's side, meeting in the middle.
 The outside is found by `outwardSide`: the side of the wall with no closed room beside it when the other has one
 (`facesBesideWall`), else the side facing away from the level's node centroid. `getLevelMeshes` returns
 `openings: OpeningMesh[]` (id, type, phase, `leafColor` after its default, and one geometry per part: `trim`, `sash`,
@@ -1840,6 +1842,14 @@ The powder room under the stair's high end is three partitions with a `heightOve
 the run's framed underside (`getStaircaseLayout(...).undersides`, floored to 1/4") so none rises into it;
 the staircase layout closes the gap over each with a panel, and the script throws if `wallsThrough` is
 not empty. Its door is 24" x 76", the height the underside leaves.
+
+The livability review (docs/history/PLAN-v12-livability.md) adds a closet to each bedroom, re-lays the
+upstairs bath, turns the Living's west window into French doors to the screen porch, hangs a solid door
+in the main-floor bedroom's opening and re-sashes the Guest's south window. `example.test.ts` checks the
+bath's fixture clearances (15" to a WC's centre, 21" in front, R307.1) and that the Guest's window has
+sashes over 20" clear with a sill at most 44" (R310). Replacing a door or a window in the same opening is
+a demolished opening and a new one on the same centre; openings of the two phases never coexist, so they
+may overlap.
 
 The proposed layout of PLAN-v6-layout.md, with MK's stair of 15 Oct 2026: the stair hall's stair (a
 one-riser bottom step 10 3/8" deep, a one-riser landing in the north-west corner, then one straight

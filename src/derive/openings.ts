@@ -29,10 +29,18 @@ export interface OpeningSymbol {
   lines: Seg[];
   /** Dashed lines (passage header). */
   dashed: Seg[];
-  /** Door leaf from the hinge, perpendicular to the wall. */
-  leaf: Seg | null;
-  /** Door swing arc from the leaf tip to the strike jamb, centered on the hinge. */
-  arc: { from: Vec2; to: Vec2; center: Vec2; r: number; sweep: 0 | 1 } | null;
+  /** Door leaves, each from its hinge, perpendicular to the wall: one, or two for a double door. */
+  leaves: Seg[];
+  /** Each leaf's swing arc from its tip to where it closes, centered on its hinge. */
+  arcs: SwingArc[];
+}
+
+export interface SwingArc {
+  from: Vec2;
+  to: Vec2;
+  center: Vec2;
+  r: number;
+  sweep: 0 | 1;
 }
 
 /** Point at distance s along the centerline and `off` along the left normal. */
@@ -45,7 +53,7 @@ export const displayCenter = (g: WallGeom, o: Pick<Opening, 'offset' | 'width'>)
 
 export function openingSymbol(
   g: WallGeom,
-  o: Pick<Opening, 'type' | 'offset' | 'width' | 'swing' | 'sliding'>,
+  o: Pick<Opening, 'type' | 'offset' | 'width' | 'swing' | 'sliding' | 'sashes'>,
 ): OpeningSymbol {
   const center = displayCenter(g, o);
   const w = Math.min(o.width, g.s1 - g.s0);
@@ -53,7 +61,7 @@ export function openingSymbol(
   const j1 = center + w / 2;
   const h = g.thickness / 2;
   const gap: OpeningSymbol['gap'] = [wallPoint(g, j0, h), wallPoint(g, j1, h), wallPoint(g, j1, -h), wallPoint(g, j0, -h)];
-  const sym: OpeningSymbol = { center, j0, j1, gap, lines: [], dashed: [], leaf: null, arc: null };
+  const sym: OpeningSymbol = { center, j0, j1, gap, lines: [], dashed: [], leaves: [], arcs: [] };
   if (o.type === 'window') {
     for (const off of [h, 0, -h]) sym.lines.push([wallPoint(g, j0, off), wallPoint(g, j1, off)]);
   } else if (o.type === 'passage') {
@@ -67,24 +75,23 @@ export function openingSymbol(
   } else {
     const swing = o.swing ?? { hinge: 'a', side: 'left' };
     const side = swing.side === 'left' ? 1 : -1;
-    const [sh, sj] = swing.hinge === 'a' ? [j0, j1] : [j1, j0];
-    const hinge = wallPoint(g, sh, side * h);
-    const tip = add(hinge, scale(g.normal, side * w));
-    const strike = wallPoint(g, sj, side * h);
-    sym.leaf = [hinge, tip];
-    sym.arc = {
-      from: tip,
-      to: strike,
-      center: hinge,
-      r: w,
-      sweep: cross(sub(tip, hinge), sub(strike, hinge)) > 0 ? 1 : 0,
-    };
+    // A double door (two leaves) hangs a half-width leaf on each jamb, meeting in the middle.
+    const mid = (j0 + j1) / 2;
+    const hung: [number, number][] = o.sashes === 2 ? [[j0, mid], [j1, mid]] : [swing.hinge === 'a' ? [j0, j1] : [j1, j0]];
+    for (const [sh, sj] of hung) {
+      const r = Math.abs(sj - sh);
+      const hinge = wallPoint(g, sh, side * h);
+      const tip = add(hinge, scale(g.normal, side * r));
+      const strike = wallPoint(g, sj, side * h);
+      sym.leaves.push([hinge, tip]);
+      sym.arcs.push({ from: tip, to: strike, center: hinge, r, sweep: cross(sub(tip, hinge), sub(strike, hinge)) > 0 ? 1 : 0 });
+    }
   }
   return sym;
 }
 
 /** SVG path for an opening symbol's arc. */
-export const arcPath = (arc: NonNullable<OpeningSymbol['arc']>, map: (p: Vec2) => Vec2 = (p) => p, r = arc.r): string => {
+export const arcPath = (arc: SwingArc, map: (p: Vec2) => Vec2 = (p) => p, r = arc.r): string => {
   const f = map(arc.from);
   const t = map(arc.to);
   return `M${f.x},${f.y}A${r},${r} 0 0 ${arc.sweep} ${t.x},${t.y}`;
@@ -175,15 +182,13 @@ export function hitOpeningRect(g: WallGeom, o: Opening, p: Vec2, margin: number)
 /** True when p is on a door's leaf or swing arc (within pickRadius). */
 export function hitOpeningSwing(g: WallGeom, o: Opening, p: Vec2, pickRadius: number): boolean {
   const sym = openingSymbol(g, o);
-  if (sym.leaf) {
-    const [hinge, tip] = sym.leaf;
+  for (const [hinge, tip] of sym.leaves) {
     const d = sub(tip, hinge);
     const len2 = dot(d, d);
     const t = Math.max(0, Math.min(1, dot(sub(p, hinge), d) / len2));
     if (dist(p, add(hinge, scale(d, t))) <= pickRadius) return true;
   }
-  if (sym.arc) {
-    const { center, from, to, r } = sym.arc;
+  for (const { center, from, to, r } of sym.arcs) {
     const v = sub(p, center);
     // Inside the quarter: between the leaf direction and the wall direction toward the strike.
     if (Math.abs(dist(p, center) - r) <= pickRadius && dot(v, sub(from, center)) >= -1e-9 && dot(v, sub(to, center)) >= -1e-9)

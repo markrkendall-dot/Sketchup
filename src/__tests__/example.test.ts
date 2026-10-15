@@ -70,6 +70,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(names(ls, 'existing')).toEqual(['Bath', 'Bunk', 'Guest (11\'5" adjusted)', 'Master', 'Master closet', 'Office / hall (11\'11" adjusted)']);
     expect(names(lb, 'proposed')).toEqual(['Basement (unpartitioned, est.)', 'Crawl space (proposed)', 'Crawl space under the foyer (proposed)', 'Utility (below)']);
     expect(names(lf, 'proposed')).toEqual([
+      'Bedroom closet (proposed)',
       'Foyer (proposed)',
       'Kitchen (17\'2" adjusted: re-measure)',
       'Laundry (proposed)',
@@ -82,8 +83,8 @@ describe('docs/examples/146-mick-road.json', () => {
     ]);
     // Upstairs the Bunk is the stair hall's upper half (open to below) and the old bath the stair's
     // top landing; the new bath is east of it; there is no hall (the Guest takes the Office); the
-    // rest keep their names.
-    expect(names(ls, 'proposed')).toEqual(['Bath (proposed)', 'Guest (11\'5" adjusted)', 'Landing (proposed)', 'Master', 'Master closet']);
+    // rest keep their names. The Master and the Guest get closets (the livability review).
+    expect(names(ls, 'proposed')).toEqual(['Bath (proposed)', 'Guest (11\'5" adjusted)', 'Guest closet (proposed)', 'Landing (proposed)', 'Master', 'Master closet', 'Master wardrobe (proposed)']);
   });
 
   it('counts the existing, demolished and new work', () => {
@@ -101,15 +102,17 @@ describe('docs/examples/146-mick-road.json', () => {
     // wall stays as the Master's north wall). New: the addition, its partition, the foyer, the
     // screen porch, the north band's two walls, the powder room's three under the stair and the
     // laundry closet's two (each splitting what it meets but the demolished walls), the block under
-    // the addition and under the foyer, the upstairs
-    // bath's south wall, and the landing's three walls (the Master's east wall, its south and east
-    // walls). The retaining wall's three pieces on the Basement are existing; its two pieces carried
-    // west to the property line are new. Today's grey Kitchen to Utility door stays as the bedroom's
-    // door (MK), so no new one is cut.
-    expect(count(all('walls'))).toEqual({ existing: 52, demo: 13, new: 30 });
+    // the addition and under the foyer, the upstairs bath's south wall, the landing's three walls
+    // (the Master's east wall, its south and east walls), and the closets of the livability review
+    // (the bedroom's walk-in, the Master's wardrobe and the Guest's closet, two walls each). The
+    // retaining wall's three pieces on the Basement are existing; its two pieces carried west to the
+    // property line are new.
+    expect(count(all('walls'))).toEqual({ existing: 55, demo: 13, new: 38 });
     // Upstairs, the Bunk's, the old bath's, the Master's and the Guest's doors go; the new bath's,
-    // the Master's and the Guest's are off the landing.
-    expect(count(all('openings'))).toEqual({ existing: 13, demo: 19, new: 26 });
+    // the Master's and the Guest's are off the landing. Today's grey half-lite door to the Utility
+    // and the Guest's three-sash south window give way to a solid door and a two-sash window in the
+    // same openings.
+    expect(count(all('openings'))).toEqual({ existing: 11, demo: 21, new: 31 });
     // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
     // side and down the bank, with its landing, a deck) stays (MK). New: the grand stair's bottom
     // step, landing and straight run, and the master bedroom's deck; the stair hall's floor opening
@@ -120,12 +123,12 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
     // The upstairs Bath's label goes with the old bath (its new one is east of the stair's top
     // landing) and the Office / hall's with the hall (the Landing's is new); the Coats closet is gone.
-    expect(count(all('rooms'))).toEqual({ existing: 7, demo: 7, new: 11 });
+    expect(count(all('rooms'))).toEqual({ existing: 7, demo: 7, new: 14 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen,
     // the pantry's shelves, the stove with its stovepipe and tee, and the placeholder bath and
-    // laundry fixtures, the foyer's bench and hooks, the dryer's vent and the range hood's duct, and
-    // seven alarms, all new.
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 48 });
+    // laundry fixtures, the foyer's bench and hooks, the dryer's vent and the range hood's duct, the
+    // bedroom closet's hanging, and seven alarms, all new.
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 51 });
     // The masonry chimney is demolished; the stove's connector and its flue are new, and six
     // fieldstone piers: two under the entry canopy's log posts, its stoop, and one under each of the
     // screen porch's three log posts.
@@ -455,17 +458,21 @@ describe('docs/examples/146-mick-road.json', () => {
     }
   });
 
-  it('passes the code checks: guards, the grand stair and the structure; six header notes', () => {
+  it('passes the code checks: guards, the grand stair and the structure; eight header notes', () => {
     expect(getIssues(plan).filter((i) => i.severity !== 'info').map((i) => `${i.code}: ${i.message}`)).toEqual([]);
     // Headers for the engineer: the new openings cut into existing bearing walls (the west wall and
-    // the Kitchen/Living partition carry the upstairs ceiling beams' ends down from above).
+    // the Kitchen/Living partition carry the upstairs ceiling beams' ends down from above). The
+    // bedroom's solid door and the Guest's two-sash window go in today's openings, whose headers are
+    // there; the tool notes them all the same.
     expect(getIssues(plan).map((i) => [plan.levels[i.levelId].name, i.code, i.at])).toEqual([
+      ['First Floor', 'structure.wall-opening', { x: 314.5, y: 264 }],
       ['First Floor', 'structure.wall-opening', { x: 3.5, y: 118.5 }],
+      ['First Floor', 'structure.wall-opening', { x: 3.5, y: 207 }],
       ['First Floor', 'structure.wall-opening', { x: 170.5, y: 118.5 }],
       ['First Floor', 'structure.wall-opening', { x: 25, y: 3.5 }],
-      ['First Floor', 'structure.wall-opening', { x: 3.5, y: 207 }],
       ['Second Floor', 'structure.wall-opening', { x: 314.5, y: 222 }],
       ['Second Floor', 'structure.wall-opening', { x: 140, y: 3.5 }],
+      ['Second Floor', 'structure.wall-opening', { x: 256, y: 311.5 }],
     ]);
   });
 
@@ -518,6 +525,8 @@ describe('docs/examples/146-mick-road.json', () => {
         // The north band, 4' deep, all walk-in pantry; the powder room under the stair's high end.
         'Powder room': [63.5, 37],
         Pantry: [138, 48],
+        // The bedroom's walk-in closet in its north-west corner (the livability review).
+        'Bedroom closet': [50, 58],
         Foyer: [89, 79.75],
         'Screen porch': [89, 150],
       },
@@ -529,7 +538,8 @@ describe('docs/examples/146-mick-road.json', () => {
     // hall: the Master takes the balcony up to the Bunk's old south wall, the Guest takes the Office
     // (an L to the bath's south wall), and the landing is all that is left (its face takes in the
     // stair hall's opening, x 7..218, y 7..135).
-    expectSizes(s, { 'Bath (proposed)': [88, 63], Master: [162, 206], Guest: [137, 233], 'Master closet': [30, 33], Landing: [211, 128] }, 'proposed');
+    // The Master's wardrobe along its north wall and the Guest's closet in its alcove.
+    expectSizes(s, { 'Bath (proposed)': [88, 63], Master: [162, 206], Guest: [137, 233], 'Master closet': [30, 33], Landing: [211, 128], 'Master wardrobe': [88.5, 24], 'Guest closet': [24, 60] }, 'proposed');
     // In the All view the demolished rooms keep their faces and the new labels sit in the parts the
     // old rooms did not cover, so no face has two names.
     expectSizes(f, { Utility: [138, 113], 'Master bedroom': [138, 65.5], 'Entry porch': [59, 57.25] }, 'all');
@@ -584,7 +594,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // old balcony.
     const sset = getFaces(s, 'proposed');
     expect(s.rooms[faceAt(sset, { x: 196, y: 28 })!.roomId!].name).toBe('Landing (proposed)');
-    expect(s.rooms[faceAt(sset, { x: 100, y: 110 })!.roomId!].name).toBe('Master');
+    expect(s.rooms[faceAt(sset, { x: 150, y: 110 })!.roomId!].name).toBe('Master');
     // The slab is cut: its top loses the opening (a quarter inch in all round) and gets the old
     // stair's hole back; no stair hole goes through it.
     expect(stairHoles(f, 'proposed', ftf)).toEqual([]);
@@ -841,21 +851,34 @@ describe('docs/examples/146-mick-road.json', () => {
       return face?.roomId ? f.rooms[face.roomId].name.replace(/ \(.*$/, '') : 'outside';
     };
     // The powder room's door swings out, into the stair hall (the Living's face; clear of its WC and
-    // vanity); the pantry's swings in.
+    // vanity); the pantry's swings in; the bedroom closet's swings out into the bedroom; the French
+    // doors from the screen porch swing into the Living.
     expect(doors.map((o) => `${o.width} ${into(o)}`).sort()).toEqual([
       '24 Living',
+      '24 Master bedroom',
       '24 Pantry',
       '28 Master bath',
       '32 Living',
+      '32 Master bedroom',
       '36 Foyer',
       '36 Screen porch',
       '36 outside',
+      '60 Living',
     ]);
-    // The bedroom's way in is today's grey Kitchen to Utility door, kept (MK), swinging into it.
+    // The bedroom's way in stays where today's grey Kitchen to Utility door is (MK), but that door,
+    // three by three clear lites over two panels, gives way to a solid one swinging into the bedroom.
     const grey = Object.values(f.openings).find((o) => o.type === 'door' && o.leafColor === '#7f8b8f')!;
-    expect([grey.phase, into(grey)]).toEqual(['existing', 'Master bedroom']);
+    const solid = doors.find((o) => o.wallId === grey.wallId)!;
+    expect([grey.phase, solid.offset, solid.width, solid.lites, solid.halfLite]).toEqual(['demo', grey.offset, 32, undefined, undefined]);
     // Interior doors are stained, not the house door's green.
-    expect(doors.filter((o) => ['Master bath', 'Pantry'].includes(into(o)) || o.width === 24).every((o) => o.leafColor === '#8a5a34')).toBe(true);
+    expect(doors.filter((o) => ['Master bath', 'Pantry', 'Master bedroom'].includes(into(o)) || o.width === 24).every((o) => o.leafColor === '#8a5a34')).toBe(true);
+    // The screen porch's lawn door at the west end of its south wall, clear of the stove's chimney
+    // (x -10..-2): you no longer step through it into the chimney.
+    const lawn = doors.find((o) => into(o) === 'outside')!;
+    const lw = f.walls[lawn.wallId];
+    const la = f.nodes[lw.a];
+    const lx = la.x + normalize(sub(f.nodes[lw.b], la)).x * lawn.offset;
+    expect([lx - lawn.width / 2, lx + lawn.width / 2]).toEqual([-86, -50]);
   });
 
   it("has the master bedroom's sliding door and the master bath's north transom", () => {
@@ -906,6 +929,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // over the master bath and its hood outside; the range hood's duct across the pantry and its cap
     // outside); the alarms.
     expect(allNew.filter((x) => roomOf(x) !== 'Kitchen').map((x) => `${roomOf(x)}: ${x.label ?? x.kind}`).sort()).toEqual([
+      'Bedroom closet: Hanging',
       'Foyer: Bench',
       'Foyer: Hooks',
       'Foyer: Hooks',
@@ -934,7 +958,7 @@ describe('docs/examples/146-mick-road.json', () => {
     ]);
     const kinds: Record<string, number> = {};
     for (const x of fixtures) kinds[x.kind] = (kinds[x.kind] ?? 0) + 1;
-    expect(kinds).toEqual({ dishwasher: 1, sink: 1, box: 6, fridge: 1, wall: 3, base: 2, range: 1, hood: 1 });
+    expect(kinds).toEqual({ dishwasher: 1, sink: 1, box: 6, fridge: 1, wall: 4, base: 3, range: 1, hood: 1 });
     expect(fixtures.every((x) => x.phase === 'new')).toBe(true);
     expect(fixtures.filter((x) => x.kind === 'box').map((x) => x.label).sort()).toEqual(['Chair', 'Chair', 'Chair', 'Chair', 'Smoke/CO', 'Table']);
     const bounds = (poly: Vec2[]) => {
@@ -944,10 +968,10 @@ describe('docs/examples/146-mick-road.json', () => {
     };
     const box = (x: (typeof allNew)[number]) => bounds(fixtureOutline(x));
     // Counters: one island top 62 x 26 over the dishwasher and the sink (with the basin cut out), 1"
-    // all round, x 211..273, y 133..159, no seating ledge; and the north run's two bases each on its
-    // own (the range carries no counter).
+    // all round, x 211..273, y 133..159, no seating ledge; and the north run's three bases each on its
+    // own (the range carries no counter, and the pantry door parts the 24" base from the rest).
     const runs = counterRuns(fixtures.filter((x) => isVisible(x.phase, 'proposed')));
-    expect(runs).toHaveLength(3);
+    expect(runs).toHaveLength(4);
     const island = runs.find((r) => r.fixtureIds.some((id) => f.fixtures[id].kind === 'sink'))!;
     expect(island.fixtureIds.map((id) => f.fixtures[id].kind).sort()).toEqual(['dishwasher', 'sink']);
     expect(island.outline).toHaveLength(4);
@@ -957,10 +981,12 @@ describe('docs/examples/146-mick-road.json', () => {
     // 38" walkways at both ends, to the Living partition's face (x 173) and the east wall's (x 311).
     expect(top.x0 - 173).toBe(38);
     expect(311 - top.x1).toBe(38);
-    // The north run on the pantry's wall (its face y 60), west to east from the pantry door: a 15"
-    // base, the range, a 15" base; the hood over the range; a 48" work aisle to the island.
+    // The north run on the pantry's wall (its face y 60), west to east: a 24" base for trash and
+    // recycling (the livability review), the pantry door, a 15" base, the range, a 15" base; the
+    // hood over the range; a 48" work aisle to the island. About 9'8" of counter in all.
     const run = fixtures.filter((x) => x.elevation === 0 && x.kind !== 'box' && box(x).y0 === 60).sort((p, q) => box(p).x0 - box(q).x0);
     expect(run.map((x) => [x.kind, box(x).x0, box(x).x1])).toEqual([
+      ['base', 173, 197],
       ['base', 222, 237],
       ['range', 237, 267],
       ['base', 267, 282],
@@ -1027,8 +1053,8 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([box(duct).x0, box(duct).x1, box(duct).y0, box(duct).y1, duct.elevation]).toEqual([248, 256, -1, 60, 86]);
     expect(allNew.filter((x) => x.label === 'Shelves').every((x) => x.elevation + x.height < duct.elevation)).toBe(true);
 
-    // The pantry's door in the band's wall (y 57.5); no new door is cut in the main block's east wall
-    // (the bedroom keeps today's grey door, y 248..280).
+    // The pantry's door in the band's wall (y 57.5); no new door is cut in the main block's east wall:
+    // the bedroom's solid door hangs in today's opening (y 248..280).
     const doorAt = (o: Opening) => {
       const w = f.walls[o.wallId];
       const a = f.nodes[w.a];
@@ -1036,7 +1062,7 @@ describe('docs/examples/146-mick-road.json', () => {
       return { x: a.x + d.x * o.offset, y: a.y + d.y * o.offset };
     };
     const newDoors = Object.values(f.openings).filter((o) => o.type === 'door' && o.phase === 'new');
-    expect(newDoors.some((o) => doorAt(o).x === 314.5)).toBe(false);
+    expect(newDoors.filter((o) => doorAt(o).x === 314.5).map((o) => [doorAt(o).y, o.width])).toEqual([[264, 32]]);
     expect(newDoors.filter((o) => doorAt(o).y === 57.5).map((o) => [doorAt(o).x, o.width])).toEqual([[210, 24]]);
     // The old bath's north window (48" wide, its sill just above the wainscot, photo 22) goes, and
     // none replaces it: the pantry's shelves line that wall.
@@ -1066,11 +1092,11 @@ describe('docs/examples/146-mick-road.json', () => {
     const existing = getLevelMeshes(plan, f.id, 'existing');
     expect([existing.fixtures.length, existing.counters.length]).toEqual([34, 5]);
     const proposedMeshes = getLevelMeshes(plan, f.id, 'proposed');
-    // The kitchen's 15 (the table and its four chairs among them) and its three counters, the
+    // The kitchen's 17 (the table and its four chairs among them) and its four counters, the
     // pantry's three shelves, the stove's five parts, and the seven placeholder bath and laundry
-    // fixtures, whose two vanities carry a counter each; the foyer's bench and hooks, the five pieces
-    // of the two vents and three alarms.
-    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([41, 5]);
+    // fixtures, whose two vanities carry a counter each; the bedroom closet's hanging, the foyer's
+    // bench and hooks, the five pieces of the two vents and three alarms.
+    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([44, 6]);
   });
 
   it('has the wood stove in the Living\'s south-west corner on a stainless flue outside the house that clears the roof by the 3-2-10 rule, and no chimney', () => {
@@ -1087,8 +1113,8 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(bounds(fixtureOutline(named(f, 'Stone')))).toEqual([7, 10, 257, 303]);
     expect(bounds(fixtureOutline(named(f, 'Hearth')))).toEqual([7, 57, 260, 300]);
     expect(f.rooms[faceAt(getFaces(f, 'proposed'), { x: 26, y: 280 })!.roomId!].name).toBe('Living');
-    // 12"+ from the west window's trim (jambs y 162..252).
-    const west = Object.values(f.openings).find((o) => o.phase === 'new' && o.type === 'window' && o.width === 90)!;
+    // 12"+ from the trim of the French doors to the screen porch (jambs y 177..237).
+    const west = Object.values(f.openings).find((o) => o.phase === 'new' && o.type === 'door' && o.width === 60)!;
     const ww = f.walls[west.wallId];
     const wa = f.nodes[ww.a];
     const southJamb = wa.y + normalize(sub(f.nodes[ww.b], wa)).y * west.offset + west.width / 2;
@@ -1129,9 +1155,29 @@ describe('docs/examples/146-mick-road.json', () => {
     };
     const inBath = Object.values(s.fixtures).filter((x) => x.phase === 'new' && s.rooms[faceAt(set, centre(x))?.roomId ?? '']?.name === 'Bath (proposed)');
     expect(inBath.map((x) => x.label ?? x.kind).sort()).toEqual(['Shower', 'WC', 'sink']);
-    const shower = inBath.find((x) => x.label === 'Shower')!;
-    const sb = fixtureOutline(shower);
-    expect([Math.max(...sb.map((p) => p.x)), Math.min(...sb.map((p) => p.y))]).toEqual([311, 7]);
+    // The livability review's layout: a 32" x 60" shower along the east wall, the WC under the north
+    // window and a 24" vanity on the south wall east of the door's swing. The WC's centre is 15"+
+    // from the wall, the shower and the vanity, with 21" clear in front of the vanity (R307.1), and
+    // the floor in front of the shower's open side (x 255..279, north of the vanity) is clear.
+    const bx = (label: string) => {
+      const o = fixtureOutline(inBath.find((x) => (x.label ?? x.kind) === label)!);
+      return { x0: Math.min(...o.map((p) => p.x)), x1: Math.max(...o.map((p) => p.x)), y0: Math.min(...o.map((p) => p.y)), y1: Math.max(...o.map((p) => p.y)) };
+    };
+    const [shower, wc, vanity] = [bx('Shower'), bx('WC'), bx('sink')];
+    expect(shower).toEqual({ x0: 279, x1: 311, y0: 7, y1: 67 });
+    expect(wc).toEqual({ x0: 230, x1: 250, y0: 7, y1: 35 });
+    expect(vanity).toEqual({ x0: 255, x1: 279, y0: 52, y1: 70 });
+    const wcMid = (wc.x0 + wc.x1) / 2;
+    expect(Math.min(wcMid - 223, shower.x0 - wcMid, vanity.x0 - wcMid)).toBeGreaterThanOrEqual(15);
+    expect(vanity.y0 - 7).toBeGreaterThanOrEqual(21);
+    expect(vanity.x0).toBeGreaterThanOrEqual(wc.x1);
+    // The Guest's way out in a fire (R310, to verify): its south window is two casements, each over
+    // 20" clear (32" sashes), sill at most 44".
+    const onSouth = (o: Opening) => s.nodes[s.walls[o.wallId].a].y === 311.5 && s.nodes[s.walls[o.wallId].b].y === 311.5;
+    const guestSouth = Object.values(s.openings).filter((o) => o.type === 'window' && o.phase === 'new' && onSouth(o));
+    expect(guestSouth.map((o) => [o.width, o.height, o.sill, o.sashes])).toEqual([[66, 46, 34, 2]]);
+    expect((guestSouth[0].width - 2) / 2).toBeGreaterThanOrEqual(20 + 8);
+    expect(guestSouth[0].sill).toBeLessThanOrEqual(44);
     // Off the landing, each new door swings into its room: the bath's, the Master's and the Guest's.
     const into = (o: Opening) => {
       const w = s.walls[o.wallId];

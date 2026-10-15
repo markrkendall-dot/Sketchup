@@ -304,8 +304,8 @@ const OpeningShape = memo(function OpeningShape({ levelId, openingId }: { levelI
       {sym.dashed.length > 0 && (
         <path className="opening-dashed" d={segPath(sym.dashed)} vectorEffect="non-scaling-stroke" />
       )}
-      {sym.arc && <path className="opening-arc" d={arcPath(sym.arc)} vectorEffect="non-scaling-stroke" />}
-      {sym.leaf && <path className="opening-leaf" d={segPath([sym.leaf])} vectorEffect="non-scaling-stroke" />}
+      {sym.arcs.length > 0 && <path className="opening-arc" d={sym.arcs.map((a) => arcPath(a)).join('')} vectorEffect="non-scaling-stroke" />}
+      {sym.leaves.length > 0 && <path className="opening-leaf" d={segPath(sym.leaves)} vectorEffect="non-scaling-stroke" />}
     </g>
   );
 });
