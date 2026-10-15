@@ -46,17 +46,6 @@ const WING = { x0: MAIN.x1, x1: MAIN.x1 + UTILITY.w + T, y0: MAIN.y1 - UTILITY.d
 // Shingled knee walls with screens above them in all four bays, a screen door in line with the house
 // door, and its own gable facing west.
 const PORCH = { x0: -66, x1: MAIN.x0, y0: MAIN.y0, y1: ft(8) };
-/**
- * The shed west of the house (photo 05, MK: existing, kept), outside faces: 20' along the road by
- * 14' deep, its east face 40' west of the main block's west face and its north face 2' south of the
- * house's. Estimates from the photo; its walls are 5" (board on 2x4 framing).
- */
-const SHED = { x0: -ft(60), x1: -ft(40), y0: ft(2), y1: ft(16) };
-const SHED_T = 5;
-/** The shed's dark asphalt shingles (photo 05). */
-const SHED_ROOF = '#4a4440';
-/** A door on the shed's north wall swings out toward the road. */
-const NORTH_OUT = { x: 0, y: -1 };
 /** The house door and the porch entry share this line (photo 08). */
 const ENTRY_Y = ft(4);
 
@@ -632,21 +621,6 @@ export function buildExamplePlan(): Plan {
   const chimney = store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights(), depth: 20, color: FINISH_COLOR, cap: true });
   if (!chimney) throw new Error('chimney rejected');
 
-  // ---- The shed west of the house (photo 05, MK: existing, kept): one storey of vertical boards in
-  // the dark chocolate brown, its ridge east-west under dark asphalt shingles, its doors on the road
-  // side: a window, a pair of board doors, a single door and a window, east to west. All estimates
-  // (SHED): re-measure its size and its distance from the house.
-  const shed = centerline(SHED, SHED_T / 2);
-  const shedWalls = drawWalls(fId, ring(shed), SHED_T, true);
-  store().updateWalls(fId, shedWalls, { finish: 'board', color: SHAKE_BROWN });
-  win(fId, { x: SHED.x1 - 36, y: shed.y0 }, 30, 30, 2, 2, { sill: 42, trim: 0 });
-  addOpeningAt(fId, { x: SHED.x1 - 108, y: shed.y0 }, { type: 'door', width: 72, height: 84, sashes: 2, leafColor: SHAKE_BROWN, trim: 0, into: NORTH_OUT });
-  addOpeningAt(fId, { x: SHED.x1 - 170, y: shed.y0 }, { type: 'door', width: 32, height: 80, leafColor: SHAKE_BROWN, trim: 0, into: NORTH_OUT });
-  win(fId, { x: SHED.x0 + 25, y: shed.y0 }, 30, 30, 2, 2, { sill: 42, trim: 0 });
-  if (!store().addRoof(fId, { shape: 'gable', outline: outline(SHED), ridgeAngle: 0, pitch: 8, overhang: 12, bearingOffset: 0, thickness: 2, fascia: 6, phase: PHASE, finish: 'shingle', color: SHED_ROOF, eave: 'fascia', boardColor: SHAKE_BROWN })) {
-    throw new Error('shed roof rejected');
-  }
-
   // ---- Fixtures as they are (photos 13 to 22; sizes are estimates). The Kitchen, inside x 173..311,
   // y 102..308: knotty pine plank fronts, a light laminate counter.
   store().updateFinishes(fId, { cabinetColor: PINE, counterColor: LAMINATE, frontStyle: 'slab' });
@@ -747,7 +721,6 @@ export function buildExamplePlan(): Plan {
   // The stair strip is part of the Living (no wall on its south side), so it has no label of its own.
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
-  label(fId, 'Shed (est.)', { x: (SHED.x0 + SHED.x1) / 2, y: (SHED.y0 + SHED.y1) / 2 });
   // Second Floor. The Office / hall is one face with the landing and the stair well.
   // Placeholder finishes (no photos of the Second Floor).
   label(sId, 'Bunk', { x: 90, y: 52 }, PHASE, PLACEHOLDER_ROOM);

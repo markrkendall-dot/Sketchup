@@ -65,7 +65,7 @@ describe('docs/examples/146-mick-road.json', () => {
     const [lb, lf, ls] = plan.levelOrder;
     expect(names(lb, 'existing')).toEqual(['Basement (unpartitioned, est.)', 'Utility (below)']);
     // The old entry hall is MK's front room; the stair strip is part of the Living (photos 16 to 20).
-    expect(names(lf, 'existing')).toEqual(['Bath', 'Entry porch (est.)', 'Front room', 'Kitchen (17\'2" adjusted: re-measure)', 'Living', 'Shed (est.)', 'Utility']);
+    expect(names(lf, 'existing')).toEqual(['Bath', 'Entry porch (est.)', 'Front room', 'Kitchen (17\'2" adjusted: re-measure)', 'Living', 'Utility']);
     expect(names(ls, 'existing')).toEqual(['Bath', 'Bunk', 'Guest (11\'5" adjusted)', 'Master', 'Master closet', 'Office / hall (11\'11" adjusted)']);
     expect(names(lb, 'proposed')).toEqual(['Basement (unpartitioned, est.)', 'Crawl space (proposed)', 'Crawl space under the foyer (proposed)', 'Utility (below)']);
     expect(names(lf, 'proposed')).toEqual([
@@ -79,7 +79,6 @@ describe('docs/examples/146-mick-road.json', () => {
       'Pantry (proposed)',
       'Powder room (proposed)',
       'Screen porch (proposed)',
-      'Shed (est.)',
     ]);
     // Upstairs the Bunk is the stair hall's upper half (open to below); the rest keep their names.
     expect(names(ls, 'proposed')).toEqual(names(ls, 'existing').filter((n) => n !== 'Bunk'));
@@ -101,19 +100,17 @@ describe('docs/examples/146-mick-road.json', () => {
     // today, photo 16), the coat closet's two under the stair (its west wall splits the north wall
     // and its front wall the hall's east wall), the block under the addition and under the foyer,
     // and the upstairs bath's south wall. The retaining wall's three pieces on the Basement are existing; its two pieces carried west to the property line are new. Today's grey Kitchen
-    // to Utility door stays as the bedroom's door (MK), so no new one is cut. The shed west of the
-    // house adds four existing walls, and its two windows and two doors.
-    expect(count(all('walls'))).toEqual({ existing: 59, demo: 11, new: 28 });
-    expect(count(all('openings'))).toEqual({ existing: 20, demo: 16, new: 25 });
+    // to Utility door stays as the bedroom's door (MK), so no new one is cut.
+    expect(count(all('walls'))).toEqual({ existing: 55, demo: 11, new: 28 });
+    expect(count(all('openings'))).toEqual({ existing: 16, demo: 16, new: 25 });
     // The demolished stair: today's flight. Today's wooden stair (two flights, along the wing's east
     // side and down the bank, with its landing, a deck) stays (MK). New: the grand stair's platform,
     // two flights and landing, and the master bedroom's deck; the stair hall's floor opening upstairs.
     expect(count(all('stairs'))).toEqual({ existing: 2, demo: 1, new: 4 });
     expect(count(all('decks'))).toEqual({ existing: 1, demo: 0, new: 1 });
     expect(count(all('floorOpenings'))).toEqual({ existing: 0, demo: 0, new: 1 });
-    // The main roof stays; the shed's roof and room are existing too (MK: kept).
-    expect(count(all('roofs'))).toEqual({ existing: 2, demo: 2, new: 3 });
-    expect(count(all('rooms'))).toEqual({ existing: 10, demo: 5, new: 10 });
+    expect(count(all('roofs'))).toEqual({ existing: 1, demo: 2, new: 3 });
+    expect(count(all('rooms'))).toEqual({ existing: 9, demo: 5, new: 10 });
     // Every fixture of today (Kitchen, Bath, front room, Utility) gives way to the proposed kitchen,
     // the pantry's shelves, the stove with its stovepipe and tee, and the placeholder bath and
     // laundry fixtures, the foyer's bench and hooks, the dryer's vent and the range hood's duct, and
@@ -184,10 +181,7 @@ describe('docs/examples/146-mick-road.json', () => {
     const interior = Object.values(level.walls).filter((w) => w.kind === 'interior');
     expect(interior.length).toBeGreaterThanOrEqual(5);
     for (const w of interior) expect(w.thickness).toBe(5);
-    // The house's exterior walls are 7"; the shed's (west of x -400) are 5".
-    const shed = (w: { a: string }) => level.nodes[w.a].x < -400;
-    for (const w of Object.values(level.walls).filter((w) => w.kind === 'exterior')) expect(w.thickness).toBe(shed(w) ? 5 : 7);
-    expect(Object.values(level.walls).filter(shed).map((w) => `${w.finish} ${w.color}`)).toEqual(Array(4).fill('board #4b3a32'));
+    for (const w of Object.values(level.walls).filter((w) => w.kind === 'exterior')) expect(w.thickness).toBe(7);
     // One stair today, climbing east from about 2' in from the west wall (photos 16 and 18) to x 132,
     // cutting the floor above.
     const stairs = Object.values(level.stairs).filter((s) => isVisible(s.phase, 'existing'));
@@ -284,11 +278,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the roofs, columns, windows, doors and terrain of the house', () => {
-    // The shed's roof (west of x -400): a gable of dark asphalt shingles, its ridge east-west.
-    const isShed = (r: { outline: { x: number }[] }) => r.outline.every((p) => p.x < -400);
-    const shedRoofs = plan.levelOrder.flatMap((id) => Object.values(plan.levels[id].roofs)).filter(isShed);
-    expect(shedRoofs.map((r) => [r.shape, r.finish, r.color, r.ridgeAngle, r.pitch, r.phase])).toEqual([['gable', 'shingle', '#4a4440', 0, 8, 'existing']]);
-    const allRoofs = plan.levelOrder.flatMap((id) => Object.values(plan.levels[id].roofs)).filter((r) => !isShed(r));
+    const allRoofs = plan.levelOrder.flatMap((id) => Object.values(plan.levels[id].roofs));
     const roofs = allRoofs.filter((r) => isVisible(r.phase, 'existing'));
     // Main gable, east wing gable, and the entry porch gable (one porch on the west face, photo 8).
     expect(roofs).toHaveLength(3);
@@ -305,7 +295,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(columns[0]).toMatchObject({ at: { x: 159, y: -10 }, width: 24, depth: 20, rotation: 0, color: '#5a3a35', cap: true });
     const openings = plan.levelOrder.flatMap((id) => {
       const level = plan.levels[id];
-      return Object.values(level.openings).filter((o) => isOpeningVisible(o, level.walls[o.wallId], 'existing') && level.nodes[level.walls[o.wallId].a].x > -400);
+      return Object.values(level.openings).filter((o) => isOpeningVisible(o, level.walls[o.wallId], 'existing'));
     });
     // The wing's north face has no window (MK).
     expect(openings.filter((o) => o.type === 'window')).toHaveLength(19);

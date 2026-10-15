@@ -426,15 +426,15 @@ describe('a wall on top of a wall (REVIEW-2 A1)', () => {
     const first = plan.levelOrder[1];
     const walls = () => store().plan.levels[first].walls;
     // The house as it stands (24 walls, 29 pieces where the proposed walls meet them; a new wall does
-    // not split a demolished one), 20 proposed ones and the shed's four.
-    expect(Object.keys(walls())).toHaveLength(53);
+    // not split a demolished one) and 20 proposed ones.
+    expect(Object.keys(walls())).toHaveLength(49);
     const north = Object.values(walls()).filter((w) => {
       const l = store().plan.levels[first];
       return l.nodes[w.a].y === 3.5 && l.nodes[w.b].y === 3.5;
     });
     expect(store().addWall(first, { x: 99, y: 3.5 }, { x: 194, y: 3.5 }, newOpts)).toBeNull();
     expect(store().plan).toBe(plan);
-    expect(Object.keys(walls())).toHaveLength(53);
+    expect(Object.keys(walls())).toHaveLength(49);
     expect(north.every((w) => walls()[w.id] === w)).toBe(true);
     for (const vm of ['existing', 'proposed', 'all'] as const) expect(getFaces(store().plan.levels[first], vm).openEnds).toHaveLength(0);
   });
