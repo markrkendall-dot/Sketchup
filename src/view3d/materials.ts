@@ -1,6 +1,9 @@
 import { logEndColor, MEMBER_COLOR } from '../model/structure';
 import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
-import type { CasePart } from '../derive/casework';
+import type { FixtureMesh, FixturePart } from '../derive/meshes';
+import { CANE_COLOR, FABRICS, IRON_COLOR, LINEN_COLOR, SHADE_COLOR, WOODS } from '../model/furniture';
+import type { FabricId, WoodId } from '../model/types';
+import { fabricTextures, paintTextures, pineFloorTextures, woodTextures, type FabricTexture } from './proceduralTextures';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
 import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
@@ -152,7 +155,17 @@ function interiorMaterial(surface: 'wall' | 'floor', phase: Phase, finish: RoomW
   let m = interiorMaterials.get(key);
   if (!m) {
     const kind = interiorTextureOf(surface, finish);
-    const tex = kind ? interiorTextures(kind, color, phase === 'new' ? 'new' : 'plain') : null;
+    const variant = phase === 'new' ? 'new' : 'plain';
+    // The wide pine floor is Nordic natural pine (proceduralTextures.ts); painted walls carry an
+    // eggshell stipple; the rest are textures.ts drawings.
+    const tex =
+      surface === 'floor' && finish === 'pine'
+        ? pineFloorTextures(color, variant)
+        : surface === 'wall' && finish === 'paint'
+          ? paintTextures(color, variant)
+          : kind
+            ? interiorTextures(kind, color, variant)
+            : null;
     m = make(tex ? '#ffffff' : interiorFlatColor(phase, finish, color));
     if (tex) {
       m.map = tex.map;
@@ -161,6 +174,7 @@ function interiorMaterial(surface: 'wall' | 'floor', phase: Phase, finish: RoomW
         m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
       }
     }
+    if (surface === 'floor' && finish === 'pine') m.roughness = 0.7; // a matte water-based finish
     if (surface === 'floor') {
       // The finish sits 1/16" over the slab top (meshes.ts FLOOR_FINISH_LIFT); the offset keeps it
       // in front of the slab from far away too, where depth precision is coarser than that.
@@ -258,7 +272,96 @@ export function railingMaterial(phase: Phase): MeshStandardMaterial {
 
 /** A staircase's tread colour (treads, handrail, newel caps) or its paint (demolished: red, new: pulled toward green, like trim). */
 export function stairPartMaterial(mat: 'tread' | 'paint', phase: Phase, color: string): MeshStandardMaterial {
-  return trimLike(`stair-${mat}`, color, phase);
+  if (mat === 'paint' || phase === 'demo') return trimLike(`stair-${mat}`, color, phase);
+  // Treads, handrail and caps: plank pine in the tread colour, grain along each piece (meshes.ts).
+  return woodLike(`stair-tread|${color}`, { grain: 'pine', color }, phase, color);
+}
+
+const woodMaterials = new Map<string, MeshStandardMaterial>();
+
+/** A textured wood (proceduralTextures.ts woodTextures), flat `flat` without a canvas; new work pulled toward green. */
+function woodLike(key: string, wood: WoodId | { grain: (typeof WOODS)[WoodId]['grain']; color: string }, phase: Phase, flat: string): MeshStandardMaterial {
+  const k = `${key}|${phase}`;
+  let m = woodMaterials.get(k);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      const tex = woodTextures(wood, phase === 'new' ? 'new' : 'plain');
+      const flatColor = phase === 'new' ? newWorkColor(flat) : flat;
+      m = make(tex ? '#ffffff' : flatColor);
+      if (tex) {
+        m.map = tex.map;
+        if (tex.normalMap) {
+          m.normalMap = tex.normalMap;
+          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
+        }
+      }
+      m.roughness = 0.75;
+      m.userData.flatColor = flatColor;
+    }
+    woodMaterials.set(k, m);
+  }
+  return m;
+}
+
+/** A catalogue wood's material (furniture frames, wood cabinets). */
+export const woodMaterial = (wood: WoodId, phase: Phase): MeshStandardMaterial => woodLike(`wood|${wood}`, wood, phase, WOODS[wood].color);
+
+/** The flat colour a furniture part stands for (export, node). */
+export function furniturePartColor(part: FixturePart, wood: WoodId, fabric: FabricId): string {
+  switch (part) {
+    case 'fabric':
+      return FABRICS[fabric].flat;
+    case 'linen':
+      return LINEN_COLOR;
+    case 'cane':
+      return CANE_COLOR;
+    case 'books':
+      return '#5a3f34';
+    case 'metal':
+      return IRON_COLOR;
+    case 'shade':
+      return SHADE_COLOR;
+    default:
+      return WOODS[wood].color;
+  }
+}
+
+/**
+ * Furniture (DESIGN.md "Furniture"): the frame in its catalogue wood, the upholstery, blanket or rug
+ * in its fabric, bed linen, a chair's cane, book spines, all textured; wrought iron; a lamp's
+ * parchment shade, faintly lit. Demolished pieces are translucent red, new ones washed green like
+ * every other texture.
+ */
+export function furnitureMaterial(part: FixturePart, phase: Phase, wood: WoodId, fabric: FabricId): MeshStandardMaterial {
+  if (part === 'wood') return woodMaterial(wood, phase);
+  if (phase === 'demo') return trimLike('furniture-demo', PHASE_COLOR.demo, phase);
+  const id: FabricTexture | null = part === 'fabric' ? fabric : part === 'linen' ? 'linen' : part === 'cane' ? 'cane' : part === 'books' ? 'books' : null;
+  const flat = furniturePartColor(part, wood, fabric);
+  const k = `furniture|${part}|${id ?? ''}|${phase}`;
+  let m = woodMaterials.get(k);
+  if (!m) {
+    const tex = id ? fabricTextures(id, phase === 'new' ? 'new' : 'plain') : null;
+    const flatColor = phase === 'new' ? (tex ? newWorkColor(flat) : pullGreen(flat)) : flat;
+    m = make(tex ? '#ffffff' : flatColor);
+    if (tex) {
+      m.map = tex.map;
+      if (tex.normalMap) {
+        m.normalMap = tex.normalMap;
+        m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
+      }
+    }
+    if (part === 'metal') {
+      m.metalness = 0.5;
+      m.roughness = 0.5;
+    } else if (part === 'shade') {
+      m.emissive = new Color(SHADE_COLOR);
+      m.emissiveIntensity = 0.15;
+    } else if (fabric === 'leather' && part === 'fabric') m.roughness = 0.6;
+    m.userData.flatColor = flatColor;
+    woodMaterials.set(k, m);
+  }
+  return m;
 }
 
 /**
@@ -396,8 +499,9 @@ farGroundMaterial.polygonOffsetUnits = -4;
  * counter colour with a slight stone sheen. Demolished parts are translucent red, new ones pulled
  * toward green, like everything else.
  */
-export function caseworkMaterial(part: CasePart, phase: Phase, color: string = DEFAULT_CABINET_COLOR): MeshStandardMaterial {
+export function caseworkMaterial(part: FixturePart, phase: Phase, color: string = DEFAULT_CABINET_COLOR, wood?: WoodId): MeshStandardMaterial {
   if (part === 'kick') return trimLike('kick', KICK_COLOR, phase);
+  if ((part === 'carcass' || part === 'front') && wood) return woodMaterial(wood, phase);
   if (part === 'carcass' || part === 'front') return trimLike('cabinet', color, phase);
   const key = `${part}|${phase}`;
   let m = partMaterials.get(key);
@@ -516,4 +620,9 @@ export function surfaceMaterial(material: SurfaceMaterial, phase: Phase, color: 
  */
 export function fenceMaterial(part: 'body' | 'end', phase: Phase, color: string = FENCE_COLOR): MeshStandardMaterial {
   return trimLike(`fence-${part}`, part === 'end' ? logEndColor(color) : color, phase);
+}
+
+/** The material of one part of a fixture mesh: a furniture piece's (furnitureMaterial) or casework's (caseworkMaterial, in its wood when it has one). */
+export function fixturePartMaterial(f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture'>, part: FixturePart): MeshStandardMaterial {
+  return f.furniture ? furnitureMaterial(part, f.phase, f.furniture.wood, f.furniture.fabric) : caseworkMaterial(part, f.phase, f.frontColor, f.wood);
 }

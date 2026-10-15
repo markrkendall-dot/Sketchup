@@ -25,6 +25,7 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
   { name: 'beam', label: 'Beam', key: 'I' },
   { name: 'post', label: 'Post', key: 'L' },
   { name: 'fixture', label: 'Cabinet', key: 'C' },
+  { name: 'furniture', label: 'Furniture', short: 'Furn.', key: 'Shift+C' },
   { name: 'measure', label: 'Measure', short: 'Tape', key: 'M' },
   { name: 'underlay', label: 'Underlay', short: 'Image', key: 'U' },
 ];
@@ -46,6 +47,7 @@ const TOOL_TITLE: Partial<Record<ToolName, string>> = {
   beam: 'Beam (I): click one end, then the other; a flush (2) 1 3/4" x 11 7/8" LVL in the floor framing over this level, a placeholder for the engineer to size',
   post: 'Post (L): click to place a 6x6 post up to the beam over it; on the lowest level it stands on a 24" x 12" footing',
   fixture: 'Cabinet (C): a cabinet, appliance or sink follows the cursor along the nearest wall; click to place it, type a width first to change it; pick the kind in the properties panel',
+  furniture: 'Furniture (Shift+C): pick a bed, dresser, desk, sofa, chair, table or rug, its wood and fabric in the properties panel; it follows the cursor, click to place it',
   underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
 };
 
@@ -222,6 +224,8 @@ export function Toolbar() {
   const siteMode = useUiStore((s) => s.siteMode);
   const showGrid = useUiStore((s) => s.showGrid);
   const toggleGrid = useUiStore((s) => s.toggleGrid);
+  const showFurniture = useUiStore((s) => s.showFurniture);
+  const toggleFurniture = useUiStore((s) => s.toggleFurniture);
   const orthoLock = useUiStore((s) => s.orthoLock);
   const measureTo = useUiStore((s) => s.measureTo);
   const setOrthoLock = useUiStore((s) => s.setOrthoLock);
@@ -403,6 +407,14 @@ export function Toolbar() {
             title="Grid (G)"
           >
             Grid
+          </button>
+          <button
+            className={showFurniture ? 'active' : ''}
+            aria-pressed={showFurniture}
+            onClick={() => afterAction(toggleFurniture)}
+            title="Furniture layer on the plan, in 3D and in the exports (Shift+F)"
+          >
+            Furniture
           </button>
           <button
             className={orthoLock ? 'active' : ''}

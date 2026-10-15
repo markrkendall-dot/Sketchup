@@ -1,15 +1,18 @@
 import { BufferGeometry, Float32BufferAttribute, Matrix4, Quaternion, ShapeUtils, Uint32BufferAttribute, Vector2, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Column, Fence, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, FabricId, Fence, Fixture, FixtureKind, FloorFinish, FurniturePiece, WoodId, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
-import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
+import { frontColorOf, frontStyleOf, hasCounter, isCabinet } from '../model/casework';
+import { FURNITURE, pieceFabricOf, pieceWoodOf } from '../model/furniture';
+import { furnitureSolids, stickCorners, type FurniturePart, type FurnitureSolid, type GrainAxis, type Local3 } from './furniture';
+import type { FixtureFrame } from './casework';
 import { DECK, getDeckLayout, type DeckBox, type DeckLayout } from './decks';
 import { memberAxis, memberBoxes, type AxisPoint } from './members';
 import { isLog, isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookIn, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookIn, isSlidingDoor, leafColorOf, roomWallLookIn, wainscotIn, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
@@ -1052,14 +1055,167 @@ export function outwardSide(fp: Pick<Footprint, 'a' | 'b' | 'normal' | 'wallId'>
  * Level-local like the walls. Every box is a closed prism, so each part is a closed surface.
  */
 export function buildFixtureParts(f: Fixture, finishes?: LevelFinishes): FixtureMesh['parts'] {
+  if (f.kind === 'furniture') return buildFurnitureParts(f);
   const fr = fixtureFrame(f);
-  const byPart = new Map<CasePart, BufferGeometry[]>();
+  const byPart = new Map<FixturePart, BufferGeometry[]>();
   for (const b of fixtureBoxes(f, finishes)) {
     const poly = [fixturePoint(fr, b.s0, b.d0), fixturePoint(fr, b.s1, b.d0), fixturePoint(fr, b.s1, b.d1), fixturePoint(fr, b.s0, b.d1)];
-    const g = prism(poly, b.y0, b.y1);
+    const g = addFrameUVs(prism(poly, b.y0, b.y1), fr, longestAxis(b));
     const list = byPart.get(b.part);
     if (list) list.push(g);
     else byPart.set(b.part, [g]);
+  }
+  return [...byPart].map(([part, gs]) => ({ part, geometry: mergeAll(gs) })).filter((p) => triangleCount(p.geometry) > 0);
+}
+
+/** A material part of a fixture: a cabinet's (derive/casework.ts) or a furniture piece's (derive/furniture.ts). */
+export type FixturePart = CasePart | FurniturePart;
+
+const longestAxis = (b: { s0: number; s1: number; d0: number; d1: number; y0: number; y1: number }): GrainAxis => {
+  const s = b.s1 - b.s0;
+  const d = b.d1 - b.d0;
+  const y = b.y1 - b.y0;
+  return y >= s && y >= d ? 'y' : s >= d ? 's' : 'd';
+};
+
+/**
+ * Texture coordinates in inches for a box in a fixture's frame (DESIGN.md "Furniture"), per
+ * triangle by its flat normal: each face takes the two frame axes (s, d, y) it lies in, u along
+ * `grain` when the face has it (the wood textures draw their grain along u), so a board's figure runs
+ * the board's length on every face.
+ */
+export function addFrameUVs(g: BufferGeometry, fr: FixtureFrame, grain: GrainAxis): BufferGeometry {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  const count = pos?.count ?? 0;
+  const uv = new Float32Array(count * 2);
+  for (let i = 0; i < count; i++) {
+    const rx = pos.getX(i) - fr.origin.x;
+    const rz = pos.getZ(i) - fr.origin.y;
+    const local = { s: rx * fr.v.x + rz * fr.v.y, d: rx * fr.u.x + rz * fr.u.y, y: pos.getY(i) };
+    const ns = Math.abs(nor.getX(i) * fr.v.x + nor.getZ(i) * fr.v.y);
+    const nd = Math.abs(nor.getX(i) * fr.u.x + nor.getZ(i) * fr.u.y);
+    const ny = Math.abs(nor.getY(i));
+    // The face's own axes: the two the normal does not point along.
+    const [a, b]: [GrainAxis, GrainAxis] = ny >= ns && ny >= nd ? ['s', 'd'] : ns >= nd ? ['d', 'y'] : ['s', 'y'];
+    const [ua, va] = grain === b ? [b, a] : [a, b];
+    uv[2 * i] = local[ua];
+    uv[2 * i + 1] = local[va];
+  }
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
+}
+
+/** A frame point (s, d, y) as a three position (level-local). */
+const worldOf = (fr: FixtureFrame, p: Local3): Vector3 => {
+  const q = fixturePoint(fr, p.s, p.d);
+  return new Vector3(q.x, p.y, q.y);
+};
+
+/**
+ * A closed six-faced solid from its eight corners (ring at one end, then the ring at the other),
+ * every triangle turned to face away from the solid's centre, with UVs in inches: u along the
+ * solid's axis on its long faces, the cross-section on its ends.
+ */
+function hexahedron(c: Vector3[]): BufferGeometry {
+  const centre = c.reduce((acc, p) => acc.add(p), new Vector3()).multiplyScalar(1 / 8);
+  const a0 = c.slice(0, 4).reduce((acc, p) => acc.add(p), new Vector3()).multiplyScalar(1 / 4);
+  const a1 = c.slice(4).reduce((acc, p) => acc.add(p), new Vector3()).multiplyScalar(1 / 4);
+  const axis = a1.clone().sub(a0).normalize();
+  const side = c[1].clone().sub(c[0]).normalize();
+  const thick = c[3].clone().sub(c[0]).normalize();
+  const quads = [
+    [0, 1, 2, 3],
+    [4, 5, 6, 7],
+    [0, 1, 5, 4],
+    [1, 2, 6, 5],
+    [2, 3, 7, 6],
+    [3, 0, 4, 7],
+  ];
+  const pos: number[] = [];
+  const uvs: number[] = [];
+  const tri = (p: Vector3, q: Vector3, r: Vector3) => {
+    const n = q.clone().sub(p).cross(r.clone().sub(p));
+    const mid = p.clone().add(q).add(r).multiplyScalar(1 / 3).sub(centre);
+    const pts = n.dot(mid) < 0 ? [p, r, q] : [p, q, r];
+    const end = Math.abs(n.clone().normalize().dot(axis)) > 0.7;
+    const across = Math.abs(n.clone().normalize().dot(side)) > Math.abs(n.clone().normalize().dot(thick)) ? thick : side;
+    for (const v of pts) {
+      const rel = v.clone().sub(a0);
+      pos.push(v.x, v.y, v.z);
+      if (end) uvs.push(rel.dot(side), rel.dot(thick));
+      else uvs.push(rel.dot(axis), rel.dot(across));
+    }
+  };
+  for (const [i, j, k, l] of quads) {
+    tri(c[i], c[j], c[k]);
+    tri(c[i], c[k], c[l]);
+  }
+  const g = geometryFrom(pos);
+  g.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
+  return g;
+}
+
+/**
+ * A round log from a to b (three positions) as one closed geometry, its body shading smooth
+ * (logBetween), with UVs in inches: along the log and round it on the body, across on the ends.
+ */
+export function logGeometry(a: Vector3, b: Vector3, diameter: number): BufferGeometry {
+  const { body, ends } = logBetween({ x: a.x, y: a.z, z: a.y }, { x: b.x, y: b.z, z: b.y }, diameter);
+  const dir = b.clone().sub(a).normalize();
+  const e1 = Math.abs(dir.y) < 0.9 ? new Vector3(0, 1, 0).cross(dir).normalize() : new Vector3(1, 0, 0).cross(dir).normalize();
+  const e2 = dir.clone().cross(e1);
+  const r = diameter / 2;
+  const uvOf = (g: BufferGeometry, round: boolean) => {
+    const pos = g.getAttribute('position');
+    const uv = new Float32Array(pos.count * 2);
+    const v = new Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).sub(a);
+      const along = v.dot(dir);
+      const x = v.dot(e1);
+      const y = v.dot(e2);
+      if (round) {
+        uv[2 * i] = along;
+        uv[2 * i + 1] = Math.atan2(y, x) * r;
+      } else {
+        uv[2 * i] = x;
+        uv[2 * i + 1] = y;
+      }
+    }
+    if (round) {
+      // A triangle across the seam (angle -pi to pi) would smear the whole texture over it: unwrap it.
+      for (let t = 0; t < pos.count; t += 3) {
+        const vs = [uv[2 * t + 1], uv[2 * t + 3], uv[2 * t + 5]];
+        if (Math.max(...vs) - Math.min(...vs) > Math.PI * r) for (let k = 0; k < 3; k++) if (vs[k] < 0) uv[2 * (t + k) + 1] += 2 * Math.PI * r;
+      }
+    }
+    g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  };
+  uvOf(body, true);
+  uvOf(ends, false);
+  return mergeAll([body, ends]);
+}
+
+/** One furniture solid as a closed geometry with normals and UVs, level-local. */
+function furnitureSolidGeometry(fr: FixtureFrame, sol: FurnitureSolid): BufferGeometry {
+  if (sol.type === 'box') {
+    const poly = [fixturePoint(fr, sol.s0, sol.d0), fixturePoint(fr, sol.s1, sol.d0), fixturePoint(fr, sol.s1, sol.d1), fixturePoint(fr, sol.s0, sol.d1)];
+    return addFrameUVs(prism(poly, sol.y0, sol.y1), fr, sol.grain ?? longestAxis(sol));
+  }
+  if (sol.type === 'stick') return hexahedron(stickCorners(sol).map((p) => worldOf(fr, p)));
+  return logGeometry(worldOf(fr, sol.a), worldOf(fr, sol.b), sol.diameter);
+}
+
+/** A furniture piece's solids (derive/furniture.ts) merged per material part, each with UVs in inches. */
+export function buildFurnitureParts(f: Fixture): FixtureMesh['parts'] {
+  const fr = fixtureFrame(f);
+  const byPart = new Map<FixturePart, BufferGeometry[]>();
+  for (const sol of furnitureSolids(f)) {
+    const g = furnitureSolidGeometry(fr, sol);
+    const list = byPart.get(sol.part);
+    if (list) list.push(g);
+    else byPart.set(sol.part, [g]);
   }
   return [...byPart].map(([part, gs]) => ({ part, geometry: mergeAll(gs) })).filter((p) => triangleCount(p.geometry) > 0);
 }
@@ -1078,8 +1234,12 @@ export interface FixtureMesh {
   phase: Phase;
   /** The cabinet fronts' colour after the defaults (model/casework.ts frontColorOf). */
   frontColor: string;
+  /** A cabinet's wood after the level's default (absent: painted in frontColor). */
+  wood?: WoodId;
+  /** A furniture piece's piece, wood and fabric after the catalogue's defaults. */
+  furniture?: { piece: FurniturePiece; wood: WoodId; fabric: FabricId; floorLayer: boolean };
   /** One merged geometry per material part, level-local like the walls. */
-  parts: { part: CasePart; geometry: BufferGeometry }[];
+  parts: { part: FixturePart; geometry: BufferGeometry }[];
 }
 
 export interface CounterMesh {
@@ -1157,14 +1317,61 @@ export interface DeckMesh {
 
 /** A staircase's solids as one geometry per group and material (empty ones left out). */
 export function buildStaircaseParts(solids: readonly StairSolid[]): StaircaseMesh['parts'] {
-  const by = new Map<string, { group: StairPartGroup; mat: StairPartMat; pos: number[] }>();
+  const by = new Map<string, { group: StairPartGroup; mat: StairPartMat; parts: BufferGeometry[] }>();
   for (const s of solids) {
     const k = `${s.group}|${s.mat}`;
     let e = by.get(k);
-    if (!e) by.set(k, (e = { group: s.group, mat: s.mat, pos: [] }));
-    slopedPrismPositions(s.poly, (p) => heightAt(s.zb, p), (p) => heightAt(s.zt, p), {}, e.pos);
+    if (!e) by.set(k, (e = { group: s.group, mat: s.mat, parts: [] }));
+    const pos: number[] = [];
+    slopedPrismPositions(s.poly, (p) => heightAt(s.zb, p), (p) => heightAt(s.zt, p), {}, pos);
+    if (pos.length) e.parts.push(grainUVs(geometryFrom(pos), longestEdge(s.poly)));
   }
-  return [...by.values()].filter((e) => e.pos.length).map((e) => ({ group: e.group, mat: e.mat, geometry: geometryFrom(e.pos) }));
+  return [...by.values()].filter((e) => e.parts.length).map((e) => ({ group: e.group, mat: e.mat, geometry: mergeAll(e.parts) }));
+}
+
+/** The unit direction of a polygon's longest edge: a tread's length, a handrail's run. */
+function longestEdge(poly: readonly Vec2[]): Vec2 {
+  let best = { x: 1, y: 0 };
+  let len = -1;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const l = Math.hypot(b.x - a.x, b.y - a.y);
+    if (l > len) {
+      len = l;
+      best = l > 0 ? { x: (b.x - a.x) / l, y: (b.y - a.y) / l } : best;
+    }
+  }
+  return best;
+}
+
+/**
+ * Texture coordinates in inches with the wood's grain (u) along `t`, a plan direction: on the top
+ * and bottom faces u along t and v across it; on the long faces u along t and v up; on the end faces
+ * the end grain, across and up (the stair treads and handrails, view3d/materials.ts stairPartMaterial).
+ */
+function grainUVs(g: BufferGeometry, t: Vec2): BufferGeometry {
+  const pos = g.getAttribute('position');
+  const nor = g.getAttribute('normal');
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const along = x * t.x + z * t.y;
+    const across = -x * t.y + z * t.x;
+    if (Math.abs(nor.getY(i)) > 0.5) {
+      uv[2 * i] = along;
+      uv[2 * i + 1] = across;
+    } else if (Math.abs(nor.getX(i) * t.x + nor.getZ(i) * t.y) < 0.7) {
+      uv[2 * i] = along;
+      uv[2 * i + 1] = pos.getY(i);
+    } else {
+      uv[2 * i] = across;
+      uv[2 * i + 1] = pos.getY(i);
+    }
+  }
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
 }
 
 /** The boxes of a deck as one geometry (prisms concatenated into one buffer). */
@@ -1746,7 +1953,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const roomOf = (f: { roomId?: Id } | null | undefined): Room | undefined => (f?.roomId ? level.rooms[f.roomId] : undefined);
   for (const f of faces.faces) {
     const room = roomOf(f);
-    const w = room && wainscotOf(room, level.wallHeight);
+    const w = room && wainscotIn(room, level.wallHeight, viewMode);
     if (w) bandSet.add(w.height);
   }
   // Exterior bands (Wall.band) likewise.
@@ -1826,8 +2033,8 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const dressable = sp(wall.phase) !== 'demo' && wallFinishOf(wall) !== 'screen';
     const sideLook = (side: 'left' | 'right') => {
       const room = dressable ? roomOf(sides?.[side]) : undefined;
-      const look = room ? roomWallLookOf(room) : null;
-      const wainscot = room ? wainscotOf(room, level.wallHeight) : null;
+      const look = room ? roomWallLookIn(room, viewMode) : null;
+      const wainscot = room ? wainscotIn(room, level.wallHeight, viewMode) : null;
       return room && (look || wainscot) ? { room, look, wainscot } : null;
     };
     const looks = { left: sideLook('left'), right: sideLook('right') };
@@ -2061,7 +2268,14 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const old = prevFixtures?.get(f.id);
     const entry: FixtureEntry = old && old.fixture === f && old.style === style ? old : { fixture: f, style, parts: buildFixtureParts(f, finishes) };
     nextFixtures.set(f.id, entry);
-    if (entry.parts.length) fixtureMeshes.push({ id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts });
+    if (!entry.parts.length) continue;
+    const mesh: FixtureMesh = { id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts };
+    if (f.kind === 'furniture' && f.piece) mesh.furniture = { piece: f.piece, wood: pieceWoodOf(f), fabric: pieceFabricOf(f), floorLayer: !!FURNITURE[f.piece].floorLayer };
+    else if (isCabinet(f.kind) || f.kind === 'wallOven' || f.kind === 'box') {
+      const wood = f.wood ?? (isCabinet(f.kind) ? finishes?.cabinetWood : undefined);
+      if (wood) mesh.wood = wood;
+    }
+    fixtureMeshes.push(mesh);
   }
   if (prevFixtures) for (const [id, e] of prevFixtures) if (nextFixtures.get(id) !== e) for (const p of e.parts) p.geometry.dispose();
   fixtureCache.set(key, nextFixtures);

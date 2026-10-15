@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import type { Issue } from '../derive/checks';
 import type { WallGeom } from '../derive/openings';
-import type { Column, FixtureKind, Id, MeasureTo, Opening, Phase, SurfaceMaterial, Vec2, ViewMode, WallKind } from '../model/types';
+import type { Column, FabricId, FixtureKind, FurniturePiece, Id, MeasureTo, Opening, Phase, SurfaceMaterial, Vec2, ViewMode, WallKind, WoodId } from '../model/types';
+import type { BedSize } from '../model/furniture';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | 'surface' | 'fence' | 'beam' | 'post' | 'joistZone' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'furniture' | 'gradePoint' | 'column' | 'surface' | 'fence' | 'beam' | 'post' | 'joistZone' | OpeningToolName;
 /** Tools that work on the site (E, C, A, Q); the others edit a level and are off in site mode. */
 export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column', 'surface', 'fence'];
 /** Tools allowed in site mode: select, measure, the site tools. */
@@ -100,6 +101,11 @@ export interface OpeningPreview {
 /** Fixture tool: the ghost of the fixture about to be placed. */
 export interface FixturePreview {
   kind: FixtureKind;
+  /** The Furniture tool's piece (kind 'furniture'). */
+  piece?: FurniturePiece;
+  /** The Furniture tool's wood and fabric for the piece (absent: the piece's own). */
+  wood?: WoodId;
+  fabric?: FabricId;
   /** Middle of the back edge. */
   origin: Vec2;
   direction: number;
@@ -173,6 +179,11 @@ export interface Draft {
   fixtureDirection: number;
   /** Fixture tool: the fixture about to be placed, following the snapped cursor. */
   fixturePreview: FixturePreview | null;
+  /** Furniture tool (Shift+C): the piece the next click places, a bed's mattress size, its wood and fabric (null: the piece's own). */
+  furniturePiece: FurniturePiece;
+  furnitureBed: BedSize;
+  furnitureWood: WoodId | null;
+  furnitureFabric: FabricId | null;
   /** Rectangle tool: the first corner clicked, null when idle. */
   rectStart: WallStart | null;
   rectPreview: RectPreview | null;
@@ -267,6 +278,7 @@ export interface ContextMenu {
 
 /** localStorage keys of the editor preferences that are not plan data (so not undoable). */
 export const ORTHO_LOCK_KEY = 'homeplan:orthoLock';
+export const FURNITURE_KEY = 'homeplan:showFurniture';
 export const MEASURE_TO_KEY = 'homeplan:measureTo';
 const MEASURE_TO_VALUES: readonly MeasureTo[] = ['center', 'inside', 'outside'];
 
@@ -288,6 +300,11 @@ function writePref(key: string, value: string): void {
 
 export function loadOrthoLock(): boolean {
   return readPref(ORTHO_LOCK_KEY) !== 'false';
+}
+
+/** The furniture layer: on unless turned off (the choice lasts across sessions). */
+export function loadShowFurniture(): boolean {
+  return readPref(FURNITURE_KEY) !== 'false';
 }
 
 export function loadMeasureTo(): MeasureTo {
@@ -337,6 +354,11 @@ export interface UiState {
   showLevelBelow: boolean;
   /** The Structure overlay on the plan (Y): joists, beam labels, bearing walls. */
   showStructure: boolean;
+  /**
+   * The furniture layer (Shift+F; DESIGN.md "Furniture"): furniture pieces on the plan, in 3D and
+   * in the exports. A view preference kept across sessions, not plan data.
+   */
+  showFurniture: boolean;
   spaceHeld: boolean;
   /** Size of the plan canvas in px, kept by PlanCanvas. */
   canvasSize: { width: number; height: number };
@@ -410,6 +432,8 @@ export interface UiState {
   resetDraft: () => void;
   toggleGrid: () => void;
   toggleStructure: () => void;
+  setShowFurniture: (on: boolean) => void;
+  toggleFurniture: () => void;
   toggleWallKind: () => void;
   setSpaceHeld: (held: boolean) => void;
   setCanvasSize: (size: { width: number; height: number }) => void;
@@ -476,11 +500,31 @@ export const emptyDraft = (): Draft => ({
   fixtureKind: 'base',
   fixtureDirection: 90,
   fixturePreview: null,
+  furniturePiece: 'bed',
+  furnitureBed: 'queen',
+  furnitureWood: null,
+  furnitureFabric: null,
   rectStart: null,
   rectPreview: null,
   measure: null,
   dragReadout: null,
 });
+
+/** The tool choices a draft reset keeps (the pickers set them). */
+const keptDraft = (d: Draft): Pick<Draft, 'fixtureKind' | 'fixtureDirection' | 'furniturePiece' | 'furnitureBed' | 'furnitureWood' | 'furnitureFabric'> => ({
+  fixtureKind: d.fixtureKind,
+  fixtureDirection: d.fixtureDirection,
+  furniturePiece: d.furniturePiece,
+  furnitureBed: d.furnitureBed,
+  furnitureWood: d.furnitureWood,
+  furnitureFabric: d.furnitureFabric,
+});
+
+/** The furniture layer on or off, remembered for the next session. */
+function showFurnitureState(on: boolean): { showFurniture: boolean } {
+  writePref(FURNITURE_KEY, String(on));
+  return { showFurniture: on };
+}
 
 export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], floorOpenings: [], staircases: [], members: [], joistZones: [], gradePoints: [], columns: [], surfaces: [], fences: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
@@ -511,6 +555,7 @@ export const useUiStore = create<UiState>()((set) => ({
   drawPhase: 'existing',
   showLevelBelow: false,
   showStructure: false,
+  showFurniture: loadShowFurniture(),
   spaceHeld: false,
   canvasSize: { width: 0, height: 0 },
   layout: '2d',
@@ -552,8 +597,11 @@ export const useUiStore = create<UiState>()((set) => ({
     set((s) => ({
       activeTool,
       underlayMode: 'move',
-      // The fixture kind and the free direction last across tool switches (the picker set them).
-      draft: { ...emptyDraft(), cursor: s.draft.cursor, fixtureKind: s.draft.fixtureKind, fixtureDirection: s.draft.fixtureDirection },
+      // The fixture kind, the furniture piece and its options, and the free direction last across
+      // tool switches (the pickers set them).
+      draft: { ...emptyDraft(), cursor: s.draft.cursor, ...keptDraft(s.draft) },
+      // Placing furniture shows its layer.
+      ...(activeTool === 'furniture' && !s.showFurniture ? showFurnitureState(true) : {}),
       hover: NO_HOVER,
       roomEdit: null,
       contextMenu: null,
@@ -603,9 +651,11 @@ export const useUiStore = create<UiState>()((set) => ({
   setViewport: (viewport) => set({ viewport }),
   patchDraft: (patch) => set((s) => ({ draft: { ...s.draft, ...patch } })),
   setRoomEdit: (roomEdit) => set({ roomEdit }),
-  resetDraft: () => set((s) => ({ draft: { ...emptyDraft(), cursor: s.draft.cursor } })),
+  resetDraft: () => set((s) => ({ draft: { ...emptyDraft(), cursor: s.draft.cursor, ...keptDraft(s.draft) } })),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   toggleStructure: () => set((s) => ({ showStructure: !s.showStructure })),
+  setShowFurniture: (on) => set(showFurnitureState(on)),
+  toggleFurniture: () => set((s) => showFurnitureState(!s.showFurniture)),
   toggleWallKind: () =>
     set((s) => ({ nextWallKind: s.nextWallKind === 'exterior' ? 'interior' : 'exterior' })),
   setSpaceHeld: (spaceHeld) => set((s) => (s.spaceHeld === spaceHeld ? s : { spaceHeld })),

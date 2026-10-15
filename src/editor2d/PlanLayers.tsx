@@ -1,6 +1,8 @@
 import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
+import { furnitureSymbol, type FurnitureSymbol } from '../derive/furniture';
+import { FURNITURE } from '../model/furniture';
 import { deckTopWords, getDeckLayout, scanSegments } from '../derive/decks';
 import { beamOutline, postOutline } from '../derive/members';
 import { isLog, joistWords } from '../model/structure';
@@ -15,7 +17,7 @@ import { FENCE_DEFAULTS, fencePostPoints, siteGhostLevelId } from '../derive/sit
 import { getStaircaseLayout } from '../derive/staircase';
 import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
-import type { Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
+import type { Fixture, Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
 import { useLayerPlan, useLayerUi } from './layerStores';
 import { outlinePath } from './outline';
@@ -444,11 +446,17 @@ function useEntityIds(levelId: Id, kind: 'walls' | 'nodes' | 'openings' | 'stair
  * Casework symbol (DESIGN.md "Casework"): the outline with a heavier front edge and door ticks,
  * dashed for what hangs above the counter, an appliance's word, a range's burners, a sink's basin.
  */
-export function FixtureGlyph({ sym, k, className, id }: { sym: FixtureSymbol; k: number; className: string; id?: Id }) {
+export function FixtureGlyph({ sym, k, className, id, detail }: { sym: FixtureSymbol; k: number; className: string; id?: Id; detail?: FurnitureSymbol | null }) {
   return (
     <g className={`${className}${sym.dashed ? ' fixture-overhead' : ''}`} data-fixture-id={id}>
       <path className="fixture-body" d={polyPath(sym.outline)} vectorEffect="non-scaling-stroke" />
       <path className="fixture-front" d={segPath([sym.front])} vectorEffect="non-scaling-stroke" />
+      {detail && (detail.lines.length > 0 || detail.rects.length > 0) && (
+        <path className="fixture-detail" d={segPath(detail.lines) + detail.rects.map(polyPath).join('')} vectorEffect="non-scaling-stroke" />
+      )}
+      {detail?.circles.map((c, i) => (
+        <circle key={`c${i}`} className="fixture-detail" cx={c.at.x} cy={c.at.y} r={c.r} vectorEffect="non-scaling-stroke" />
+      ))}
       {sym.ticks.length > 0 && <path className="fixture-tick" d={segPath(sym.ticks)} vectorEffect="non-scaling-stroke" />}
       {sym.basin && <path className="fixture-basin" d={polyPath(sym.basin)} vectorEffect="non-scaling-stroke" />}
       {sym.burners.map((b, i) => (
@@ -469,10 +477,15 @@ const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelI
   const f = useLayerPlan((s) => s.plan.levels[levelId]?.fixtures?.[fixtureId]);
   const viewMode = useLayerUi((s) => s.viewMode);
   const selected = useLayerUi((s) => s.selection.fixtures.includes(fixtureId));
+  const showFurniture = useLayerUi((s) => s.showFurniture);
   const k = useLayerUi(viewportScale);
   const sym = useMemo(() => (f ? fixtureSymbol(f) : null), [f]);
+  const detail = useMemo(() => (f?.kind === 'furniture' ? furnitureSymbol(f) : null), [f]);
   if (!f || !sym || !isVisible(f.phase, viewMode)) return null;
-  return <FixtureGlyph sym={sym} k={k} id={fixtureId} className={`fixture fixture-${f.kind} phase-${shownPhase(f.phase, viewMode)}${selected ? ' is-selected' : ''}`} />;
+  // The furniture layer (Shift+F) off hides every piece.
+  if (f.kind === 'furniture' && !showFurniture) return null;
+  const piece = f.kind === 'furniture' && f.piece ? ` fixture-piece-${f.piece}` : '';
+  return <FixtureGlyph sym={sym} k={k} id={fixtureId} detail={detail} className={`fixture fixture-${f.kind}${piece} phase-${shownPhase(f.phase, viewMode)}${selected ? ' is-selected' : ''}`} />;
 });
 
 /** The counter slabs' outlines (one path per run, so an L-shaped counter reads as one top). */
@@ -498,9 +511,22 @@ const CounterLayer = memo(function CounterLayer({ levelId }: { levelId: Id }) {
   );
 });
 
-/** Cabinets, appliances and sinks, under the walls (their backs sit against the wall faces). */
+/**
+ * Cabinets, appliances, sinks and furniture, under the walls (their backs sit against the wall
+ * faces); rugs first, so the pieces standing on them draw over them.
+ */
 const FixturesLayer = memo(function FixturesLayer({ levelId }: { levelId: Id }) {
-  const ids = useEntityIds(levelId, 'fixtures');
+  const ids = useLayerPlan(
+    useShallow((s) => {
+      const fixtures = s.plan.levels[levelId]?.fixtures ?? NO_RECORD;
+      const all = Object.keys(fixtures) as Id[];
+      const onFloor = (id: Id) => {
+        const f = (fixtures as Record<Id, Fixture>)[id];
+        return f.kind === 'furniture' && !!f.piece && !!FURNITURE[f.piece]?.floorLayer;
+      };
+      return [...all.filter(onFloor), ...all.filter((id) => !onFloor(id))];
+    }),
+  );
   if (ids.length === 0) return null;
   return (
     <>

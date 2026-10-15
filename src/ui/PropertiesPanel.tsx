@@ -17,7 +17,8 @@ import { activateUnderlayTool, makeToolContext, switchTool } from '../editor2d/t
 import { beamHeights, joistDepth, memberBoxes } from '../derive/members';
 import { bearingOf } from '../derive/structure';
 import { isLog, isTimber, joistWords, MEMBER_COLOR, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
-import { setFixtureKind } from '../editor2d/tools/fixtureTool';
+import { setFixtureKind, setFurnitureChoice } from '../editor2d/tools/fixtureTool';
+import { BED_SIZE_IDS, BED_SIZES, bedOverall, bedSizeOf, FABRIC_IDS, FABRICS, FURNITURE, FURNITURE_CATEGORIES, FURNITURE_PIECES, furnitureDefaults, furnitureNameOf, pieceFabricOf, pieceWoodOf, WOOD_IDS, WOODS, type BedSize } from '../model/furniture';
 import { COLUMN_KIND_NAME, SURFACE_MATERIAL_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import {
@@ -26,8 +27,8 @@ import {
   counterTopOf,
   DEFAULT_CABINET_COLOR,
   DEFAULT_COUNTER_COLOR,
+  CASEWORK_KINDS,
   FIXTURE_DEFAULTS,
-  FIXTURE_KINDS,
   FIXTURE_LABEL,
   FRONT_STYLE_LABEL,
   FRONT_STYLES,
@@ -46,7 +47,7 @@ import { boundsOf } from '../model/geometry';
 import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
-import type { Beam, Column, Deck, Fence, Fixture, FloorOpening, FrontStyle, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Beam, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -1084,6 +1085,8 @@ type FloorChoice = 'default' | (typeof FLOOR_FINISHES)[number];
 const floorOptions: { value: FloorChoice; label: string }[] = [{ value: 'default', label: 'Default (the slab)' }, ...FLOOR_FINISHES.map((f) => ({ value: f, label: FLOOR_FINISH_LABEL[f] }))];
 type ProposedFloorChoice = 'keep' | (typeof FLOOR_FINISHES)[number];
 const proposedFloorOptions: { value: ProposedFloorChoice; label: string }[] = [{ value: 'keep', label: 'Keep today\'s floor' }, ...FLOOR_FINISHES.map((f) => ({ value: f, label: FLOOR_FINISH_LABEL[f] }))];
+type ProposedWallChoice = 'keep' | (typeof ROOM_WALL_FINISHES)[number];
+const proposedWallOptions: { value: ProposedWallChoice; label: string }[] = [{ value: 'keep', label: 'Keep today\'s walls' }, ...ROOM_WALL_FINISHES.map((f) => ({ value: f, label: ROOM_WALL_FINISH_LABEL[f] }))];
 /** A new wainscot's height: a common chair-rail height. */
 const DEFAULT_WAINSCOT = 36;
 
@@ -1162,6 +1165,20 @@ function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; 
               value={room.proposedFloor.color ?? FLOOR_COLOR[room.proposedFloor.finish]}
               onCommit={(color) => set({ proposedFloor: { finish: room.proposedFloor!.finish, color } })}
               onReset={room.proposedFloor.color ? () => set({ proposedFloor: { finish: room.proposedFloor!.finish } }) : undefined}
+            />
+          )}
+          <SelectField
+            label="Proposed walls"
+            value={room.proposedWall?.finish ?? 'keep'}
+            options={proposedWallOptions}
+            onChange={(v) => set({ proposedWall: v === 'keep' ? undefined : { finish: v, ...(room.proposedWall?.color ? { color: room.proposedWall.color } : {}) } })}
+          />
+          {room.proposedWall && (
+            <ColorField
+              label="Proposed wall colour"
+              value={room.proposedWall.color ?? ROOM_WALL_COLOR[room.proposedWall.finish]}
+              onCommit={(color) => set({ proposedWall: { finish: room.proposedWall!.finish, color } })}
+              onReset={room.proposedWall.color ? () => set({ proposedWall: { finish: room.proposedWall!.finish } }) : undefined}
             />
           )}
         </>
@@ -1538,7 +1555,13 @@ function StairsOpeningFields({ level, stairs, ftf }: { level: Level; stairs: Sta
   );
 }
 
-const fixtureKindOptions = FIXTURE_KINDS.map((k) => ({ value: k, label: FIXTURE_LABEL[k] }));
+const fixtureKindOptions = CASEWORK_KINDS.map((k) => ({ value: k, label: FIXTURE_LABEL[k] }));
+/** The catalogue by category ("Beds: Bed", "Seating: Sofa"...). */
+const furniturePieceOptions = FURNITURE_CATEGORIES.flatMap((c) => FURNITURE_PIECES.filter((p) => FURNITURE[p].category === c).map((p) => ({ value: p, label: `${c}: ${FURNITURE[p].label}` })));
+const bedSizeOptions = BED_SIZE_IDS.map((b) => ({ value: b, label: `${BED_SIZES[b].label} (${BED_SIZES[b].mattress[0]}" x ${BED_SIZES[b].mattress[1]}" mattress)` }));
+/** '' is the piece's own wood or fabric (or, for a cabinet, painted). */
+const woodOptions = (own: string) => [{ value: '' as WoodId | '', label: own }, ...WOOD_IDS.map((w) => ({ value: w as WoodId | '', label: WOODS[w].label }))];
+const fabricOptions = (own: string) => [{ value: '' as FabricId | '', label: own }, ...FABRIC_IDS.map((f) => ({ value: f as FabricId | '', label: FABRICS[f].label }))];
 const frontStyleOptions = FRONT_STYLES.map((s) => ({ value: s, label: FRONT_STYLE_LABEL[s] }));
 const FACING_OPTIONS: { value: string; label: string }[] = [
   { value: '0', label: 'Right (+x)' },
@@ -1569,7 +1592,121 @@ function FixtureToolProps() {
   );
 }
 
+/** The furniture tool is active and nothing is selected: the piece the next click places, its wood and fabric. */
+function FurnitureToolProps() {
+  const piece = useUiStore((s) => s.draft.furniturePiece);
+  const bed = useUiStore((s) => s.draft.furnitureBed);
+  const wood = useUiStore((s) => s.draft.furnitureWood);
+  const fabric = useUiStore((s) => s.draft.furnitureFabric);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const spec = FURNITURE[piece];
+  const def = furnitureDefaults(piece, bed);
+  const choose = (patch: Parameters<typeof setFurnitureChoice>[1]) => setFurnitureChoice(makeToolContext(), patch);
+  return (
+    <>
+      <h3>Furniture tool</h3>
+      <SelectField label="Piece" value={piece} options={furniturePieceOptions} onChange={(p) => choose({ furniturePiece: p as FurniturePiece })} />
+      {piece === 'bed' && <SelectField label="Bed size" value={bed} options={bedSizeOptions} onChange={(b) => choose({ furnitureBed: b as BedSize })} />}
+      {spec.uses.wood && <SelectField label="Wood" value={(wood ?? '') as WoodId | ''} options={woodOptions(`Its own (${WOODS[spec.wood].label})`)} onChange={(w) => choose({ furnitureWood: w || null })} />}
+      {spec.uses.fabric && (
+        <SelectField label="Fabric" value={(fabric ?? '') as FabricId | ''} options={fabricOptions(`Its own (${FABRICS[spec.fabric ?? 'cream'].label})`)} onChange={(f) => choose({ furnitureFabric: f || null })} />
+      )}
+      <ReadOnly label="Size">
+        {formatLength(def.width, denom)} wide, {formatLength(def.depth, denom)} deep, {formatLength(def.height, denom)} high
+      </ReadOnly>
+      <p className="panel-note">
+        {spec.placement === 'wall'
+          ? `The ${spec.label.toLowerCase()} follows the cursor with its back on the nearest wall.`
+          : `The ${spec.label.toLowerCase()} follows the cursor, centred on it; Tab turns it.`}{' '}
+        Hold Shift to swap wall and free placement. Click to place it; type a width first (36, 2'6) to change it. Edit its size, wood
+        and fabric after placing by selecting it. Shift+F shows or hides all the furniture.
+      </p>
+    </>
+  );
+}
+
+/** A furniture piece selected: what it is, its size (a bed by its mattress), wood and fabric. */
+function FurnitureProps({ level, fixture }: { level: Level; fixture: Fixture }) {
+  const updateFixture = usePlanStore((s) => s.updateFixture);
+  const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
+  const p = fixture.piece!;
+  const spec = FURNITURE[p];
+  const dir = String(fixture.direction);
+  const facing = FACING_OPTIONS.some((o) => o.value === dir) ? FACING_OPTIONS : [...FACING_OPTIONS, { value: dir, label: `${dir}°` }];
+  const bed = p === 'bed' ? bedSizeOf(fixture.width) : null;
+  return (
+    <>
+      <h3>{furnitureNameOf(fixture)}</h3>
+      <SelectField
+        label="Piece"
+        value={p}
+        options={furniturePieceOptions}
+        onChange={(next) => {
+          // A new piece brings its stock size unless the size was changed by hand.
+          const old = furnitureDefaults(p, bed ?? undefined);
+          const stock = fixture.width === old.width && fixture.depth === old.depth && fixture.height === old.height;
+          const n = next as FurniturePiece;
+          set(stock ? { piece: n, ...furnitureDefaults(n), elevation: fixture.elevation } : { piece: n });
+        }}
+      />
+      {p === 'bed' && (
+        <SelectField
+          label="Bed size"
+          value={(bed ?? '') as BedSize | ''}
+          options={[...(bed ? [] : [{ value: '' as BedSize | '', label: 'Custom' }]), ...bedSizeOptions]}
+          onChange={(b) => b && set(bedOverall(b as BedSize))}
+        />
+      )}
+      {spec.uses.wood && (
+        <SelectField
+          label="Wood"
+          value={(fixture.wood ?? '') as WoodId | ''}
+          options={woodOptions(`Its own (${WOODS[spec.wood].label})`)}
+          onChange={(w) => set({ wood: w || undefined })}
+        />
+      )}
+      {spec.uses.fabric && (
+        <SelectField
+          label="Fabric"
+          value={(fixture.fabric ?? '') as FabricId | ''}
+          options={fabricOptions(`Its own (${FABRICS[spec.fabric ?? 'cream'].label})`)}
+          onChange={(f) => set({ fabric: f || undefined })}
+        />
+      )}
+      <ReadOnly label="Made in">
+        {spec.uses.wood ? WOODS[pieceWoodOf(fixture)].label : ''}
+        {spec.uses.wood && spec.uses.fabric ? ', ' : ''}
+        {spec.uses.fabric ? FABRICS[pieceFabricOf(fixture)].label : ''}
+      </ReadOnly>
+      <LengthField label="Width" value={fixture.width} onCommit={(v) => void (v !== null && set({ width: v }))} hint={p === 'bed' ? 'Across the bed, frame included.' : 'Along its back.'} />
+      <LengthField label="Depth" value={fixture.depth} onCommit={(v) => void (v !== null && set({ depth: v }))} hint={p === 'bed' ? 'Head to foot.' : 'Back to front.'} />
+      <LengthField label="Height" value={fixture.height} onCommit={(v) => void (v !== null && set({ height: v }))} hint={p === 'bed' ? 'To the top of the headboard.' : undefined} />
+      <SelectField label="Facing" value={dir} options={facing} onChange={(v) => set({ direction: Number(v) })} />
+      <SelectField label="Phase" value={fixture.phase} options={phaseOptions} onChange={(ph) => set({ phase: ph })} />
+      <div className="field">
+        <label htmlFor={`fixture-label-${fixture.id}`}>Label</label>
+        <input
+          id={`fixture-label-${fixture.id}`}
+          aria-label="Label"
+          defaultValue={fixture.label ?? ''}
+          placeholder={furnitureNameOf({ ...fixture, label: undefined })}
+          onBlur={(e) => set({ label: e.target.value.trim() || undefined })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') releaseFocus(e.currentTarget);
+          }}
+        />
+      </div>
+      <p className="panel-note">Drag with the select tool to move. Shift+F hides or shows all the furniture.</p>
+    </>
+  );
+}
+
 function FixtureProps({ level, fixture }: { level: Level; fixture: Fixture }) {
+  if (fixture.kind === 'furniture' && fixture.piece) return <FurnitureProps level={level} fixture={fixture} />;
+  return <CaseworkProps level={level} fixture={fixture} />;
+}
+
+function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
   const updateFixture = usePlanStore((s) => s.updateFixture);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
@@ -1626,6 +1763,12 @@ function FixtureProps({ level, fixture }: { level: Level; fixture: Fixture }) {
       {isCabinet(fixture.kind) || fixture.kind === 'wallOven' ? (
         <>
           <SelectField label="Fronts" value={style} options={frontStyleOptions} onChange={(s) => set({ frontStyle: s })} />
+          <SelectField
+            label="Wood"
+            value={(fixture.wood ?? '') as WoodId | ''}
+            options={woodOptions(level.finishes?.cabinetWood ? `Level's (${WOODS[level.finishes.cabinetWood].label})` : 'Painted')}
+            onChange={(w) => set({ wood: w || undefined })}
+          />
           <ColorField
             label="Front colour"
             value={color}
@@ -1675,6 +1818,7 @@ function CaseworkDefaults({ level }: { level: Level }) {
         hint={f?.counterColor === undefined ? `Default ${DEFAULT_COUNTER_COLOR}.` : undefined}
       />
       <SelectField label="Cabinet fronts" value={(f?.frontStyle ?? 'slab') as FrontStyle} options={frontStyleOptions} onChange={(s) => updateFinishes(level.id, { frontStyle: s })} />
+      <SelectField label="Cabinet wood" value={(f?.cabinetWood ?? '') as WoodId | ''} options={woodOptions('Painted')} onChange={(w) => updateFinishes(level.id, { cabinetWood: w || undefined })} />
       <ReadOnly label="Fixtures">{count}</ReadOnly>
     </>
   );
@@ -3129,6 +3273,7 @@ export function PropertiesPanel() {
   const underlaySelected = useUiStore((s) => s.underlaySelected);
   const underlayTool = useUiStore((s) => s.activeTool === 'underlay');
   const fixtureTool = useUiStore((s) => s.activeTool === 'fixture');
+  const furnitureTool = useUiStore((s) => s.activeTool === 'furniture');
   const level = usePlanStore((s) => s.plan.levels[levelId]);
   const site = usePlanStore((s) => s.plan.site);
   const siteMode = useUiStore((s) => s.siteMode);
@@ -3176,6 +3321,7 @@ export function PropertiesPanel() {
   if (total === 0 && siteMode) body = <SiteProps key="site" site={site} />;
   else if (total === 0 && (underlayTool || (underlaySelected && level.underlay))) body = <UnderlayProps key={level.id} level={level} />;
   else if (total === 0 && fixtureTool) body = <FixtureToolProps key="fixture-tool" />;
+  else if (total === 0 && furnitureTool) body = <FurnitureToolProps key="furniture-tool" />;
   else if (total === 0) body = <LevelProps key={level.id} level={level} />;
   else if (total === 1 && walls.length === 1) body = <WallProps key={walls[0].id} level={level} wall={walls[0]} />;
   else if (total === 1 && openings.length === 1)

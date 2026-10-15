@@ -785,7 +785,7 @@ function drawScreen(ctx: Ctx): void {
  * A tile texture over a canvas: repeating, mipmapped. `repeat` 1/48 for siding (UVs in inches, one
  * repeat per 48" tile); roof UVs are in tiles already (meshes.ts addRoofUVs), so roofs use 1.
  */
-function tileTexture(canvas: HTMLCanvasElement, colorSpace: ColorSpace, repeat = 1 / TILE_INCHES): CanvasTexture {
+export function tileTexture(canvas: HTMLCanvasElement, colorSpace: ColorSpace, repeat = 1 / TILE_INCHES): CanvasTexture {
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = colorSpace;
   tex.wrapS = RepeatWrapping;
@@ -797,7 +797,7 @@ function tileTexture(canvas: HTMLCanvasElement, colorSpace: ColorSpace, repeat =
   return tex;
 }
 
-function tileCanvas(): { canvas: HTMLCanvasElement; ctx: Ctx } | null {
+export function tileCanvas(): { canvas: HTMLCanvasElement; ctx: Ctx } | null {
   const canvas = document.createElement('canvas');
   canvas.width = TEXTURE_PX;
   canvas.height = TEXTURE_PX;

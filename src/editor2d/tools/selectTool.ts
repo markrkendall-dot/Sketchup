@@ -10,7 +10,8 @@ import { isOpeningVisible, isVisible, visibleNodeIds } from '../../derive/phase'
 import { add, dist, dot, pointInPolygon, projectPointToSegment, sub } from '../../model/geometry';
 import { WALL_OVERLAP_MESSAGE } from '../../model/plan';
 import { nudgeShifts } from '../../model/offset';
-import type { Id, Level, Member, Plan, Vec2, ViewMode } from '../../model/types';
+import type { Fixture, Id, Level, Member, Plan, Vec2, ViewMode } from '../../model/types';
+import { FURNITURE } from '../../model/furniture';
 import { formatLength } from '../../model/units';
 import { needsRenovationChoice, perpendicularShift, requestWallMove } from '../../ui/wallMove';
 import { pauseHistory, resumeHistory, usePlanStore } from '../../store/planStore';
@@ -140,7 +141,7 @@ const nearOutline = (outline: readonly Vec2[], p: Vec2, tol: number): boolean =>
  * or within 2 px of it), then floor openings (the same), then roofs (inside the outline grown by the overhang); the most recently
  * added on top. Elements hidden in `viewMode` are never hit.
  */
-export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all', opts: { structure?: boolean } = {}): Hit {
+export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = 'all', opts: { structure?: boolean; furniture?: boolean } = {}): Hit {
   let best: Hit = null;
   let bestD = SNAP_RADIUS_PX.node / k;
   const shownNodes = visibleNodeIds(level, viewMode);
@@ -191,10 +192,13 @@ export function hitTest(level: Level, p: Vec2, k: number, viewMode: ViewMode = '
   }
   const room = hitRoomLabel(level, viewMode, p, k);
   if (room) return { kind: 'room', id: room };
-  // Topmost (last placed) fixture first.
-  const fixture = Object.values(level.fixtures ?? {})
+  // Topmost (last placed) fixture first; furniture only while its layer is on, rugs after everything
+  // else (the pieces standing on them come first).
+  const shownFixtures = Object.values(level.fixtures ?? {})
     .reverse()
-    .find((f) => isVisible(f.phase, viewMode) && hitFixture(f, p, 2 / k));
+    .filter((f) => isVisible(f.phase, viewMode) && (opts.furniture !== false || f.kind !== 'furniture'));
+  const onFloor = (f: Fixture) => f.kind === 'furniture' && !!f.piece && !!FURNITURE[f.piece]?.floorLayer;
+  const fixture = [...shownFixtures.filter((f) => !onFloor(f)), ...shownFixtures.filter(onFloor)].find((f) => hitFixture(f, p, 2 / k));
   if (fixture) return { kind: 'fixture', id: fixture.id };
   // Topmost (last drawn) stairs first.
   const stairs = Object.values(level.stairs).reverse();
@@ -403,7 +407,7 @@ export const selectTool: Tool = {
   onPointerDown(e, ctx) {
     // Right-click: the canvas menu ("Walk from here", "Split wall here", PlanContextMenu.tsx) at the clicked point.
     if (e.button === 2) {
-      const under = hitTest(ctx.level(), e.world, ctx.ui().viewport.k, ctx.ui().viewMode, { structure: ctx.ui().showStructure });
+      const under = hitTest(ctx.level(), e.world, ctx.ui().viewport.k, ctx.ui().viewMode, { structure: ctx.ui().showStructure, furniture: ctx.ui().showFurniture });
       ctx.ui().setContextMenu({ screen: e.screen, world: e.world, levelId: ctx.levelId, ...(under?.kind === 'wall' ? { wallId: under.id } : {}) });
       return;
     }
@@ -428,7 +432,7 @@ export const selectTool: Tool = {
       drag = { kind: 'beam-end', ...beamEnd, startScreen: e.screen, started: false };
       return;
     }
-    const hit = liftToStaircase(level, hitTest(level, e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure }), ui.openStaircaseId);
+    const hit = liftToStaircase(level, hitTest(level, e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure, furniture: ui.showFurniture }), ui.openStaircaseId);
     // A click off the open staircase's pieces closes it.
     if (ui.openStaircaseId && !(hit?.kind === 'stairs' && level.stairs[hit.id]?.staircaseId === ui.openStaircaseId)) ui.setOpenStaircase(null);
 
@@ -517,7 +521,7 @@ export const selectTool: Tool = {
   onPointerMove(e, ctx) {
     const ui = ctx.ui();
     if (!drag) {
-      const hit = hitTest(ctx.level(), e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure });
+      const hit = hitTest(ctx.level(), e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure, furniture: ui.showFurniture });
       ui.setHover({
         nodeId: hit?.kind === 'node' ? hit.id : null,
         wallId: hit?.kind === 'wall' ? hit.id : null,
@@ -741,7 +745,7 @@ export const selectTool: Tool = {
   onDoubleClick(e, ctx) {
     const ui = ctx.ui();
     const level = ctx.level();
-    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure });
+    const hit = hitTest(level, e.world, ui.viewport.k, ui.viewMode, { structure: ui.showStructure, furniture: ui.showFurniture });
     if (hit?.kind === 'room') startRename(ctx, hit.id);
     // A piece of a staircase: open the staircase and select the piece alone.
     if (hit?.kind === 'stairs') {

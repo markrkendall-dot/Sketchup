@@ -61,6 +61,7 @@ function sceneUiChanged(s: UiState, prev: UiState): boolean {
     s.hidden3dLevels !== prev.hidden3dLevels ||
     s.only3dActiveAndBelow !== prev.only3dActiveAndBelow ||
     s.show3dRoofs !== prev.show3dRoofs ||
+    s.showFurniture !== prev.showFurniture ||
     s.siteMode !== prev.siteMode
   );
 }
@@ -327,11 +328,12 @@ function View3dToolbar() {
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const grid = useUiStore((s) => s.show3dGrid);
   const roofs = useUiStore((s) => s.show3dRoofs);
+  const furniture = useUiStore((s) => s.showFurniture);
   const walking = useUiStore((s) => s.cameraMode === 'walk');
   const preset = useUiStore((s) => s.view3dPreset);
   // The standalone viewer has no walk mode (keyboard driven) and no grid.
   const viewer = useUiStore((s) => s.viewerMode);
-  const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, setShow3dRoofs, requestFit3d, setCameraMode, setView3dPreset } = useUiStore.getState();
+  const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, setShow3dRoofs, setShowFurniture, requestFit3d, setCameraMode, setView3dPreset } = useUiStore.getState();
   const nameList = names.split('\u0000');
   return (
     <div className="view3d-toolbar" role="toolbar" aria-label="3D view">
@@ -349,6 +351,10 @@ function View3dToolbar() {
       <label title="Untick to lift the roofs off and look down into the top floor">
         <input type="checkbox" checked={roofs} onChange={(e) => setShow3dRoofs(e.target.checked)} />
         Roofs
+      </label>
+      <label title="The furniture layer (Shift+F): beds, chairs, tables and rugs, on the plan too">
+        <input type="checkbox" checked={furniture} onChange={(e) => setShowFurniture(e.target.checked)} />
+        Furniture
       </label>
       {!viewer && (
         <label title="Grid lines on the ground (12 inch cells, 10 foot sections)">

@@ -92,6 +92,21 @@ export function floorLookOf(r: Pick<Room, 'floorFinish' | 'floorColor'>): Interi
   return { finish, color: r.floorColor ?? FLOOR_COLOR[finish] };
 }
 
+/** Whether a room shows its proposed walls (Room.proposedWall) in a view: an existing room's, in the Proposed view. */
+const proposedWallsIn = (r: Pick<Room, 'phase' | 'proposedWall'>, viewMode: ViewMode): boolean => !!r.proposedWall && viewMode === 'proposed' && (r.phase ?? 'existing') === 'existing';
+
+/** The look of a room's walls in a view: an existing room's proposed walls in the Proposed view, else roomWallLookOf. */
+export function roomWallLookIn(r: Pick<Room, 'wallFinish' | 'wallColor' | 'phase' | 'proposedWall'>, viewMode: ViewMode): InteriorLook<RoomWallFinish> | null {
+  const p = r.proposedWall;
+  if (p && proposedWallsIn(r, viewMode)) return { finish: p.finish, color: p.color ?? ROOM_WALL_COLOR[p.finish] };
+  return roomWallLookOf(r);
+}
+
+/** The room's wainscot in a view: none where its proposed walls show (they are redone), else wainscotOf. */
+export function wainscotIn(r: Pick<Room, 'wainscot' | 'phase' | 'proposedWall'>, wallHeight: number, viewMode: ViewMode): ReturnType<typeof wainscotOf> {
+  return proposedWallsIn(r, viewMode) ? null : wainscotOf(r, wallHeight);
+}
+
 /**
  * The look of a room's floor in a view: an existing room's proposed floor (Room.proposedFloor) in
  * the Proposed view, else floorLookOf.

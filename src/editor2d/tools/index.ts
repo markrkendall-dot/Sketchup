@@ -13,7 +13,7 @@ import {
 } from '../../store/uiStore';
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint, type GhostWall } from '../snap';
-import { fixtureTool } from './fixtureTool';
+import { fixtureTool, furnitureTool } from './fixtureTool';
 import { doorTool, passageTool, windowTool } from './openingTool';
 import { measureTool } from './measureTool';
 import { rectTool } from './rectTool';
@@ -83,6 +83,7 @@ const tools: Record<ToolName, Tool> = {
   floorOpening: floorOpeningTool,
   underlay: underlayTool,
   fixture: fixtureTool,
+  furniture: furnitureTool,
   gradePoint: gradePointTool,
   column: columnTool,
   surface: surfaceTool,
@@ -236,7 +237,8 @@ export function pruneSelection(): void {
   const rooms = sel.rooms.filter((id) => level.rooms[id] && isVisible(level.rooms[id].phase ?? 'existing', vm));
   const stairs = sel.stairs.filter((id) => level.stairs[id] && isVisible(level.stairs[id].phase, vm));
   const roofs = sel.roofs.filter((id) => level.roofs[id] && isVisible(level.roofs[id].phase, vm));
-  const fixtures = sel.fixtures.filter((id) => level.fixtures[id] && isVisible(level.fixtures[id].phase, vm));
+  // Furniture leaves the selection when its layer is turned off.
+  const fixtures = sel.fixtures.filter((id) => level.fixtures[id] && isVisible(level.fixtures[id].phase, vm) && (ui.showFurniture || level.fixtures[id].kind !== 'furniture'));
   const decks = sel.decks.filter((id) => level.decks?.[id] && isVisible(level.decks[id].phase, vm));
   const floorOpenings = sel.floorOpenings.filter((id) => level.floorOpenings?.[id] && isVisible(level.floorOpenings[id].phase, vm));
   // A staircase stays selected while one of its pieces is shown.

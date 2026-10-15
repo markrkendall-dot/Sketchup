@@ -47,6 +47,7 @@ export function ViewerApp() {
             ))}
           </div>
         )}
+        {tab === 'plan' && <FurnitureToggle />}
       </header>
       <div className="viewer-body">{tab === '3d' ? <Scene3D /> : <PlanTab />}</div>
     </div>
@@ -59,19 +60,31 @@ export function ViewerApp() {
  * own stylesheet travels with it, and the `:root` variables it declares are the ones the editor's
  * page defines anyway.
  */
+/** The plan tab's furniture layer switch (the 3D tab has its own, in the 3D bar). */
+function FurnitureToggle() {
+  const on = useUiStore((s) => s.showFurniture);
+  return (
+    <label className="viewer-furniture" title="Show the furniture (Shift+F)">
+      <input type="checkbox" checked={on} onChange={(e) => useUiStore.getState().setShowFurniture(e.target.checked)} />
+      Furniture
+    </label>
+  );
+}
+
 function PlanTab() {
   const plan = usePlanStore((s) => s.plan);
   const viewMode = useUiStore((s) => s.viewMode);
+  const furniture = useUiStore((s) => s.showFurniture);
   const activeLevelId = useUiStore((s) => s.activeLevelId);
   const levelId = plan.levels[activeLevelId] ? activeLevelId : plan.levelOrder[0];
   const svg = useMemo(() => {
     try {
       // The export sizes itself in inches for printing; here it fills the pan-zoom area instead.
-      return planSvg(plan, levelId, viewMode).replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1');
+      return planSvg(plan, levelId, viewMode, { furniture }).replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1');
     } catch {
       return null;
     }
-  }, [plan, levelId, viewMode]);
+  }, [plan, levelId, viewMode, furniture]);
   return (
     <>
       <div className="viewer-levels" role="tablist" aria-label="Level">

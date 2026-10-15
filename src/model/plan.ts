@@ -7,6 +7,7 @@ import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './
 import { BAND_FINISHES, FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, SURFACE_MATERIALS, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
 import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
+import { isFabricId, isFurniturePiece, isWoodId } from './furniture';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
 import type { Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
@@ -592,7 +593,7 @@ const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color', 'bearing', 'band'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
-const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor'] as const;
+const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
@@ -602,8 +603,8 @@ const FENCE_KEYS = ['id', 'points', 'height', 'rails', 'postSpacing', 'phase', '
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
 const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
-const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang'] as const;
-const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle'] as const;
+const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric'] as const;
+const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle', 'cabinetWood'] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
 const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
 const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
@@ -728,6 +729,8 @@ function migrateRooms(raw: Json): Level['rooms'] {
     const pf = r.proposedFloor;
     const pfOk = isObject(pf) && typeof pf.finish === 'string' && FLOOR_FINISHES.includes(pf.finish as FloorFinish);
     put(room, 'proposedFloor', pfOk ? { finish: pf.finish, ...(isHexColor(pf.color) ? { color: pf.color.toLowerCase() } : {}) } : undefined);
+    const pw = r.proposedWall;
+    put(room, 'proposedWall', isObject(pw) && wallFinishOk(pw.finish) ? { finish: pw.finish, ...(isHexColor(pw.color) ? { color: pw.color.toLowerCase() } : {}) } : undefined);
     out[rid] = room as unknown as Room;
   }
   return out;
@@ -1091,11 +1094,18 @@ const isOverhang = (v: unknown): v is NonNullable<Fixture['counterOverhang']> =>
   isObject(v) && (['front', 'back', 'left', 'right'] as const).every((k) => isNum(v[k]) && (v[k] as number) >= 0);
 
 /**
- * Why a fixture cannot be used (an unknown kind, a non-positive size, a negative elevation, a
- * malformed optional field), or null when it can (also used by the store).
+ * Why a fixture cannot be used (an unknown kind, furniture without a known piece, a non-positive
+ * size, a negative elevation, a malformed optional field), or null when it can (also used by the
+ * store).
  */
-export function fixtureProblem(f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang'>): string | null {
+export function fixtureProblem(
+  f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang' | 'piece' | 'wood' | 'fabric'>,
+): string | null {
   if (typeof f.kind !== 'string' || !FIXTURE_KINDS.includes(f.kind)) return `unknown kind ${String(f.kind)}`;
+  if (f.kind === 'furniture' && !isFurniturePiece(f.piece)) return `furniture needs a known piece (${String(f.piece)})`;
+  if (f.kind !== 'furniture' && f.piece !== undefined) return 'only furniture has a piece';
+  if (f.wood !== undefined && !isWoodId(f.wood)) return `unknown wood ${String(f.wood)}`;
+  if (f.fabric !== undefined && (f.kind !== 'furniture' || !isFabricId(f.fabric))) return f.kind !== 'furniture' ? 'only furniture has a fabric' : `unknown fabric ${String(f.fabric)}`;
   if (!isPoint(f.origin)) return 'needs a position';
   if (!isNum(f.direction)) return 'needs a direction';
   if (!isNum(f.width) || f.width <= 0 || !isNum(f.depth) || f.depth <= 0 || !isNum(f.height) || f.height <= 0) return 'width, depth and height must be positive';
@@ -1120,6 +1130,7 @@ function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
       depth: f.depth as number,
       height: f.height as number,
       elevation: isNum(f.elevation) ? f.elevation : 0,
+      piece: f.kind === 'furniture' ? (f.piece as Fixture['piece']) : undefined,
     };
     const problem = fixtureProblem(base);
     if (problem) {
@@ -1137,6 +1148,9 @@ function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
     put(fixture, 'frontColor', isHexColor(f.frontColor) ? f.frontColor.toLowerCase() : undefined);
     const o = f.counterOverhang;
     put(fixture, 'counterOverhang', isOverhang(o) ? { front: o.front, back: o.back, left: o.left, right: o.right } : undefined);
+    put(fixture, 'piece', base.piece);
+    put(fixture, 'wood', isWoodId(f.wood) ? f.wood : undefined);
+    put(fixture, 'fabric', base.kind === 'furniture' && isFabricId(f.fabric) ? f.fabric : undefined);
     out[fid] = fixture as unknown as Fixture;
   }
   return out;
@@ -1149,6 +1163,7 @@ function migrateFinishes(raw: unknown): LevelFinishes | undefined {
   put(out, 'cabinetColor', isHexColor(raw.cabinetColor) ? raw.cabinetColor.toLowerCase() : undefined);
   put(out, 'counterColor', isHexColor(raw.counterColor) ? raw.counterColor.toLowerCase() : undefined);
   put(out, 'frontStyle', typeof raw.frontStyle === 'string' && FRONT_STYLES.includes(raw.frontStyle as FrontStyle) ? raw.frontStyle : undefined);
+  put(out, 'cabinetWood', isWoodId(raw.cabinetWood) ? raw.cabinetWood : undefined);
   return Object.keys(out).length ? (out as unknown as LevelFinishes) : undefined;
 }
 

@@ -97,6 +97,17 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     run: () => switchTool(useUiStore.getState().siteMode ? 'column' : 'fixture'),
     whileDrawing: true,
   },
+  {
+    keys: 'Shift+C',
+    label: 'Furniture: pick a piece, its size, wood and fabric in the properties panel; it follows the cursor (a bed or dresser backs onto the nearest wall, a table or rug is free), click to place; Shift swaps wall and free',
+    group: 'Tools',
+    combos: ['shift+c'],
+    run: () => {
+      if (useUiStore.getState().siteMode) return false;
+      switchTool('furniture');
+    },
+    whileDrawing: true,
+  },
   tool('u', 'underlay', 'Image underlay: load, move, scale by two points; lock it, then trace walls with W'),
 
   { keys: "12'6  150  6 1/2\"", label: "Type a length (walls), or the distance from the nearer corner's inside face to the near edge (doors, windows, passages); Enter commits", group: 'While drawing' },
@@ -140,6 +151,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   },
   { keys: 'G', label: 'Grid on or off', group: 'View', combos: ['g'], run: () => useUiStore.getState().toggleGrid() },
   { keys: 'Y', label: 'Structure overlay on or off: the joists over each level, beams, posts and bearing walls', group: 'View', combos: ['y'], run: () => useUiStore.getState().toggleStructure() },
+  { keys: 'Shift+F', label: 'Furniture layer on or off: the furniture on the plan, in 3D and in the exports', group: 'View', combos: ['shift+f'], run: () => useUiStore.getState().toggleFurniture() },
   {
     keys: '[',
     label: 'Narrow window (under 900 px): show or hide the level bar',

@@ -13,6 +13,7 @@ import {
   type CounterOverhang,
 } from '../model/casework';
 import { add, cross, dot, polygonSignedArea, scale, sub } from '../model/geometry';
+import { furniturePlanLabel } from '../model/furniture';
 import type { Fixture, FrontStyle, Id, LevelFinishes, Vec2 } from '../model/types';
 import { directionVector, normalizeDegrees } from './stairs';
 
@@ -102,6 +103,8 @@ export interface CaseBox {
   y0: number;
   y1: number;
 }
+
+// Furniture has its own solids (derive/furniture.ts furnitureSolids); fixtureBoxes gives it none.
 
 const box = (part: CasePart, s0: number, s1: number, d0: number, d1: number, y0: number, y1: number): CaseBox | null =>
   s1 - s0 > 1e-6 && d1 - d0 > 1e-6 && y1 - y0 > 1e-6 ? { part, s0, s1, d0, d1, y0, y1 } : null;
@@ -503,7 +506,8 @@ export function fixtureSymbol(f: Fixture): FixtureSymbol {
     front: [outline[1], outline[2]],
     ticks,
     dashed: isOverhead(f.kind),
-    label: f.kind === 'range' || f.kind === 'sink' ? (f.label?.trim() || null) : word,
+    // Furniture: a big piece's name ("Queen bed"), else its label or nothing (derive/furniture.ts draws its detail).
+    label: f.kind === 'furniture' ? furniturePlanLabel(f) : f.kind === 'range' || f.kind === 'sink' ? (f.label?.trim() || null) : word,
     labelAt: fixturePoint(fr, 0, f.depth / 2),
     labelAngle,
     burners,

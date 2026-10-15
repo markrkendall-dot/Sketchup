@@ -4,7 +4,9 @@ import type { Fixture, FixtureKind, FrontStyle, Level, LevelFinishes } from './t
 // toe-kick dimensions and the colour defaults. Pure data shared by the tool, the panel, the 3D
 // materials, the 2D symbols and the loader's validation.
 
-export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'wall', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', 'box'];
+export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'wall', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', 'box', 'furniture'];
+/** The kinds the Cabinet tool offers (furniture has its own tool and catalogue, model/furniture.ts). */
+export const CASEWORK_KINDS: readonly FixtureKind[] = FIXTURE_KINDS.filter((k) => k !== 'furniture');
 
 export const FIXTURE_LABEL: Record<FixtureKind, string> = {
   base: 'Base cabinet',
@@ -19,6 +21,7 @@ export const FIXTURE_LABEL: Record<FixtureKind, string> = {
   hood: 'Range hood',
   microwave: 'Microwave',
   box: 'Box',
+  furniture: 'Furniture',
 };
 
 /** The short word on an appliance's plan symbol. */
@@ -54,6 +57,8 @@ export const FIXTURE_DEFAULTS: Record<FixtureKind, FixtureSize> = {
   hood: { width: 30, depth: 18, height: 12, elevation: 66 },
   microwave: { width: 30, depth: 16, height: 17, elevation: 54 },
   box: { width: 24, depth: 24, height: 24, elevation: 0 },
+  // Nominal: the Furniture tool places each piece at its own size (model/furniture.ts).
+  furniture: { width: 24, depth: 24, height: 30, elevation: 0 },
 };
 
 /** Wall cabinet heights the panel offers; tall cabinets 84 or 96. */

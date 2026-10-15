@@ -48,13 +48,14 @@ export interface PlanFrame {
  * What the level shows in a view mode, for fitting the drawing: the visible walls' outlines, the
  * roofs with their overhangs, the decks, the stairs. Null when there is nothing.
  */
-export function levelDrawingBounds(level: Level, viewMode: ViewMode): Bounds | null {
+export function levelDrawingBounds(level: Level, viewMode: ViewMode, opts: { furniture?: boolean } = {}): Bounds | null {
   const pts: Vec2[] = [];
   for (const fp of getFootprints(level, viewMode).values()) pts.push(...fp.poly);
   for (const r of Object.values(level.roofs ?? {})) if (isVisible(r.phase, viewMode)) pts.push(...roofOutlineWithOverhang(r));
   for (const d of Object.values(level.decks ?? {})) if (isVisible(d.phase, viewMode)) pts.push(...d.outline);
   for (const st of Object.values(level.stairs)) if (isVisible(st.phase, viewMode)) pts.push(...stairsSymbol(st, 1).outline);
-  for (const f of Object.values(level.fixtures ?? {})) if (isVisible(f.phase, viewMode)) pts.push(...fixtureExtent(f));
+  // Furniture only while its layer is on (absent: on).
+  for (const f of Object.values(level.fixtures ?? {})) if (isVisible(f.phase, viewMode) && (opts.furniture !== false || f.kind !== 'furniture')) pts.push(...fixtureExtent(f));
   return boundsOf(pts);
 }
 
@@ -136,9 +137,10 @@ function titleBlock(plan: Plan, level: Level, viewMode: ViewMode, frame: PlanFra
 }
 
 /** The UI state the layers draw an export with: the view mode, the export scale, nothing selected or hovered. */
-function exportUiState(levelId: Id, viewMode: ViewMode): UiState {
+function exportUiState(levelId: Id, viewMode: ViewMode, furniture: boolean): UiState {
   return {
     ...useUiStore.getState(),
+    showFurniture: furniture,
     activeLevelId: levelId,
     siteMode: false,
     viewMode,
@@ -158,12 +160,16 @@ export interface PlanExport {
   frame: PlanFrame;
 }
 
-/** The level's plan as a stand-alone SVG document and its frame. Throws when the level is missing. */
-export function planExport(plan: Plan, levelId: Id, viewMode: ViewMode, opts: { date?: Date } = {}): PlanExport {
+/**
+ * The level's plan as a stand-alone SVG document and its frame. Throws when the level is missing.
+ * The furniture shows as the furniture layer is set (Shift+F), unless `opts.furniture` says.
+ */
+export function planExport(plan: Plan, levelId: Id, viewMode: ViewMode, opts: { date?: Date; furniture?: boolean } = {}): PlanExport {
   const level = plan.levels[levelId];
   if (!level) throw new Error('No level to export.');
-  const frame = planFrame(levelDrawingBounds(level, viewMode));
-  const stores = snapshotStores(plan, exportUiState(levelId, viewMode));
+  const furniture = opts.furniture ?? useUiStore.getState().showFurniture;
+  const frame = planFrame(levelDrawingBounds(level, viewMode, { furniture }));
+  const stores = snapshotStores(plan, exportUiState(levelId, viewMode, furniture));
   const layers = renderToStaticMarkup(createElement(LayerStoresContext.Provider, { value: stores }, createElement(PlanLayers, { levelId })));
   const title = `${plan.name} - ${level.name}`;
   const svg = [
@@ -180,7 +186,7 @@ export function planExport(plan: Plan, levelId: Id, viewMode: ViewMode, opts: { 
 }
 
 /** The level's plan as a stand-alone SVG document (see planExport). */
-export function planSvg(plan: Plan, levelId: Id, viewMode: ViewMode, opts: { date?: Date } = {}): string {
+export function planSvg(plan: Plan, levelId: Id, viewMode: ViewMode, opts: { date?: Date; furniture?: boolean } = {}): string {
   return planExport(plan, levelId, viewMode, opts).svg;
 }
 

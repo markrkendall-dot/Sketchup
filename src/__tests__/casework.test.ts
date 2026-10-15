@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { basinOutline, counterOutline, counterRuns, doorCount, fixtureBoxes, fixtureOutline, fixtureSymbol, frontSpans, hitFixture, rectilinearUnion, simplifyRing } from '../derive/casework';
 import { buildCounterGeometry, buildFixtureParts, clearMeshCache, getLevelMeshes, triangleCount } from '../derive/meshes';
 import { buildExportScene, disposeExportScene } from '../io/export3d';
-import { BASIN, COUNTER_THICKNESS, FIXTURE_DEFAULTS, FIXTURE_KINDS, hasCounter, TOE_KICK } from '../model/casework';
+import { BASIN, CASEWORK_KINDS, COUNTER_THICKNESS, FIXTURE_DEFAULTS, FIXTURE_KINDS, hasCounter, TOE_KICK } from '../model/casework';
 import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, defaultLevelId, fixtureProblem, migrate, MIGRATIONS, SCHEMA_VERSION } from '../model/plan';
 import type { Fixture, Id } from '../model/types';
@@ -328,7 +328,8 @@ describe('casework meshes', () => {
   afterAll(() => clearMeshCache());
 
   it('every part of every kind is a closed surface, as is a counter run with a basin hole', () => {
-    for (const k of FIXTURE_KINDS) {
+    // Furniture is built per piece (furniture.test.ts).
+    for (const k of CASEWORK_KINDS) {
       const parts = buildFixtureParts(fixture(k, { frontStyle: 'panel' }));
       expect(parts.length).toBeGreaterThan(0);
       for (const p of parts) {

@@ -83,6 +83,10 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: 'Point along a wall, click to place. Type a width to change it.',
     busy: 'Type the width, then click or Enter to place. Esc clears.',
   },
+  furniture: {
+    idle: 'Pick a piece in the panel, click to place. Tab turns, Shift swaps.',
+    busy: 'Type the width, then click or Enter to place. Esc clears.',
+  },
   gradePoint: {
     idle: 'Click a spot on the ground, then type its elevation.',
     busy: "Type the elevation (-4, -6'4), Enter places it. Esc cancels.",
@@ -172,6 +176,10 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   underlay: { idle: '', busy: '' },
   fixture: {
     idle: 'The cabinet or appliance follows the cursor with its back on the nearest wall face and slides to abut the last one; click to place it. Type a width (36, 2\'6) to change it; pick the kind in the properties panel; hold Shift for free placement, Tab turns it.',
+    busy: 'Type the width in feet and inches, then click or press Enter to place it. Esc clears the width.',
+  },
+  furniture: {
+    idle: 'The piece chosen in the properties panel follows the cursor: a bed, dresser or desk backs onto the nearest wall face, a table, chair or rug is centred on the cursor (Shift swaps the two, Tab turns a free piece); click to place it. Type a width first to change it.',
     busy: 'Type the width in feet and inches, then click or press Enter to place it. Esc clears the width.',
   },
   gradePoint: {

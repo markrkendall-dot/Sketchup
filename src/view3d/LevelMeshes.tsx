@@ -5,7 +5,7 @@ import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { counterColorOf } from '../model/casework';
-import { caseworkMaterial, counterMaterial, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { counterMaterial, fixturePartMaterial, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -20,6 +20,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const viewMode = useUiStore((s) => s.viewMode);
   // The 3D bar's Roofs checkbox: off lifts every roof (with its fascia and rafter tails) off.
   const showRoofs = useUiStore((s) => s.show3dRoofs);
+  // The furniture layer (Shift+F, the 3D bar's Furniture checkbox): off hides every piece.
+  const showFurniture = useUiStore((s) => s.showFurniture);
   const meshes = usePlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
   // Decks have their own memo: they depend on the ground and other levels (derive/meshes.ts getDeckMeshes).
   const decks = usePlanStore((s) => getDeckMeshes(s.plan, levelId, viewMode));
@@ -210,16 +212,16 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           )}
         </group>
       ))}
-      {meshes.fixtures.map((f) => (
+      {meshes.fixtures.filter((f) => showFurniture || !f.furniture).map((f) => (
         <group key={f.id} name={`fixture:${f.id}`}>
           {f.parts.map((p) => (
             <mesh
               key={p.part}
               name={`fixture:${f.id}:${p.part}`}
               geometry={p.geometry}
-              material={caseworkMaterial(p.part, f.phase, f.frontColor)}
+              material={fixturePartMaterial(f, p.part)}
               renderOrder={f.phase === 'demo' ? 1 : 0}
-              castShadow={f.phase !== 'demo'}
+              castShadow={f.phase !== 'demo' && !f.furniture?.floorLayer}
               receiveShadow
               dispose={null}
             />

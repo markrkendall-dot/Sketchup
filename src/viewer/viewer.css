@@ -73,6 +73,15 @@ body,
   color: #991b1b;
 }
 
+.viewer-furniture {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  font-size: 14px;
+  color: #3f3f46;
+}
+
 .viewer-body {
   flex: 1;
   min-height: 0;

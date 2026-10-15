@@ -2,7 +2,7 @@ import { Group, Mesh, type BufferGeometry, type Material, type MeshStandardMater
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
-import type { CasePart } from '../derive/casework';
+import type { FixtureMesh, FixturePart } from '../derive/meshes';
 import type { FillPart } from '../derive/openings3d';
 import { getDeckMeshes, getFenceMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
@@ -10,7 +10,7 @@ import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_L
 import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { chimneyPartMaterial, fixturePartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -22,7 +22,7 @@ import { downloadBlob, planFileName } from './file';
 export const METRES_PER_INCH = 0.0254;
 
 /** The 3D view's level visibility (which levels the export includes). */
-export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode'>>;
+export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode' | 'showFurniture'>>;
 
 export type ExportFormat = 'glb' | 'obj';
 
@@ -71,17 +71,37 @@ const fenceMaterialName = (part: 'body' | 'end', phase: Phase, color: string) =>
   return phase === 'demo' || color === FENCE_COLOR ? `${base}_${phase}` : `${base}_${phase}_${color.slice(1)}`;
 };
 const chimneyPartMaterialName = (part: ChimneyPart, phase: Phase) => (part === 'hood' || part === 'stem' ? `flue_${part}_${phase}` : `chimney_${part}_${phase}`);
-/** `cabinet`, `kick`, `appliance`, `basin` (plus `_<hex>` for cabinets not in the default colour), then `_<phase>` for other phases. */
-const caseworkMaterialName = (part: CasePart, phase: Phase, color: string) => {
-  const base = part === 'carcass' || part === 'front' ? (phase !== 'demo' && color !== DEFAULT_CABINET_COLOR ? `cabinet_${color.slice(1)}` : 'cabinet') : part;
+/**
+ * `cabinet`, `kick`, `appliance`, `basin` (plus `_<hex>` for cabinets not in the default colour, or
+ * `cabinet_wood_<wood>` for cabinets in a wood), then `_<phase>` for other phases. Furniture:
+ * `furniture_<part>_<wood or fabric>` (`furniture_wood_hickory`, `furniture_fabric_buffaloRed`,
+ * `furniture_linen`), then `_<phase>`.
+ */
+const fixtureMaterialName = (f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture'>, part: FixturePart) => {
+  const phase = f.phase;
+  let base: string;
+  if (f.furniture) {
+    base = phase === 'demo' && part !== 'wood' ? 'furniture' : part === 'wood' ? `furniture_wood_${f.furniture.wood}` : part === 'fabric' ? `furniture_fabric_${f.furniture.fabric}` : `furniture_${part}`;
+  } else if (part === 'carcass' || part === 'front') {
+    base = phase !== 'demo' && f.wood ? `cabinet_wood_${f.wood}` : phase !== 'demo' && f.frontColor !== DEFAULT_CABINET_COLOR ? `cabinet_${f.frontColor.slice(1)}` : 'cabinet';
+  } else base = part;
   return phase === 'existing' ? base : `${base}_${phase}`;
 };
 const counterMaterialName = (phase: Phase, color: string) => {
   const base = phase !== 'demo' && color !== DEFAULT_COUNTER_COLOR ? `counter_${color.slice(1)}` : 'counter';
   return phase === 'existing' ? base : `${base}_${phase}`;
 };
-/** `Cabinet (base)`, `Appliance (range)`, `Sink`, `Box`. */
-const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sink' ? `Cabinet (${FIXTURE_LABEL[kind].replace(' cabinet', '').toLowerCase()})` : kind === 'sink' ? 'Sink' : kind === 'box' ? 'Box' : `Appliance (${FIXTURE_LABEL[kind].toLowerCase()})`);
+/** `Cabinet (base)`, `Appliance (range)`, `Sink`, `Box`, `Furniture (bed)`. */
+const fixtureMeshName = (kind: FixtureKind, piece?: string) =>
+  kind === 'furniture'
+    ? `Furniture (${piece ?? 'piece'})`
+    : isCabinet(kind) && kind !== 'sink'
+      ? `Cabinet (${FIXTURE_LABEL[kind].replace(' cabinet', '').toLowerCase()})`
+      : kind === 'sink'
+        ? 'Sink'
+        : kind === 'box'
+          ? 'Box'
+          : `Appliance (${FIXTURE_LABEL[kind].toLowerCase()})`;
 
 /**
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
@@ -244,9 +264,11 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
       }
     }
     // Casework: one mesh per material part of each fixture, then the counter slabs.
+    // Furniture only while its layer is on (absent: on).
     for (const f of meshes.fixtures) {
+      if (f.furniture && levelVisibility.showFurniture === false) continue;
       for (const p of f.parts) {
-        const m = mesh(fixtureMeshName(f.kind), p.geometry, material(caseworkMaterialName(p.part, f.phase, f.frontColor), caseworkMaterial(p.part, f.phase, f.frontColor)));
+        const m = mesh(fixtureMeshName(f.kind, f.furniture?.piece), p.geometry, material(fixtureMaterialName(f, p.part), fixturePartMaterial(f, p.part)));
         if (f.phase === 'demo') m.renderOrder = 1;
         group.add(m);
       }

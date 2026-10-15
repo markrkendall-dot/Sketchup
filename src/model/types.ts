@@ -124,6 +124,12 @@ export interface Room {
    * room keeps its floor. Ignored on a new or demolished room (set their floor directly).
    */
   proposedFloor?: { finish: FloorFinish; color?: string };
+  /**
+   * The walls an existing room gets in the proposed design (redone: no wainscot), shown in the
+   * Proposed view in place of wallFinish/wallColor/wainscot. Absent: the room keeps its walls.
+   * Ignored on a new or demolished room.
+   */
+  proposedWall?: { finish: RoomWallFinish; color?: string };
 }
 
 export interface Stairs {
@@ -248,9 +254,34 @@ export interface Roof {
  * and a labelled generic box. Each is a plan rectangle standing on the level's floor (or at an
  * `elevation` above it for wall cabinets, the hood and the microwave).
  */
-export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink' | 'box';
+export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink' | 'box' | 'furniture';
 /** Cabinet door and drawer fronts: flat slabs, or a frame round a recessed panel. */
 export type FrontStyle = 'slab' | 'panel';
+/** What a piece of furniture is (DESIGN.md "Furniture"; model/furniture.ts FURNITURE). */
+export type FurniturePiece =
+  | 'bed'
+  | 'nightstand'
+  | 'dresser'
+  | 'chest'
+  | 'desk'
+  | 'deskChair'
+  | 'diningTable'
+  | 'diningChair'
+  | 'sofa'
+  | 'armchair'
+  | 'rocker'
+  | 'coffeeTable'
+  | 'sideTable'
+  | 'bookcase'
+  | 'bench'
+  | 'trunk'
+  | 'adirondackChair'
+  | 'floorLamp'
+  | 'rug';
+/** A catalogue wood (model/furniture.ts WOODS): a colour and a grain. */
+export type WoodId = 'nordicPine' | 'hickory' | 'peeledLog' | 'darkLog' | 'fumedOak' | 'paintedGreen' | 'paintedRed' | 'paintedCream';
+/** A catalogue fabric (model/furniture.ts FABRICS): a pattern and its colours. */
+export type FabricId = 'buffaloRed' | 'buffaloGreen' | 'pointBlanket' | 'woolPlaid' | 'canvas' | 'leather' | 'navajo' | 'braided' | 'cream';
 
 export interface Fixture {
   id: Id;
@@ -278,6 +309,15 @@ export interface Fixture {
    * sink). Absent: 1" at the front; an island 1" all round.
    */
   counterOverhang?: { front: Inches; back: Inches; left: Inches; right: Inches };
+  /** Kind 'furniture' only (and required there): what the piece is. */
+  piece?: FurniturePiece;
+  /**
+   * A furniture piece's frame, or a cabinet's carcass and fronts, in a catalogue wood. Absent: the
+   * piece's own wood; a cabinet: the level's cabinet wood, else painted in its front colour.
+   */
+  wood?: WoodId;
+  /** Furniture only: the upholstery, blanket or rug. Absent: the piece's own. */
+  fabric?: FabricId;
 }
 
 /** Per-level defaults for casework (DESIGN.md "Casework"); every field optional. */
@@ -285,6 +325,8 @@ export interface LevelFinishes {
   cabinetColor?: string;
   counterColor?: string;
   frontStyle?: FrontStyle;
+  /** Cabinets in a catalogue wood rather than painted. */
+  cabinetWood?: WoodId;
 }
 
 /** A post or chimney on the site (M9 implements their behaviour). */

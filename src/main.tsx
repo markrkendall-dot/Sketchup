@@ -71,6 +71,10 @@ async function boot(): Promise<void> {
     // Any edit clears the status bar's notice (REVIEW-2 C3).
     clearNoticeOnEdit(s.plan, prev.plan);
   });
+  // Turning the furniture layer off drops the hidden pieces from the selection.
+  useUiStore.subscribe((s, prev) => {
+    if (s.showFurniture !== prev.showFurniture) pruneSelection();
+  });
   startChecks();
   startAutosave(usePlanStore, {
     // A failure stays in the status bar until a later save works.

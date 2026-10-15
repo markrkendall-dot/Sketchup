@@ -424,6 +424,35 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-width: 1.6;
 }
 
+/* Furniture (DESIGN.md "Furniture"): a lighter, warmer outline than casework, its detail (a bed's
+   pillows and turn-down, a chair's back, a sofa's cushions, a rug's border and fringe) thinner. */
+.fixture-furniture .fixture-body {
+  fill: #fbf8f2;
+  stroke: #6b6258;
+  stroke-width: 0.8;
+}
+
+.fixture-furniture .fixture-front {
+  stroke: #6b6258;
+  stroke-width: 1;
+}
+
+.fixture .fixture-detail {
+  fill: none;
+  stroke: #8a8178;
+  stroke-width: 0.6;
+}
+
+.fixture-piece-rug .fixture-body {
+  fill: #f3ece0;
+  stroke-dasharray: 4 3;
+}
+
+.fixture-piece-rug .fixture-front {
+  stroke-width: 0.8;
+  stroke-dasharray: 4 3;
+}
+
 .fixture .fixture-tick {
   fill: none;
   stroke: #3f3f46;

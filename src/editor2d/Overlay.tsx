@@ -1,11 +1,13 @@
 import { memo } from 'react';
 import { fixtureSymbol } from '../derive/casework';
+import { furnitureSymbol } from '../derive/furniture';
+import { furnitureNameOf } from '../model/furniture';
 import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
 import { FIXTURE_LABEL } from '../model/casework';
 import { defaultGradeElevation } from '../derive/site';
 import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
 import { add, dist, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
-import type { Column, Underlay, Vec2 } from '../model/types';
+import type { Column, Fixture, Underlay, Vec2 } from '../model/types';
 import { COLUMN_KIND_NAME, nextColumnKind } from './tools/siteTools';
 import { formatPxScale, nearestAxis, pixelDistance } from '../model/underlay';
 import { formatLength, formatLengthCompact, parseLength } from '../model/units';
@@ -382,16 +384,19 @@ function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number
  * the real symbol, with its kind and width on a pill (green while the width is typed).
  */
 function FixtureGhost({ preview, v, denom }: { preview: FixturePreview; v: Viewport; denom: number }) {
-  const sym = fixtureSymbol({ id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: 1, elevation: 0, phase: 'existing' });
+  const ghost: Fixture = { id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: 1, elevation: 0, phase: 'existing', ...(preview.piece ? { piece: preview.piece } : {}) };
+  const sym = fixtureSymbol(ghost);
+  const detail = preview.piece ? furnitureSymbol(ghost) : null;
   const front = worldToScreen(v, midpoint(sym.front[0], sym.front[1]));
   const back = worldToScreen(v, preview.origin);
   const out = normalize(sub(front, back));
   const at = add(front, scale(out.x === 0 && out.y === 0 ? { x: 0, y: 1 } : out, 16));
-  const text = `${FIXTURE_LABEL[preview.kind]} ${formatLengthCompact(preview.width, denom)}${preview.wallId ? '' : ' (free)'}`;
+  const name = preview.piece ? furnitureNameOf({ piece: preview.piece, width: preview.width }) : FIXTURE_LABEL[preview.kind];
+  const text = `${name} ${formatLengthCompact(preview.width, denom)}${preview.wallId ? '' : ' (free)'}`;
   return (
     <g className={`fixture-ghost${preview.typed ? ' typed' : ''}${preview.abuts ? ' abuts' : ''}`}>
       <g transform={`translate(${v.tx} ${v.ty}) scale(${v.k})`}>
-        <FixtureGlyph sym={sym} k={v.k} className="fixture fixture-ghost-glyph" />
+        <FixtureGlyph sym={sym} k={v.k} detail={detail} className={`fixture fixture-ghost-glyph${preview.piece ? ' fixture-furniture' : ''}`} />
       </g>
       <Pill at={at} text={text} className="measure-readout" />
     </g>
