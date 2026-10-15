@@ -1243,12 +1243,11 @@ function proposed(ids: ExistingIds): void {
   const foyerNorth = FOYER.y0 + T;
   furnish(fId, 'coatBench', { x: (fy.west + CL.x0) / 2, y: foyerNorth }, 90, { width: CL.x0 - HALF - (fy.west + HALF), depth: 18, height: 66, builtIn: true });
   // The screen porch (MK, 15 Oct 2026): two green Adirondack chairs facing the lake (south), a side
-  // table between them, x -84..-2, y 198..232: clear of the foyer's screen door swing (to y 194),
-  // the way to the lawn door (x -86..-50 at the south wall) and the stove's chimney and tee (x
-  // -10..0, y 252..260).
-  furnish(fId, 'adirondackChair', { x: -69, y: 198 }, 90);
-  furnish(fId, 'sideTable', { x: -43, y: 206 }, 90, { width: 18, depth: 18, wood: 'paintedGreen' });
-  furnish(fId, 'adirondackChair', { x: -17, y: 198 }, 90);
+  // table between them, x -84..-2, y 226..260: clear of the foyer's screen door swing (to y 194)
+  // and the way to the lawn door (x -86..-50 at the south wall).
+  furnish(fId, 'adirondackChair', { x: -69, y: 226 }, 90);
+  furnish(fId, 'sideTable', { x: -43, y: 234 }, 90, { width: 18, depth: 18, wood: 'paintedGreen' });
+  furnish(fId, 'adirondackChair', { x: -17, y: 226 }, 90);
   roof(fId, { shape: 'shed', outline: outline({ x0: FOYER.x0, x1: ROOF_EAST, y0: FOYER.y1, y1: MAIN.y1 }), ridgeAngle: 180, pitch: 4, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
 
   // ---- The Adirondack entry and screen porch (MK; docs/history/PLAN-v10-adirondack.md; sizes are
@@ -1453,22 +1452,22 @@ function proposed(ids: ExistingIds): void {
     furnish(fId, 'diningChair', { x, y: TABLE.south + 18 }, 270);
   }
 
-  // ---- The Living (MK, 15 Oct 2026: furnish the house, Adirondack camp style): a log sofa in red
-  // buffalo check facing the lake window and the stove, x 58..142, y 158..194, its back to the way
-  // from the house door to the kitchen; a Navajo rug before it (x 60..156, y 196..268, clear of the
-  // hearth at x 57); a peeled-log coffee table on it; a plaid armchair facing west at the kitchen
-  // opening's south end (x 132..166, y 222..256); a hickory rocker facing the stove 36" from its
-  // front (x 75..109, y 244..268); a pine bookcase on the west wall between the house door's swing
-  // (to y 134.5) and the stove's stone (from y 233), y 138..174; an iron floor lamp at the sofa's
-  // west end and a side table at its east end.
-  furnish(fId, 'rug', { x: 108, y: 196 }, 90, { width: 96, depth: 72, fabric: 'navajo' });
-  furnish(fId, 'sofa', { x: 100, y: 158 }, 90);
-  furnish(fId, 'coffeeTable', { x: 108, y: 214 }, 90);
-  furnish(fId, 'armchair', { x: 166, y: 239 }, 180, { fabric: 'woolPlaid' });
-  furnish(fId, 'rocker', { x: 109, y: 256 }, 180);
-  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 156 }, 0, { width: 36 });
-  furnish(fId, 'floorLamp', { x: 48, y: 160 }, 90);
-  furnish(fId, 'sideTable', { x: 154, y: 166 }, 90);
+  // ---- The Living (MK, 15 Oct 2026: furnish the house, Adirondack camp style; rearranged the same
+  // day round the stove on the west wall, its front at x 39, y 150..174): a log sofa in red buffalo
+  // check facing the lake window, x 80..164, y 144..180, its back to the way from the house door to
+  // the kitchen and its west end 41" from the stove; a Navajo rug before the hearth (x 58..154, y
+  // 126..198, clear of the hearth at x 57); a peeled-log coffee table (x 98..146, y 196..220); a
+  // hickory rocker (about x 51..87, y 200..241) and a plaid armchair (about x 118..166, y 225..272)
+  // turned to face the stove, a side table between them; an iron floor lamp by the rocker, 40" from
+  // the stove; a pine bookcase on the west wall in the south-west corner, y 262..298.
+  furnish(fId, 'rug', { x: 106, y: 126 }, 90, { width: 96, depth: 72, fabric: 'navajo' });
+  furnish(fId, 'sofa', { x: 122, y: 144 }, 90);
+  furnish(fId, 'coffeeTable', { x: 122, y: 196 }, 90);
+  furnish(fId, 'armchair', { x: 156, y: 258 }, 215, { fabric: 'woolPlaid' });
+  furnish(fId, 'rocker', { x: 76, y: 236 }, 245);
+  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 280 }, 0, { width: 36 });
+  furnish(fId, 'floorLamp', { x: 24, y: 214 }, 90);
+  furnish(fId, 'sideTable', { x: 104, y: 246 }, 90);
 
   // ---- The pantry's fittings (x 173..311, y 7..55): shelves 12" deep and 84" high on its north
   // wall and on its end walls south of them, clear of its door's swing (x 198..222). The powder room
@@ -1559,37 +1558,42 @@ function proposed(ids: ExistingIds): void {
   alarm(sId, { x: 196, y: 105 }, 'Smoke/CO');
   alarm(bId, { x: MAIN.x1 / 2, y: MAIN.y1 / 2 + 24 }, 'Smoke');
 
-  // ---- 8. The wood stove (MK, 14 Oct 2026; moved north on 15 Oct 2026 from the Living's south-west
-  // corner, the French doors gone), its back to the Living's west wall, facing east into the room,
-  // centred y 256, just south of where the French doors were (y 177..237): a stone hearth 50" out
-  // from the wall and 40" wide (y 236..276, 18" in front of the stove, 8" each side), a 3" stone
-  // surround on the wall behind it (46" wide, y 233..279, to 60" up), and the stove 24" wide, 26"
-  // deep, 30" high, 6" off the surround. MK asked for it where the bookcase is (y 138..174), but the
-  // chimney outside rises up the gable wall, and north of y 256 it would pass in front of the
-  // Master's west window upstairs (y 176..224, its trim and 18" shutters to y 246); MK chose to
-  // slide the stove south. Its stove's listed clearances decide the final spacing.
-  const STOVE = { y: 256 };
+  // ---- 8. The wood stove (MK, 14 Oct 2026; moved on 15 Oct 2026 from the Living's south-west
+  // corner to where the bookcase was, the French doors gone), its back to the Living's west wall,
+  // facing east into the room, centred y 162: a stone hearth 50" out from the wall and 40" wide
+  // (y 142..182, 18" in front of the stove, 8" each side), a 3" stone surround on the wall behind it
+  // (46" wide, y 139..185, to 60" up), and the stove 24" wide, 26" deep, 30" high, 6" off the
+  // surround. The surround stops clear of the house door's trim (to y 138.5). Its stove's listed
+  // clearances decide the final spacing.
+  const STOVE = { y: 162 };
   const STONE = '#7d7a73';
   kitchen({ kind: 'box', label: 'Hearth', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 40, depth: 50, height: 1, frontColor: STONE });
   kitchen({ kind: 'box', label: 'Stone', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 46, depth: 3, height: 59, elevation: 1, frontColor: STONE });
   kitchen({ kind: 'box', label: 'Wood stove', origin: { x: CL.x0 + HALF + 6, y: STOVE.y }, direction: 0, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
-  // Its flue runs outside the house (MK, 14 Oct 2026), to the 2025 Residential Code of New York State
-  // (docs/history/PLAN-v7-exterior-flue.md). Inside, a 6" double-wall black connector, 8" outside,
-  // rises from the stove's collar (x 19, 6" in from its back) to an elbow and turns west into a listed
-  // wall thimble over the stone (centre 66" up): it passes through no floor or ceiling, and the
-  // bedroom upstairs needs no chase. Outside, an insulated 6" chimney (UL 103 HT, 8" outside) starts
-  // at a tee with a cleanout below the thimble, 2" clear of the siding (x -10..-2), and rises
-  // straight (no offsets) on the screen porch's east side (y 252..260, 6" south of the upstairs
-  // window's south shutter), through the porch's shed roof by the house wall, up the gable wall and
-  // through the main roof's 24" rake overhang 98 1/2" south of the ridge, with a rain cap. Its top follows the
-  // 3-2-10 rule: 3' over where it leaves the roof, and 2' over any roof within 10' (here the ridge),
-  // braced to the roof.
+  // Its flue runs outside the Living (MK, 14 Oct 2026), to the 2025 Residential Code of New York
+  // State (docs/history/PLAN-v7-exterior-flue.md), and goes up the gable wall just north of the
+  // Master's west window upstairs (MK, 15 Oct 2026: y 176..224, its trim and 18" north shutter to
+  // y 154). Below that spot is the foyer, so the chimney starts in the foyer. Inside the Living, a 6"
+  // double-wall black connector, 8" outside, rises from the stove's collar (x 19, 6" in from its
+  // back) to an elbow, runs 17" north over the stone and turns west into a listed wall thimble
+  // (centre 66" up, y 145): it passes through no floor or ceiling, and the bedroom upstairs needs
+  // no chase. In the foyer, an insulated 6" chimney (UL 103 HT, 8" outside) starts at a tee with a
+  // cleanout below the thimble in its south-east corner (x -10..-2, y 141..149: 2" off the siding,
+  // 2" off the foyer's south wall, 2 1/2" off the house door's trim) and rises straight (no
+  // offsets) through the foyer roof where it meets the house, up the gable wall and through the
+  // main roof's 24" rake overhang 12 1/2" north of the ridge, with a rain cap. Its top follows the
+  // 3-2-10 rule: 3' over where it leaves the roof, and 2' over any roof within 10' (the ridge),
+  // braced to the roof. For the chimney maker: whether it needs a guard or an enclosure where it
+  // stands in the foyer (a chase would not fit beside the house door), and the flashing where it
+  // passes the foyer roof against the gable wall.
   const THIMBLE = 66;
+  const THIMBLE_Y = 145;
   const COLLAR = { x: CL.x0 + HALF + 12, y: STOVE.y };
-  const FLUE = { x: MAIN.x0 - 2 - 4, y: STOVE.y };
+  const FLUE = { x: MAIN.x0 - 2 - 4, y: THIMBLE_Y };
   if (!store().addColumn({ at: COLLAR, kind: 'flue', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP + 31, top: FLOOR_TOP + THIMBLE + 4, color: STOVE_BLACK })) throw new Error('connector rejected');
-  kitchen({ kind: 'box', label: 'Stovepipe', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 8, depth: COLLAR.x - (CL.x0 + HALF), height: 8, elevation: THIMBLE - 4, frontColor: STOVE_BLACK });
-  kitchen({ kind: 'box', label: 'Tee', origin: { x: MAIN.x0, y: STOVE.y }, direction: 180, width: 8, depth: MAIN.x0 - FLUE.x, height: 8, elevation: THIMBLE - 4, frontColor: COLUMN_COLOR.flue });
+  kitchen({ kind: 'box', label: 'Stovepipe', origin: { x: COLLAR.x, y: COLLAR.y + 4 }, direction: 270, width: 8, depth: COLLAR.y + 4 - (THIMBLE_Y - 4), height: 8, elevation: THIMBLE - 4, frontColor: STOVE_BLACK });
+  kitchen({ kind: 'box', label: 'Stovepipe', origin: { x: CL.x0 + HALF, y: THIMBLE_Y }, direction: 0, width: 8, depth: COLLAR.x - 4 - (CL.x0 + HALF), height: 8, elevation: THIMBLE - 4, frontColor: STOVE_BLACK });
+  kitchen({ kind: 'box', label: 'Tee', origin: { x: MAIN.x0, y: THIMBLE_Y }, direction: 180, width: 8, depth: MAIN.x0 - FLUE.x, height: 8, elevation: THIMBLE - 4, frontColor: COLUMN_COLOR.flue });
   const mainRoof = Object.values(level(sId).roofs)[0];
   const secondTop = getLevelElevations(getPlan())[sId].floorTop;
   const roofTop = (p: Vec2) => {

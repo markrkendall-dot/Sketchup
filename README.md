@@ -824,20 +824,19 @@ where the built design differs from them):
 
    About 18'7" of counter in all. The cabinet colour, the counter colour and the fronts are the
    First Floor's casework defaults: change them in the Level panel, or per cabinet in its panel.
-6. **Wood stove** (MK) on the Living's **west wall**, just south of where the French doors were
-   (moved there from the south-west corner on 15 Oct 2026), its back to the wall, facing east into
-   the room, centred 21'4" from the north wall's outside face: a stone hearth 4'2" x 3'4", a stone
-   surround behind it and the stove 6" off it. MK asked for it by the bookcase, but its chimney
-   outside would then rise in front of the Master's west window upstairs; MK chose to slide it
-   south until the chimney clears that window's shutters. Its flue runs **outside the
-   house** (MK), to the 2025 Residential Code of New York State: a black double-wall stovepipe
-   rises from the stove and turns west into a listed wall thimble over the stone; outside, an
-   insulated **stainless chimney** (8", an insulated 6" chimney, UL 103 Type HT) rises straight from
-   a tee with a cleanout, 2" off the siding, on the screen porch's east side, through the
-   porch roof, up the gable wall and through the main roof's rake overhang, with a rain cap. It
-   comes out of the rake 8'2" south of the ridge and stands about 6' over it, 2' higher than the
-   ridge (the 3-2-10 rule). Nothing
-   passes through the bedroom upstairs. The code checklist is in
+6. **Wood stove** (MK) on the Living's **west wall** where the bookcase was (moved there from the
+   south-west corner on 15 Oct 2026), its back to the wall, facing east into the room, centred
+   13'6" from the north wall's outside face, its stone surround just clear of the house door's
+   trim: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it. Its flue
+   runs **outside the Living** (MK), to the 2025 Residential Code of New York State, and goes up
+   the gable wall **just north of the Master's west window** upstairs (MK). Below that spot is the
+   foyer, so: a black double-wall stovepipe rises from the stove, runs 17" north over the stone and
+   turns west into a listed wall thimble; in the foyer's south-east corner, beside the house door,
+   an insulated **stainless chimney** (8", an insulated 6" chimney, UL 103 Type HT) rises straight
+   from a tee with a cleanout, 2" off the siding, through the foyer roof where it meets the house,
+   up the gable wall and through the main roof's rake overhang a foot north of the ridge, with a
+   rain cap. It stands 3' over the rake, 2'6" over the ridge (the 3-2-10 rule). Nothing passes
+   through the bedroom upstairs. The code checklist is in
    `docs/history/PLAN-v7-exterior-flue.md`. The **masonry chimney** on the north wall is
    demolished.
 7. **Upstairs bath** (MK: a full bath with a stall shower in the north-east): east of the stair's
@@ -854,7 +853,7 @@ where the built design differs from them):
    line with the house door, under a gable facing west, and south of it a screen porch (13'1" x 8')
    with screens above knee walls, two screen doors and a shed roof high at the house wall. The
    Living's west window, which would only look into the porch, goes and the wall is closed (the
-   stove stands there); the porch is reached from the foyer. (The livability review's 60" French
+   stove's stone is there; its chimney stands in the foyer's south-east corner); the porch is reached from the foyer. (The livability review's 60" French
    doors from the Living were taken out on 15 Oct 2026, MK.) The porch's lawn door is at the west
    end of its south wall. For coats (there is no closet under the stair), a
    **transom** high in the foyer's north wall facing the driveway (60" x 18", sill 70") and under
@@ -929,10 +928,11 @@ where the built design differs from them):
     proposed **cabinets** (kitchen, island, wardrobes, vanities, pantry shelves) are in the same
     Nordic pine.
 13. **Furniture** (MK, 15 Oct 2026; Adirondack camp style, on the furniture layer, Shift+F):
-    - the **Living**: a peeled-log sofa in red buffalo check facing the lake window and the stove,
-      a Navajo rug before it with a log coffee table, a wool-plaid armchair at the kitchen opening,
-      a hickory rocker 3' from the stove, a pine bookcase between the house door and the stove, an
-      iron floor lamp and a side table;
+    - the **Living** (rearranged round the stove on the west wall, 15 Oct 2026): a peeled-log sofa
+      in red buffalo check facing the lake window, its end 3'5" from the stove; a Navajo rug before
+      the hearth with a log coffee table; a hickory rocker and a wool-plaid armchair turned to face
+      the stove, a side table between them; an iron floor lamp by the rocker; a pine bookcase in
+      the south-west corner;
     - the **kitchen**: the pine farm table and four hickory ladder-back chairs with cane seats;
     - the **foyer**: the built-in coat bench (shown with the furniture layer off too); the **screen porch**: two green Adirondack
       chairs and a side table facing the lake;
@@ -1039,8 +1039,10 @@ the engineer, the trades and the tape measure):
 **The trades and the makers' instructions**
 - The stove and its chimney: the stove's listing and the chimney maker's instructions set the
   clearances (to the surround, to the furniture), the thimble, the supports and the top, and win
-  over the plan's numbers; the chimney's 6' over the rake needs a roof brace, and where it
-  passes the porch roof 6" from the house wall the flashing has to be worked into the wall's. See
+  over the plan's numbers. The chimney's 3' over the rake needs a roof brace; where it passes the
+  foyer roof against the gable wall the flashing has to be worked into the wall's; and in the
+  foyer it stands 2 1/2" from the house door's trim, so whether it needs a guard or an enclosure
+  there (a chase would not fit without moving the door) is for the chimney maker. See
   `docs/history/PLAN-v7-exterior-flue.md`.
 - The alarms: hard-wired and interconnected or not (exceptions in alterations), for the electrician
   and the inspector.
