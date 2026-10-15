@@ -1831,12 +1831,15 @@ Utility's pine paneling on a wood floor. The Second Floor's rooms and the propos
 (`PLACEHOLDER_ROOM`, `PLACEHOLDER_WET`: off-white paint, wood boards, tile in the baths and the foyer) until the
 owner chooses; the basement has none.
 
-The proposed kitchen (docs/history/PLAN-v11-kitchen-north.md: the range on the pantry's wall, the
-refrigerator on the east wall, the island moved north, a table by the lake window) is placed through
-`fixture()`, which throws when the store refuses one; fixture ids are renamed like the rest (`f-c1`
-...). `example.test.ts` checks that every new fixture lies inside its room's face in the proposed
-view, overlaps no wall footprint and shares no space with another fixture (plan and height), and that
-`counterRuns` gives the island one 62 x 26 top and the north run's two bases one each.
+The proposed kitchen (docs/history/PLAN-v11-kitchen-north.md and PLAN-v13-kitchen-open.md: the range
+on the pantry's wall, base cabinets and the refrigerator on the east wall, the island moved west into a
+wide opening in the Kitchen/Living wall, a table by the lake window) is placed through `fixture()`,
+which throws when the store refuses one; fixture ids are renamed like the rest (`f-c1` ...).
+`example.test.ts` checks that every new fixture lies inside its room's face in the proposed view,
+overlaps no wall footprint and shares no space with another fixture (plan and height), and that
+`counterRuns` gives the island one 62 x 26 top, an L from the north run's corner base down the east
+wall, and the other bases a piece each. The wide opening is a full-height passage in the bearing
+partition: the load-path checks read the wall as continuous, and the header note covers it.
 
 The powder room under the stair's high end is three partitions with a `heightOverride` each, read from
 the run's framed underside (`getStaircaseLayout(...).undersides`, floored to 1/4") so none rises into it;

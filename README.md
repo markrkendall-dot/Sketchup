@@ -751,10 +751,11 @@ where the built design differs from them):
    footing in the basement under each (placeholders for the engineer).
 
    The house door (32", green) is in the west wall in the middle of the old stair strip, in line
-   with the foyer's front door, and a new 32" cased opening at the strip's east end leads straight
-   on into the kitchen. New windows light the hall: a 24" one over the landing, a second casement
-   pair upstairs in the north wall over the top of the run and one in the upstairs west wall. The hall is
-   **open to the Living** (MK): no wall on the strip's south side, as today (photo 16).
+   with the foyer's front door, and the strip runs straight on into the kitchen through the wide
+   opening in the Kitchen/Living wall (item 5). New windows light the hall: a 24" one over the
+   landing, a second casement pair upstairs in the north wall over the top of the run and one in the
+   upstairs west wall. The hall is **open to the Living** (MK): no wall on the strip's south side,
+   as today (photo 16).
 4. **North band** (MK: the kitchen stops short of the north wall): a 4' band along the north wall
    east of the stair hall, all of it a **walk-in pantry** (11'6" x 4'; MK, 15 Oct 2026: the powder
    room went under the stair), with 12" shelves on its north wall and both end walls and a 24" door
@@ -763,30 +764,33 @@ where the built design differs from them):
    as it stands, since a new wall does not split a demolished one.
 5. **Kitchen**, 11'6" x 20'8", south of the band, the old bath included (MK, 15 Oct 2026). All of
    its casework is new; today's cabinets and the bath's fixtures (photos 13 to 22) are demolished:
+   - the **Kitchen/Living wall opened up**: one opening floor to ceiling, 11'1 1/2", from the hall's
+     end to the south side of today's 48" Living doorway, in place of the hall's cased opening, the
+     4'5" wall and that doorway; the 16" wall south of it and the pass-through stay. The wall bears
+     (the upstairs Master/Guest partition stands on it and two ceiling beams' ends land on it), so a
+     flush beam over the opening carries that to its ends (see "The engineer");
    - on the **north wall** (the pantry's): west of the pantry door a 24" base for trash and
-     recycling, then a 15" base, the **range** with its hood and a 15" base, wall cabinets over the
-     bases. The hood's 8" duct runs straight
-     north through the pantry, across its ceiling over the shelves (86" to 94"), to a wall cap on
-     the north face: about 5', no bends, no roof penetration;
-   - the **refrigerator** on the east wall in the north-east corner, 36" wide and counter-depth,
-     2" off the pantry's wall for its hinge, a wall cabinet over it; south of it the east wall is
+     recycling, then a 15" base, the **range** with its hood and a 20" base into the corner, wall
+     cabinets over the bases. The hood's 8" duct runs straight north through the pantry, across its
+     ceiling over the shelves (86" to 94"), to a wall cap on the north face: about 5', no bends, no
+     roof penetration;
+   - on the **east wall**, shared with the master suite: base cabinets and counter from the corner
+     (24", 30" and 24", the counter one L with the north run's), the **refrigerator** (36" wide,
+     counter-depth) with its back on the master bedroom's walk-in closet, which deadens its hum, and
+     a 24" base after it for a landing; wall cabinets over them all. South of them the east wall is
      the way to the master bedroom's door;
-   - the **island**, moved north into the work triangle, its fronts facing north so whoever is at
+   - the **island**, moved west into the work triangle, its fronts facing north so whoever is at
      the sink faces the lake with the range behind them: a 24" dishwasher and a 36" sink cabinet
-     under one top 62" x 26", no seating ledge; a 48" work aisle to the range, 38" walkways at
-     both ends;
+     under one top 62" x 26", no seating ledge; a 48" work aisle to the range, 46" to the east
+     counter and 42" to the refrigerator; its west end is 5" short of the old wall's line, so you
+     walk round it through the Living;
    - a **table** by the lake window, 36" x 60", centred on it, with four chairs (six with chairs at
      the ends): 45" from the island to its chairs, 39" past its east end to the bedroom door;
-   - the **work triangle**, centre to centre: range to refrigerator about 3'9", refrigerator to
-     sink about 6'7", sink to range about 6'2", about 16'8" in all. The first leg is a little under
-     the usual 4': the pantry door, which has to stay east of the old bath wall's line, pins the
-     run's west end.
+   - the **work triangle**, centre to centre: range to refrigerator about 8', refrigerator to sink
+     about 6'4", sink to range about 6'8", about 21' in all.
 
-   About 9'8" of counter in all, less than a kitchen this size usually wants (about 13'): the 11'6"
-   width leaves no room for more with an island and a table, and the walk-in pantry carries the
-   storage. The kitchen's north-west corner is the way in from the hall, with the pantry's door. The
-   cabinet colour, the counter colour and the fronts are the First Floor's casework defaults: change
-   them in the Level panel, or per cabinet in its panel.
+   About 18'7" of counter in all. The cabinet colour, the counter colour and the fronts are the
+   First Floor's casework defaults: change them in the Level panel, or per cabinet in its panel.
 6. **Wood stove** (MK) in the Living's **south-west corner**, its back to the west wall, facing east
    into the room: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it,
    clear of the west window and beside the lake window's west end. Its flue runs **outside the
@@ -894,7 +898,8 @@ daily life, and what changed:
 - **The upstairs bath**: its shower could not be stepped into; re-laid out (item 7).
 - **The porch** was reached only through the foyer: French doors from the Living (item 8).
 - **Privacy**: a solid door to the main-floor bedroom (item 1).
-- **Counter**: a 24" base by the pantry door (item 5).
+- **Counter**: a 24" base by the pantry door (item 5); later the east wall's run (MK) took it to
+  about 18'7".
 
 And three things it could not change inside the choices already made, for MK to weigh:
 
@@ -933,11 +938,17 @@ the engineer, the trades and the tape measure):
   footing under the peeled log post; and upstairs the two ceiling beams on the Master's and the
   Guest's old north walls' lines (y 137.5 and y 152.5), with a 6x6 and footing in the basement
   under each inner end. The checks find nothing missing in that load path.
+- The flush beam over the 11'1 1/2" Kitchen/Living opening: it carries the upstairs Master/Guest
+  partition and the two ceiling beams' inner ends (y 137.5 and y 152.5) to its ends, the studs and
+  the (2) 6x6 at y 99.5 and a post in the 16" wall south of the opening, with one under it to a
+  footing. The basement 6x6s planned under the ceiling beams' ends move to the opening's ends. The
+  tool draws the wall as continuous with a header (noted HDR), so it does not show this.
 - Confirm the y 99.5 wall was the bearing wall (the tool infers it: the joists would span 25'-8"
   without it) and that the Bunk's south wall upstairs carried no more than itself (the attic joists
   span 11'-2" without it). Survey the basement under the post.
-- The headers noted HDR on the structure overlay: the cased opening in the partition, the two
-  First Floor north windows and the stair hall's upper north window.
+- The headers noted HDR on the structure overlay: the wide opening in the partition, the French
+  doors to the porch, the two First Floor north windows and the stair hall's upper north window
+  (and the bedroom's door and the Guest's window, which go in today's openings).
 
 **MK, the engineer and the builder** (the Adirondack entry)
 - The logs' sizes and species (cedar or spruce), the stone, and how the canopy's log posts are

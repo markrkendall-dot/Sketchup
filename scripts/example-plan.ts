@@ -894,7 +894,9 @@ function proposed(ids: ExistingIds): void {
   // line that wall). The old fixtures: the Kitchen's casework, the Bath's, the
   // Utility's, and the wood stove with the pipe chase behind it. Today's grey Kitchen to Utility door
   // (3 x 3 clear lites over two panels): it becomes the master bedroom's door, so a solid one takes
-  // its place (the livability review, docs/history/PLAN-v12-livability.md).
+  // its place (the livability review, docs/history/PLAN-v12-livability.md). Today's 48" doorway from
+  // the Living to the Kitchen: it and the wall north of it give way to one wide opening (MK, 15 Oct
+  // 2026, below).
   demolish(fId, {
     walls: [
       { x: (pc.x0 + CL.x0) / 2, y: pc.y0 },
@@ -906,7 +908,7 @@ function proposed(ids: ExistingIds): void {
       { x: 60, y: 99.5 },
       { x: 194.5, y: 30 },
     ],
-    openings: [ids.eastWindow, ids.wingSouth, ids.houseDoor, ids.livingWest, ids.frontWindow, ids.bathWindow, openingAt(fId, { x: CL.x1, y: 264 })],
+    openings: [ids.eastWindow, ids.wingSouth, ids.houseDoor, ids.livingWest, ids.frontWindow, ids.bathWindow, openingAt(fId, { x: CL.x1, y: 264 }), openingAt(fId, { x: PART_KL, y: 212 })],
     stairs: [ids.stair],
     roofs: [ids.wingRoof, ids.porchRoof],
     fixtures: ids.fixtures,
@@ -1054,9 +1056,16 @@ function proposed(ids: ExistingIds): void {
   // east of where the band's wall crosses the old bath wall's line, x 194.5, so the range run has
   // the rest of the wall); it swings in, clear of the shelves. No window: shelves line the north wall.
   add({ x: 210, y: BAND.south }, { type: 'door', width: 24, height: 80, into: NORTH, leafColor: STAINED_DOOR });
-  // The hall to the kitchen: a 32" cased opening in the Kitchen/Living partition at the stair
-  // strip's east end, on the line of the house door (y 118.5).
-  add({ x: PART_KL, y: 118.5 }, { type: 'passage', width: 32, height: 80, sill: 0 });
+  // The Kitchen/Living partition opened up (MK, 15 Oct 2026: the island moves west, and the wall it
+  // would hit comes out): one opening floor to ceiling from the hall's end (y 102.5) to the south
+  // jamb of today's Living doorway (y 236), 133 1/2" (11'1 1/2"), in place of a 32" cased opening
+  // from the hall, the 4'5" wall and that doorway. The 16" wall south of it and the pass-through stay.
+  // The partition bears (the upstairs Master/Guest partition stands on it and the two ceiling beams'
+  // ends land on it), so a flush beam over the opening carries that to its ends: the studs and the
+  // (2) 6x6 at y 99.5, and a post in the 16" wall with one under it to a footing (the engineer's;
+  // the tool notes the header).
+  const KL_OPEN = { north: 102.5, south: 236 };
+  add({ x: PART_KL, y: (KL_OPEN.north + KL_OPEN.south) / 2 }, { type: 'passage', width: KL_OPEN.south - KL_OPEN.north, height: level(fId).wallHeight, sill: 0 });
   // The stair hall: a 24" window over the stair's landing in the north wall (x 13..37, sill 36, 2 x
   // 3 lites); safety glass, being this near the steps.
   add({ x: 25, y: CL.y0 }, { type: 'window', width: 24, height: 48, sill: 36, lites: { cols: 2, rows: 3 } });
@@ -1300,18 +1309,20 @@ function proposed(ids: ExistingIds): void {
   // ---- 2. The kitchen, x 173..311, y 60..308 inside (the old bath and most of the old front room's
   // east end, south of the pantry). All new; cabinet and counter colours are the level's defaults. A
   // fixture's origin is the middle of its back edge and its direction the way its front faces (left
-  // and right as you face the front). Its north-west corner (x 173..~210, y 60..135) is the way in
-  // from the hall's cased opening, with the pantry's door. MK, 15 Oct 2026: the range on the north
-  // wall, venting through the pantry; the refrigerator on the east wall; the sink and the
-  // dishwasher in the island, moved north into the work triangle; a table by the lake window.
+  // and right as you face the front). Its west side is open to the hall and the Living (the wide
+  // opening above, y 102.5..236). MK, 15 Oct 2026: the range on the north wall, venting through the
+  // pantry; the refrigerator on the wall shared with the master bedroom, with cabinets and counters
+  // along that wall; the sink and the dishwasher in the island, moved west into the work triangle; a
+  // table by the lake window.
   const kitchen = (f: Omit<NewFixture, 'phase' | 'elevation'> & { elevation?: number }) => fixture(fId, { elevation: 0, ...f, phase: NEW });
   const KITCHEN_EAST = 311;
   const KITCHEN_NORTH = BAND.south + TI / 2;
   const COUNTER_HEIGHT = 34.5;
   // The north wall (the pantry's south wall), fronts facing south: west of the pantry door a 24" base
-  // for trash and recycling (the livability review: about 8' of counter was too little), then from
-  // the door east a 15" base, the 30" range under its hood (x 237..267) and a 15" base, wall cabinets
-  // over the bases. The range carries no counter, so each base has its own.
+  // for trash and recycling (the livability review), then from the door east a 15" base, the 30"
+  // range under its hood (x 237..267) and a 20" base into the corner, wall cabinets over the bases.
+  // The range carries no counter, so the bases either side have their own; the 20" one's turns the
+  // corner into the east run's.
   const RANGE_X = 252;
   const northWall = (kind: NewFixture['kind'], x: number, width: number, depth: number, height: number, elevation = 0) =>
     kitchen({ kind, origin: { x, y: KITCHEN_NORTH }, direction: 90, width, depth, height, elevation });
@@ -1320,26 +1331,41 @@ function proposed(ids: ExistingIds): void {
   northWall('base', 229.5, 15, 24, COUNTER_HEIGHT);
   northWall('range', RANGE_X, 30, 25, 36);
   northWall('hood', RANGE_X, 30, 18, 30, 66);
-  northWall('base', 274.5, 15, 24, COUNTER_HEIGHT);
+  northWall('base', 277, 20, 24, COUNTER_HEIGHT);
   northWall('wall', 229.5, 15, 12, 30, 54);
-  northWall('wall', 274.5, 15, 12, 30, 54);
-  // The refrigerator on the east wall (the wall shared with the master suite) in the north-east
-  // corner, facing west: 36" wide, counter-depth (29", x 282..311), y 62..98, 2" off the pantry's
-  // wall for its hinge, a wall cabinet over it. South of it the east wall is the walkway to the
-  // master bedroom's door (y 248..280).
-  kitchen({ kind: 'fridge', origin: { x: KITCHEN_EAST, y: 80 }, direction: 180, width: 36, depth: 29, height: 70 });
-  kitchen({ kind: 'wall', origin: { x: KITCHEN_EAST, y: 80 }, direction: 180, width: 36, depth: 15, height: 15, elevation: 70 });
+  northWall('wall', 277, 20, 12, 30, 54);
+  // The east wall (shared with the master suite), fronts facing west, north to south: a 24" corner
+  // base (y 60..84, its counter mitred into the north run's), a 30" and a 24" base (to y 138); the
+  // refrigerator, 36" wide and counter-depth (29", x 282..311), at y 140..176, 2" off the base for its
+  // door, its back on the master bedroom's walk-in closet (y 122.5..180.5), which deadens its hum; a
+  // 24" base after it (y 176..200) for a landing. Wall cabinets over the bases, one over the
+  // refrigerator. South of y 200 the east wall is the way to the master bedroom's door (y 248..280).
+  const eastWall = (kind: NewFixture['kind'], y: number, width: number, depth: number, height: number, elevation = 0) =>
+    kitchen({ kind, origin: { x: KITCHEN_EAST, y }, direction: 180, width, depth, height, elevation });
+  const FRIDGE_Y = 158;
+  for (const [y, width] of [
+    [72, 24],
+    [99, 30],
+    [126, 24],
+    [188, 24],
+  ] as const) {
+    eastWall('base', y, width, 24, COUNTER_HEIGHT);
+    eastWall('wall', y, width, 12, 30, 54);
+  }
+  eastWall('fridge', FRIDGE_Y, 36, 29, 70);
+  eastWall('wall', FRIDGE_Y, 36, 15, 15, 70);
   // The island, its fronts facing north (you stand north of it, facing the lake), the range behind
-  // you: the dishwasher and the sink cabinet, x 212..272, y 134..158, under one top 62 x 26 (1" all
-  // round, x 211..273, y 133..159), no seating ledge. A 48" work aisle to the north counter (y 85),
-  // 38" walkways to the Living partition (x 173) and the east wall (x 311), about 36" from its
-  // north-east corner to the refrigerator's. Work triangle, centre to centre: range to refrigerator
-  // about 3'9" (a little under the usual 4': the pantry door pins the run's west end), refrigerator
-  // to sink about 6'7", sink to range about 6'2", about 16'8" in all.
+  // you, moved west (MK): the dishwasher and the sink cabinet, x 179..239, y 134..158, under one top
+  // 62 x 26 (1" all round, x 178..240, y 133..159), no seating ledge. A 48" work aisle to the north
+  // counter (y 85), 46" to the east counter's front (x 286) and 42" to the refrigerator's (x 282); its
+  // west end is 5" short of the old wall line (x 173), within the wide opening, so you walk round it
+  // through the Living. Work triangle, centre to centre: range to refrigerator about 8'0",
+  // refrigerator to sink about 6'4", sink to range about 6'8", about 21'1" in all. About 18'7" of
+  // counter: 24 + 15 + 20 on the north wall, 24 + 30 + 24 + 24 on the east wall, the island's 62.
   const ISLAND_BACK = 158;
   const ISLAND_TOP = { front: 1, back: 1 };
-  kitchen({ kind: 'dishwasher', origin: { x: 224, y: ISLAND_BACK }, direction: 270, width: 24, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { ...ISLAND_TOP, left: 1, right: 0 } });
-  kitchen({ kind: 'sink', origin: { x: 254, y: ISLAND_BACK }, direction: 270, width: 36, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { ...ISLAND_TOP, left: 0, right: 1 } });
+  kitchen({ kind: 'dishwasher', origin: { x: 191, y: ISLAND_BACK }, direction: 270, width: 24, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { ...ISLAND_TOP, left: 1, right: 0 } });
+  kitchen({ kind: 'sink', origin: { x: 221, y: ISLAND_BACK }, direction: 270, width: 36, depth: 24, height: COUNTER_HEIGHT, counterOverhang: { ...ISLAND_TOP, left: 0, right: 1 } });
   // The table by the lake window (MK), 60 x 36 x 30, centred on the window (x 242), x 212..272, y
   // 222..258, with two chairs on each long side (18" square, at its edges): 45" from the island to
   // the north chairs, 39" past its east end to the master bedroom's door, 32" behind the south
