@@ -22,7 +22,7 @@ import { floorOpeningTool } from './floorOpeningTool';
 import { roofTool } from './roofTool';
 import { roomTool } from './roomTool';
 import { selectTool } from './selectTool';
-import { columnTool, gradePointTool, siteSelectTool } from './siteTools';
+import { columnTool, fenceTool, gradePointTool, siteSelectTool, surfaceTool } from './siteTools';
 import { stairsTool } from './stairsTool';
 import { beamTool, joistZoneTool, postTool } from './structureTools';
 import { requestUnderlayImage, underlayTool } from './underlayTool';
@@ -85,12 +85,14 @@ const tools: Record<ToolName, Tool> = {
   fixture: fixtureTool,
   gradePoint: gradePointTool,
   column: columnTool,
+  surface: surfaceTool,
+  fence: fenceTool,
   beam: beamTool,
   post: postTool,
   joistZone: joistZoneTool,
 };
 
-/** The tool object for a name; in site mode the select tool is the site one (grade points and columns). */
+/** The tool object for a name; in site mode the select tool is the site one (grade points, columns, surfaces and fences). */
 export const getTool = (name: ToolName): Tool => (name === 'select' && useUiStore.getState().siteMode ? siteSelectTool : tools[name]);
 
 interface GhostSnapSources {
@@ -244,8 +246,10 @@ export function pruneSelection(): void {
   const site = getPlan().site;
   const gradePoints = sel.gradePoints.filter((id) => site.gradePoints[id]);
   const columns = sel.columns.filter((id) => site.columns[id] && isVisible(site.columns[id].phase, vm));
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + members.length + joistZones.length + gradePoints.length + columns.length !== selectionSize(sel)) {
-    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases, members, joistZones, gradePoints, columns });
+  const surfaces = sel.surfaces.filter((id) => site.surfaces[id] && isVisible(site.surfaces[id].phase, vm));
+  const fences = sel.fences.filter((id) => site.fences[id] && isVisible(site.fences[id].phase, vm));
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + members.length + joistZones.length + gradePoints.length + columns.length + surfaces.length + fences.length !== selectionSize(sel)) {
+    ui.setSelection({ nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases, members, joistZones, gradePoints, columns, surfaces, fences });
   }
   // An inline rename of a room that undo removed has nothing left to edit.
   const edit = ui.roomEdit;

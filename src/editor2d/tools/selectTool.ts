@@ -303,7 +303,7 @@ function pruneSelection(ctx: ToolContext): void {
   const staircases = sel.staircases.filter((id) => level.staircases?.[id]);
   const members = sel.members.filter((id) => level.members?.[id]);
   const joistZones = sel.joistZones.filter((id) => level.joistZones?.[id]);
-  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + members.length + joistZones.length + sel.gradePoints.length + sel.columns.length !== selectionSize(sel)) {
+  if (nodes.length + walls.length + openings.length + rooms.length + stairs.length + roofs.length + fixtures.length + decks.length + floorOpenings.length + staircases.length + members.length + joistZones.length + sel.gradePoints.length + sel.columns.length + sel.surfaces.length + sel.fences.length !== selectionSize(sel)) {
     ctx.ui().setSelection({ ...sel, nodes, walls, openings, rooms, stairs, roofs, fixtures, decks, floorOpenings, staircases, members, joistZones });
   }
 }

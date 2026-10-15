@@ -171,9 +171,23 @@ export interface Column {
   kind: 'post' | 'chimney' | 'flue' | 'pier'; phase: Phase;   // a flue is round: width is its diameter
   color?: string; cap?: boolean;                                     // see "Site and terrain"
 }
+// Schema 8: flat-material patches draped on the ground, and split-rail fences standing on it.
+export type SurfaceMaterial = 'gravel' | 'asphalt' | 'concrete' | 'stone';
+export interface SiteSurface {
+  id: Id; outline: Vec2[];                                           // >= 3 points, not crossing itself
+  material: SurfaceMaterial; phase: Phase; color?: string;           // see "Site and terrain"
+}
+export interface Fence {
+  id: Id; points: Vec2[];                                            // >= 2 points, an open polyline
+  height: Inches;                                                    // posts' top above the ground (42)
+  rails: number;                                                     // whole, 1..4 (2)
+  postSpacing: Inches;                                               // most room between posts, >= 24 (120)
+  phase: Phase; color?: string;
+}
 export interface Site {
   northAngle: Degrees;      // degrees clockwise from the top of the plan to true north
   gradePoints: Record<Id, GradePoint>; columns: Record<Id, Column>;
+  surfaces: Record<Id, SiteSurface>; fences: Record<Id, Fence>;     // schema 8
 }
 
 export interface PlanSettings {
@@ -187,7 +201,7 @@ export interface PlanSettings {
 // undo. migrate() ignores them in older files.
 
 export interface Plan {
-  schemaVersion: 7; id: Id; name: string;
+  schemaVersion: 8; id: Id; name: string;
   levelOrder: Id[];          // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
@@ -574,8 +588,9 @@ bare slab edge shows between the shingles and the clapboard).
 
 ## Site and terrain (`derive/site.ts`, `editor2d/tools/siteTools.ts`)
 
-The plan's `site` holds the ground (grade points: spot elevations), the columns (chimney, posts, flues) and
-the north angle. None of it belongs to a level.
+The plan's `site` holds the ground (grade points: spot elevations), the columns (chimney, posts, flues), the
+ground surfaces (gravel, asphalt, concrete, stone), the fences and the north angle. None of it belongs to a
+level.
 
 **Terrain** (`site.ts`, pure, position arrays like `roofs.ts`; `meshes.ts` wraps them). `terrainHeightAt`
 is the triangulated surface through the grade points (a TIN): `delaunay` (Bowyer-Watson in a super
@@ -591,7 +606,8 @@ between its points, showing a foot or two of foundation.) Exactly a point's elev
 it, flat for a single point, the inverse-distance (power 2) average when the points do not span an
 area (two, or all in a line), and `fallback` (the bottom of the lowest level's slab,
 `fallbackElevation`) without points. `terrainGrid(site, bounds, fallback)` samples it on a 24" grid over
-the plan bounds (`siteBounds`: nodes of every level, roof outlines, columns, grade points) plus 1200"
+the plan bounds (`siteBounds`: nodes of every level, roof and deck outlines, columns, surface outlines,
+fence points, grade points, so the grid covers every site element) plus 1200"
 (`TERRAIN_MARGIN`, 100'), rounded outward to whole cells, so a wall moving about does not change the grid;
 the step grows when that would exceed 200 cells along an axis. The result is an indexed
 surface (vertex = plan x, elevation, plan y; two triangles per cell, all facing +Y) plus its `bounds`
@@ -679,16 +695,70 @@ arrestor in the window screens' wire mesh (`chimneyPartMaterial`). A column and 
 receive the sun's shadows; a demolished one casts none, and neither does the arrestor (see-through,
 drawn after the opaque meshes like a screen).
 
+**Ground surfaces** (`SiteSurface`, schema 8) are flat-material patches on the ground: a gravel drive, an
+asphalt road, a concrete pad, flagstones. A surface has no height of its own: `site.ts drapeSurface(outline,
+grid)` lays it on the terrain grid the view shows (`planTerrain`, the house cut out of it included). The
+outline is triangulated (`roofs.ts triangulate`, ear clipping, after turning it to positive area); each of
+its triangles is clipped against every grid triangle it overlaps, found through an index of the grid's
+triangles by the cells their bounding boxes touch (`gridIndexOf`, made once per grid object), then a
+convex-convex clip by the grid triangle's three inward half-planes (`clipHalfPlane`); each piece is fanned
+into triangles facing up whose corners take the height of the grid triangle's plane there (barycentric,
+`planeThrough`) plus `SURFACE_LIFT` (1"). So the surface lies exactly on the ground, split wherever the
+ground folds, and its plan area is the outline's. `meshes.ts buildSurfaceGeometry` makes it a non-indexed
+geometry with flat normals (`computeVertexNormals`) and UVs in inches (u = plan x, v = plan y).
+`getSurfaceMeshes(plan, viewMode)` returns the visible ones (`SurfaceMesh`: id, shown phase, material,
+`color` after the default, geometry), memoized per view mode by the `surfaces` record and the grid object
+(the same array while both are), each surface's geometry kept while its object and the grid are, the
+replaced or dropped ones disposed (`clearSiteCache` disposes all). Colours (`SURFACE_COLOR`,
+`surfaceColorOf` in `model/finish.ts`): gravel `#a39a88`, asphalt `#3d3d3f`, concrete `#b3b0a8`, stone
+`#8a8378`; `color` (`#rrggbb`, lower-cased) overrides it. `view3d/materials.ts surfaceMaterial(material,
+phase, color)`: gravel and asphalt carry a canvas texture drawn in the colour under a white tint
+(`groundTexture.ts surfaceTexture`: a 512 px seeded tile for 48" of ground, `repeat` 1/48; gravel is the
+colour mottled by noise under 9000 small stones 1/4" to 3/4" in lighter and darker shades, each with a
+shadow; asphalt is the colour with fine grain and lighter aggregate specks; every mark wrapped round the
+tile's edges), stone carries the walls' fieldstone (`sidingTextures('stone', ...)`) as flagstones,
+concrete is the flat colour; matte (asphalt roughness 0.85); without a canvas (node, tests, the export)
+the flat colour (`userData.flatColor`). Every surface material, the demolished one too, has a polygon
+offset toward the camera (factor -1, units -4) on top of the 1" lift, so far away, where depth precision
+is coarser than an inch, the lawn never shows through. Demolished: translucent red; new: the colour
+pulled toward green. `SiteMeshes.tsx SiteSurfaces` draws them with the ground's render order; they
+receive the sun's shadows and cast none.
+
+**Fences** (`Fence`, schema 8) are split-rail (post and rail) fences along an open polyline, laid out by
+pure functions in `site.ts`. `fencePostPoints` puts a post at every point and, along each run, as few more
+as keep every gap within `postSpacing`, evenly spread (`ceil(length / spacing)` gaps: a 25' run at 10'
+gets two more, 8'4" apart); a fence whose last point is back on its first (within 1", four points or
+more) shares that post and closes. `fenceLayout(fence, ground)` stands each post from
+`FENCE_DEFAULTS.belowGrade` (6") under the ground at it to `height` over it, and runs `rails` rails
+between each two consecutive posts (and from the last to the first when closed), axis to axis, at
+`fenceRailFractions(rails)` of the height over the ground at either end: evenly from 30% to 85%
+(`railLow`, `railHigh`), a single rail at 85% (a top rail), so the rails follow the slope.
+`meshes.ts buildFenceGeometry` builds every post (6" across, `FENCE_DEFAULTS.post`) and rail (4",
+`rail`) with `logBetween` (round logs with smooth normals, see "Structure") and merges their bodies into
+one geometry and their end discs into another. `getFenceMeshes(plan, viewMode)` returns the visible ones
+(`FenceMesh`: id, shown phase, `color`, `body`, `ends`), the ground being `terrainHeightAt` (the TIN, not
+the cut grid: a post by the house stands at grade), memoized per view mode by the `fences` record, the
+`gradePoints` record and the fallback elevation, a fence's geometry kept while its object and the ground
+are. The colour is weathered grey wood `#8b8478` (`FENCE_COLOR`, `fenceColorOf`); `fenceMaterial('body',
+phase, color)` is that colour and `fenceMaterial('end', ...)` the end grain's (`logEndColor`), both like
+trim (demolished translucent red, new pulled toward green). `SiteMeshes.tsx SiteFences` draws them; they
+cast and receive shadows, a demolished one casts none.
+
 **Site mode** (`uiStore.siteMode`, the "Site" tab below the lowest level in the level bar): entering it
 makes the lowest level active (so the panel and store actions have a level), clears the selection and
 shows, in place of the level's layers (`PlanLayers.tsx SiteView`), the first floor (the level above the
-lowest, or the lowest if alone) as a ghost, every level's roofs as faint ghosts, and the site layer: grade
-points as small triangles with their elevation, columns as rectangles (chimney hatched like brick, post and
-pier solid; demolished hatched red, new green; hidden in the views that hide them), a north arrow in the
-canvas corner turned by `northAngle`. Choosing any level (the lowest too) leaves site mode
-(`setActiveLevel` clears the flag). In site mode only select, grade point (E) and column (C) work;
-`switchTool` refuses the level tools and says "Choose a level to draw walls" in the status bar (the
-toolbar buttons stay clickable but dimmed and `aria-disabled`; E and C do nothing outside it). In
+lowest, or the lowest if alone) as a ghost, every level's roofs as faint ghosts, and the site layer, bottom
+to top: ground surfaces as filled outlines in their material's colour (gravel speckled with the
+`hp-gravel` pattern, the others flat, in the surface's own colour when it has one and its phase does not
+colour it), fences as a line with a dot at each post (`fencePostPoints`, at least 2.5 px across), columns
+as rectangles (chimney hatched like brick, post and pier solid), grade points as small triangles with
+their elevation, and a north arrow in the canvas corner turned by `northAngle`. Surfaces, fences and
+columns follow their phase (demolished hatched or dashed red, new green) and are hidden in the views
+that hide them. Choosing any level (the lowest too) leaves site mode
+(`setActiveLevel` clears the flag). In site mode only select, measure, grade point (E), column (C),
+surface (A) and fence (Q) work (`SITE_TOOLS`); `switchTool` refuses the level tools and says "Choose a
+level to draw walls" in the status bar (the toolbar buttons stay clickable but dimmed and
+`aria-disabled`; E, A and Q do nothing outside it, and C is the cabinet tool there). In
 site mode the 3D view's "Only active level and below", the export and the walk start use the level
 the site view ghosts (the first floor) as the active level (`active3dLevel`), since the active level
 is parked at the lowest.
@@ -698,28 +768,48 @@ midpoints and the grid. Grade point: a click stores the spot in `draft.gradePend
 takes the elevation in feet-inches (a minus sign is allowed); Enter places it, with nothing typed at the
 first floor's floor top (the level the view shows; `defaultGradeElevation`); Esc clears the buffer, then
 the spot. Column: the column follows the cursor (`draft.columnPreview`), Tab steps chimney, post, flue, pier (`nextColumnKind`),
-the click places it with the defaults above in the toolbar's "Draw as" phase. The site select tool
-(`getTool('select')` returns it in site mode) picks grade points (10 px) before columns (visible ones, with
-a 4 px slack), shift-click and box-select add, a drag moves the whole selection with `moveSiteItems`
-(one set; the first changing step is tracked and the rest folded in, one undo step), Delete removes
-through `deleteEntities`. Store actions: `addGradePoint`, `updateGradePoint`, `deleteGradePoints`,
+the click places it with the defaults above in the toolbar's "Draw as" phase. Surface (A) and fence (Q)
+are outline tools (`makeOutlineTool`, as the roof and deck tools, with the spec's `snap` set to
+`siteSnap`): the surface tool closes its outline on the first corner, a double-click or Enter, and Tab
+(the spec's `onKey`) steps `draft.surfaceMaterial` through gravel, asphalt, concrete, stone
+(`nextSurfaceMaterial`) before it closes; the fence tool is `open`: at least 2 points, finished by Enter
+or a double-click, a click on the first point adds it again (a closed run), no self-crossing check, no
+closing edge in the draft (`Overlay.tsx OutlineDraft`). Both: Backspace removes the last point, Esc
+cancels, the new element is selected in the "Draw as" phase, and a fence takes `FENCE_DEFAULTS` (42"
+high, 2 rails, posts at most 120" apart). The site select tool (`getTool('select')` returns it in site
+mode) picks with `hitSite`: grade points (10 px), then columns (visible ones, with a 4 px slack, the
+latest on top), then fences (the nearest within 5 px of its line, `FENCE_PICK_PX`), then surfaces (the
+point inside the outline; the smallest area on top, so a pad on a drive can be picked); shift-click and
+box-select add (a surface or fence when all its points are in the box), a drag moves the whole
+selection with `moveSiteItems` (one set; the first changing step is tracked and the rest folded in, one
+undo step; a surface's outline and a fence's points move as a whole), Delete removes through
+`deleteEntities`. Store actions: `addGradePoint`, `updateGradePoint`, `deleteGradePoints`,
 `clearGradePoints`, `addColumn`, `updateColumn`, `deleteColumns` (`columnProblem` rejects a non-positive
-size or a top at or below the base), `moveSiteItems`, `setNorthAngle` (normalized to [0, 360)); each is
-one undo step and a no-op leaves the plan object alone. `setPhase` and `deleteEntities` take `columns`
-(and `deleteEntities` `gradePoints`). `Selection` gains `gradePoints` and `columns`. The panel has Grade
-point (elevation, position, against the first floor), Column (kind, size, rotation, base, top, "Colour"
-with a reset to the default, "Cap and spark arrestor" for a chimney, phase, "Reset heights") and, with
-nothing selected in site mode, Site (north angle, "Road is north", counts,
-"Clear grade points" with a confirm).
+size or a top at or below the base), `addSurface`, `updateSurface`, `deleteSurfaces` (`surfaceProblem`
+rejects an outline of fewer than 3 points, crossing itself or enclosing no area, an unknown material, a
+colour not `#rrggbb`), `addFence`, `updateFence`, `deleteFences` (`fenceProblem` rejects fewer than 2
+points or two on top of each other, a height not above 0, rails not a whole number 1 to 4
+(`MAX_FENCE_RAILS`), a post spacing under 24" (`MIN_FENCE_SPACING`), a bad colour; `color` takes
+undefined to clear it), `moveSiteItems(points, columns, { surfaces, fences })` (new outlines and point
+lists, kept only with the same count of points), `setNorthAngle` (normalized to [0, 360)); each is one
+undo step and a no-op leaves the plan object alone. `setPhase` and `deleteEntities` take `columns`,
+`surfaces` and `fences` (and `deleteEntities` `gradePoints`). `Selection` gains `gradePoints`, `columns`,
+`surfaces` and `fences`. The panel has Grade point (elevation, position, against the first floor), Column
+(kind, size, rotation, base, top, "Colour" with a reset to the default, "Cap and spark arrestor" for a
+chimney, phase, "Reset heights"), Surface (material, "Colour" with a reset, phase, area, corners), Fence
+(height, rails, post spacing, "Colour" with a reset, phase, length, posts, "Reset to defaults") and, with
+nothing selected in site mode, Site (north angle, "Road is north", counts, "Clear grade points" with a
+confirm). The status bar counts the visible columns, surfaces and fences in site mode.
 
 **North and light**: `sunPosition(northAngle)` is the sun's direction (the light, the sky's sun and the
 shadow camera follow it, see "3D"), the south-west offset (-700, 1100) in plan turned clockwise by the angle
 and 1600" up (about 51 degrees above the horizon), so the sun comes from the south-west once north is
 applied.
 
-**Phases** apply to roofs and columns exactly like walls: `isVisible(phase, viewMode)` in `RoofShape` and
-`ColumnShape` (2D), `hitTest` / `hitSite` (picking), `pruneSelection`, `getLevelMeshes` (roofs, and walls
-they raise), `getSiteMeshes`, the export, and the status bar counts; "Mark demolish" (panel, `setPhase`)
+**Phases** apply to roofs, columns, surfaces and fences exactly like walls: `isVisible(phase, viewMode)` in
+`RoofShape`, `ColumnShape`, `SurfaceShape` and `FenceShape` (2D), `hitTest` / `hitSite` (picking),
+`pruneSelection`, `getLevelMeshes` (roofs, and walls they raise), `getSiteMeshes`, `getSurfaceMeshes`,
+`getFenceMeshes`, the export, and the status bar counts; "Mark demolish" (panel, `setPhase`)
 and the toolbar's "Draw as" cover them.
 
 **Export**: after the level groups a `Site` group (elevation 0, absolute heights) holds `Terrain` (material
@@ -727,8 +817,12 @@ and the toolbar's "Draw as" cover them.
 would only be a plane at the slab) and the visible columns as `Chimney` / `Flue` / `Post` (materials
 `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the kind's default unless demolished; a
 chimney's brick is its flat colour). A capped chimney's cap and arrestor follow its shaft as two more
-`Chimney` meshes, materials `chimney_cap_<phase>` and `chimney_arrestor_<phase>`. The far ground is not
-exported.
+`Chimney` meshes, materials `chimney_cap_<phase>` and `chimney_arrestor_<phase>`. Then each visible ground
+surface is a `Surface` mesh (material `surface_<material>_<phase>`, plus `_<hex>` in a colour other than the
+material's default unless demolished; the flat colour, no texture), draped on the ground even without
+grade points (then on the flat ground at the slab, which is not exported), and each fence two `Fence`
+meshes, its logs (`fence_<phase>`) and their ends (`fence_end_<phase>`), plus `_<hex>` in a colour other
+than the weathered grey unless demolished. The far ground is not exported.
 
 **Fit 3D** (`bounds.ts planBox`) takes in the walls that close a room (`houseNodes`: the walls of
 the All view's faces; a level whose walls close nothing gives all its nodes), so a free-standing
@@ -1660,7 +1754,9 @@ document to n + 1 and they run in order (0 -> 1: entity arrays become records ke
 missing `levelOrder` comes from the levels array, settings are filled; 1 -> 2: every level gets an
 empty `roofs` record and the plan a default `site`; 2 -> 3: every level gets an empty `fixtures`
 record; 3 -> 4: every level gets an empty `decks` record; 4 -> 5: every level gets an empty
-`floorOpenings` record). The upgraded document is
+`floorOpenings` record; 5 -> 6: `staircases`; 6 -> 7: `joistZones` and `members`; 7 -> 8: the site gets
+empty `surfaces` and `fences` records; a broken surface or fence is dropped with a console warning naming
+it, a bad colour alone, a colour lower-cased). The upgraded document is
 then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
 file's order so a current file round-trips byte for byte), with defaults for missing optional
 values and broken openings, rooms, stairs and underlays dropped (a broken roof, deck or floor opening is dropped
@@ -1679,11 +1775,12 @@ root named after the plan and scaled by 0.0254, one group per level the 3D view 
 skipped) at its floor top, meshes `Wall <n> (<kind>, <phase>)`, `Floor`, `Stairs`, `Roof`, `Fascia`, `Rafters`,
 `Beam`, `Post`, `Footing`, `Log end`, `Deck`, `Deck framing`, `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour
 other than the default), `Stair railing` and `Guard` (material `railing_<phase>`), `Window`, `Door`, then a `Site` group
-(`Terrain`, `Chimney`, `Flue`, `Post`, `Pier`; a capped chimney's cap and arrestor are more `Chimney` meshes, a capped flue's
+(`Terrain`, `Chimney`, `Flue`, `Post`, `Pier`, `Surface`, `Fence`; a capped chimney's cap and arrestor are more `Chimney` meshes, a capped flue's
 rain cap two more `Flue` meshes, `flue_stem_<phase>` and `flue_hood_<phase>`) with cloned geometry and cloned live materials
 (one per phase/kind, roofs `roof_<finish>_<phase>`, boards `fascia_<phase>` and tails `rafter_<phase>` (plus `_<hex>`
 in a board colour other than tan), columns `column_<kind>_<phase>` (plus `_<hex>` in a colour other than the
-default), `chimney_cap_<phase>`, `chimney_arrestor_<phase>`, `terrain`, named without spaces; no texture or
+default), surfaces `surface_<material>_<phase>`, fences `fence_<phase>` and `fence_end_<phase>` (each plus
+`_<hex>` likewise), `chimney_cap_<phase>`, `chimney_arrestor_<phase>`, `terrain`, named without spaces; no texture or
 normal map, a textured material's flat colour instead, see "Exterior appearance"), disposed after
 export. glTF: `GLTFExporter`, `binary: true`, `trs: true`. OBJ: `OBJExporter` on the same group with
 the scale reset to 1 (inches; SketchUp asks for units) and each mesh name prefixed with its level,

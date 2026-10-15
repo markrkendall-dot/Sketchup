@@ -1,7 +1,7 @@
 import { BufferGeometry, Float32BufferAttribute, Matrix4, Quaternion, ShapeUtils, Uint32BufferAttribute, Vector2, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Column, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, Stairs, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
+import type { Column, Fence, Fixture, FixtureKind, FloorFinish, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter } from '../model/casework';
 import { DECK, getDeckLayout, type DeckBox, type DeckLayout } from './decks';
@@ -9,13 +9,13 @@ import { memberAxis, memberBoxes, type AxisPoint } from './members';
 import { isLog, isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, deckColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
 import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, wallSideFaces, type FaceSet } from './rooms';
-import { CHIMNEY_CAP, chimneyPartBoxes, circleOutline, columnOutline, hasChimneyCap, planTerrain, type ChimneyPart, type TerrainGrid } from './site';
+import { CHIMNEY_CAP, chimneyPartBoxes, circleOutline, columnOutline, drapeSurface, FENCE_DEFAULTS, fenceLayout, fallbackElevation, hasChimneyCap, planTerrain, terrainHeightAt, type ChimneyPart, type FenceLayout, type TerrainGrid } from './site';
 import { boardColorOf, DEFAULT_SASH_COLOR, ROOF_COLOR, roofColorOf, ROOF_TILE, SIDING_FINISHES, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsPoint } from './stairs';
@@ -2415,10 +2415,152 @@ export function getSiteMeshes(plan: Plan, viewMode: ViewMode): SiteMeshes {
   return result;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Ground surfaces and fences (DESIGN.md "Site and terrain"), in absolute elevation like the columns.
+
+/**
+ * A ground surface draped on the terrain grid (site.ts drapeSurface, 1" above it): non-indexed,
+ * flat normals (up, the ground's slope), UVs in inches (u = plan x, v = plan y) like the terrain's.
+ */
+export function buildSurfaceGeometry(outline: readonly Vec2[], grid: TerrainGrid): BufferGeometry {
+  const pos = drapeSurface(outline, grid);
+  const uv = new Float32Array((pos.length / 3) * 2);
+  for (let v = 0; v < pos.length / 3; v++) {
+    uv[v * 2] = pos[v * 3];
+    uv[v * 2 + 1] = pos[v * 3 + 2];
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return g;
+}
+
+export interface SurfaceMesh {
+  id: Id;
+  /** The phase as shown in the view mode (shownPhase). */
+  phase: Phase;
+  material: SurfaceMaterial;
+  /** The surface's colour after the default (model/finish.ts surfaceColorOf). */
+  color: string;
+  geometry: BufferGeometry;
+}
+
+/**
+ * A fence's logs (site.ts fenceLayout, built by logBetween): the posts (FENCE_DEFAULTS.post across)
+ * and rails (FENCE_DEFAULTS.rail across) in one body, and their end discs (the end grain) in another.
+ */
+export function buildFenceGeometry(layout: FenceLayout): { body: BufferGeometry; ends: BufferGeometry } {
+  const logs = [
+    ...layout.posts.map((p) => logBetween({ x: p.at.x, y: p.at.y, z: p.bottom }, { x: p.at.x, y: p.at.y, z: p.top }, FENCE_DEFAULTS.post)),
+    ...layout.rails.map((r) => logBetween(r.a, r.b, FENCE_DEFAULTS.rail)),
+  ];
+  return { body: mergeAll(logs.map((l) => l.body)), ends: mergeAll(logs.map((l) => l.ends)) };
+}
+
+export interface FenceMesh {
+  id: Id;
+  phase: Phase;
+  /** The fence's colour after the default (model/finish.ts fenceColorOf). */
+  color: string;
+  body: BufferGeometry;
+  ends: BufferGeometry;
+}
+
+interface SurfaceEntry {
+  surface: SiteSurface;
+  grid: TerrainGrid;
+  geometry: BufferGeometry;
+}
+
+interface FenceEntry {
+  fence: Fence;
+  gradePoints: Site['gradePoints'];
+  fallback: number;
+  body: BufferGeometry;
+  ends: BufferGeometry;
+}
+
+const surfaceCache = new Map<ViewMode, Map<Id, SurfaceEntry>>();
+const surfaceResult = new Map<ViewMode, { surfaces: Site['surfaces']; grid: TerrainGrid; result: SurfaceMesh[] }>();
+const fenceCache = new Map<ViewMode, Map<Id, FenceEntry>>();
+const fenceResult = new Map<ViewMode, { fences: Site['fences']; gradePoints: Site['gradePoints']; fallback: number; result: FenceMesh[] }>();
+
+/**
+ * The ground surfaces visible in a view mode as meshes draped on its terrain grid, memoized: the
+ * same array while the surfaces record and the grid (planTerrain, which follows the grade points,
+ * the plan bounds and the house's cut) are the same, and a surface's geometry is reused while its
+ * object and the grid are (geometry that drops out or is replaced is disposed).
+ */
+export function getSurfaceMeshes(plan: Plan, viewMode: ViewMode): SurfaceMesh[] {
+  const surfaces = plan.site.surfaces;
+  const grid = planTerrain(plan, viewMode);
+  const hit = surfaceResult.get(viewMode);
+  if (hit && hit.surfaces === surfaces && hit.grid === grid) return hit.result;
+  const prev = surfaceCache.get(viewMode);
+  const next = new Map<Id, SurfaceEntry>();
+  const out: SurfaceMesh[] = [];
+  for (const sf of Object.values(surfaces)) {
+    if (!isVisible(sf.phase, viewMode)) continue;
+    const old = prev?.get(sf.id);
+    const entry = old && old.surface === sf && old.grid === grid ? old : { surface: sf, grid, geometry: buildSurfaceGeometry(sf.outline, grid) };
+    next.set(sf.id, entry);
+    out.push({ id: sf.id, phase: shownPhase(sf.phase, viewMode), material: sf.material, color: surfaceColorOf(sf), geometry: entry.geometry });
+  }
+  if (prev) for (const [id, e] of prev) if (next.get(id) !== e) e.geometry.dispose();
+  surfaceCache.set(viewMode, next);
+  surfaceResult.set(viewMode, { surfaces, grid, result: out });
+  return out;
+}
+
+/**
+ * The fences visible in a view mode as meshes standing on the ground, memoized like the surfaces:
+ * the same array while the fences record, the grade points record and the fallback elevation (what
+ * the ground under them, terrainHeightAt, depends on) are the same; a fence's geometry is reused
+ * while its object is, and disposed when it drops out or is rebuilt.
+ */
+export function getFenceMeshes(plan: Plan, viewMode: ViewMode): FenceMesh[] {
+  const { fences, gradePoints } = plan.site;
+  const fallback = fallbackElevation(plan);
+  const hit = fenceResult.get(viewMode);
+  if (hit && hit.fences === fences && hit.gradePoints === gradePoints && hit.fallback === fallback) return hit.result;
+  const prev = fenceCache.get(viewMode);
+  const next = new Map<Id, FenceEntry>();
+  const out: FenceMesh[] = [];
+  const ground = (p: Vec2) => terrainHeightAt(plan.site, p, fallback);
+  for (const f of Object.values(fences)) {
+    if (!isVisible(f.phase, viewMode)) continue;
+    const old = prev?.get(f.id);
+    const entry = old && old.fence === f && old.gradePoints === gradePoints && old.fallback === fallback ? old : { fence: f, gradePoints, fallback, ...buildFenceGeometry(fenceLayout(f, ground)) };
+    next.set(f.id, entry);
+    out.push({ id: f.id, phase: shownPhase(f.phase, viewMode), color: fenceColorOf(f), body: entry.body, ends: entry.ends });
+  }
+  if (prev) {
+    for (const [id, e] of prev) {
+      if (next.get(id) === e) continue;
+      e.body.dispose();
+      e.ends.dispose();
+    }
+  }
+  fenceCache.set(viewMode, next);
+  fenceResult.set(viewMode, { fences, gradePoints, fallback, result: out });
+  return out;
+}
+
 function clearSiteCache(): void {
   for (const m of columnCache.values()) for (const e of m.values()) disposeColumnEntry(e);
   columnCache.clear();
   siteResultCache.clear();
+  for (const m of surfaceCache.values()) for (const e of m.values()) e.geometry.dispose();
+  surfaceCache.clear();
+  surfaceResult.clear();
+  for (const m of fenceCache.values())
+    for (const e of m.values()) {
+      e.body.dispose();
+      e.ends.dispose();
+    }
+  fenceCache.clear();
+  fenceResult.clear();
   terrainEntry?.geometry.dispose();
   terrainEntry = null;
   farGroundEntry?.geometry.dispose();

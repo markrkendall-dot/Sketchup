@@ -11,7 +11,7 @@ import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces 
 import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
 import { faceAt, getFaces, interiorPoint, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
-import { siteGhostLevelId } from '../derive/site';
+import { FENCE_DEFAULTS, fencePostPoints, siteGhostLevelId } from '../derive/site';
 import { getStaircaseLayout } from '../derive/staircase';
 import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
@@ -46,6 +46,7 @@ const OPEN_END_PX = 4.5;
 const ROOM_TINTS = 4;
 export const HATCH_DEMO_ID = 'hp-hatch-demo';
 export const HATCH_CHIMNEY_ID = 'hp-hatch-chimney';
+export const GRAVEL_PATTERN_ID = 'hp-gravel';
 
 const viewportScale = (s: { viewport: { k: number } }) => s.viewport.k;
 const pt = (p: Vec2) => `${p.x},${p.y}`;
@@ -89,6 +90,11 @@ const PatternDefs = memo(function PatternDefs() {
       <pattern id={HATCH_CHIMNEY_ID} patternUnits="userSpaceOnUse" width={size} height={size} patternTransform="rotate(-45)">
         <rect className="hatch-chimney-bg" width={size} height={size} />
         <line className="hatch-chimney-line" x1={0} y1={0} x2={0} y2={size} strokeWidth={1.5 / k} />
+      </pattern>
+      <pattern id={GRAVEL_PATTERN_ID} patternUnits="userSpaceOnUse" width={size} height={size}>
+        <rect className="gravel-bg" width={size} height={size} />
+        <circle className="gravel-dot" cx={size * 0.25} cy={size * 0.3} r={0.9 / k} />
+        <circle className="gravel-dot" cx={size * 0.7} cy={size * 0.75} r={0.9 / k} />
       </pattern>
     </defs>
   );
@@ -1391,7 +1397,7 @@ export const GhostLevel = memo(function GhostLevel({ levelId }: { levelId: Id })
 });
 
 // ---------------------------------------------------------------------------------------------
-// Site layer (site mode): grade points and columns over the first floor's ghost.
+// Site layer (site mode): ground surfaces, fences, columns and grade points over the first floor's ghost.
 
 /** A grade point: a small triangle with its elevation beside it, constant on screen. */
 const GradePointShape = memo(function GradePointShape({ pointId }: { pointId: Id }) {
@@ -1431,12 +1437,63 @@ const ColumnShape = memo(function ColumnShape({ columnId }: { columnId: Id }) {
   );
 });
 
-/** The site's grade points and columns (picking is done by the select tool, hitSite). */
+/** A ground surface: its outline filled in the material's colour (gravel speckled); demo hatched red, new green. */
+const SurfaceShape = memo(function SurfaceShape({ surfaceId }: { surfaceId: Id }) {
+  const sf = useLayerPlan((s) => s.plan.site.surfaces[surfaceId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => s.selection.surfaces.includes(surfaceId));
+  if (!sf || !isVisible(sf.phase, viewMode)) return null;
+  const phase = shownPhase(sf.phase, viewMode);
+  // Its own colour where the phase does not colour it (gravel keeps its speckle).
+  return (
+    <path
+      className={`surface surface-${sf.material} phase-${phase}${selected ? ' is-selected' : ''}`}
+      data-surface-id={surfaceId}
+      d={polyPath(sf.outline)}
+      style={sf.color && sf.material !== 'gravel' && phase === 'existing' ? { fill: sf.color } : undefined}
+      vectorEffect="non-scaling-stroke"
+    />
+  );
+});
+
+/** A fence: its line, with a dot at each post (fencePostPoints); demo dashed red, new green. */
+const FenceShape = memo(function FenceShape({ fenceId }: { fenceId: Id }) {
+  const f = useLayerPlan((s) => s.plan.site.fences[fenceId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const selected = useLayerUi((s) => s.selection.fences.includes(fenceId));
+  const k = useLayerUi(viewportScale);
+  const posts = useMemo(() => (f ? fencePostPoints(f) : []), [f]);
+  if (!f || !isVisible(f.phase, viewMode)) return null;
+  // The post's own size, but never under 2.5 px across on screen.
+  const r = Math.max(FENCE_DEFAULTS.post / 2, 2.5 / k);
+  return (
+    <g className={`fence phase-${shownPhase(f.phase, viewMode)}${selected ? ' is-selected' : ''}`} data-fence-id={fenceId}>
+      <polyline className="fence-line" points={f.points.map(pt).join(' ')} vectorEffect="non-scaling-stroke" />
+      {posts.map((p, i) => (
+        <circle key={i} className="fence-post" cx={p.x} cy={p.y} r={r} vectorEffect="non-scaling-stroke" />
+      ))}
+    </g>
+  );
+});
+
+/** The site's surfaces, fences, columns and grade points, bottom to top (picking is done by the select tool, hitSite). */
 const SiteLayer = memo(function SiteLayer() {
   const pointIds = useLayerPlan(useShallow((s) => Object.keys(s.plan.site.gradePoints)));
   const columnIds = useLayerPlan(useShallow((s) => Object.keys(s.plan.site.columns)));
+  const surfaceIds = useLayerPlan(useShallow((s) => Object.keys(s.plan.site.surfaces)));
+  const fenceIds = useLayerPlan(useShallow((s) => Object.keys(s.plan.site.fences)));
   return (
     <g className="layer-site" pointerEvents="none">
+      <g className="layer-surfaces">
+        {surfaceIds.map((id) => (
+          <SurfaceShape key={id} surfaceId={id} />
+        ))}
+      </g>
+      <g className="layer-fences">
+        {fenceIds.map((id) => (
+          <FenceShape key={id} fenceId={id} />
+        ))}
+      </g>
       <g className="layer-columns">
         {columnIds.map((id) => (
           <ColumnShape key={id} columnId={id} />

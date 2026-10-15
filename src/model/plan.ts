@@ -1,17 +1,18 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
 import { phasesCoexist } from '../derive/phase';
+import { selfIntersects } from '../derive/rooms';
 import { MAX_STAIRS_BELOW, stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
-import { BAND_FINISHES, FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, WALL_FINISHES } from './finish';
+import { BAND_FINISHES, FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, SURFACE_MATERIALS, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
 import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
-import type { Column, Deck, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, Staircase, Stairs, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
-export const SCHEMA_VERSION = 7 as const;
+export const SCHEMA_VERSION = 8 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
 export const MERGE_EPS = 0.5;
 
@@ -47,7 +48,7 @@ export function createLevel(name: string, wallHeight: number, floorThickness: nu
 }
 
 /** The site of a new plan (and of files from before schema version 2). */
-export const defaultSite = (): Site => ({ northAngle: 0, gradePoints: {}, columns: {} });
+export const defaultSite = (): Site => ({ northAngle: 0, gradePoints: {}, columns: {}, surfaces: {}, fences: {} });
 
 export function createEmptyPlan(name = 'Untitled plan'): Plan {
   const levels = [
@@ -575,6 +576,13 @@ export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
     next.schemaVersion = 7;
     return next;
   },
+  /** Version 7: the site has no ground surfaces or fences; add empty `surfaces` and `fences` records. */
+  7: (doc) => {
+    const next: Json = { ...doc };
+    if (isObject(doc.site)) next.site = { ...doc.site, surfaces: {}, fences: {} };
+    next.schemaVersion = 8;
+    return next;
+  },
 };
 
 const PHASES = new Set(['existing', 'demo', 'new']);
@@ -588,7 +596,9 @@ const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFini
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
-const SITE_KEYS = ['northAngle', 'gradePoints', 'columns'] as const;
+const SITE_KEYS = ['northAngle', 'gradePoints', 'columns', 'surfaces', 'fences'] as const;
+const SURFACE_KEYS = ['id', 'outline', 'material', 'phase', 'color'] as const;
+const FENCE_KEYS = ['id', 'points', 'height', 'rails', 'postSpacing', 'phase', 'color'] as const;
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
 const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
@@ -815,6 +825,39 @@ export function columnProblem(c: Pick<Column, 'at' | 'width' | 'depth' | 'rotati
   if (!(c.top > c.base)) return 'the top must be above the base';
   if (c.color !== undefined && !isHexColor(c.color)) return 'the colour must be a hex colour';
   if (c.cap !== undefined && typeof c.cap !== 'boolean') return 'the cap must be on or off';
+  return null;
+}
+
+/** The most rails a fence has between two posts. */
+export const MAX_FENCE_RAILS = 4;
+/** The least spacing a fence's posts can be given. */
+export const MIN_FENCE_SPACING = 24;
+
+/**
+ * Why a ground surface cannot be used (an outline of fewer than 3 points, crossing itself or
+ * enclosing no area, an unknown material, a colour that is not `#rrggbb`), or null.
+ */
+export function surfaceProblem(sf: Pick<SiteSurface, 'outline' | 'material' | 'color'>): string | null {
+  const shape = outlineProblem(sf.outline);
+  if (shape) return shape;
+  if (selfIntersects(sf.outline)) return 'the outline crosses itself';
+  if (!SURFACE_MATERIALS.includes(sf.material)) return 'the material must be gravel, asphalt, concrete or stone';
+  if (sf.color !== undefined && !isHexColor(sf.color)) return 'the colour must be a hex colour';
+  return null;
+}
+
+/**
+ * Why a fence cannot be used (fewer than 2 points, two points on top of each other, a height not
+ * above 0, rails not a whole number from 1 to MAX_FENCE_RAILS, a post spacing under
+ * MIN_FENCE_SPACING, a colour that is not `#rrggbb`), or null.
+ */
+export function fenceProblem(f: Pick<Fence, 'points' | 'height' | 'rails' | 'postSpacing' | 'color'>): string | null {
+  if (!Array.isArray(f.points) || f.points.length < 2 || !f.points.every(isPoint)) return 'needs at least 2 points';
+  if (f.points.some((p, i) => i > 0 && dist(p, f.points[i - 1]) < 1)) return 'two points are on top of each other';
+  if (!isNum(f.height) || f.height <= 0) return 'the height must be positive';
+  if (!Number.isInteger(f.rails) || f.rails < 1 || f.rails > MAX_FENCE_RAILS) return `rails must be 1 to ${MAX_FENCE_RAILS}`;
+  if (!isNum(f.postSpacing) || f.postSpacing < MIN_FENCE_SPACING) return `the post spacing must be at least ${MIN_FENCE_SPACING}"`;
+  if (f.color !== undefined && !isHexColor(f.color)) return 'the colour must be a hex colour';
   return null;
 }
 
@@ -1106,7 +1149,61 @@ function migrateFinishes(raw: unknown): LevelFinishes | undefined {
   return Object.keys(out).length ? (out as unknown as LevelFinishes) : undefined;
 }
 
-/** The plan's site: north angle, grade points and columns (broken entries are dropped). */
+/**
+ * Ground surfaces read field by field: an unusable outline or an unknown material drops the surface
+ * (with a console warning naming it); a missing phase is existing; a bad colour is dropped alone.
+ */
+function migrateSurfaces(raw: Json): Site['surfaces'] {
+  const out: Site['surfaces'] = {};
+  for (const [id, sf] of Object.entries(raw)) {
+    const drop = (why: string) => console.warn(`HomePlan: site: dropped surface ${id}: ${why}`);
+    if (!isObject(sf)) {
+      drop('not an object');
+      continue;
+    }
+    const problem = surfaceProblem({ outline: sf.outline as Vec2[], material: sf.material as SurfaceMaterial });
+    if (problem) {
+      drop(problem);
+      continue;
+    }
+    const surface = pick(sf, SURFACE_KEYS);
+    surface.id = id;
+    surface.outline = (sf.outline as Vec2[]).map((p) => ({ x: p.x, y: p.y }));
+    surface.phase = phaseOf(sf.phase);
+    put(surface, 'color', isHexColor(sf.color) ? sf.color.toLowerCase() : undefined);
+    out[id] = surface as unknown as SiteSurface;
+  }
+  return out;
+}
+
+/**
+ * Fences read field by field: unusable points, height, rails or post spacing drop the fence (with a
+ * console warning naming it); a missing phase is existing; a bad colour is dropped alone.
+ */
+function migrateFences(raw: Json): Site['fences'] {
+  const out: Site['fences'] = {};
+  for (const [id, f] of Object.entries(raw)) {
+    const drop = (why: string) => console.warn(`HomePlan: site: dropped fence ${id}: ${why}`);
+    if (!isObject(f)) {
+      drop('not an object');
+      continue;
+    }
+    const problem = fenceProblem({ points: f.points as Vec2[], height: f.height as number, rails: f.rails as number, postSpacing: f.postSpacing as number });
+    if (problem) {
+      drop(problem);
+      continue;
+    }
+    const fence = pick(f, FENCE_KEYS);
+    fence.id = id;
+    fence.points = (f.points as Vec2[]).map((p) => ({ x: p.x, y: p.y }));
+    fence.phase = phaseOf(f.phase);
+    put(fence, 'color', isHexColor(f.color) ? f.color.toLowerCase() : undefined);
+    out[id] = fence as unknown as Fence;
+  }
+  return out;
+}
+
+/** The plan's site: north angle, grade points, columns, surfaces and fences (broken entries are dropped). */
 function migrateSite(raw: unknown): Site {
   const src = isObject(raw) ? raw : {};
   const site = pick(src, SITE_KEYS);
@@ -1136,6 +1233,8 @@ function migrateSite(raw: unknown): Site {
     columns[id] = col as unknown as Column;
   }
   site.columns = columns;
+  site.surfaces = migrateSurfaces(isObject(src.surfaces) ? src.surfaces : {});
+  site.fences = migrateFences(isObject(src.fences) ? src.fences : {});
   return site as unknown as Site;
 }
 

@@ -33,6 +33,8 @@ const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = 
 const SITE_TOOL_BUTTONS: { name: ToolName; label: string; key: string; title: string }[] = [
   { name: 'gradePoint', label: 'Grade point', key: 'E', title: 'Grade point (E): click a spot on the ground, type its elevation, Enter' },
   { name: 'column', label: 'Column', key: 'C', title: 'Column (C): click to place a chimney; Tab switches to a post, then a flue (a round metal pipe), then a pier (fieldstone)' },
+  { name: 'surface', label: 'Surface', key: 'A', title: 'Surface (A): click the corners of a gravel drive, a road, a pad or flagstones, close on the first corner or Enter; Tab switches gravel, asphalt, concrete, stone' },
+  { name: 'fence', label: 'Fence', key: 'Q', title: 'Fence (Q): click the points of a split-rail fence, double-click or Enter to finish; Backspace removes the last point' },
 ];
 
 const TOOL_TITLE: Partial<Record<ToolName, string>> = {

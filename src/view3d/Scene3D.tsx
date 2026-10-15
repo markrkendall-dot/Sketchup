@@ -12,7 +12,7 @@ import { Controls } from './Controls';
 import { viewSun } from './elevation';
 import { LevelMeshes } from './LevelMeshes';
 import { setEnvironmentMap } from './materials';
-import { FarGround, SiteColumns, Terrain } from './SiteMeshes';
+import { FarGround, SiteColumns, SiteFences, SiteSurfaces, Terrain } from './SiteMeshes';
 import { visible3dLevels } from './visibility';
 
 // Light (DESIGN.md "3D"): the sun casts shadows, a hemisphere light is the sky's fill, drei's Sky
@@ -436,7 +436,7 @@ function WalkOverlay() {
 
 /**
  * The 3D model: the sky, the terrain and the far ground round it, one group per level at its
- * elevation, the site's columns, orbit or walk controls, an optional ground grid, the sun with its
+ * elevation, the site's columns, ground surfaces and fences, orbit or walk controls, an optional ground grid, the sun with its
  * shadows, the sky's fill and the environment map glass reflects.
  * Renders on demand only (frameloop="demand") while orbiting, so an idle model costs nothing.
  */
@@ -466,6 +466,8 @@ export default function Scene3D() {
         <GroundGrid />
         <Levels />
         <SiteColumns />
+        <SiteSurfaces />
+        <SiteFences />
         <Controls />
         <InvalidateOnChange />
         <CaptureHandle />

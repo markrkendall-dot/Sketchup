@@ -50,7 +50,7 @@ export function zoomToFit(): void {
 /** True when the plan has anything worth asking about before it is replaced. */
 export function planHasContent(plan: Plan): boolean {
   const site = plan.site;
-  if (site && (Object.keys(site.gradePoints).length > 0 || Object.keys(site.columns).length > 0)) return true;
+  if (site && (Object.keys(site.gradePoints).length > 0 || Object.keys(site.columns).length > 0 || Object.keys(site.surfaces ?? {}).length > 0 || Object.keys(site.fences ?? {}).length > 0)) return true;
   return plan.levelOrder.some((id) => {
     const l = plan.levels[id];
     return (

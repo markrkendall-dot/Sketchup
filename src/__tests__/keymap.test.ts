@@ -62,6 +62,8 @@ describe('KEY_BINDINGS', () => {
       [key('u'), 'underlay'],
       [key('i'), 'beam'],
       [key('l'), 'post'],
+      [key('a'), 'surface'],
+      [key('q'), 'fence'],
       [key('y'), 'Structure'],
       [key('1'), 'level'],
       [key('3'), 'level'],

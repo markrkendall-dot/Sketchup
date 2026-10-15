@@ -4,13 +4,13 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
 import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
-import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, getSiteMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getFenceMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
 import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
-import { COLUMN_COLOR, DECK_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
-import type { Column, FixtureKind, Phase, Plan, RoofFinish, ViewMode, WallFinish, WallKind } from '../model/types';
+import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import type { Column, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { caseworkMaterial, chimneyPartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 
@@ -62,6 +62,14 @@ const openingMaterialName = (part: FillPart, phase: Phase, color?: string) => {
 /** `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the kind's default (a demolished one is red whatever its colour). */
 const columnMaterialName = (kind: Column['kind'], phase: Phase, color: string) =>
   phase === 'demo' || color === COLUMN_COLOR[kind] ? `column_${kind}_${phase}` : `column_${kind}_${phase}_${color.slice(1)}`;
+/** `surface_<material>_<phase>`, plus `_<hex>` in a colour other than the material's default (a demolished one is red whatever its colour). */
+const surfaceMaterialName = (material: SurfaceMaterial, phase: Phase, color: string) =>
+  phase === 'demo' || color === SURFACE_COLOR[material] ? `surface_${material}_${phase}` : `surface_${material}_${phase}_${color.slice(1)}`;
+/** `fence_<phase>` and its log ends `fence_end_<phase>`, plus `_<hex>` in a colour other than the weathered grey (a demolished one is red whatever its colour). */
+const fenceMaterialName = (part: 'body' | 'end', phase: Phase, color: string) => {
+  const base = part === 'end' ? 'fence_end' : 'fence';
+  return phase === 'demo' || color === FENCE_COLOR ? `${base}_${phase}` : `${base}_${phase}_${color.slice(1)}`;
+};
 const chimneyPartMaterialName = (part: ChimneyPart, phase: Phase) => (part === 'hood' || part === 'stem' ? `flue_${part}_${phase}` : `chimney_${part}_${phase}`);
 /** `cabinet`, `kick`, `appliance`, `basin` (plus `_<hex>` for cabinets not in the default colour), then `_<phase>` for other phases. */
 const caseworkMaterialName = (part: CasePart, phase: Phase, color: string) => {
@@ -85,7 +93,10 @@ const fixtureMeshName = (kind: FixtureKind) => (isCabinet(kind) && kind !== 'sin
  * elevation 0, absolute heights) follows with the `Chimney`, `Flue`, `Post` and `Pier` meshes the view mode shows
  * (materials `column_<kind>_<phase>`, plus `_<hex>` in a colour other than the default; a capped
  * chimney's cap and spark arrestor are more `Chimney` meshes, `chimney_cap_<phase>` and
- * `chimney_arrestor_<phase>`; a capped flue's rain cap is two more `Flue` meshes, `flue_stem_<phase>` and `flue_hood_<phase>`) and, when the site has grade points, the `Terrain` (material `terrain`; without grade points the
+ * `chimney_arrestor_<phase>`; a capped flue's rain cap is two more `Flue` meshes, `flue_stem_<phase>` and `flue_hood_<phase>`), the
+ * ground surfaces as `Surface` meshes (materials `surface_<material>_<phase>`, plus `_<hex>` in a colour other than the
+ * material's), the fences as two `Fence` meshes each (`fence_<phase>` for the posts and rails, `fence_end_<phase>` for the
+ * logs' ends, plus `_<hex>` in a colour other than the default) and, when the site has grade points, the `Terrain` (material `terrain`; without grade points the
  * ground is a flat plane at the slab and is left out). Geometries are clones (the
  * mesh cache owns the originals) and materials are clones of the live view's, one per phase/kind
  * combination; free both with disposeExportScene().
@@ -263,6 +274,22 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
       const pm = mesh(name, p.geometry, material(chimneyPartMaterialName(p.part, c.phase), chimneyPartMaterial(p.part, c.phase)));
       if (c.phase === 'demo' || p.part === 'arrestor') pm.renderOrder = 1;
       site.add(pm);
+    }
+  }
+  // Ground surfaces draped on the terrain, then the fences' logs and their ends.
+  for (const sf of getSurfaceMeshes(plan, viewMode)) {
+    const m = mesh('Surface', sf.geometry, material(surfaceMaterialName(sf.material, sf.phase, sf.color), surfaceMaterial(sf.material, sf.phase, sf.color)));
+    m.renderOrder = 1;
+    site.add(m);
+  }
+  for (const f of getFenceMeshes(plan, viewMode)) {
+    for (const [part, geometry] of [
+      ['body', f.body],
+      ['end', f.ends],
+    ] as const) {
+      const m = mesh('Fence', geometry, material(fenceMaterialName(part, f.phase, f.color), fenceMaterial(part, f.phase, f.color)));
+      if (f.phase === 'demo') m.renderOrder = 1;
+      site.add(m);
     }
   }
   if (site.children.length) root.add(site);

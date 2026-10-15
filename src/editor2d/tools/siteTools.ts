@@ -1,30 +1,40 @@
 import { getFootprints } from '../../derive/footprint';
-import { columnDefaults, defaultGradeElevation, pointInColumn, siteGhostLevelId } from '../../derive/site';
+import { columnDefaults, defaultGradeElevation, distanceToFence, FENCE_DEFAULTS, fenceLength, pointInColumn, pointInSurface, siteGhostLevelId, surfaceArea } from '../../derive/site';
 import { isVisible } from '../../derive/phase';
 import { add, dist, sub } from '../../model/geometry';
-import type { Column, Id, Site, Vec2, ViewMode } from '../../model/types';
-import { formatLength, tryParseLength } from '../../model/units';
+import { SURFACE_MATERIALS } from '../../model/finish';
+import type { Column, Id, Site, SurfaceMaterial, Vec2, ViewMode } from '../../model/types';
+import { formatArea, formatLength, formatLengthCompact, tryParseLength } from '../../model/units';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection, type SnapResult } from '../../store/uiStore';
 import { faceSnapSources, snapFaceCorner, snapFaceEdge, snapPoint } from '../snap';
 import type { Tool, ToolContext, ToolPointerEvent } from './index';
 import { applyBufferKey } from './lengthBuffer';
+import { makeOutlineTool } from './outlineTool';
 
-// The site tools (DESIGN.md "Site and terrain"): grade point (E), column (C), and the select tool
-// as it works in site mode. All of them work on plan.site, over the ghost of the first floor.
+// The site tools (DESIGN.md "Site and terrain"): grade point (E), column (C), ground surface (A),
+// fence (Q), and the select tool as it works in site mode. All of them work on plan.site, over the
+// ghost of the first floor.
 
 const DRAG_THRESHOLD_PX = 3;
 /** Pick radius of a grade point's triangle, in screen px. */
 export const GRADE_PICK_PX = 10;
 /** A column is picked within this many screen px of its rectangle. */
 export const COLUMN_PICK_PX = 4;
+/** A fence is picked within this many screen px of its line. */
+export const FENCE_PICK_PX = 5;
 
-export type SiteHit = { kind: 'gradePoint'; id: Id } | { kind: 'column'; id: Id } | null;
+export type SiteHit = { kind: 'gradePoint'; id: Id } | { kind: 'column'; id: Id } | { kind: 'fence'; id: Id } | { kind: 'surface'; id: Id } | null;
+
+/** The selection list of each kind of site hit. */
+export const SITE_SELECTION_KEY = { gradePoint: 'gradePoints', column: 'columns', fence: 'fences', surface: 'surfaces' } as const;
 
 /**
  * Grade points first (within GRADE_PICK_PX of the marker), then columns (inside the rectangle
- * grown by COLUMN_PICK_PX; the most recently added on top). Elements hidden in `viewMode` are
- * never hit; grade points belong to no phase.
+ * grown by COLUMN_PICK_PX; the most recently added on top), then fences (within FENCE_PICK_PX of
+ * the line; the nearest), then ground surfaces (p inside the outline; the smallest on top, so a pad
+ * on a drive can be picked). Elements hidden in `viewMode` are never hit; grade points belong to no
+ * phase.
  */
 export function hitSite(site: Site, p: Vec2, k: number, viewMode: ViewMode = 'all'): SiteHit {
   let best: SiteHit = null;
@@ -39,7 +49,27 @@ export function hitSite(site: Site, p: Vec2, k: number, viewMode: ViewMode = 'al
   if (best) return best;
   const cols = Object.values(site.columns).reverse();
   const c = cols.find((col) => isVisible(col.phase, viewMode) && pointInColumn(col, p, COLUMN_PICK_PX / k));
-  return c ? { kind: 'column', id: c.id } : null;
+  if (c) return { kind: 'column', id: c.id };
+  let fenceD = FENCE_PICK_PX / k;
+  for (const f of Object.values(site.fences)) {
+    if (!isVisible(f.phase, viewMode)) continue;
+    const d = distanceToFence(f, p);
+    if (d <= fenceD) {
+      fenceD = d;
+      best = { kind: 'fence', id: f.id };
+    }
+  }
+  if (best) return best;
+  let smallest = Infinity;
+  for (const sf of Object.values(site.surfaces)) {
+    if (!isVisible(sf.phase, viewMode) || !pointInSurface(sf, p)) continue;
+    const area = surfaceArea(sf);
+    if (area < smallest) {
+      smallest = area;
+      best = { kind: 'surface', id: sf.id };
+    }
+  }
+  return best;
 }
 
 /**
@@ -221,10 +251,70 @@ export const columnTool: Tool = {
 };
 
 // ---------------------------------------------------------------------------------------------
+// Ground surface and fence tools
+
+export const SURFACE_MATERIAL_NAME: Record<SurfaceMaterial, string> = { gravel: 'Gravel', asphalt: 'Asphalt', concrete: 'Concrete', stone: 'Stone' };
+/** The material Tab switches to after `m`. */
+export const nextSurfaceMaterial = (m: SurfaceMaterial): SurfaceMaterial => SURFACE_MATERIALS[(SURFACE_MATERIALS.indexOf(m) + 1) % SURFACE_MATERIALS.length];
+
+/**
+ * Surface tool (A in site mode): click the corners of a gravel drive, an asphalt road, a concrete
+ * pad or flagstones (they snap like the other site tools, siteSnap), close it on the first corner,
+ * with a double-click or Enter (makeOutlineTool). Tab steps gravel, asphalt, concrete, stone; the
+ * surface takes the toolbar's "Draw as" phase and lies on the ground in 3D.
+ */
+export const surfaceTool = makeOutlineTool({
+  noun: 'surface',
+  selectionKey: 'surfaces',
+  snap: (ctx, raw) => siteSnap(ctx, raw),
+  create: (ctx, outline) => {
+    const ui = ctx.ui();
+    return ctx.actions.addSurface({ outline, material: ui.draft.surfaceMaterial, phase: ui.drawPhase });
+  },
+  added: (ctx, outline) => `${SURFACE_MATERIAL_NAME[ctx.ui().draft.surfaceMaterial]} surface added, ${formatArea(surfaceArea({ outline }))}. Tab changes the next one's material.`,
+  remove: (ctx, ids) => ctx.actions.deleteSurfaces(ids),
+  onKey: (e, ctx) => {
+    if (e.key !== 'Tab') return false;
+    const ui = ctx.ui();
+    const material = nextSurfaceMaterial(ui.draft.surfaceMaterial);
+    ui.patchDraft({ surfaceMaterial: material, error: false, message: `Drawing ${SURFACE_MATERIAL_NAME[material].toLowerCase()} (Tab: ${SURFACE_MATERIAL_NAME[nextSurfaceMaterial(material)].toLowerCase()}).` });
+    return true;
+  },
+});
+
+/**
+ * Fence tool (Q in site mode): click the fence's points (siteSnap), finish with a double-click or
+ * Enter; Backspace removes the last point, Esc cancels (makeOutlineTool, open). A split-rail fence
+ * with the defaults (FENCE_DEFAULTS: 42" high, 2 rails, posts at most 10' apart) in the "Draw as"
+ * phase; the panel edits them.
+ */
+export const fenceTool = makeOutlineTool({
+  noun: 'fence',
+  selectionKey: 'fences',
+  open: true,
+  snap: (ctx, raw) => siteSnap(ctx, raw),
+  create: (ctx, points) => {
+    const { height, rails, postSpacing } = FENCE_DEFAULTS;
+    return ctx.actions.addFence({ points, height, rails, postSpacing, phase: ctx.ui().drawPhase });
+  },
+  added: (ctx, points) => `Fence added, ${formatLengthCompact(fenceLength({ points }), ctx.plan().settings.precisionDenominator)} long. Set its height, rails and post spacing in the properties panel.`,
+  remove: (ctx, ids) => ctx.actions.deleteFences(ids),
+});
+
+// ---------------------------------------------------------------------------------------------
 // Select tool in site mode
 
 type SiteDrag =
-  | { kind: 'move'; startScreen: Vec2; grab: Vec2; points: Record<Id, Vec2>; columns: Record<Id, Vec2>; started: boolean }
+  | {
+      kind: 'move';
+      startScreen: Vec2;
+      grab: Vec2;
+      points: Record<Id, Vec2>;
+      columns: Record<Id, Vec2>;
+      surfaces: Record<Id, Vec2[]>;
+      fences: Record<Id, Vec2[]>;
+      started: boolean;
+    }
   | { kind: 'box'; a: Vec2; additive: boolean };
 
 let drag: SiteDrag | null = null;
@@ -235,7 +325,7 @@ function finishDrag(): void {
   if (drag?.kind === 'move' && drag.started) resumeHistory();
 }
 
-/** Select, move and delete grade points and columns. The wall, opening, room, stairs and roof picking is off. */
+/** Select, move and delete grade points, columns, fences and surfaces. The wall, opening, room, stairs and roof picking is off. */
 export const siteSelectTool: Tool = {
   onPointerDown(e: ToolPointerEvent, ctx) {
     if (e.button !== 0) return;
@@ -248,7 +338,7 @@ export const siteSelectTool: Tool = {
       drag = { kind: 'box', a: e.world, additive: e.shiftKey };
       return;
     }
-    const key = hit.kind === 'gradePoint' ? 'gradePoints' : 'columns';
+    const key = SITE_SELECTION_KEY[hit.kind];
     if (e.shiftKey) {
       ui.setSelection({ ...sel, [key]: toggle(sel[key], hit.id) });
       drag = null;
@@ -260,7 +350,11 @@ export const siteSelectTool: Tool = {
     const columns: Record<Id, Vec2> = {};
     for (const id of next.gradePoints) if (site.gradePoints[id]) points[id] = { ...site.gradePoints[id].at };
     for (const id of next.columns) if (site.columns[id]) columns[id] = { ...site.columns[id].at };
-    drag = { kind: 'move', startScreen: e.screen, grab: e.world, points, columns, started: false };
+    const surfaces: Record<Id, Vec2[]> = {};
+    const fences: Record<Id, Vec2[]> = {};
+    for (const id of next.surfaces) if (site.surfaces[id]) surfaces[id] = site.surfaces[id].outline.map((p) => ({ ...p }));
+    for (const id of next.fences) if (site.fences[id]) fences[id] = site.fences[id].points.map((p) => ({ ...p }));
+    drag = { kind: 'move', startScreen: e.screen, grab: e.world, points, columns, surfaces, fences, started: false };
   },
 
   onPointerMove(e, ctx) {
@@ -279,9 +373,10 @@ export const siteSelectTool: Tool = {
     const d = sub(e.world, drag.grab);
     const step = { x: round(d.x), y: round(d.y) };
     const moved = (o: Record<Id, Vec2>) => Object.fromEntries(Object.entries(o).map(([id, p]) => [id, add(p, step)]));
+    const movedAll = (o: Record<Id, Vec2[]>) => Object.fromEntries(Object.entries(o).map(([id, ps]) => [id, ps.map((p) => add(p, step))]));
     ui.patchDraft({ cursor: e.world, snap: null });
     const before = ctx.plan();
-    ctx.actions.moveSiteItems(moved(drag.points), moved(drag.columns));
+    ctx.actions.moveSiteItems(moved(drag.points), moved(drag.columns), { surfaces: movedAll(drag.surfaces), fences: movedAll(drag.fences) });
     if (!drag.started && ctx.plan() !== before) {
       // The first set that changes the plan is tracked; the rest fold into it (one undo step).
       drag.started = true;
@@ -303,11 +398,15 @@ export const siteSelectTool: Tool = {
         const site = ctx.plan().site;
         const gradePoints = Object.values(site.gradePoints).filter((g) => inside(g.at)).map((g) => g.id);
         const columns = Object.values(site.columns).filter((c) => isVisible(c.phase, ui.viewMode) && inside(c.at)).map((c) => c.id);
+        // A surface or fence is taken in when all its points are in the box.
+        const surfaces = Object.values(site.surfaces).filter((sf) => isVisible(sf.phase, ui.viewMode) && sf.outline.every(inside)).map((sf) => sf.id);
+        const fences = Object.values(site.fences).filter((f) => isVisible(f.phase, ui.viewMode) && f.points.every(inside)).map((f) => f.id);
         const sel = ui.selection;
+        const union = (a: Id[], b: Id[]) => [...new Set([...a, ...b])];
         ui.setSelection(
           drag.additive
-            ? { ...sel, gradePoints: [...new Set([...sel.gradePoints, ...gradePoints])], columns: [...new Set([...sel.columns, ...columns])] }
-            : { ...EMPTY_SELECTION, gradePoints, columns },
+            ? { ...sel, gradePoints: union(sel.gradePoints, gradePoints), columns: union(sel.columns, columns), surfaces: union(sel.surfaces, surfaces), fences: union(sel.fences, fences) }
+            : { ...EMPTY_SELECTION, gradePoints, columns, surfaces, fences },
         );
       }
       ui.patchDraft({ box: null });
@@ -323,7 +422,7 @@ export const siteSelectTool: Tool = {
     const sel = ui.selection;
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (!selectionSize(sel)) return false;
-      ctx.actions.deleteEntities(ctx.levelId, { nodes: [], walls: [], gradePoints: sel.gradePoints, columns: sel.columns });
+      ctx.actions.deleteEntities(ctx.levelId, { nodes: [], walls: [], gradePoints: sel.gradePoints, columns: sel.columns, surfaces: sel.surfaces, fences: sel.fences });
       ui.clearSelection();
       return true;
     }

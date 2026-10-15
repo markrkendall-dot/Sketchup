@@ -87,7 +87,7 @@ describe('migrate from schemaVersion 1', () => {
     expect(plan.levels.f.roofs).toEqual({});
     // Schema 3 (casework) adds an empty fixtures record on the way through.
     expect(plan.levels.f.fixtures).toEqual({});
-    expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {} });
+    expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {}, surfaces: {}, fences: {} });
     expect(plan.levels.f.walls.w1).toEqual(V1_FILE.levels.f.walls.w1);
     expect(plan.settings).toEqual(V1_FILE.settings);
     // The upgraded plan round-trips byte for byte from then on.
@@ -232,6 +232,13 @@ describe('migrate a current file', () => {
         c1: { id: 'c1', at: { x: 120, y: -6 }, width: 24, depth: 20, rotation: 0, base: -100, top: 400, kind: 'chimney', phase: 'existing', color: '#5a3a35', cap: true },
         c2: { id: 'c2', at: { x: 300, y: -6 }, width: 6, depth: 6, rotation: 0, base: -4, top: 96, kind: 'post', phase: 'new' },
       },
+      // Schema 8: a gravel drive and a fence, one in its own colour.
+      surfaces: {
+        s1: { id: 's1', outline: [{ x: -200, y: -300 }, { x: -80, y: -300 }, { x: -80, y: 0 }, { x: -200, y: 0 }], material: 'gravel', phase: 'existing' },
+      },
+      fences: {
+        f1: { id: 'f1', points: [{ x: -300, y: -300 }, { x: -300, y: 200 }, { x: 100, y: 260 }], height: 42, rails: 3, postSpacing: 96, phase: 'new', color: '#6b5a48' },
+      },
     };
     return plan;
   }
@@ -300,6 +307,8 @@ describe('migrate a current file', () => {
     plan.site.extra = 1;
     plan.site.gradePoints.g1.extra = 1;
     plan.site.columns.c1.extra = 1;
+    plan.site.surfaces.s1.extra = 1;
+    plan.site.fences.f1.extra = 1;
     const text = JSON.stringify(migrate(plan));
     expect(text).not.toContain('"extra"');
     expect(text).toBe(clean);

@@ -138,3 +138,103 @@ export function grassTexture(): CanvasTexture | null {
   tex.needsUpdate = true;
   return (cached = tex);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Ground surfaces: gravel and asphalt (DESIGN.md "Site and terrain"). One 512 px tile (the lawn's
+// size) for 48" of ground, so a texel is 3/32"; the surfaces' UVs are in inches like the terrain's.
+// Drawn in the surface's colour (its mean stays close to it), seeded, every mark wrapped.
+
+/** Inches of ground one gravel or asphalt tile covers. */
+export const SURFACE_TILE_INCHES = 48;
+
+const rgbOf = (hex: string): Rgb => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+const shade = (c: Rgb, k: number): string => `rgb(${clamp255(c[0] * k)}, ${clamp255(c[1] * k)}, ${clamp255(c[2] * k)})`;
+
+/** The colour, mottled by noise at two scales and per-pixel grain of `grain` (a fraction of the colour). */
+function drawMottle(ctx: CanvasRenderingContext2D, color: Rgb, rand: () => number, mottle: number, grain: number): void {
+  const mid = valueNoise(12, rand);
+  const fine = valueNoise(96, rand);
+  const img = ctx.createImageData(GRASS_PX, GRASS_PX);
+  for (let y = 0; y < GRASS_PX; y++) {
+    for (let x = 0; x < GRASS_PX; x++) {
+      const k = 1 + mottle * (0.6 * (mid(x, y) - 0.5) + 0.4 * (fine(x, y) - 0.5)) + grain * (rand() - 0.5);
+      const i = (y * GRASS_PX + x) * 4;
+      for (let c = 0; c < 3; c++) img.data[i + c] = clamp255(color[c] * k);
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/** Gravel: the colour mottled, under thousands of small stones (1/4" to 3/4") in lighter and darker shades, each with a shadow. */
+function drawGravel(ctx: CanvasRenderingContext2D, color: Rgb): void {
+  const rand = seeded(5309);
+  drawMottle(ctx, color, rand, 0.25, 0.2);
+  const pxPerInch = GRASS_PX / SURFACE_TILE_INCHES;
+  for (let n = 0; n < 9000; n++) {
+    const x = rand() * GRASS_PX;
+    const y = rand() * GRASS_PX;
+    const r = (0.12 + rand() * 0.26) * pxPerInch;
+    const squash = 0.6 + rand() * 0.4;
+    const a = rand() * Math.PI;
+    const tone = shade(color, 0.7 + rand() * 0.6);
+    wrapped(x, y, r + 2, (px, py) => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(px + 0.8, py + 0.8, r, r * squash, a, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = tone;
+      ctx.beginPath();
+      ctx.ellipse(px, py, r, r * squash, a, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+}
+
+/** Asphalt: the colour with fine grain and faint lighter aggregate specks. */
+function drawAsphalt(ctx: CanvasRenderingContext2D, color: Rgb): void {
+  const rand = seeded(7741);
+  drawMottle(ctx, color, rand, 0.12, 0.3);
+  for (let n = 0; n < 5000; n++) {
+    const x = rand() * GRASS_PX;
+    const y = rand() * GRASS_PX;
+    const w = 1 + Math.floor(rand() * 2);
+    ctx.fillStyle = shade(color, 1.25 + rand() * 0.5);
+    wrapped(x, y, 2, (px, py) => ctx.fillRect(Math.floor(px), Math.floor(py), w, w));
+  }
+}
+
+const surfaceCache = new Map<string, CanvasTexture | null>();
+
+/**
+ * The texture of a gravel or asphalt surface in `color`, drawn once per material and colour: sRGB,
+ * repeating, `repeat` 1/48 for the surfaces' inch UVs. Null wherever there is no DOM canvas (node,
+ * tests), where the surface is the flat colour.
+ */
+export function surfaceTexture(material: 'gravel' | 'asphalt', color: string): CanvasTexture | null {
+  const key = `${material}|${color}`;
+  const hit = surfaceCache.get(key);
+  if (hit !== undefined) return hit;
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = GRASS_PX;
+  canvas.height = GRASS_PX;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    surfaceCache.set(key, null);
+    return null;
+  }
+  if (material === 'gravel') drawGravel(ctx, rgbOf(color));
+  else drawAsphalt(ctx, rgbOf(color));
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
+  tex.wrapS = RepeatWrapping;
+  tex.wrapT = RepeatWrapping;
+  tex.repeat.set(1 / SURFACE_TILE_INCHES, 1 / SURFACE_TILE_INCHES);
+  tex.minFilter = LinearMipmapLinearFilter;
+  tex.anisotropy = 2;
+  tex.needsUpdate = true;
+  surfaceCache.set(key, tex);
+  return tex;
+}

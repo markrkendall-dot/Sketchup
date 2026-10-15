@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import type { Issue } from '../derive/checks';
 import type { WallGeom } from '../derive/openings';
-import type { Column, FixtureKind, Id, MeasureTo, Opening, Phase, Vec2, ViewMode, WallKind } from '../model/types';
+import type { Column, FixtureKind, Id, MeasureTo, Opening, Phase, SurfaceMaterial, Vec2, ViewMode, WallKind } from '../model/types';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | 'beam' | 'post' | 'joistZone' | OpeningToolName;
-/** Tools that work on the site (E, C); the others edit a level and are off in site mode. */
-export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column'];
+export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'gradePoint' | 'column' | 'surface' | 'fence' | 'beam' | 'post' | 'joistZone' | OpeningToolName;
+/** Tools that work on the site (E, C, A, Q); the others edit a level and are off in site mode. */
+export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column', 'surface', 'fence'];
 /** Tools allowed in site mode: select, measure, the site tools. */
 export const isSiteModeTool = (tool: ToolName): boolean => tool === 'select' || tool === 'measure' || SITE_TOOLS.includes(tool);
 /** Shown in the status bar when a level tool is asked for in site mode. */
@@ -157,8 +157,10 @@ export interface Draft {
   stairsDirection: number;
   /** Underlay tool, scale / rotate modes: the calibration points clicked so far (world). */
   underlayPoints: Vec2[];
-  /** Roof, deck and floor opening tools: the outline corners clicked so far (world). */
+  /** Roof, deck, floor opening, surface and fence tools: the outline corners (a fence's points) clicked so far (world). */
   outlinePoints: Vec2[];
+  /** Surface tool: what the next surface is made of (Tab steps through them). */
+  surfaceMaterial: SurfaceMaterial;
   /** Grade point tool: the spot clicked, waiting for its elevation (typed in the length buffer, Enter places). */
   gradePending: Vec2 | null;
   /** Column tool: what the next click places (Tab toggles). */
@@ -198,6 +200,8 @@ export interface Selection {
   /** Site elements (plan.site), selectable in site mode. */
   gradePoints: Id[];
   columns: Id[];
+  surfaces: Id[];
+  fences: Id[];
 }
 
 /** The inline room name editor (RoomNameEditor). */
@@ -468,6 +472,7 @@ export const emptyDraft = (): Draft => ({
   gradePending: null,
   columnKind: 'chimney',
   columnPreview: null,
+  surfaceMaterial: 'gravel',
   fixtureKind: 'base',
   fixtureDirection: 90,
   fixturePreview: null,
@@ -477,11 +482,11 @@ export const emptyDraft = (): Draft => ({
   dragReadout: null,
 });
 
-export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], floorOpenings: [], staircases: [], members: [], joistZones: [], gradePoints: [], columns: [] };
+export const EMPTY_SELECTION: Selection = { nodes: [], walls: [], openings: [], rooms: [], stairs: [], roofs: [], fixtures: [], decks: [], floorOpenings: [], staircases: [], members: [], joistZones: [], gradePoints: [], columns: [], surfaces: [], fences: [] };
 const NO_HOVER: Hover = { nodeId: null, wallId: null, openingId: null };
 
 export const selectionSize = (s: Selection): number =>
-  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.decks.length + s.floorOpenings.length + s.staircases.length + s.members.length + s.joistZones.length + s.gradePoints.length + s.columns.length;
+  s.nodes.length + s.walls.length + s.openings.length + s.rooms.length + s.stairs.length + s.roofs.length + s.fixtures.length + s.decks.length + s.floorOpenings.length + s.staircases.length + s.members.length + s.joistZones.length + s.gradePoints.length + s.columns.length + s.surfaces.length + s.fences.length;
 
 /** Split ratio bounds, so neither view collapses. */
 export const MIN_SPLIT = 0.2;

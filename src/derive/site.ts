@@ -1,5 +1,5 @@
-import { boundsOf, clipHalfPlane, cross, pointInPolygon, polygonSignedArea, sub, type Bounds } from '../model/geometry';
-import type { Column, Id, Plan, Site, Vec2, ViewMode } from '../model/types';
+import { boundsOf, clipHalfPlane, cross, dist, lerp, pointInPolygon, polygonSignedArea, projectPointToSegment, sub, type Bounds } from '../model/geometry';
+import type { Column, Fence, Id, Plan, Site, SiteSurface, Vec2, ViewMode } from '../model/types';
 import { getLevelElevations } from './levels';
 import { isVisible, phasesCoexist } from './phase';
 import { roofBearing, roofExtremes, roofHeightAt, triangulate } from './roofs';
@@ -10,7 +10,8 @@ import { getFaces, slabOutlines } from './rooms';
 //
 // Grade points are spot elevations of the ground. The terrain is the triangulated surface through
 // them (a TIN: linear over the Delaunay triangles of the points, level beyond their hull), sampled
-// on a coarse grid around the plan; columns (chimneys, posts) are boxes standing on it.
+// on a coarse grid around the plan; columns (chimneys, posts) are boxes standing on it, ground
+// surfaces (gravel, asphalt) are draped on it and fences stand on it.
 
 /** Grid cell size of the terrain. */
 export const TERRAIN_STEP = 24;
@@ -539,8 +540,9 @@ export function lowestGround(plan: Plan): number {
 const EMPTY_BOUNDS: Bounds = { minX: 0, minY: 0, maxX: 240, maxY: 240 };
 
 /**
- * The plan's extent in plan coordinates: every level's nodes, roof and deck outlines, the columns
- * and the grade points. A 20' square at the origin for an empty plan.
+ * The plan's extent in plan coordinates: every level's nodes, roof and deck outlines, the columns,
+ * the ground surfaces' outlines, the fences' points and the grade points (so the terrain grid
+ * covers every site element). A 20' square at the origin for an empty plan.
  */
 export function siteBounds(plan: Plan): Bounds {
   const pts: Vec2[] = [];
@@ -552,6 +554,8 @@ export function siteBounds(plan: Plan): Bounds {
     for (const d of Object.values(level.decks ?? {})) for (const p of d.outline) pts.push(p);
   }
   for (const c of Object.values(plan.site.columns)) for (const p of columnOutline(c)) pts.push(p);
+  for (const sf of Object.values(plan.site.surfaces ?? {})) for (const p of sf.outline) pts.push(p);
+  for (const f of Object.values(plan.site.fences ?? {})) for (const p of f.points) pts.push(p);
   for (const g of Object.values(plan.site.gradePoints)) pts.push(g.at);
   return boundsOf(pts) ?? EMPTY_BOUNDS;
 }
@@ -755,4 +759,219 @@ export function siteGhostLevelId(plan: { readonly levelOrder: readonly Id[] }): 
 /** Columns the view mode shows. */
 export function visibleColumns(site: Site, viewMode: ViewMode): Column[] {
   return Object.values(site.columns).filter((c) => isVisible(c.phase, viewMode));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ground surfaces
+
+/** How far a ground surface is drawn above the terrain, so the two never share a depth. */
+export const SURFACE_LIFT = 1;
+
+/** Surfaces the view mode shows. */
+export function visibleSurfaces(site: Site, viewMode: ViewMode): SiteSurface[] {
+  return Object.values(site.surfaces).filter((sf) => isVisible(sf.phase, viewMode));
+}
+
+/** A ground surface's plan area (square inches). */
+export const surfaceArea = (sf: Pick<SiteSurface, 'outline'>): number => Math.abs(polygonSignedArea(sf.outline));
+
+/** True when p is inside the surface's outline. */
+export const pointInSurface = (sf: Pick<SiteSurface, 'outline'>, p: Vec2): boolean => pointInPolygon(p, sf.outline);
+
+/** The terrain grid's triangles, bucketed by the grid cells their plan bounding boxes touch. */
+const gridIndexCache = new WeakMap<TerrainGrid, number[][]>();
+
+function gridIndexOf(grid: TerrainGrid): number[][] {
+  let cells = gridIndexCache.get(grid);
+  if (cells) return cells;
+  const { positions: p, indices: idx, bounds: b, step, cellsX, cellsY } = grid;
+  const made: number[][] = Array.from({ length: cellsX * cellsY }, () => []);
+  const cell = (v: number, min: number, n: number) => Math.min(n - 1, Math.max(0, Math.floor((v - min) / step)));
+  // A triangle's box shrunk a hair, so one along a cell's edge lands in that cell only.
+  const e = 1e-6;
+  for (let t = 0; t < idx.length / 3; t++) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let k = 0; k < 3; k++) {
+      const v = idx[t * 3 + k];
+      minX = Math.min(minX, p[v * 3]);
+      maxX = Math.max(maxX, p[v * 3]);
+      minY = Math.min(minY, p[v * 3 + 2]);
+      maxY = Math.max(maxY, p[v * 3 + 2]);
+    }
+    for (let j = cell(minY + e, b.minY, cellsY); j <= cell(maxY - e, b.minY, cellsY); j++) {
+      for (let i = cell(minX + e, b.minX, cellsX); i <= cell(maxX - e, b.minX, cellsX); i++) made[j * cellsX + i].push(t);
+    }
+  }
+  gridIndexCache.set(grid, (cells = made));
+  return cells;
+}
+
+/**
+ * A ground surface draped on the terrain (DESIGN.md "Site and terrain"): the outline triangulated
+ * (ear clipping), each of its triangles clipped against every terrain triangle it overlaps (those in
+ * the grid cells under its bounding box, gridIndexOf, then a convex-convex clip by the terrain
+ * triangle's three half-planes), each piece fanned into triangles whose corners take the terrain
+ * triangle's height there (the plane through its corners, so the surface lies exactly on the ground)
+ * plus `lift`. Positions in three coordinates (plan x, elevation, plan y), 9 numbers per triangle,
+ * every triangle facing up. Any part outside the grid is left out.
+ */
+export function drapeSurface(outline: readonly Vec2[], grid: TerrainGrid, lift: number = SURFACE_LIFT): Float32Array {
+  const area = polygonSignedArea(outline);
+  if (outline.length < 3 || Math.abs(area) <= MIN_PIECE_AREA) return new Float32Array(0);
+  const ring = area > 0 ? [...outline] : [...outline].reverse();
+  const { positions: p, indices: idx, bounds: b, step, cellsX, cellsY } = grid;
+  const cells = gridIndexOf(grid);
+  const out: number[] = [];
+  // The surface triangle each terrain triangle was last tried against (one may sit in several cells).
+  const seen = new Int32Array(idx.length / 3).fill(-1);
+  const cell = (v: number, min: number) => Math.floor((v - min) / step);
+  triangulate(ring).forEach(([i0, i1, i2], s) => {
+    const tri = [ring[i0], ring[i1], ring[i2]];
+    const box = boundsOf(tri)!;
+    const j1 = Math.min(cellsY - 1, cell(box.maxY, b.minY));
+    const c1 = Math.min(cellsX - 1, cell(box.maxX, b.minX));
+    for (let j = Math.max(0, cell(box.minY, b.minY)); j <= j1; j++) {
+      for (let i = Math.max(0, cell(box.minX, b.minX)); i <= c1; i++) {
+        for (const t of cells[j * cellsX + i]) {
+          if (seen[t] === s) continue;
+          seen[t] = s;
+          const ids = [idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]];
+          let corners = ids.map((v) => ({ x: p[v * 3], y: p[v * 3 + 2] }));
+          let heights = ids.map((v) => p[v * 3 + 1]);
+          const ta = polygonSignedArea(corners);
+          if (Math.abs(ta) <= MIN_PIECE_AREA) continue;
+          if (ta < 0) {
+            corners = [corners[0], corners[2], corners[1]];
+            heights = [heights[0], heights[2], heights[1]];
+          }
+          // The surface triangle clipped by the terrain triangle's inward half-planes.
+          let piece: Vec2[] = tri;
+          for (let k = 0; k < 3 && piece.length; k++) {
+            const a = corners[k];
+            const q = corners[(k + 1) % 3];
+            const n = { x: q.y - a.y, y: -(q.x - a.x) };
+            piece = clipHalfPlane(piece, n, n.x * a.x + n.y * a.y);
+          }
+          if (piece.length < 3 || Math.abs(polygonSignedArea(piece)) <= MIN_PIECE_AREA) continue;
+          const heightAt = planeThrough(corners, heights);
+          const at = (v: Vec2) => [v.x, heightAt(v) + lift, v.y];
+          for (let k = 1; k + 1 < piece.length; k++) {
+            const v0 = piece[0];
+            const v1 = piece[k];
+            const v2 = piece[k + 1];
+            // Upward in three coordinates: negative signed area on the y-down plan.
+            if (cross(sub(v1, v0), sub(v2, v0)) < 0) out.push(...at(v0), ...at(v1), ...at(v2));
+            else out.push(...at(v0), ...at(v2), ...at(v1));
+          }
+        }
+      }
+    }
+  });
+  return new Float32Array(out);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fences
+
+/**
+ * A new fence: posts 42" above the ground, 2 rails, posts at most 120" (10') apart. Posts are round
+ * logs `post` across, set `belowGrade` into the ground; rails are logs `rail` across, spread from
+ * `railLow` to `railHigh` of the height above the ground at each post.
+ */
+export const FENCE_DEFAULTS = { height: 42, rails: 2, postSpacing: 120, post: 6, rail: 4, belowGrade: 6, railLow: 0.3, railHigh: 0.85 } as const;
+
+/** Fences the view mode shows. */
+export function visibleFences(site: Site, viewMode: ViewMode): Fence[] {
+  return Object.values(site.fences).filter((f) => isVisible(f.phase, viewMode));
+}
+
+/** A fence's length along its points. */
+export function fenceLength(f: Pick<Fence, 'points'>): number {
+  let len = 0;
+  for (let i = 1; i < f.points.length; i++) len += dist(f.points[i - 1], f.points[i]);
+  return len;
+}
+
+/** True when a fence's last point is back on its first (a closed paddock): the two share a post. */
+const fenceCloses = (pts: readonly Vec2[]): boolean => pts.length > 3 && dist(pts[0], pts[pts.length - 1]) < 1;
+
+/**
+ * Where a fence's posts stand in plan: one at every point and, along each run between two points,
+ * as few more as keep every gap within `postSpacing`, evenly spread (a 25' run at 10' gets two more,
+ * 8'4" apart). A fence that closes on its first point shares the first post.
+ */
+export function fencePostPoints(f: Pick<Fence, 'points' | 'postSpacing'>): Vec2[] {
+  const pts = f.points;
+  if (pts.length === 0) return [];
+  const out: Vec2[] = [{ x: pts[0].x, y: pts[0].y }];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const gaps = Math.max(1, Math.ceil(dist(a, b) / f.postSpacing - 1e-9));
+    for (let k = 1; k <= gaps; k++) out.push(k === gaps ? { x: b.x, y: b.y } : lerp(a, b, k / gaps));
+  }
+  if (fenceCloses(pts)) out.pop();
+  return out;
+}
+
+/** The heights of a fence's rails over the ground at a post, as fractions of its height; a single rail is the top one. */
+export function fenceRailFractions(rails: number): number[] {
+  const { railLow, railHigh } = FENCE_DEFAULTS;
+  if (rails <= 1) return [railHigh];
+  return Array.from({ length: rails }, (_, k) => railLow + ((railHigh - railLow) * k) / (rails - 1));
+}
+
+export interface FencePost {
+  at: Vec2;
+  /** The ground at the post. */
+  ground: number;
+  /** Bottom (FENCE_DEFAULTS.belowGrade under the ground) and top (`height` over it), absolute elevations. */
+  bottom: number;
+  top: number;
+}
+
+/** A point of a rail's axis: plan x and y, z its absolute elevation. */
+export interface FencePoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface FenceLayout {
+  posts: FencePost[];
+  /** Rails from one post's axis to the next one's. */
+  rails: { a: FencePoint; b: FencePoint }[];
+}
+
+/**
+ * A fence laid out on the ground (`ground` gives the elevation at a plan point, e.g. groundAt): its
+ * posts (fencePostPoints) from FENCE_DEFAULTS.belowGrade below the ground to `height` above it, and
+ * between each two consecutive posts `rails` rails at fenceRailFractions of the height over the
+ * ground at either end, so the rails follow the slope. A fence that closes on its first point also
+ * joins its last post to the first.
+ */
+export function fenceLayout(f: Pick<Fence, 'points' | 'height' | 'rails' | 'postSpacing'>, ground: (p: Vec2) => number): FenceLayout {
+  const posts = fencePostPoints(f).map((at) => {
+    const g = ground(at);
+    return { at, ground: g, bottom: g - FENCE_DEFAULTS.belowGrade, top: g + f.height };
+  });
+  const runs = fenceCloses(f.points) ? posts.length : posts.length - 1;
+  const fractions = fenceRailFractions(f.rails);
+  const rails: FenceLayout['rails'] = [];
+  for (let i = 0; i < runs; i++) {
+    const a = posts[i];
+    const b = posts[(i + 1) % posts.length];
+    for (const t of fractions) rails.push({ a: { x: a.at.x, y: a.at.y, z: a.ground + t * f.height }, b: { x: b.at.x, y: b.at.y, z: b.ground + t * f.height } });
+  }
+  return { posts, rails };
+}
+
+/** The distance from p to the fence's polyline. */
+export function distanceToFence(f: Pick<Fence, 'points'>, p: Vec2): number {
+  let best = Infinity;
+  for (let i = 1; i < f.points.length; i++) best = Math.min(best, projectPointToSegment(p, f.points[i - 1], f.points[i]).distance);
+  return best;
 }

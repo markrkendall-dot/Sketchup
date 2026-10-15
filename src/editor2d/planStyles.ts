@@ -799,7 +799,7 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-dasharray: 12 4 3 4;
 }
 
-/* Site (grade points, columns, north) --------------------------------------------------------- */
+/* Site (grade points, columns, surfaces, fences, north) -------------------------------------- */
 
 /* The first floor under the site layer: clearer than the level-below ghost. */
 .site-ghost .ghost-wall {
@@ -892,6 +892,95 @@ export const PLAN_RULES = `.wall-exterior {
 .column.is-selected .column-body {
   stroke: var(--accent);
   stroke-width: 2.4;
+}
+
+/* Ground surfaces: the material's colour, a little lighter than in 3D so the ghost reads through. */
+.surface {
+  stroke: #57534e;
+  stroke-width: 1;
+  fill-opacity: 0.75;
+}
+
+.gravel-bg {
+  fill: #c9c1b0;
+}
+
+.gravel-dot {
+  fill: #7d7464;
+}
+
+.surface-gravel {
+  fill: url(#hp-gravel);
+}
+
+.surface-asphalt {
+  fill: #5a5a5d;
+}
+
+.surface-concrete {
+  fill: #d4d1ca;
+}
+
+.surface-stone {
+  fill: #b3aa9c;
+}
+
+.surface.phase-new {
+  stroke: var(--new-edge);
+  fill: #a7d9b4;
+}
+
+.surface.phase-demo {
+  stroke: var(--demo);
+  stroke-dasharray: 5 3;
+  fill: url(#hp-hatch-demo);
+}
+
+.surface.is-selected {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+
+/* Fences: the line between the posts and a dot at each post. */
+.fence .fence-line {
+  fill: none;
+  stroke: #6b6457;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.fence .fence-post {
+  fill: #8b8478;
+  stroke: #3f3a33;
+  stroke-width: 1;
+}
+
+.fence.phase-new .fence-line,
+.fence.phase-new .fence-post {
+  stroke: var(--new-edge);
+}
+
+.fence.phase-new .fence-post {
+  fill: #86c79a;
+}
+
+.fence.phase-demo .fence-line {
+  stroke: var(--demo);
+  stroke-dasharray: 5 3;
+}
+
+.fence.phase-demo .fence-post {
+  stroke: var(--demo);
+  fill: var(--demo-fill);
+}
+
+.fence.is-selected .fence-line,
+.fence.is-selected .fence-post {
+  stroke: var(--accent);
+}
+
+.fence.is-selected .fence-line {
+  stroke-width: 3;
 }`;
 
 export const PLAN_STYLES = `${PLAN_VARS}\n\n${PLAN_RULES}\n`;

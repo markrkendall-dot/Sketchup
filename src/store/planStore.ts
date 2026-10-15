@@ -10,11 +10,13 @@ import {
   columnProblem,
   createEmptyPlan,
   deckProblem,
+  fenceProblem,
   stairsRailingsOf,
   floorOpeningProblem,
   fixtureProblem,
   roofOptionProblem,
   roofProblem,
+  surfaceProblem,
   findNodeNear,
   MERGE_EPS,
   movesCreateOverlap,
@@ -28,7 +30,7 @@ import {
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import { planRenovation } from '../model/renovate';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from '../model/structure';
-import type { Beam, Column, Deck, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Beam, Column, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
@@ -83,6 +85,15 @@ export type GradePointPatch = Partial<Omit<GradePoint, 'id'>>;
 export type NewGradePoint = Omit<GradePoint, 'id'> & { id?: Id };
 export type ColumnPatch = Partial<Omit<Column, 'id'>>;
 export type NewColumn = Omit<Column, 'id'> & { id?: Id };
+export type SurfacePatch = Partial<Omit<SiteSurface, 'id'>>;
+export type NewSurface = Omit<SiteSurface, 'id'> & { id?: Id };
+export type FencePatch = Partial<Omit<Fence, 'id'>>;
+export type NewFence = Omit<Fence, 'id'> & { id?: Id };
+/** Ground surfaces' and fences' new outlines and points (a drag of the site selection). */
+export interface SiteShapeMoves {
+  surfaces?: Record<Id, Vec2[]>;
+  fences?: Record<Id, Vec2[]>;
+}
 /** A new deck; its railings default to one per edge, all on (normalizeRailings). */
 export type NewDeck = Omit<Deck, 'id' | 'railings'> & { id?: Id; railings?: boolean[] };
 export type DeckPatch = Partial<Omit<Deck, 'id'>>;
@@ -122,6 +133,8 @@ export interface EntitySelection {
   /** Site elements (plan.site); the level id the action is given only scopes the other kinds. */
   gradePoints?: Id[];
   columns?: Id[];
+  surfaces?: Id[];
+  fences?: Id[];
 }
 
 export interface PlanState {
@@ -284,19 +297,33 @@ export interface PlanState {
    */
   updateColumn: (id: Id, patch: ColumnPatch) => void;
   deleteColumns: (ids: Id[]) => void;
-  /** Move grade points and columns to new positions in one set (a drag of the site selection). */
-  moveSiteItems: (points: Record<Id, Vec2>, columns: Record<Id, Vec2>) => void;
+  /** Add a ground surface; returns the id, or null when its outline, material or colour is not usable (surfaceProblem). */
+  addSurface: (surface: NewSurface) => Id | null;
+  /** Patch a ground surface; an unusable outline, material or colour is rejected. `color` takes undefined to clear it. */
+  updateSurface: (id: Id, patch: SurfacePatch) => void;
+  deleteSurfaces: (ids: Id[]) => void;
+  /** Add a fence; returns the id, or null when its points, height, rails, post spacing or colour are not usable (fenceProblem). */
+  addFence: (fence: NewFence) => Id | null;
+  /** Patch a fence; an unusable field is rejected. `color` takes undefined to clear it. */
+  updateFence: (id: Id, patch: FencePatch) => void;
+  deleteFences: (ids: Id[]) => void;
+  /**
+   * Move grade points and columns to new positions, and give surfaces new outlines and fences new
+   * points, in one set (a drag of the site selection).
+   */
+  moveSiteItems: (points: Record<Id, Vec2>, columns: Record<Id, Vec2>, shapes?: SiteShapeMoves) => void;
   /** Turn the plan relative to true north (normalized to [0, 360)). */
   setNorthAngle: (degrees: number) => void;
   /** Delete every grade point (the terrain goes flat again) in one undo step. */
   clearGradePoints: () => void;
   /**
-   * Set the phase of walls, openings, stairs, roofs, fixtures, decks, floor openings, columns and
-   * room labels together (e.g. "Mark demolish"). A room set to existing stores no phase.
+   * Set the phase of walls, openings, stairs, roofs, fixtures, decks, floor openings, columns,
+   * ground surfaces, fences and room labels together (e.g. "Mark demolish"). A room set to existing
+   * stores no phase.
    */
   setPhase: (
     levelId: Id,
-    sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; floorOpenings?: Id[]; staircases?: Id[]; members?: Id[]; joistZones?: Id[]; columns?: Id[]; rooms?: Id[] },
+    sel: { walls: Id[]; openings: Id[]; stairs?: Id[]; roofs?: Id[]; fixtures?: Id[]; decks?: Id[]; floorOpenings?: Id[]; staircases?: Id[]; members?: Id[]; joistZones?: Id[]; columns?: Id[]; surfaces?: Id[]; fences?: Id[]; rooms?: Id[] },
     phase: Phase,
   ) => void;
   /**
@@ -503,6 +530,43 @@ function cleanColumn(c: Column): Column {
   if (c.color === undefined) delete out.color;
   if (c.cap === undefined) delete out.cap;
   return out;
+}
+
+/** A ground surface's stored form: outline copied, colour lower-cased, an unset colour left out. */
+function cleanSurface(sf: SiteSurface): SiteSurface {
+  const out: SiteSurface = { ...sf, outline: Array.isArray(sf.outline) ? sf.outline.map((p) => ({ x: p.x, y: p.y })) : sf.outline };
+  if (typeof sf.color === 'string') out.color = sf.color.toLowerCase();
+  else delete out.color;
+  return out;
+}
+
+/** A fence's stored form: points copied, colour lower-cased, an unset colour left out. */
+function cleanFence(f: Fence): Fence {
+  const out: Fence = { ...f, points: Array.isArray(f.points) ? f.points.map((p) => ({ x: p.x, y: p.y })) : f.points };
+  if (typeof f.color === 'string') out.color = f.color.toLowerCase();
+  else delete out.color;
+  return out;
+}
+
+const samePoints = (p: readonly Vec2[], q: readonly Vec2[]): boolean => p.length === q.length && p.every((v, i) => v.x === q[i].x && v.y === q[i].y);
+
+/**
+ * Write the patched fields of a site element that differ onto it (undefined deletes an optional
+ * one); false when none differs, so the edit is a no-op. Point lists compare by value.
+ */
+function applySitePatch<T extends object>(target: T, next: T, keys: readonly (keyof T)[]): boolean {
+  const same = (k: keyof T) => {
+    const a = next[k];
+    const b = target[k];
+    return Array.isArray(a) && Array.isArray(b) ? samePoints(a as Vec2[], b as Vec2[]) : a === b;
+  };
+  if (keys.every(same)) return false;
+  for (const k of keys) {
+    if (same(k)) continue;
+    if (next[k] === undefined) delete target[k];
+    else target[k] = next[k];
+  }
+  return true;
 }
 
 /**
@@ -718,6 +782,8 @@ export const usePlanStore = create<PlanState>()(
             for (const id of sel.joistZones ?? []) delete level.joistZones[id];
             for (const id of sel.gradePoints ?? []) delete plan.site.gradePoints[id];
             for (const id of sel.columns ?? []) delete plan.site.columns[id];
+            for (const id of sel.surfaces ?? []) delete plan.site.surfaces[id];
+            for (const id of sel.fences ?? []) delete plan.site.fences[id];
             // Removing walls changes the corner joins of their neighbours.
             if (sel.nodes.length || sel.walls.length) clampOpenings(level);
           }),
@@ -1374,7 +1440,59 @@ export const usePlanStore = create<PlanState>()(
             for (const id of ids) delete site.columns[id];
           }),
 
-        moveSiteItems: (points, columns) =>
+        addSurface: (input) => {
+          let id: Id | null = null;
+          editSite((site) => {
+            const sf = cleanSurface({ ...input, id: input.id ?? newId() });
+            if (surfaceProblem(sf)) return false;
+            site.surfaces[sf.id] = sf;
+            id = sf.id;
+          });
+          return id;
+        },
+
+        updateSurface: (id, patch) =>
+          editSite((site) => {
+            const sf = site.surfaces[id];
+            if (!sf) return false;
+            const next = cleanSurface({ ...sf, ...patch, id });
+            if (surfaceProblem(next)) return false;
+            return applySitePatch(sf, next, Object.keys(patch) as (keyof SurfacePatch)[]);
+          }),
+
+        deleteSurfaces: (ids) =>
+          editSite((site) => {
+            if (!ids.some((id) => site.surfaces[id])) return false;
+            for (const id of ids) delete site.surfaces[id];
+          }),
+
+        addFence: (input) => {
+          let id: Id | null = null;
+          editSite((site) => {
+            const f = cleanFence({ ...input, id: input.id ?? newId() });
+            if (fenceProblem(f)) return false;
+            site.fences[f.id] = f;
+            id = f.id;
+          });
+          return id;
+        },
+
+        updateFence: (id, patch) =>
+          editSite((site) => {
+            const f = site.fences[id];
+            if (!f) return false;
+            const next = cleanFence({ ...f, ...patch, id });
+            if (fenceProblem(next)) return false;
+            return applySitePatch(f, next, Object.keys(patch) as (keyof FencePatch)[]);
+          }),
+
+        deleteFences: (ids) =>
+          editSite((site) => {
+            if (!ids.some((id) => site.fences[id])) return false;
+            for (const id of ids) delete site.fences[id];
+          }),
+
+        moveSiteItems: (points, columns, shapes = {}) =>
           editSite((site) => {
             let changed = false;
             for (const [id, p] of Object.entries(points)) {
@@ -1387,6 +1505,19 @@ export const usePlanStore = create<PlanState>()(
               const c = site.columns[id];
               if (!c || !isPoint(p) || (c.at.x === p.x && c.at.y === p.y)) continue;
               c.at = { x: p.x, y: p.y };
+              changed = true;
+            }
+            // A surface or fence takes its new shape only when it can still be used (the same count of points, moved).
+            for (const [id, outline] of Object.entries(shapes.surfaces ?? {})) {
+              const sf = site.surfaces[id];
+              if (!sf || !Array.isArray(outline) || outline.length !== sf.outline.length || !outline.every(isPoint) || samePoints(sf.outline, outline)) continue;
+              sf.outline = outline.map((p) => ({ x: p.x, y: p.y }));
+              changed = true;
+            }
+            for (const [id, pts] of Object.entries(shapes.fences ?? {})) {
+              const f = site.fences[id];
+              if (!f || !Array.isArray(pts) || pts.length !== f.points.length || !pts.every(isPoint) || samePoints(f.points, pts)) continue;
+              f.points = pts.map((p) => ({ x: p.x, y: p.y }));
               changed = true;
             }
             if (!changed) return false;
@@ -1405,6 +1536,14 @@ export const usePlanStore = create<PlanState>()(
             for (const id of sel.columns ?? []) {
               const c = plan.site.columns[id];
               if (c && c.phase !== phase) c.phase = phase;
+            }
+            for (const id of sel.surfaces ?? []) {
+              const sf = plan.site.surfaces[id];
+              if (sf && sf.phase !== phase) sf.phase = phase;
+            }
+            for (const id of sel.fences ?? []) {
+              const f = plan.site.fences[id];
+              if (f && f.phase !== phase) f.phase = phase;
             }
             for (const id of sel.roofs ?? []) {
               const r = level.roofs[id];

@@ -53,7 +53,7 @@ const tool = (key: string, name: ToolName, label: string): KeyBinding => ({
   whileDrawing: true,
 });
 
-/** A tool that only exists in site mode (E, C); elsewhere the key does nothing. */
+/** A tool that only exists in site mode (E, A, Q); elsewhere the key does nothing. */
 const siteTool = (key: string, name: ToolName, label: string): KeyBinding => ({
   keys: key.toUpperCase(),
   label,
@@ -87,6 +87,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   tool('i', 'beam', 'Draw a beam: click one end, then the other (they snap like wall corners); a flush (2) LVL placeholder in the floor framing over this level, sized by the engineer'),
   tool('l', 'post', 'Place a post: click; it runs from this floor up to the beam over it (else the ceiling), snaps to beam ends, and on the lowest level stands on a footing'),
   siteTool('e', 'gradePoint', 'Site only: place a grade point: click a spot on the ground, type its elevation (-4, -6\'4), Enter'),
+  siteTool('a', 'surface', 'Site only: draw a ground surface (gravel, asphalt, concrete, stone): click its corners, click the first corner or press Enter to close; Tab changes the material'),
+  siteTool('q', 'fence', 'Site only: draw a split-rail fence: click its points, double-click or press Enter to finish; set the height, rails and post spacing in the properties panel'),
   {
     keys: 'C',
     label: 'Cabinets and appliances: the chosen kind follows the cursor along the nearest wall, click to place, type a width first to change it (site: place a chimney; Tab switches to a post, then a flue, then a pier)',
@@ -99,8 +101,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
 
   { keys: "12'6  150  6 1/2\"", label: "Type a length (walls), or the distance from the nearer corner's inside face to the near edge (doors, windows, passages); Enter commits", group: 'While drawing' },
   { keys: 'Enter or click', label: 'Walls: with nothing typed, commit the wall at the cursor', group: 'While drawing' },
-  { keys: 'Backspace', label: 'Edit the typed length; roof, deck or floor opening: remove the last corner', group: 'While drawing' },
-  { keys: 'Esc', label: 'Clear the typed length, then finish the wall chain; roof, deck or floor opening: cancel the outline; with Select, clear the selection', group: 'While drawing' },
+  { keys: 'Backspace', label: 'Edit the typed length; roof, deck, floor opening, surface or fence: remove the last corner', group: 'While drawing' },
+  { keys: 'Esc', label: 'Clear the typed length, then finish the wall chain; roof, deck, floor opening, surface or fence: cancel the outline; with Select, clear the selection', group: 'While drawing' },
   {
     keys: 'X',
     label: 'Next wall: exterior or interior',
@@ -110,7 +112,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     whileDrawing: true,
   },
   { keys: 'Shift (hold)', label: 'Invert ortho lock; with ortho off, 15° steps', group: 'While drawing' },
-  { keys: 'Tab / Shift+Tab', label: 'Door: flip the swing side / the hinge; stairs and free cabinets: turn 90°', group: 'While drawing' },
+  { keys: 'Tab / Shift+Tab', label: 'Door: flip the swing side / the hinge; stairs and free cabinets: turn 90°; site surface: the next material', group: 'While drawing' },
   { keys: 'Shift (hold)', label: 'Cabinet: place it away from the walls (free)', group: 'While drawing' },
   { keys: 'Delete', label: 'Delete the selection', group: 'While drawing' },
   { keys: 'Enter / F2', label: 'Rename the selected room', group: 'While drawing' },

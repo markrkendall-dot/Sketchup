@@ -1428,7 +1428,7 @@ button.primary:hover:not(:disabled) {
   }
 }
 
-/* Roof and deck tools: the outline being drawn (a deck's in wood brown). */
+/* Roof, deck, surface and fence tools: the outline being drawn (a deck's in wood brown). */
 .outline-draft-line {
   fill: none;
   stroke: #9a3412;
@@ -1456,6 +1456,18 @@ button.primary:hover:not(:disabled) {
 .outline-draft.deck .outline-draft-close,
 .outline-draft.deck .outline-draft-point {
   stroke: #7a5c48;
+}
+
+/* Site mode: a ground surface's outline in stone grey, a fence's line in the fence's grey. */
+.outline-draft.surface .outline-draft-line,
+.outline-draft.surface .outline-draft-close,
+.outline-draft.surface .outline-draft-point {
+  stroke: #57534e;
+}
+
+.outline-draft.fence .outline-draft-line,
+.outline-draft.fence .outline-draft-point {
+  stroke: #6b6457;
 }
 
 .ridge-buttons button {

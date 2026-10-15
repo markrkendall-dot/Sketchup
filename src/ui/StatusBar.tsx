@@ -91,6 +91,14 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: 'Click to place; Tab switches chimney, post, flue and pier.',
     busy: 'Click to place; Tab switches chimney, post, flue and pier.',
   },
+  surface: {
+    idle: 'Click the corners of the surface; Tab changes the material.',
+    busy: 'Click the next corner; the first one or Enter closes. Esc cancels.',
+  },
+  fence: {
+    idle: 'Click the points of the fence.',
+    busy: 'Click the next point; double-click or Enter finishes. Esc cancels.',
+  },
   beam: {
     idle: "Click one end of the beam; it snaps like a wall.",
     busy: "Click the beam's other end. Esc cancels.",
@@ -107,8 +115,8 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
 
 /** Site mode's select tool. */
 const SITE_SELECT_HINT: [string, string] = [
-  'Click a grade point or column, drag to move. E and C place them.',
-  'Click a grade point or column to select it, drag to move, Delete removes. E places a grade point, C a chimney or post. Choose a level to draw walls.',
+  'Click a grade point, column, fence or surface, drag to move. E, C, A and Q place them.',
+  'Click a grade point, column, fence or surface to select it, drag to move, Delete removes. E places a grade point, C a chimney or post, A draws a ground surface, Q a fence. Choose a level to draw walls.',
 ];
 
 /** The same hints in full, shown as the tooltip. */
@@ -173,6 +181,14 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   column: {
     idle: 'Click to place a column. Tab steps through a chimney (24" x 40"), a post (6" x 6"), a flue (a round 8" metal pipe, a stove\'s chimney) and a pier (16" x 16" fieldstone); set the size and heights in the properties panel.',
     busy: 'Click to place a column. Tab steps through a chimney, a post, a flue and a pier.',
+  },
+  surface: {
+    idle: 'Click the corners of a ground surface: a gravel drive, an asphalt road, a concrete pad or flagstones. Tab steps through gravel, asphalt, concrete and stone before you close it. It lies on the ground in 3D; set its colour in the properties panel.',
+    busy: 'Click the next corner. Click the first corner, double-click or press Enter to close the outline. Backspace removes the last corner, Esc cancels.',
+  },
+  fence: {
+    idle: 'Click the points of a split-rail fence: log posts at every point and at most 10\' apart between them, two rails, 42" high. Set the height, rails and post spacing in the properties panel.',
+    busy: 'Click the next point. Double-click or press Enter to finish the fence. Backspace removes the last point, Esc cancels.',
   },
   beam: {
     idle: 'Click one end of a beam, then the other; the ends snap like wall corners. A new beam is a flush (2) 1 3/4" x 11 7/8" LVL in the floor framing over this level: a placeholder for the engineer to size. Set it in the properties panel.',
@@ -339,6 +355,16 @@ export function StatusBar() {
     for (const c of Object.values(s.plan.site.columns)) if (isVisible(c.phase, viewMode)) n++;
     return n;
   });
+  const surfaceCount = usePlanStore((s) => {
+    let n = 0;
+    for (const sf of Object.values(s.plan.site.surfaces)) if (isVisible(sf.phase, viewMode)) n++;
+    return n;
+  });
+  const fenceCount = usePlanStore((s) => {
+    let n = 0;
+    for (const f of Object.values(s.plan.site.fences)) if (isVisible(f.phase, viewMode)) n++;
+    return n;
+  });
   const hasUnderlay = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
   const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
   const underlayMode = useUiStore((s) => s.underlayMode);
@@ -416,13 +442,23 @@ export function StatusBar() {
       <span className="status-view" title="View mode (V)">
         View: {VIEW_MODE_LABEL[viewMode]}
       </span>
-      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs, decks, floor openings and columns">
+      <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs, decks, floor openings, columns, surfaces and fences">
         Drawing: {PHASE_LABEL[drawPhase].toLowerCase()}
       </span>
       <span className="status-counts">
         {siteMode ? (
           <>
             Site: {gradeCount} {gradeCount === 1 ? 'grade point' : 'grade points'}, {columnCount} {columnCount === 1 ? 'column' : 'columns'}
+            {surfaceCount > 0 && (
+              <>
+                , {surfaceCount} {surfaceCount === 1 ? 'surface' : 'surfaces'}
+              </>
+            )}
+            {fenceCount > 0 && (
+              <>
+                , {fenceCount} {fenceCount === 1 ? 'fence' : 'fences'}
+              </>
+            )}
           </>
         ) : (
           <>

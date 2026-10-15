@@ -1,8 +1,8 @@
 import { memo } from 'react';
-import { getFarGroundGeometry, getSiteMeshes, getTerrainGeometry } from '../derive/meshes';
+import { getFarGroundGeometry, getFenceMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry } from '../derive/meshes';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
-import { chimneyPartMaterial, columnMaterial, farGroundMaterial, terrainMaterial } from './materials';
+import { chimneyPartMaterial, columnMaterial, farGroundMaterial, fenceMaterial, surfaceMaterial, terrainMaterial } from './materials';
 
 /**
  * The ground draws after the house's opaque meshes (which keep render order 0), so the depth test
@@ -64,6 +64,62 @@ export const SiteColumns = memo(function SiteColumns() {
               material={chimneyPartMaterial(p.part, c.phase)}
               renderOrder={c.phase === 'demo' || p.part === 'arrestor' ? 1 : 0}
               castShadow={c.phase !== 'demo' && p.part !== 'arrestor'}
+              receiveShadow
+              dispose={null}
+            />
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+});
+
+/**
+ * The site's ground surfaces (gravel, asphalt, concrete, stone) draped on the terrain 1" above it
+ * (derive/meshes.ts getSurfaceMeshes), hidden by the view mode like walls. Drawn with the ground
+ * (after the house's opaque meshes) and a polygon offset toward the camera, so the lawn never shows
+ * through; they receive the sun's shadows and cast none.
+ */
+export const SiteSurfaces = memo(function SiteSurfaces() {
+  const viewMode = useUiStore((s) => s.viewMode);
+  const meshes = usePlanStore((s) => getSurfaceMeshes(s.plan, viewMode));
+  return (
+    <group name="site-surfaces">
+      {meshes.map((sf) => (
+        <mesh
+          key={sf.id}
+          name={`surface:${sf.id}`}
+          geometry={sf.geometry}
+          material={surfaceMaterial(sf.material, sf.phase, sf.color)}
+          renderOrder={GROUND_RENDER_ORDER}
+          receiveShadow
+          dispose={null}
+        />
+      ))}
+    </group>
+  );
+});
+
+/**
+ * The site's split-rail fences (derive/meshes.ts getFenceMeshes): the posts and rails in the fence's
+ * colour, the logs' ends in the end grain's. They cast and receive shadows; a demolished one
+ * (translucent) casts none.
+ */
+export const SiteFences = memo(function SiteFences() {
+  const viewMode = useUiStore((s) => s.viewMode);
+  const meshes = usePlanStore((s) => getFenceMeshes(s.plan, viewMode));
+  return (
+    <group name="site-fences">
+      {meshes.map((f) => (
+        <group key={f.id}>
+          {(['body', 'end'] as const).map((part) => (
+            <mesh
+              key={part}
+              name={`fence:${f.id}:${part}`}
+              geometry={part === 'body' ? f.body : f.ends}
+              material={fenceMaterial(part, f.phase, f.color)}
+              renderOrder={f.phase === 'demo' ? 1 : 0}
+              castShadow={f.phase !== 'demo'}
               receiveShadow
               dispose={null}
             />

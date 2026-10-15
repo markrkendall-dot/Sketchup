@@ -729,7 +729,7 @@ describe('loading roofs', () => {
     const plan = migrate(v1);
     expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
     expect(plan.levels.l1.roofs).toEqual({});
-    expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {} });
+    expect(plan.site).toEqual({ northAngle: 0, gradePoints: {}, columns: {}, surfaces: {}, fences: {} });
   });
 
   it('keeps a valid roof field by field and drops broken ones with a warning', () => {

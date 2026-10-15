@@ -1,4 +1,4 @@
-import type { Column, Deck, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, Wall, WallFinish, WallKind } from './types';
+import type { Column, Deck, Fence, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, SiteSurface, SurfaceMaterial, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
@@ -171,5 +171,12 @@ export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColo
 /** Column colours by kind: brick red for a chimney, trim tan for a post, stainless for a flue, grey-brown fieldstone for a pier. */
 export const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c', flue: '#b9bdc1', pier: '#8a8378' };
 export const columnColorOf = (c: Pick<Column, 'kind' | 'color'>): string => c.color ?? COLUMN_COLOR[c.kind];
+/** Ground surface colours by material: light tan-grey gravel, near-black asphalt, pale concrete, grey-brown flagstone. */
+export const SURFACE_COLOR: Record<SurfaceMaterial, string> = { gravel: '#a39a88', asphalt: '#3d3d3f', concrete: '#b3b0a8', stone: '#8a8378' };
+export const SURFACE_MATERIALS: readonly SurfaceMaterial[] = ['gravel', 'asphalt', 'concrete', 'stone'];
+export const surfaceColorOf = (s: Pick<SiteSurface, 'material' | 'color'>): string => s.color ?? SURFACE_COLOR[s.material];
+/** A split-rail fence: weathered grey wood. */
+export const FENCE_COLOR = '#8b8478';
+export const fenceColorOf = (f: Pick<Fence, 'color'>): string => f.color ?? FENCE_COLOR;
 /** A chimney's cap: pale concrete. */
 export const CHIMNEY_CAP_COLOR = '#b8b4ac';

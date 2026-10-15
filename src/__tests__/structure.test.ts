@@ -80,7 +80,7 @@ describe('structure store actions', () => {
 
 describe('structure in the file', () => {
   it('schema 7 adds joist zones and members to every level', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(7);
     const v6 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 6 }));
     for (const l of Object.values(v6.levels) as Record<string, unknown>[]) {
       delete l.joistZones;

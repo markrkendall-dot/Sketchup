@@ -4,9 +4,9 @@ import type { CasePart } from '../derive/casework';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
 import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
-import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DECK_COLOR, DEFAULT_WEATHERING, defaultWallColor, RAILING_COLOR, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
-import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, WallFinish, WallKind } from '../model/types';
-import { GRASS_COLOR, grassTexture } from './groundTexture';
+import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DECK_COLOR, DEFAULT_WEATHERING, defaultWallColor, FENCE_COLOR, RAILING_COLOR, SURFACE_COLOR, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, SurfaceMaterial, WallFinish, WallKind } from '../model/types';
+import { GRASS_COLOR, grassTexture, surfaceTexture } from './groundTexture';
 import { brickTextures, interiorTextures, NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures, type InteriorTexture } from './textures';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
@@ -474,4 +474,46 @@ export function columnMaterial(kind: Column['kind'], phase: Phase, color: string
 export function chimneyPartMaterial(part: ChimneyPart, phase: Phase): MeshStandardMaterial {
   if (part === 'hood' || part === 'stem') return columnMaterial('flue', phase);
   return part === 'cap' ? trimLike('chimney-cap', CHIMNEY_CAP_COLOR, phase) : screenMaterial(phase);
+}
+
+const surfaceMaterials = new Map<string, MeshStandardMaterial>();
+
+/**
+ * A ground surface (DESIGN.md "Site and terrain"): by material, phase and colour (the surface's own,
+ * else SURFACE_COLOR). Gravel (speckled stones) and asphalt (fine grain) carry their canvas texture
+ * (groundTexture.ts surfaceTexture) drawn in the colour under a white tint; stone is the walls'
+ * fieldstone (sidingTextures) as flagstones; concrete is the flat colour. Matte. It lies 1" over the
+ * terrain (site.ts SURFACE_LIFT) and is drawn a little toward the camera as well, so from far away,
+ * where depth precision is coarser than that, the lawn never shows through. Demolished: translucent
+ * red; new: the colour pulled toward green. The flat colour is kept in `userData.flatColor` for the
+ * export; without a canvas (node) it is the material's colour.
+ */
+export function surfaceMaterial(material: SurfaceMaterial, phase: Phase, color: string = SURFACE_COLOR[material]): MeshStandardMaterial {
+  const key = phase === 'demo' ? 'demo' : `${material}|${phase}|${color}`;
+  let m = surfaceMaterials.get(key);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      const flat = phase === 'new' ? pullGreen(color) : color;
+      const map = material === 'gravel' || material === 'asphalt' ? surfaceTexture(material, flat) : material === 'stone' ? (sidingTextures('stone', color, phase === 'new' ? 'new' : 'plain')?.map ?? null) : null;
+      m = make(map ? '#ffffff' : flat);
+      m.map = map;
+      m.roughness = material === 'asphalt' ? 0.85 : 1;
+      m.userData.flatColor = flat;
+    }
+    m.polygonOffset = true;
+    m.polygonOffsetFactor = -1;
+    m.polygonOffsetUnits = -4;
+    surfaceMaterials.set(key, m);
+  }
+  return m;
+}
+
+/**
+ * A split-rail fence's logs in its colour (weathered grey wood by default, FENCE_COLOR), their end
+ * discs in the end grain's (logEndColor, like a log member's); demolished: red, new: pulled toward
+ * green, like trim.
+ */
+export function fenceMaterial(part: 'body' | 'end', phase: Phase, color: string = FENCE_COLOR): MeshStandardMaterial {
+  return trimLike(`fence-${part}`, part === 'end' ? logEndColor(color) : color, phase);
 }

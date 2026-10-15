@@ -29,7 +29,16 @@ export interface OutlineToolSpec {
   /** "roof", "deck", "floor opening": in the tool's messages. */
   noun: string;
   /** The selection kind the new element is selected as, and Delete removes. */
-  selectionKey: 'roofs' | 'decks' | 'floorOpenings' | 'joistZones';
+  selectionKey: 'roofs' | 'decks' | 'floorOpenings' | 'joistZones' | 'surfaces' | 'fences';
+  /**
+   * An open polyline (a fence): at least 2 points, finished by Enter or a double-click; a click on
+   * the first point adds it again (a closed run) instead of closing, and it may cross itself.
+   */
+  open?: boolean;
+  /** Where a click lands; absent: outlineSnap (the level's walls). The site tools snap with siteSnap. */
+  snap?: (ctx: ToolContext, raw: Vec2, shift: boolean, from: Vec2 | null) => SnapResult;
+  /** Keys of the tool's own (the surface tool's Tab), tried after the outline's; true when used. */
+  onKey?: (e: KeyboardEvent, ctx: ToolContext) => boolean;
   /** Add the element over the closed outline; its id, or null when the store refuses it. */
   create(ctx: ToolContext, outline: Vec2[]): Id | null;
   /** The status line once it is added. */
@@ -43,11 +52,14 @@ export interface OutlineToolSpec {
  * walls' outside faces), close by clicking the first corner, double-clicking or pressing Enter.
  * Backspace removes the last corner, Esc cancels; with no corners, Delete or Backspace removes the
  * selected elements of the tool's kind. The new element is selected and the tool stays active.
+ * With `open` it draws a polyline instead (a fence), finished by Enter or a double-click.
  */
 export function makeOutlineTool(spec: OutlineToolSpec): Tool {
+  const minPoints = spec.open ? 2 : 3;
   const preview = (ctx: ToolContext, e: ToolPointerEvent): SnapResult => {
     const pts = ctx.ui().draft.outlinePoints;
-    const snap = outlineSnap(ctx, e.world, e.shiftKey, pts[pts.length - 1] ?? null);
+    const from = pts[pts.length - 1] ?? null;
+    const snap = spec.snap ? spec.snap(ctx, e.world, e.shiftKey, from) : outlineSnap(ctx, e.world, e.shiftKey, from);
     ctx.ui().patchDraft({ cursor: e.world, snap });
     return snap;
   };
@@ -56,11 +68,11 @@ export function makeOutlineTool(spec: OutlineToolSpec): Tool {
   const finish = (ctx: ToolContext): boolean => {
     const ui = ctx.ui();
     const outline = ui.draft.outlinePoints;
-    if (outline.length < 3) {
-      ui.patchDraft({ error: true, message: `A ${spec.noun} needs at least 3 corners.` });
+    if (outline.length < minPoints) {
+      ui.patchDraft({ error: true, message: spec.open ? `A ${spec.noun} needs at least 2 points.` : `A ${spec.noun} needs at least 3 corners.` });
       return false;
     }
-    if (selfIntersects(outline)) {
+    if (!spec.open && selfIntersects(outline)) {
       ui.patchDraft({ error: true, message: 'The outline crosses itself. Backspace removes the last corner.' });
       return false;
     }
@@ -80,16 +92,19 @@ export function makeOutlineTool(spec: OutlineToolSpec): Tool {
       const ui = ctx.ui();
       const snap = preview(ctx, e);
       const pts = ui.draft.outlinePoints;
-      if (pts.length >= 3 && dist(snap.point, pts[0]) * ui.viewport.k <= SNAP_RADIUS_PX.node) {
+      if (!spec.open && pts.length >= 3 && dist(snap.point, pts[0]) * ui.viewport.k <= SNAP_RADIUS_PX.node) {
         finish(ctx);
         return;
       }
       if (pts.length && dist(snap.point, pts[pts.length - 1]) < 1e-6) return;
-      ui.patchDraft({
-        outlinePoints: [...pts, snap.point],
-        error: false,
-        message: pts.length >= 2 ? `Click the first corner or press Enter to close the ${spec.noun} outline.` : null,
-      });
+      const prompt = spec.open
+        ? pts.length >= 1
+          ? `Double-click or press Enter to finish the ${spec.noun}.`
+          : null
+        : pts.length >= 2
+          ? `Click the first corner or press Enter to close the ${spec.noun} outline.`
+          : null;
+      ui.patchDraft({ outlinePoints: [...pts, snap.point], error: false, message: prompt });
     },
 
     onPointerMove(e, ctx) {
@@ -99,7 +114,7 @@ export function makeOutlineTool(spec: OutlineToolSpec): Tool {
     onPointerUp() {},
 
     onDoubleClick(_e, ctx) {
-      if (ctx.ui().draft.outlinePoints.length >= 3) finish(ctx);
+      if (ctx.ui().draft.outlinePoints.length >= minPoints) finish(ctx);
     },
 
     onKeyDown(e, ctx) {
@@ -119,6 +134,7 @@ export function makeOutlineTool(spec: OutlineToolSpec): Tool {
         ui.patchDraft({ outlinePoints: [], error: false, message: null });
         return true;
       }
+      if (spec.onKey?.(e, ctx)) return true;
       const selected = ui.selection[spec.selectionKey];
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length) {
         spec.remove(ctx, selected);

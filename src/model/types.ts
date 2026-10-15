@@ -346,11 +346,53 @@ export interface GradePoint {
   elevation: Inches;
 }
 
+/** What a ground surface is made of: it sets the default colour and the 3D texture. */
+export type SurfaceMaterial = 'gravel' | 'asphalt' | 'concrete' | 'stone';
+
+/**
+ * A flat-material patch on the ground (schema version 8, DESIGN.md "Site and terrain"): a gravel
+ * drive, an asphalt road, a concrete pad, flagstones. It has no height of its own: in 3D it is
+ * draped on the terrain, a little above it.
+ */
+export interface SiteSurface {
+  id: Id;
+  /** Plan polygon (at least 3 points, not crossing itself). */
+  outline: Vec2[];
+  material: SurfaceMaterial;
+  phase: Phase;
+  /** Hex colour `#rrggbb`. Absent: by material (model/finish.ts SURFACE_COLOR). */
+  color?: string;
+}
+
+/**
+ * A split-rail (post and rail) fence along an open polyline (schema version 8, DESIGN.md "Site and
+ * terrain"): round log posts at every point and between them at most `postSpacing` apart, standing
+ * on the ground, with `rails` log rails between consecutive posts following the slope.
+ */
+export interface Fence {
+  id: Id;
+  /** At least 2 points; an open polyline (the last point does not join the first). */
+  points: Vec2[];
+  /** Top of the posts above the ground (default 42"). */
+  height: Inches;
+  /** Rails between posts, an integer 1 to 4 (default 2). */
+  rails: number;
+  /** The most distance between two posts (default 120", at least 24"). */
+  postSpacing: Inches;
+  phase: Phase;
+  /** Hex colour `#rrggbb`. Absent: weathered grey wood (model/finish.ts FENCE_COLOR). */
+  color?: string;
+}
+
 export interface Site {
   /** Degrees clockwise from the top of the plan to true north; 0 = north is up the screen. */
   northAngle: Degrees;
   gradePoints: Record<Id, GradePoint>;
   columns: Record<Id, Column>;
+  /** Ground surfaces: gravel, asphalt, concrete, stone (schema version 8). */
+  surfaces: Record<Id, SiteSurface>;
+  /** Split-rail fences (schema version 8). */
+  fences: Record<Id, Fence>;
 }
 
 export interface Underlay {
@@ -494,7 +536,7 @@ export interface ProposedLook {
 }
 
 export interface Plan {
-  schemaVersion: 7;
+  schemaVersion: 8;
   id: Id;
   name: string;
   levelOrder: Id[]; // bottom to top

@@ -11,14 +11,14 @@ import { coreInterval, jambDistances, liveFootprints } from '../derive/openings'
 import { isVisible, PHASE_LABEL } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
-import { columnDefaults, groundAt } from '../derive/site';
+import { columnDefaults, FENCE_DEFAULTS, fenceLength, fencePostPoints, groundAt, surfaceArea } from '../derive/site';
 import { directionVector, flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
 import { activateUnderlayTool, makeToolContext, switchTool } from '../editor2d/tools';
 import { beamHeights, joistDepth, memberBoxes } from '../derive/members';
 import { bearingOf } from '../derive/structure';
 import { isLog, isTimber, joistWords, MEMBER_COLOR, MEMBER_DEFAULTS, normalizeJoists } from '../model/structure';
 import { setFixtureKind } from '../editor2d/tools/fixtureTool';
-import { COLUMN_KIND_NAME } from '../editor2d/tools/siteTools';
+import { COLUMN_KIND_NAME, SURFACE_MATERIAL_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import {
   counterColorOf,
@@ -41,12 +41,12 @@ import {
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
 import { dist, pointInPolygon, polygonSignedArea } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
-import { columnProblem, MAX_DECK_ELEVATION, MAX_ROOF_PITCH, wallLength } from '../model/plan';
+import { columnProblem, fenceProblem, MAX_DECK_ELEVATION, MAX_FENCE_RAILS, MAX_ROOF_PITCH, MIN_FENCE_SPACING, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
 import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
-import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
+import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
-import type { Beam, Column, Deck, Fixture, FloorOpening, FrontStyle, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Beam, Column, Deck, Fence, Fixture, FloorOpening, FrontStyle, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -365,6 +365,8 @@ function SelectionActions({
   members,
   joistZones,
   columns,
+  surfaces,
+  fences,
   rooms,
 }: {
   levelId: Id;
@@ -378,12 +380,14 @@ function SelectionActions({
   members: Member[];
   joistZones: JoistZone[];
   columns: Column[];
+  surfaces: SiteSurface[];
+  fences: Fence[];
   rooms: Room[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
   const deleteEntities = usePlanStore((s) => s.deleteEntities);
   const selection = useUiStore((s) => s.selection);
-  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...members, ...joistZones, ...columns, ...rooms]);
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...members, ...joistZones, ...columns, ...surfaces, ...fences, ...rooms]);
   if (phases.length === 0 && selectionSize(selection) === 0) return null;
   const allDemo = phases.length > 0 && phases.every((p) => p === 'demo');
   const ids = {
@@ -397,6 +401,8 @@ function SelectionActions({
     members: members.map((m) => m.id),
     joistZones: joistZones.map((z) => z.id),
     columns: columns.map((c) => c.id),
+    surfaces: surfaces.map((sf) => sf.id),
+    fences: fences.map((f) => f.id),
     rooms: rooms.map((r) => r.id),
   };
   return (
@@ -2363,12 +2369,86 @@ function ColumnProps({ column }: { column: Column }) {
   );
 }
 
+const surfaceMaterialOptions = SURFACE_MATERIALS.map((m) => ({ value: m, label: SURFACE_MATERIAL_NAME[m] }));
+
+function SurfaceProps({ surface }: { surface: SiteSurface }) {
+  const updateSurface = usePlanStore((s) => s.updateSurface);
+  return (
+    <>
+      <h3>{SURFACE_MATERIAL_NAME[surface.material]} surface</h3>
+      <SelectField label="Material" value={surface.material} options={surfaceMaterialOptions} onChange={(material) => updateSurface(surface.id, { material })} />
+      <ColorField
+        label="Colour"
+        value={surfaceColorOf(surface)}
+        onCommit={(color) => updateSurface(surface.id, { color })}
+        onReset={surface.color ? () => updateSurface(surface.id, { color: undefined }) : undefined}
+        hint={`Default for ${surface.material}: ${SURFACE_COLOR[surface.material]}.${surface.material === 'gravel' ? ' The 3D view speckles it with stones.' : surface.material === 'stone' ? ' The 3D view draws it as flagstones.' : ''}`}
+      />
+      <SelectField label="Phase" value={surface.phase} options={phaseOptions} onChange={(phase) => updateSurface(surface.id, { phase })} />
+      <ReadOnly label="Area">{formatArea(surfaceArea(surface))}</ReadOnly>
+      <ReadOnly label="Corners">{surface.outline.length}</ReadOnly>
+      <p className="panel-note">It lies on the ground in 3D, following the grade points. Drag it with the select tool to move it.</p>
+    </>
+  );
+}
+
+function FenceProps({ fence }: { fence: Fence }) {
+  const updateFence = usePlanStore((s) => s.updateFence);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const set = (patch: Partial<Fence>): string | null => {
+    const problem = fenceProblem({ ...fence, ...patch });
+    if (problem) return problem[0].toUpperCase() + problem.slice(1) + '.';
+    updateFence(fence.id, patch);
+    return null;
+  };
+  return (
+    <>
+      <h3>Fence</h3>
+      <LengthField label="Height" value={fence.height} onCommit={(v) => (v === null ? null : set({ height: v }))} hint="Top of the posts above the ground." />
+      <NumberField
+        label="Rails"
+        value={fence.rails}
+        onCommit={(v) => updateFence(fence.id, { rails: v })}
+        check={(v) => (Number.isInteger(v) && v >= 1 && v <= MAX_FENCE_RAILS ? null : `A whole number from 1 to ${MAX_FENCE_RAILS}.`)}
+        hint="Log rails between the posts, spread from 30% to 85% of the height; one rail is a top rail."
+      />
+      <LengthField
+        label="Post spacing"
+        value={fence.postSpacing}
+        onCommit={(v) => (v === null ? null : set({ postSpacing: v }))}
+        hint={`The most room between two posts (at least ${MIN_FENCE_SPACING}"); there is a post at every point and as few more as keep to it.`}
+      />
+      <ColorField
+        label="Colour"
+        value={fenceColorOf(fence)}
+        onCommit={(color) => updateFence(fence.id, { color })}
+        onReset={fence.color ? () => updateFence(fence.id, { color: undefined }) : undefined}
+        hint={`Default: weathered grey wood, ${FENCE_COLOR}. The logs' ends show a lighter end grain.`}
+      />
+      <SelectField label="Phase" value={fence.phase} options={phaseOptions} onChange={(phase) => updateFence(fence.id, { phase })} />
+      <ReadOnly label="Length">{formatLength(fenceLength(fence), denom)}</ReadOnly>
+      <ReadOnly label="Posts">{fencePostPoints(fence).length}</ReadOnly>
+      <div className="panel-buttons">
+        <button
+          onClick={() => updateFence(fence.id, { height: FENCE_DEFAULTS.height, rails: FENCE_DEFAULTS.rails, postSpacing: FENCE_DEFAULTS.postSpacing })}
+          title={`${FENCE_DEFAULTS.height}" high, ${FENCE_DEFAULTS.rails} rails, posts at most ${FENCE_DEFAULTS.postSpacing / 12}' apart`}
+        >
+          Reset to defaults
+        </button>
+      </div>
+      <p className="panel-note">6" log posts set 6" into the ground, 4" log rails following the slope. Drag it with the select tool to move it.</p>
+    </>
+  );
+}
+
 /** Nothing selected in site mode: the north angle, the counts and the way to start over. */
 function SiteProps({ site }: { site: Site }) {
   const setNorthAngle = usePlanStore((s) => s.setNorthAngle);
   const clearGradePoints = usePlanStore((s) => s.clearGradePoints);
   const points = Object.keys(site.gradePoints).length;
   const columns = Object.keys(site.columns).length;
+  const surfaces = Object.keys(site.surfaces).length;
+  const fences = Object.keys(site.fences).length;
   return (
     <>
       <h3>Site</h3>
@@ -2385,6 +2465,8 @@ function SiteProps({ site }: { site: Site }) {
       </div>
       <ReadOnly label="Grade points">{points}</ReadOnly>
       <ReadOnly label="Columns">{columns}</ReadOnly>
+      <ReadOnly label="Surfaces">{surfaces}</ReadOnly>
+      <ReadOnly label="Fences">{fences}</ReadOnly>
       <div className="panel-buttons">
         <button
           className="danger"
@@ -2396,7 +2478,7 @@ function SiteProps({ site }: { site: Site }) {
           Clear grade points
         </button>
       </div>
-      <p className="panel-note">E places a grade point (click, type the elevation, Enter). C places a chimney or post. The ground is interpolated between grade points.</p>
+      <p className="panel-note">E places a grade point (click, type the elevation, Enter). C places a chimney or post. A draws a ground surface (gravel, asphalt, concrete, stone), Q a split-rail fence. The ground is interpolated between grade points.</p>
     </>
   );
 }
@@ -2414,6 +2496,8 @@ function MixedProps({
   members,
   joistZones,
   columns,
+  surfaces,
+  fences,
   rooms,
 }: {
   levelId: Id;
@@ -2428,6 +2512,8 @@ function MixedProps({
   members: Member[];
   joistZones: JoistZone[];
   columns: Column[];
+  surfaces: SiteSurface[];
+  fences: Fence[];
   rooms: Room[];
 }) {
   const setPhase = usePlanStore((s) => s.setPhase);
@@ -2447,10 +2533,12 @@ function MixedProps({
   if (members.length - beams) parts.push(`${members.length - beams} ${members.length - beams === 1 ? 'post' : 'posts'}`);
   if (joistZones.length) parts.push(`${joistZones.length} joist ${joistZones.length === 1 ? 'zone' : 'zones'}`);
   if (columns.length) parts.push(`${columns.length} ${columns.length === 1 ? 'column' : 'columns'}`);
+  if (surfaces.length) parts.push(`${surfaces.length} ${surfaces.length === 1 ? 'surface' : 'surfaces'}`);
+  if (fences.length) parts.push(`${fences.length} ${fences.length === 1 ? 'fence' : 'fences'}`);
   if (sel.gradePoints.length) parts.push(`${sel.gradePoints.length} grade ${sel.gradePoints.length === 1 ? 'point' : 'points'}`);
   if (sel.nodes.length) parts.push(`${sel.nodes.length} ${sel.nodes.length === 1 ? 'corner' : 'corners'}`);
   if (sel.rooms.length) parts.push(`${sel.rooms.length} ${sel.rooms.length === 1 ? 'room' : 'rooms'}`);
-  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...members, ...joistZones, ...columns, ...rooms]);
+  const phases = phasesOf([...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...members, ...joistZones, ...columns, ...surfaces, ...fences, ...rooms]);
   const onlyFixtures = fixtures.length > 0 && phases.length === fixtures.length;
   const groupStairs = usePlanStore((s) => s.groupStairs);
   return (
@@ -2488,6 +2576,8 @@ function MixedProps({
                 members: members.map((m) => m.id),
                 joistZones: joistZones.map((z) => z.id),
                 columns: columns.map((c) => c.id),
+                surfaces: surfaces.map((sf) => sf.id),
+                fences: fences.map((f) => f.id),
                 rooms: rooms.map((r) => r.id),
               },
               p,
@@ -3037,6 +3127,8 @@ export function PropertiesPanel() {
   const withPieces = [...stairs, ...Object.values(level.stairs).filter((st) => st.staircaseId && scIds.has(st.staircaseId) && !sel.stairs.includes(st.id))];
   const gradePoints = sel.gradePoints.map((id) => site.gradePoints[id]).filter(Boolean);
   const columns = sel.columns.map((id) => site.columns[id]).filter(Boolean);
+  const surfaces = sel.surfaces.map((id) => site.surfaces[id]).filter(Boolean);
+  const fences = sel.fences.map((id) => site.fences[id]).filter(Boolean);
   const members = sel.members.map((id) => level.members?.[id]).filter(Boolean);
   const joistZones = sel.joistZones.map((id) => level.joistZones?.[id]).filter(Boolean);
   const live: Selection = {
@@ -3054,6 +3146,8 @@ export function PropertiesPanel() {
     joistZones: joistZones.map((z) => z.id),
     gradePoints: gradePoints.map((g) => g.id),
     columns: columns.map((c) => c.id),
+    surfaces: surfaces.map((sf) => sf.id),
+    fences: fences.map((f) => f.id),
   };
   const total = selectionSize(live);
 
@@ -3076,15 +3170,17 @@ export function PropertiesPanel() {
   else if (total === 1 && fixtures.length === 1) body = <FixtureProps key={fixtures[0].id} level={level} fixture={fixtures[0]} />;
   else if (total === 1 && gradePoints.length === 1) body = <GradePointProps key={gradePoints[0].id} point={gradePoints[0]} />;
   else if (total === 1 && columns.length === 1) body = <ColumnProps key={columns[0].id} column={columns[0]} />;
+  else if (total === 1 && surfaces.length === 1) body = <SurfaceProps key={surfaces[0].id} surface={surfaces[0]} />;
+  else if (total === 1 && fences.length === 1) body = <FenceProps key={fences[0].id} fence={fences[0]} />;
   else if (total === walls.length) body = <MultiWallProps key={walls.map((w) => w.id).join(',')} levelId={level.id} walls={walls} />;
-  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} members={members} joistZones={joistZones} columns={columns} rooms={rooms} />;
+  else body = <MixedProps levelId={level.id} sel={live} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} members={members} joistZones={joistZones} columns={columns} surfaces={surfaces} fences={fences} rooms={rooms} />;
 
   return (
     <aside className="side-panel" aria-label="Properties">
       <div className="panel-title">Properties</div>
       <div className="panel-body">
         {body}
-        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} members={members} joistZones={joistZones} columns={columns} rooms={rooms} />}
+        {total > 0 && <SelectionActions levelId={level.id} walls={walls} openings={openings} stairs={withPieces} roofs={roofs} fixtures={fixtures} decks={decks} floorOpenings={floorOpenings} members={members} joistZones={joistZones} columns={columns} surfaces={surfaces} fences={fences} rooms={rooms} />}
       </div>
     </aside>
   );

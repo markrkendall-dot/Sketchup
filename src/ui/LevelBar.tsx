@@ -62,7 +62,8 @@ function LevelTab({ levelId, index }: { levelId: Id; index: number }) {
 }
 
 /**
- * The Site pseudo-level, below the lowest level: grade points, chimney and posts, the north angle.
+ * The Site pseudo-level, below the lowest level: grade points, chimney and posts, ground surfaces,
+ * fences, the north angle.
  * The 2D view shows the first floor as a ghost under the site layer.
  */
 function SiteTab() {
@@ -74,7 +75,7 @@ function SiteTab() {
       className={`level-tab site-tab${active ? ' active' : ''}`}
       aria-pressed={active}
       data-site-tab
-      title="Site: grade points (the ground), chimney and posts, north. Pick any level to go back to editing it."
+      title="Site: grade points (the ground), chimney and posts, ground surfaces and fences, north. Pick any level to go back to editing it."
       onClick={() => {
         enterSiteMode();
         focusCanvas();

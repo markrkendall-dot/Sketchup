@@ -68,6 +68,8 @@ const siteWith = (...points: ReturnType<typeof gp>[]): Site => ({
   northAngle: 0,
   gradePoints: Object.fromEntries(points.map((p) => [p.id, p])),
   columns: {},
+  surfaces: {},
+  fences: {},
 });
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
@@ -573,6 +575,8 @@ describe('columns', () => {
       northAngle: 0,
       gradePoints: { 'g100,50': gp(100, 50, 0) },
       columns: { a: col({ id: 'a', phase: 'demo' }), b: col({ id: 'b', at: { x: 300, y: 300 }, phase: 'new' }) },
+      surfaces: {},
+      fences: {},
     };
     expect(hitSite(site, { x: 104, y: 50 }, 1)).toEqual({ kind: 'gradePoint', id: 'g100,50' });
     expect(hitSite(site, { x: 100, y: 62 }, 1)).toEqual({ kind: 'column', id: 'a' }); // inside 24 x 40
