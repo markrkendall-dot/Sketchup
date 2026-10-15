@@ -407,8 +407,8 @@ sketch, the owner's floor sketches and photos (`docs/photos/`: 01 to 09 outside,
 the gable roof with deep open eaves and rafter tails under rusting corrugated metal, the east wing
 with its own gable, the screened entry porch with its knee walls and west-facing gable, the chimney
 stained like the house with its cap and spark arrestor, shingle below and clapboard above, the
-casement and picture windows, the green shutters, and the walkout basement on the lake side, grey
-block with vertical boards round its double door. It is a **starter, not a survey**. Both floors'
+casement and picture windows, the green shutters, the walkout basement on the lake side, grey
+block with vertical boards round its double door, and the board shed on the west lawn. It is a **starter, not a survey**. Both floors'
 interiors come from the owner's tape and sketches (face to face): the First Floor's rooms, 5"
 partitions and stair, and the Second Floor's rooms and partitions. The exterior
 wall thickness (7") and the outside size are derived from those measurements. Everything else (the
@@ -605,6 +605,7 @@ from the main block's outside corners (north-west corner = 0, 0).
 | North windows | first floor three casements (2 x 3 lites) 80 x 56 at x 96", sill 30, west of the chimney, and two single panes 48 x 44 at x 234", sill 42 (the Bath's, over the washer and dryer, its sill just above the wainscot, photo 22); second floor two casements (2 x 3 lites) 46 x 44, sill 36, at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office; its west jamb is 2" from that wall's face) (photos 6 and 7) | Jamb to the west corner |
 | East windows | second floor two pairs of casements (2 x 3 lites) 46 x 44, sill 34, at y 98" and y 222"; first floor a casement pair (2 x 3 lites) 40 x 40, sill 42, at y 160" over the Kitchen sink (photos 3, 13 and 15) | **Jamb to the north corner, and where the wing's north wall meets this wall: the sink sits further south than the model's wing allows** |
 | Wing windows | pairs of casements: east end 48 x 44, 2 x 3 lites (photo 3); south face 48 x 44, 2 x 2 lites (photo 23); sill 30. The north face has no window (MK) | Rough openings |
+| Shed (photo 05, MK: existing, kept) | 20' x 14' outside, 5" walls of vertical boards in the dark brown, its east face 40' west of the main block's west face and its north face 2' south of the house's; an 8:12 gable of dark asphalt shingles, ridge east-west, 12" overhang; on the road side a 30" window, a pair of board doors 72" x 84", a 32" door and another 30" window | **Outside size, distance from the house and the road**, roof pitch, door and window positions |
 | Retaining wall | poured concrete, 10" thick, top 96" above the basement floor, about 10' south of the main block, from 10' past its west face to the wing's corner (photos 2 and 23) | **Distance from the house, height, where it ends west** |
 | Basement double door | 72 x 80 on the wing's south wall, two plain leaves in the stain (photo 2) | Jamb to jamb |
 | Roof pitches | main 6:12, wing 7:12, entry porch 5:12 (photos 3 and 8) | A level and a tape against the rafter or the gable |
