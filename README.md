@@ -706,10 +706,11 @@ with the places where the built design differs from them):
    under the ceiling over the shower and out through the master bath's north wall to a vent hood
    (about 13' with two bends, inside the code's 35' less 5' a bend: M1502.4.5.1, to verify).
 3. **Stair hall.** The old front room, the stair strip and the Bunk over them are one stair hall,
-   13'5" x 10'8", **open through both floors** north of the balcony (a floor opening over x 7 to
-   169, y 7 to 91). The old stair, the front room's walls (the y 99.5 line and the old bath's west
-   wall) and its 80" north window are demolished; upstairs the Bunk's south wall and door, its
-   whole east wall and the old bath's south wall and door go. The new stair (MK, 15 Oct 2026) is
+   13'5" x 10'8", **open through both floors** north of the upstairs Master (a floor opening over x
+   7 to 167.5, y 7 to 97). The old stair, the front room's walls (the y 99.5 line and the old bath's
+   west wall) and its 80" north window are demolished; upstairs the Bunk's door, its whole east
+   wall and the old bath's south wall and door go, and the Bunk's south wall stays as the Master's
+   north wall. The new stair (MK, 15 Oct 2026) is
    **a step up to a landing, then one straight run up the north wall** with no second turn: 15
    risers of 7.2" on 10 3/8" treads, one staircase (the "Grand stair") in **thick pine treads**
    (2", the floors' whitewashed pine) with a 1" nosing over white risers, box newels and a round
@@ -718,14 +719,21 @@ with the places where the built design differs from them):
    - a **landing** in the north-west corner, a step higher, where you turn east;
    - a run of 12 risers **straight east along the north wall**, railed on its open side, arriving
      at x 167.5, just short of the hall's east wall;
-   - a **top landing** upstairs where the old bath was, part of the upstairs hall (pine), with the
-     guard round the opening's east edge and along the **balcony** (y 91 to 135), which leads to the
-     upstairs bedroom's door and east into the upstairs hall;
+   - a **top landing** upstairs where the old bath was (pine), 3'8" x 10'8", with a guard along
+     the opening's east edge; **no upstairs hall** (MK, 15 Oct 2026): the landing is all there is,
+     with a door to each room, the bath's (east), the Master's (west) and the Guest's (south);
    - the space under the high end of the run is left open (the coat closet that stood under the
      old landing went with it).
    - a **peeled log post**, 14" across, pale and barkless, stands in the hall on the line of the old
-     wall between the front room and the Living, under the balcony's header, from the floor to the
-     ceiling, with a 6x6 on a footing under it in the basement.
+     wall between the front room and the Living, under the stair hall's header, from the floor to
+     the ceiling, with a 6x6 on a footing under it in the basement.
+
+   Upstairs the rooms take the old hall: the **Master** takes the balcony (its north wall, solid,
+   on the stair hall's edge), 13'6" x 17'2"; the **Guest** takes the Office as an alcove (an L,
+   11'5" across, 19'5" long on its east side, with the Office's transom). The old walls between
+   them carried the ceiling joists, so a flush beam in the ceiling on each of their lines picks
+   them up, down the Master/Guest partition and the Kitchen/Living wall below to a 6x6 on a footing
+   in the basement under each (placeholders for the engineer).
 
    The house door (32", green) is in the west wall in the middle of the old stair strip, in line
    with the foyer's front door, and a new 32" cased opening at the strip's east end leads straight
@@ -768,8 +776,8 @@ with the places where the built design differs from them):
 7. **Upstairs bath** (MK: a full bath with a stall shower in the north-east): east of the stair's
    top landing, across the Office's north end, 7'4" x 5'3", the old bath's east wall its west wall:
    the WC under the north window, a 36" x 36" stall shower in the north-east corner and a 48"
-   vanity on its south wall (placeholders), and a 28" door from the hall. The Office keeps 7'4" x
-   6'3" south of it, with its transom.
+   vanity on its south wall (placeholders), and a 28" door from the stair's top landing. South of
+   it the old Office is now the Guest room's alcove, with its transom.
 8. **The Adirondack entry: foyer and screen porch** on the west face in place of the entry porch
    (MK: "thoroughly Adirondack", with the ends of exposed beams showing at the entry;
    `docs/history/PLAN-v10-adirondack.md`). An enclosed foyer (7'10" x 8') with the 36" front door
@@ -822,7 +830,7 @@ with the places where the built design differs from them):
 10. **Alarms** (the wood stove brings carbon monoxide alarms; R314 and R315, to verify against the
     2025 RCNYS): a smoke alarm in each bedroom (the master bedroom, the upstairs Master and Guest)
     and in the basement, and a combination smoke and CO alarm outside the sleeping areas on each
-    floor (by the master bedroom's door in the kitchen, on the upstairs balcony) and in the Living
+    floor (by the master bedroom's door in the kitchen, on the stair's top landing upstairs) and in the Living
     with the stove. The code asks for alarms hard-wired and interconnected in new work, with
     exceptions in alterations; which apply here is for the electrician and the inspector.
 11. **Retaining wall carried west** (MK, after the site sketch): from today's free end about 20'
@@ -832,8 +840,8 @@ with the places where the built design differs from them):
     left out of what the 3D view frames and shadows, so the house keeps its size on screen.
 12. **Floors** (MK, 15 Oct 2026): **6" pine, face-nailed** with old square cut nails, whitewashed
     so it reads white and not yellow, through the **whole first floor** (the hall, the Living, the
-    kitchen, the foyer, the pantry, the laundry and the master bedroom) and the **upstairs hall**
-    with the stair's top landing and the balcony; **tile** in the bathrooms (the powder room, the
+    kitchen, the foyer, the pantry, the laundry and the master bedroom) and on the stair's **top
+    landing** upstairs; **tile** in the bathrooms (the powder room, the
     master bath and the upstairs bath); **oatmeal carpet** in the upstairs bedrooms and the master
     closet. The screen porch keeps its outdoor boards. Rooms kept from today carry their new floor
     as a proposed floor, so the Existing view still shows today's floors.
@@ -869,9 +877,11 @@ the engineer, the trades and the tape measure):
   Floor, **Draw as: new**, the Box tool (`B`, `24' x 26'`, Enter).
 
 **The engineer** (the tool draws and checks the load path; it sizes nothing)
-- Size the balcony header (y 92.75), the kitchen beam (y 99.5), the studs in the partition under
-  their ends, the basement post (two 6x6s) and its 24" x 12" footing. The checks find nothing
-  missing in that load path.
+- Size the stair hall's header and the kitchen beam (both on y 99.5), the studs in the partition
+  under their shared end, the basement post (two 6x6s) and its 24" x 12" footing; the 6x6 and
+  footing under the peeled log post; and upstairs the two ceiling beams on the Master's and the
+  Guest's old north walls' lines (y 137.5 and y 152.5), with a 6x6 and footing in the basement
+  under each inner end. The checks find nothing missing in that load path.
 - Confirm the y 99.5 wall was the bearing wall (the tool infers it: the joists would span 25'-8"
   without it) and that the Bunk's south wall upstairs carried no more than itself (the attic joists
   span 11'-2" without it). Survey the basement under the post.

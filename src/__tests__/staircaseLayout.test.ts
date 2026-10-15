@@ -67,11 +67,13 @@ describe("the starter's Grand stair", () => {
     expect(layout.wallsThrough).toEqual([]);
   });
 
-  it('dresses the balcony guard in its style, reaching on to its top newel with no post of its own beside it', () => {
+  it('dresses the landing\'s guard in its style, reaching on to its top newel with no post of its own beside it', () => {
     const fo = Object.values(starter.levels[s].floorOpenings)[0];
     const g = getFloorOpeningLayout(starter, s, fo.id, 'proposed')!;
     expect(g.style).toEqual({ treadColor: '#d8d0c2', paintColor: '#f1efe8' });
-    expect(g.rail.length).toBe(2);
+    // One run of guard, up the opening's east edge beside the landing (the Master's north wall
+    // carries the south edge).
+    expect(g.rail.length).toBe(1);
     // The guard's posts are box newels; none stands within a newel's width of the stair's top newel.
     const posts = g.railing.filter((b) => Math.abs(b.poly[0].x - b.poly[1].x) + Math.abs(b.poly[0].y - b.poly[1].y) > 5);
     expect(posts.length).toBeGreaterThan(0);

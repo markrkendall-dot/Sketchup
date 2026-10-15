@@ -1840,7 +1840,10 @@ one-riser bottom step 10 3/8" deep, a one-riser landing in the north-west corner
 run of 12 east along the north wall to x 167.5; 15 risers of 108 / 15 on 10 3/8" treads, railed on
 the run's open side, cutting nothing, in 2" whitewashed pine treads) under the Second Floor's floor
 opening (floor opening ids `s-h1` ...), its guard opening where the run arrives, the old upstairs
-bath its top landing; a 14" peeled log post under the balcony header (a 6x6 on a footing under it); the north band's walls, placed where they
+bath its top landing; no upstairs hall (the Master takes the balcony, its north wall the Bunk's old
+south wall on the opening's edge; the Guest takes the Office; a flush ceiling beam on each of their
+old north walls' lines, with a basement post under each inner end); a 14" peeled log post under
+the stair hall's header (a 6x6 on a footing under it); the north band's walls, placed where they
 meet the old walls outside the old openings (the band's wall at y 51.5 touches the old bath door's
 jamb, its divider at x 261.5 clears the old bath window), so nothing of the existing house moves;
 the laundry closet in the master bath; the stove's boxes on the First Floor; and, routed outside
