@@ -1829,11 +1829,17 @@ Utility's pine paneling on a wood floor. The Second Floor's rooms and the propos
 (`PLACEHOLDER_ROOM`, `PLACEHOLDER_WET`: off-white paint, wood boards, tile in the baths and the foyer) until the
 owner chooses; the basement has none.
 
-The proposed kitchen (docs/history/PLAN-v5-kitchen.md, with the east run of PLAN-v6-layout.md) is
-placed through `fixture()`, which throws when the store refuses one; fixture ids are renamed like the
-rest (`f-c1` ...). `example.test.ts` checks that every new fixture lies inside its room's face in the
-proposed view, overlaps no wall footprint and shares no space with another fixture (plan and height),
-and that `counterRuns` gives the island one 66 x 37 top and the east run's three bases one each.
+The proposed kitchen (docs/history/PLAN-v11-kitchen-north.md: the range on the pantry's wall, the
+refrigerator on the east wall, the island moved north, a table by the lake window) is placed through
+`fixture()`, which throws when the store refuses one; fixture ids are renamed like the rest (`f-c1`
+...). `example.test.ts` checks that every new fixture lies inside its room's face in the proposed
+view, overlaps no wall footprint and shares no space with another fixture (plan and height), and that
+`counterRuns` gives the island one 62 x 26 top and the north run's two bases one each.
+
+The powder room under the stair's high end is three partitions with a `heightOverride` each, read from
+the run's framed underside (`getStaircaseLayout(...).undersides`, floored to 1/4") so none rises into it;
+the staircase layout closes the gap over each with a panel, and the script throws if `wallsThrough` is
+not empty. Its door is 24" x 76", the height the underside leaves.
 
 The proposed layout of PLAN-v6-layout.md, with MK's stair of 15 Oct 2026: the stair hall's stair (a
 one-riser bottom step 10 3/8" deep, a one-riser landing in the north-west corner, then one straight

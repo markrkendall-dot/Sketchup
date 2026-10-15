@@ -680,7 +680,8 @@ The starter also holds the owner's proposed design (his briefs of 12 and 14 Oct 
 *new* and *demolish* work on the house as it stands (the second half of `scripts/example-plan.ts`,
 `proposed()`; the plans are `docs/history/PLAN-v4-proposed.md`, `docs/history/PLAN-v5-kitchen.md`
 for the island, `docs/history/PLAN-v6-layout.md` for the stair hall, the north band, the stove
-and the upstairs bath, and `docs/history/PLAN-v7-exterior-flue.md` for the stove's flue outside,
+and the upstairs bath, `docs/history/PLAN-v7-exterior-flue.md` for the stove's flue outside, and
+`docs/history/PLAN-v11-kitchen-north.md` for the powder room under the stair and the kitchen around the island,
 with the places where the built design differs from them):
 
 1. **Master suite.** The east wing grows north to the road corner at the same depth: one
@@ -722,8 +723,14 @@ with the places where the built design differs from them):
    - a **top landing** upstairs where the old bath was (pine), 3'8" x 10'8", with a guard along
      the opening's east edge; **no upstairs hall** (MK, 15 Oct 2026): the landing is all there is,
      with a door to each room, the bath's (east), the Master's (west) and the Guest's (south);
-   - the space under the high end of the run is left open (the coat closet that stood under the
-     old landing went with it).
+   - the **powder room** under the high end of the run (MK, 15 Oct 2026), 5'3 1/2" x 3'1": its
+     walls stand under the stair, each no higher than the stair's underside over it (47 1/2" at the
+     west end, 77" where the door is), and the stair's framing closes the gap above them. The door,
+     from the hall at the top of the run, is **24" x 76"**: the underside is about 6'5" there, so a
+     6'8" door does not fit. The WC stands against the west wall facing east, so you sit where the
+     ceiling is low (4'3" to 5'10" over it); a narrow 18" x 12" vanity is on the east wall, where it is
+     7'3" to 7'11" (placeholders). The run west of it stays open underneath (the coat closet that
+     stood under the old landing went with it).
    - a **peeled log post**, 14" across, pale and barkless, stands in the hall on the line of the old
      wall between the front room and the Living, under the stair hall's header, from the floor to
      the ceiling, with a 6x6 on a footing under it in the basement.
@@ -741,26 +748,34 @@ with the places where the built design differs from them):
    pair upstairs in the north wall over the top of the run and one in the upstairs west wall. The hall is
    **open to the Living** (MK): no wall on the strip's south side, as today (photo 16).
 4. **North band** (MK: the kitchen stops short of the north wall): a 4' band along the north wall
-   east of the stair hall holds the **powder room** (7'2" x 4', a 30" vanity and a WC as
-   placeholders, a 28" door from the kitchen and a small window) and, in the north-east corner, a
-   **walk-in pantry** (3'11" x 4', shelves on two walls, a 24" door). The band's wall crosses the
-   old bath's west wall across its door; the door keeps its place in the house as it stands, since
-   a new wall does not split a demolished one.
-5. **Kitchen**, 11'6" x 20'8", south of the band, the old bath included. All of its casework is
-   new; today's cabinets and the bath's fixtures (photos 13 to 22) are demolished:
-   - the **island** with its fronts facing north, so whoever is at the sink faces the lake: a 24"
-     dishwasher and a 36" sink cabinet under one top 66" x 37" with a 12" seating ledge on the lake
-     side and **two stools** tucked 6" under it; 36" walkways at both ends, 60" from the ledge to the lake wall;
-   - on the east wall (shared with the master suite), north to south: a 24" base by the pantry,
-     the **refrigerator** (a wall cabinet over it), a 24" base, the **range** with its hood (an 8"
-     duct east through the wall and along the master bedroom's ceiling in a soffit, 86" to 94", to
-     a wall cap over the bedroom's east window, about 13'; no roof penetration) and a 30" base, wall cabinets over the bases;
-   - the **work triangle**, centre to centre: refrigerator to sink about 10'9", sink to range
-     about 6'7", range to refrigerator 4'9", about 22' in all.
+   east of the stair hall, all of it a **walk-in pantry** (11'6" x 4'; MK, 15 Oct 2026: the powder
+   room went under the stair), with 12" shelves on its north wall and both end walls and a 24" door
+   from the kitchen's north-west corner. The band's wall is the kitchen's north wall, with the range
+   on it. It crosses the old bath's west wall across its door; the door keeps its place in the house
+   as it stands, since a new wall does not split a demolished one.
+5. **Kitchen**, 11'6" x 20'8", south of the band, the old bath included (MK, 15 Oct 2026). All of
+   its casework is new; today's cabinets and the bath's fixtures (photos 13 to 22) are demolished:
+   - on the **north wall** (the pantry's), from the pantry door east: a 15" base, the **range**
+     with its hood and a 15" base, wall cabinets over the bases. The hood's 8" duct runs straight
+     north through the pantry, across its ceiling over the shelves (86" to 94"), to a wall cap on
+     the north face: about 5', no bends, no roof penetration;
+   - the **refrigerator** on the east wall in the north-east corner, 36" wide and counter-depth,
+     2" off the pantry's wall for its hinge, a wall cabinet over it; south of it the east wall is
+     the way to the master bedroom's door;
+   - the **island**, moved north into the work triangle, its fronts facing north so whoever is at
+     the sink faces the lake with the range behind them: a 24" dishwasher and a 36" sink cabinet
+     under one top 62" x 26", no seating ledge; a 48" work aisle to the range, 38" walkways at
+     both ends;
+   - a **table** by the lake window, 36" x 60", centred on it, with four chairs (six with chairs at
+     the ends): 45" from the island to its chairs, 39" past its east end to the bedroom door;
+   - the **work triangle**, centre to centre: range to refrigerator about 3'9", refrigerator to
+     sink about 6'7", sink to range about 6'2", about 16'8" in all. The first leg is a little under
+     the usual 4': the pantry door, which has to stay east of the old bath wall's line, pins the
+     run's west end.
 
-   The kitchen's north-west corner is the way in from the hall, with the powder room's and the
-   pantry's doors. The cabinet colour, the counter colour and the fronts are the First Floor's
-   casework defaults: change them in the Level panel, or per cabinet in its panel.
+   The kitchen's north-west corner is the way in from the hall, with the pantry's door. The cabinet
+   colour, the counter colour and the fronts are the First Floor's casework defaults: change them
+   in the Level panel, or per cabinet in its panel.
 6. **Wood stove** (MK) in the Living's **south-west corner**, its back to the west wall, facing east
    into the room: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it,
    clear of the west window and beside the lake window's west end. Its flue runs **outside the
@@ -900,10 +915,19 @@ the engineer, the trades and the tape measure):
   `docs/history/PLAN-v7-exterior-flue.md`.
 - The alarms: hard-wired and interconnected or not (exceptions in alterations), for the electrician
   and the inspector.
-- The upstairs bath's pipes come down through the powder room under it (the old chase in the front
+- The upstairs bath's pipes come down through the pantry under it (the old chase in the front
   room is gone with the stove): their route is for the plumber.
 - The dryer vent's and the hood duct's products (a 4" rigid duct and a vent hood with a damper; an
-  8" duct, the hood maker's size, and a wall cap) and the soffit over the master bedroom.
+  8" duct, the hood maker's size, and a wall cap 4' under the upstairs bath window, against the
+  code's 3' from openings, M1504.3). A hood over 400 cfm needs makeup air (M1503.6): pick the hood
+  with that in mind. Verify both against the 2025 RCNYS.
+- The powder room's exhaust fan (it has no window): out through the north wall, its duct under
+  the stair.
+
+**The inspector**
+- The powder room under the stair: its ceiling slopes from about 4'3" to 7'11", against the code's
+  ceiling height for bathrooms (R305.1, with the exception for the space over fixtures, which only
+  have to be usable); and its 24" x 76" door. Ask before framing it.
 
 **The tape measure** (before ordering anything)
 - Every new size is from the plan, not measured.
