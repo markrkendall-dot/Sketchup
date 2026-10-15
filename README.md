@@ -423,11 +423,12 @@ the gable roof with deep open eaves and rafter tails under rusting corrugated me
 with its own gable, the screened entry porch with its knee walls and west-facing gable, the chimney
 stained like the house with its cap and spark arrestor, shingle below and clapboard above, the
 casement and picture windows, the green shutters, and the walkout basement on the lake side, grey
-block with vertical boards round its double door. It is a **starter, not a survey**. Both floors'
+block with vertical boards round its double door, and the yard: Mick Road, the gravel pull-off
+where the cars park, the porch's step and the split-rail fence along the retaining wall. It is a **starter, not a survey**. Both floors'
 interiors come from the owner's tape and sketches (face to face): the First Floor's rooms, 5"
 partitions and stair, and the Second Floor's rooms and partitions. The exterior
 wall thickness (7") and the outside size are derived from those measurements. Everything else (the
-basement, the windows, the roofs, the porch, the terrain) is an estimate from the photos, and every
+basement, the windows, the roofs, the porch, the terrain, the yard) is an estimate from the photos, and every
 room name that depends on one says "(est.)" or "not measured". A room name that says "adjusted"
 is a measurement that disagreed with a neighbour and was changed to make the house close (see
 below). The plan's name says so too.
@@ -620,6 +621,11 @@ from the main block's outside corners (north-west corner = 0, 0).
 | North windows | first floor three casements (2 x 3 lites) 80 x 56 at x 96", sill 30, west of the chimney, and two single panes 48 x 44 at x 234", sill 42 (the Bath's, over the washer and dryer, its sill just above the wainscot, photo 22); second floor two casements (2 x 3 lites) 46 x 44, sill 36, at x 78" and x 248" (was x 240", moved east so it clears the Bath's east wall and sits in the Office; its west jamb is 2" from that wall's face) (photos 6 and 7) | Jamb to the west corner |
 | East windows | second floor two pairs of casements (2 x 3 lites) 46 x 44, sill 34, at y 98" and y 222"; first floor a casement pair (2 x 3 lites) 40 x 40, sill 42, at y 160" over the Kitchen sink (photos 3, 13 and 15) | **Jamb to the north corner, and where the wing's north wall meets this wall: the sink sits further south than the model's wing allows** |
 | Wing windows | pairs of casements: east end 48 x 44, 2 x 3 lites (photo 3); south face 48 x 44, 2 x 2 lites (photo 23); sill 30. The north face has no window (MK) | Rough openings |
+| Mick Road | asphalt, 18' wide, its near edge 12' north of the north face (site sketch; a car parks between, photo 07), drawn from 100' west to 75' east of the house | **Distance from the north face to the road's edge**, road width |
+| Gravel pull-off | from 18' west of the west face (past the porch, photo 05) to 25' east of it (near the north-east corner, photo 04), from the road to 2' short of the north face | Its corners from the house's north-west corner |
+| Gravel strip, lake face | 12" wide, 12" out from the south face, x 6" to 300" (photo 01) | Width, distance from the wall, where it ends |
+| Porch step | a concrete pad 4' x 2'6" at the porch's screen door and two flagstones 20" x 16" south of it (photos 07 and 08); demolished in the proposed design (the foyer and its stoop) | Pad size, stone sizes and places |
+| Split-rail fence | two rails, posts 42" high and at most 10' apart, a foot inside the retaining wall's top: from the house down the wall's return, along its angled and straight pieces, then on west across the lawn to 58' west of the house (photos 01, 05, 07 and 24) | **Where it ends west**, post height and spacing |
 | Retaining wall | poured concrete, 10" thick, top 96" above the basement floor, about 10' south of the main block, from 10' past its west face to the wing's corner (photos 2 and 23) | **Distance from the house, height, where it ends west** |
 | Basement double door | 72 x 80 on the wing's south wall, two plain leaves in the stain (photo 2) | Jamb to jamb |
 | Roof pitches | main 6:12, wing 7:12, entry porch 5:12 (photos 3 and 8) | A level and a tape against the rafter or the gable |

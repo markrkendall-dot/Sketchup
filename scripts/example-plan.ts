@@ -9,13 +9,13 @@
 // First Floor interior is the owner's tape measurements (face to face), set out from the inside faces.
 import { getLevelElevations } from '../src/derive/levels';
 import { roofBearing, roofHeightAt } from '../src/derive/roofs';
-import { columnDefaults, groundAt } from '../src/derive/site';
+import { columnDefaults, FENCE_DEFAULTS, groundAt } from '../src/derive/site';
 import { getStaircaseLayout, heightAt } from '../src/derive/staircase';
 import { COLUMN_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
 import { MEMBER_DEFAULTS } from '../src/model/structure';
-import type { Id, Opening, Phase, Plan, Roof, Room, Vec2 } from '../src/model/types';
+import type { Id, Opening, Phase, Plan, Roof, Room, SiteSurface, Vec2 } from '../src/model/types';
 import { getPlan, usePlanStore, type NewDeck, type NewFixture, type NewStairs } from '../src/store/planStore';
 
 const ft = (feet: number): number => feet * 12;
@@ -46,6 +46,33 @@ const WING = { x0: MAIN.x1, x1: MAIN.x1 + UTILITY.w + T, y0: MAIN.y1 - UTILITY.d
 // Shingled knee walls with screens above them in all four bays, a screen door in line with the house
 // door, and its own gable facing west.
 const PORCH = { x0: -66, x1: MAIN.x0, y0: MAIN.y0, y1: ft(8) };
+/**
+ * The yard, all estimates (README, "What to replace with measurements"). Mick Road: asphalt, 18' wide,
+ * its near edge 12' north of the north face (the site sketch, photo 10; a car parks between the two,
+ * photo 07). The gravel pull-off: from 18' west of the west face (past the porch, photo 05) east to
+ * near the north-east corner (photo 04), from the road to 2' short of the house. The porch entry's
+ * concrete pad, 4' x 2'6", and two flagstones south of it on the lawn (photos 07 and 08). A gravel
+ * strip a foot wide along the lake face, a foot out from it (photo 01). The fence: two rails (photo
+ * 01) a foot inside the retaining wall's top, from the house down its return, along its angled and
+ * straight pieces, then on west across the lawn (photos 05, 07 and 24) to about 58' west of the house.
+ */
+const YARD = {
+  road: { x0: -ft(100), x1: ft(75), y0: -ft(30), y1: -ft(12) },
+  pullOff: { x0: -ft(18), x1: ft(25), y0: -ft(12), y1: -ft(2) },
+  pad: { x0: -96, x1: -66, y0: 24, y1: 72 },
+  stones: [
+    { x0: -98, x1: -78, y0: 96, y1: 112 },
+    { x0: -104, x1: -84, y0: 126, y1: 142 },
+  ],
+  dripStrip: { x0: 6, x1: 300, y0: ft(26) + 3 + 12, y1: ft(26) + 3 + 24 },
+  fence: [
+    { x: 302, y: ft(26) + 3 + 8 },
+    { x: 302, y: 423 },
+    { x: 56, y: 477 },
+    { x: -388, y: 477 },
+    { x: -ft(58), y: 477 },
+  ],
+};
 /** The house door and the porch entry share this line (photo 08). */
 const ENTRY_Y = ft(4);
 
@@ -328,6 +355,8 @@ function stableIds(plan: Plan): string {
   });
   Object.keys(plan.site.gradePoints).forEach((id, i) => add(id, `grade-${i + 1}`));
   Object.keys(plan.site.columns).forEach((id, i) => add(id, `column-${i + 1}`));
+  Object.keys(plan.site.surfaces).forEach((id, i) => add(id, `surface-${i + 1}`));
+  Object.keys(plan.site.fences).forEach((id, i) => add(id, `fence-${i + 1}`));
   let text = JSON.stringify({ ...plan, modifiedAt: '2026-01-01T00:00:00.000Z' }, null, 2);
   // Quoted ids only (as keys and as values); ids are 10 random characters, never a plain word.
   for (const [old, name] of names) text = text.split(`"${old}"`).join(`"${name}"`);
@@ -621,6 +650,22 @@ export function buildExamplePlan(): Plan {
   const chimney = store().addColumn({ at: chimneyAt, kind: 'chimney', phase: PHASE, ...chimneyHeights(), depth: 20, color: FINISH_COLOR, cap: true });
   if (!chimney) throw new Error('chimney rejected');
 
+  // ---- The yard (photos 01, 04, 05, 07, 08 and 24; the site sketch, photo 10). All estimates (YARD):
+  // Mick Road, asphalt, along the north side; the gravel pull-off between it and the north face, where
+  // the cars park; a concrete pad at the porch's entry with two flagstones south of it; a gravel strip
+  // along the lake face; and the two-rail split-rail fence along the top of the retaining wall, from the
+  // house down its return and west past its free end across the west lawn.
+  const surface = (outline: Vec2[], material: SiteSurface['material']) => {
+    if (!store().addSurface({ outline, material, phase: PHASE })) throw new Error(`${material} at ${JSON.stringify(outline[0])} rejected`);
+  };
+  surface(outline(YARD.road), 'asphalt');
+  surface(outline(YARD.pullOff), 'gravel');
+  surface(outline(YARD.pad), 'concrete');
+  for (const r of YARD.stones) surface(outline(r), 'stone');
+  surface(outline(YARD.dripStrip), 'gravel');
+  const { height, rails, postSpacing } = FENCE_DEFAULTS;
+  if (!store().addFence({ points: YARD.fence, height, rails, postSpacing, phase: PHASE })) throw new Error('fence rejected');
+
   // ---- Fixtures as they are (photos 13 to 22; sizes are estimates). The Kitchen, inside x 173..311,
   // y 102..308: knotty pine plank fronts, a light laminate counter.
   store().updateFinishes(fId, { cabinetColor: PINE, counterColor: LAMINATE, frontStyle: 'slab' });
@@ -853,6 +898,9 @@ function proposed(ids: ExistingIds): void {
   });
   // The site: the masonry chimney on the north wall (MK: a stainless flue serves the new stove).
   store().setPhase(fId, { walls: [], openings: [], columns: [ids.chimney] }, 'demo');
+  // The porch entry's concrete pad and the flagstones south of it give way to the foyer and its stoop.
+  const porchStep = Object.values(getPlan().site.surfaces).filter((x) => x.material === 'concrete' || x.material === 'stone');
+  store().setPhase(fId, { walls: [], openings: [], surfaces: porchStep.map((x) => x.id) }, 'demo');
   if (getPlan().site.columns[ids.chimney].phase !== 'demo') throw new Error('the chimney was not marked');
 
   // ---- 1. East addition: the wing grows north to the road corner at the same depth, one wing down

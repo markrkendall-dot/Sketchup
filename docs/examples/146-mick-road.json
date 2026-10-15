@@ -5267,8 +5267,177 @@
         "id": "column-9"
       }
     },
-    "surfaces": {},
-    "fences": {}
+    "surfaces": {
+      "surface-1": {
+        "outline": [
+          {
+            "x": -1200,
+            "y": -360
+          },
+          {
+            "x": 900,
+            "y": -360
+          },
+          {
+            "x": 900,
+            "y": -144
+          },
+          {
+            "x": -1200,
+            "y": -144
+          }
+        ],
+        "material": "asphalt",
+        "phase": "existing",
+        "id": "surface-1"
+      },
+      "surface-2": {
+        "outline": [
+          {
+            "x": -216,
+            "y": -144
+          },
+          {
+            "x": 300,
+            "y": -144
+          },
+          {
+            "x": 300,
+            "y": -24
+          },
+          {
+            "x": -216,
+            "y": -24
+          }
+        ],
+        "material": "gravel",
+        "phase": "existing",
+        "id": "surface-2"
+      },
+      "surface-3": {
+        "outline": [
+          {
+            "x": -96,
+            "y": 24
+          },
+          {
+            "x": -66,
+            "y": 24
+          },
+          {
+            "x": -66,
+            "y": 72
+          },
+          {
+            "x": -96,
+            "y": 72
+          }
+        ],
+        "material": "concrete",
+        "phase": "demo",
+        "id": "surface-3"
+      },
+      "surface-4": {
+        "outline": [
+          {
+            "x": -98,
+            "y": 96
+          },
+          {
+            "x": -78,
+            "y": 96
+          },
+          {
+            "x": -78,
+            "y": 112
+          },
+          {
+            "x": -98,
+            "y": 112
+          }
+        ],
+        "material": "stone",
+        "phase": "demo",
+        "id": "surface-4"
+      },
+      "surface-5": {
+        "outline": [
+          {
+            "x": -104,
+            "y": 126
+          },
+          {
+            "x": -84,
+            "y": 126
+          },
+          {
+            "x": -84,
+            "y": 142
+          },
+          {
+            "x": -104,
+            "y": 142
+          }
+        ],
+        "material": "stone",
+        "phase": "demo",
+        "id": "surface-5"
+      },
+      "surface-6": {
+        "outline": [
+          {
+            "x": 6,
+            "y": 327
+          },
+          {
+            "x": 300,
+            "y": 327
+          },
+          {
+            "x": 300,
+            "y": 339
+          },
+          {
+            "x": 6,
+            "y": 339
+          }
+        ],
+        "material": "gravel",
+        "phase": "existing",
+        "id": "surface-6"
+      }
+    },
+    "fences": {
+      "fence-1": {
+        "points": [
+          {
+            "x": 302,
+            "y": 323
+          },
+          {
+            "x": 302,
+            "y": 423
+          },
+          {
+            "x": 56,
+            "y": 477
+          },
+          {
+            "x": -388,
+            "y": 477
+          },
+          {
+            "x": -696,
+            "y": 477
+          }
+        ],
+        "height": 42,
+        "rails": 2,
+        "postSpacing": 120,
+        "phase": "existing",
+        "id": "fence-1"
+      }
+    }
   },
   "modifiedAt": "2026-01-01T00:00:00.000Z",
   "proposedLook": {

@@ -172,7 +172,7 @@ export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColo
 export const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c', flue: '#b9bdc1', pier: '#8a8378' };
 export const columnColorOf = (c: Pick<Column, 'kind' | 'color'>): string => c.color ?? COLUMN_COLOR[c.kind];
 /** Ground surface colours by material: light tan-grey gravel, near-black asphalt, pale concrete, grey-brown flagstone. */
-export const SURFACE_COLOR: Record<SurfaceMaterial, string> = { gravel: '#a39a88', asphalt: '#3d3d3f', concrete: '#b3b0a8', stone: '#8a8378' };
+export const SURFACE_COLOR: Record<SurfaceMaterial, string> = { gravel: '#8d8574', asphalt: '#3d3d3f', concrete: '#b3b0a8', stone: '#8a8378' };
 export const SURFACE_MATERIALS: readonly SurfaceMaterial[] = ['gravel', 'asphalt', 'concrete', 'stone'];
 export const surfaceColorOf = (s: Pick<SiteSurface, 'material' | 'color'>): string => s.color ?? SURFACE_COLOR[s.material];
 /** A split-rail fence: weathered grey wood. */

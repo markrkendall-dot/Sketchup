@@ -710,7 +710,7 @@ geometry with flat normals (`computeVertexNormals`) and UVs in inches (u = plan 
 `color` after the default, geometry), memoized per view mode by the `surfaces` record and the grid object
 (the same array while both are), each surface's geometry kept while its object and the grid are, the
 replaced or dropped ones disposed (`clearSiteCache` disposes all). Colours (`SURFACE_COLOR`,
-`surfaceColorOf` in `model/finish.ts`): gravel `#a39a88`, asphalt `#3d3d3f`, concrete `#b3b0a8`, stone
+`surfaceColorOf` in `model/finish.ts`): gravel `#8d8574`, asphalt `#3d3d3f`, concrete `#b3b0a8`, stone
 `#8a8378`; `color` (`#rrggbb`, lower-cased) overrides it. `view3d/materials.ts surfaceMaterial(material,
 phase, color)`: gravel and asphalt carry a canvas texture drawn in the colour under a white tint
 (`groundTexture.ts surfaceTexture`: a 512 px seeded tile for 48" of ground, `repeat` 1/48; gravel is the
@@ -1805,6 +1805,12 @@ stained, capped. The script's `addOpeningAt` throws when the store moves an open
 jamb past a corner or a partition's face), so every number in it is where the opening is, and
 `example.test.ts` checks that no two surrounds (trim, sill, shutters) on one wall line overlap, which
 would z-fight; the porch's openings have no trim, since its posts are only 3.5" wide.
+
+The yard (`YARD`, all estimates) is site surfaces and a fence through the store: Mick Road
+(asphalt), the gravel pull-off between it and the north face, the porch entry's concrete pad and two
+flagstones (demolished in the proposed design, under the foyer and its stoop), a gravel strip along
+the lake face, and a two-rail split-rail fence a foot inside the retaining wall's top, carried west
+across the lawn. Surface and fence ids are renamed `surface-1` ... and `fence-1`.
 
 The First Floor's rooms carry their interior finishes from the photos (the Utility's from the owner) through
 `label()`'s finishes: the Kitchen's blue check wallpaper and beige tile, the Living's cream boards and the front

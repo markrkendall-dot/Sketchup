@@ -12,7 +12,7 @@ import { shutterWidth, SILL_THICKNESS } from '../derive/openings3d';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { roofBearing, roofExtremes, roofHeightAt } from '../derive/roofs';
 import { faceAt, getFaces } from '../derive/rooms';
-import { groundAt } from '../derive/site';
+import { fenceLayout, groundAt } from '../derive/site';
 import { flightSteps, floorToFloor, stairsBase, stairsRise } from '../derive/stairs';
 import { normalize, perpLeft, pointInPolygon, polygonSignedArea, sub } from '../model/geometry';
 import { counterRuns, fixtureOutline } from '../derive/casework';
@@ -275,6 +275,32 @@ describe('docs/examples/146-mick-road.json', () => {
     expect([...dressedRooms].sort()).toEqual(['Bath', 'Front', 'Kitchen', 'Living', 'Utility']);
     // The shelves stay under the windows' 30" sills.
     expect(inUtility.filter((x) => x.label === 'Open shelves').every((x) => x.height < 30)).toBe(true);
+  });
+
+  it('has the yard: Mick Road, the gravel pull-off and strip, the porch step and the split-rail fence', () => {
+    const surfaces = Object.values(plan.site.surfaces);
+    const box = (o: Vec2[]) => [Math.min(...o.map((p) => p.x)), Math.min(...o.map((p) => p.y)), Math.max(...o.map((p) => p.x)), Math.max(...o.map((p) => p.y))];
+    expect(surfaces.map((x) => [x.material, x.phase, box(x.outline)])).toEqual([
+      // Mick Road, 18' wide, 12' north of the north face; the pull-off between it and the house.
+      ['asphalt', 'existing', [-1200, -360, 900, -144]],
+      ['gravel', 'existing', [-216, -144, 300, -24]],
+      // The porch entry's pad and two flagstones, demolished for the proposed foyer and its stoop.
+      ['concrete', 'demo', [-96, 24, -66, 72]],
+      ['stone', 'demo', [-98, 96, -78, 112]],
+      ['stone', 'demo', [-104, 126, -84, 142]],
+      // The strip along the lake face.
+      ['gravel', 'existing', [6, 327, 300, 339]],
+    ]);
+    // Nothing paved runs under the house or the chimney.
+    for (const x of surfaces) for (const p of x.outline) expect(p.y < -20 || p.x <= -66 || p.y > 315).toBe(true);
+    // The fence: two rails, a foot inside the retaining wall's top, every post standing on the ground
+    // and none more than 10' from the next.
+    const fences = Object.values(plan.site.fences);
+    expect(fences.map((f) => [f.height, f.rails, f.postSpacing, f.phase, f.points.length])).toEqual([[42, 2, 120, 'existing', 5]]);
+    const layout = fenceLayout(fences[0], (p) => groundAt(plan, p));
+    for (let i = 1; i < layout.posts.length; i++) expect(Math.hypot(layout.posts[i].at.x - layout.posts[i - 1].at.x, layout.posts[i].at.y - layout.posts[i - 1].at.y)).toBeLessThanOrEqual(120 + 1e-6);
+    // On the terrace (-6) along the retaining wall.
+    for (const p of fences[0].points.slice(1, 4)) expect(groundAt(plan, p)).toBeCloseTo(-6, 0);
   });
 
   it('has the roofs, columns, windows, doors and terrain of the house', () => {
