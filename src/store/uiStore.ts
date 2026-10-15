@@ -278,7 +278,6 @@ export interface ContextMenu {
 
 /** localStorage keys of the editor preferences that are not plan data (so not undoable). */
 export const ORTHO_LOCK_KEY = 'homeplan:orthoLock';
-export const FURNITURE_KEY = 'homeplan:showFurniture';
 export const MEASURE_TO_KEY = 'homeplan:measureTo';
 const MEASURE_TO_VALUES: readonly MeasureTo[] = ['center', 'inside', 'outside'];
 
@@ -300,11 +299,6 @@ function writePref(key: string, value: string): void {
 
 export function loadOrthoLock(): boolean {
   return readPref(ORTHO_LOCK_KEY) !== 'false';
-}
-
-/** The furniture layer: on unless turned off (the choice lasts across sessions). */
-export function loadShowFurniture(): boolean {
-  return readPref(FURNITURE_KEY) !== 'false';
 }
 
 export function loadMeasureTo(): MeasureTo {
@@ -356,7 +350,7 @@ export interface UiState {
   showStructure: boolean;
   /**
    * The furniture layer (Shift+F; DESIGN.md "Furniture"): furniture pieces on the plan, in 3D and
-   * in the exports. A view preference kept across sessions, not plan data.
+   * in the exports. A view setting, not plan data; off at every load (MK).
    */
   showFurniture: boolean;
   spaceHeld: boolean;
@@ -520,9 +514,8 @@ const keptDraft = (d: Draft): Pick<Draft, 'fixtureKind' | 'fixtureDirection' | '
   furnitureFabric: d.furnitureFabric,
 });
 
-/** The furniture layer on or off, remembered for the next session. */
+/** The furniture layer on or off. */
 function showFurnitureState(on: boolean): { showFurniture: boolean } {
-  writePref(FURNITURE_KEY, String(on));
   return { showFurniture: on };
 }
 
@@ -551,11 +544,12 @@ export const useUiStore = create<UiState>()((set) => ({
   roomEdit: null,
   showGrid: true,
   nextWallKind: 'exterior',
-  viewMode: 'all',
+  // Each load opens on the proposed design, roofs off, furniture off (MK, 15 Oct 2026).
+  viewMode: 'proposed',
   drawPhase: 'existing',
   showLevelBelow: false,
   showStructure: false,
-  showFurniture: loadShowFurniture(),
+  showFurniture: false,
   spaceHeld: false,
   canvasSize: { width: 0, height: 0 },
   layout: '2d',
@@ -564,7 +558,7 @@ export const useUiStore = create<UiState>()((set) => ({
   hidden3dLevels: [],
   only3dActiveAndBelow: false,
   show3dGrid: true,
-  show3dRoofs: true,
+  show3dRoofs: false,
   fit3dRequest: 0,
   showUnderlay: true,
   underlaySelected: false,

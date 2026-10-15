@@ -964,7 +964,7 @@ along its longest edge).
 line, a rug's border and fringe (dashed), a lamp's shade; the big pieces carry their name
 (`furniturePlanLabel`).
 
-**Layer.** `showFurniture` (UI state, persisted as `homeplan:showFurniture`, default on; Shift+F,
+**Layer.** `showFurniture` (UI state, off at every load like the 3D roofs, the view opening on Proposed (MK); Shift+F,
 the toolbar's and the 3D bar's Furniture buttons, the viewer's Plan tab checkbox) hides every
 piece on the plan (`FixturesLayer`), from picking (`hitTest` opts, `pruneSelection`), in 3D
 (`LevelMeshes`, filtered at render like the roofs, so no cache depends on it), from the plan

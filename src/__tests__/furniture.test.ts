@@ -11,7 +11,7 @@ import { createEmptyPlan, defaultLevelId, fixtureProblem, migrate } from '../mod
 import type { Fixture, FurniturePiece, Id } from '../model/types';
 import { hitTest } from '../editor2d/tools/selectTool';
 import { clearHistory, usePlanStore } from '../store/planStore';
-import { FURNITURE_KEY, loadShowFurniture, useUiStore } from '../store/uiStore';
+import { useUiStore } from '../store/uiStore';
 import { BUFFALO_CHECK, clampWarmth, fabricPixels, paintPixels, PINE_MAX_WARMTH, woodPixels } from '../view3d/proceduralTextures';
 import { PX_PER_INCH, TEXTURE_PX } from '../view3d/textures';
 import { furnitureMaterial, stairPartMaterial } from '../view3d/materials';
@@ -197,21 +197,12 @@ describe('the furniture layer', () => {
     clearMeshCache();
   });
 
-  it('is on by default, toggles, and is remembered', () => {
-    const mem = new Map<string, string>();
-    const ls = globalThis.localStorage;
-    Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => mem.set(k, v) }, configurable: true });
-    try {
-      expect(loadShowFurniture()).toBe(true);
-      useUiStore.getState().toggleFurniture();
-      expect(useUiStore.getState().showFurniture).toBe(false);
-      expect(mem.get(FURNITURE_KEY)).toBe('false');
-      expect(loadShowFurniture()).toBe(false);
-      useUiStore.getState().toggleFurniture();
-      expect(loadShowFurniture()).toBe(true);
-    } finally {
-      Object.defineProperty(globalThis, 'localStorage', { value: ls, configurable: true });
-    }
+  it('toggles, and the Furniture tool turns it on', () => {
+    useUiStore.getState().toggleFurniture();
+    expect(useUiStore.getState().showFurniture).toBe(false);
+    useUiStore.getState().setTool('furniture');
+    expect(useUiStore.getState().showFurniture).toBe(true);
+    useUiStore.getState().setTool('select');
   });
 
   it('hides furniture from picking, the plan export and its frame, and the 3D export when off; a rug is picked after the chair on it', () => {

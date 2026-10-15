@@ -62,6 +62,10 @@ unit tests. `npm run build:example` rebuilds `docs/examples/146-mick-road.json` 
 To see what the tool does before drawing anything, click **Open example** in the toolbar: it
 loads the starter plan of 146 Mick Road, then press the **3D** button.
 
+Every load opens on the **Proposed** view with the **roofs** and the **furniture** off (tick Roofs
+and Furniture in the 3D bar, or press Shift+F for the furniture, to show them); the viewer opens
+the same way.
+
 ## Drawing an existing house
 
 Before you start, measure on paper. Then follow these steps in order.

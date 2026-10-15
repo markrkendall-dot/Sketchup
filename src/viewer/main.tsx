@@ -27,8 +27,9 @@ async function boot(): Promise<void> {
     const ui = useUiStore.getState();
     ui.setActiveLevel(defaultLevelId(plan));
     ui.setLayout('3d');
-    // It opens on the house as it stands, solid in its own finishes; Proposed and All are a tap away.
-    useUiStore.setState({ viewerMode: true, viewMode: 'existing' });
+    // It opens like the editor (MK, 15 Oct 2026): on the proposed design, roofs and furniture off;
+    // Existing and All, the roofs and the furniture are a tap away.
+    useUiStore.setState({ viewerMode: true, viewMode: 'proposed', show3dRoofs: false, showFurniture: false });
     document.title = `${plan.name.replace(/\s*\(.*\)\s*$/, '')} Viewer`;
     createRoot(root).render(
       <StrictMode>
