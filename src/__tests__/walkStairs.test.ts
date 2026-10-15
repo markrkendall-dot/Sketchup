@@ -27,14 +27,14 @@ function walk(start: Vec2, lid: string, ...points: Vec2[]): WalkState {
 }
 
 describe('walking the grand stair', () => {
-  it('climbs from the stair hall to the Second Floor: the platform, flight 1, the landing, flight 2', () => {
-    const end = walk({ x: 25, y: 75 }, f, { x: 25, y: 28 }, { x: 148, y: 28 }, { x: 148, y: 110 });
-    expect(end.at).toEqual({ x: 148, y: 110 });
+  it('climbs from the stair hall to the Second Floor: the step, the landing, the straight run, the top landing', () => {
+    const end = walk({ x: 25, y: 75 }, f, { x: 25, y: 28 }, { x: 190, y: 28 }, { x: 190, y: 110 });
+    expect(end.at).toEqual({ x: 190, y: 110 });
     expect(end.feet).toBeCloseTo(elev[s].floorTop, 6);
     expect(levelAtFeet(plan, levels, end.feet)).toBe(s);
   });
 
-  it('stops at the side of flight 1; stays on the floor under the framed landing', () => {
+  it('stops at the side of the run; stays on the floor under its high end', () => {
     const side = walk({ x: 85, y: 75 }, f, { x: 85, y: 20 });
     expect(side.at.y).toBeGreaterThan(49);
     expect(side.feet).toBe(elev[f].floorTop);

@@ -29,67 +29,48 @@ describe("the starter's Grand stair", () => {
   const [scId] = Object.keys(starter.levels[f].staircases);
   const layout = getStaircaseLayout(starter, f, scId, 'proposed')!;
 
-  it('is framed underneath, with a bullnose, in the default oak and white', () => {
-    expect(layout.members).toEqual(['f-s2', 'f-s3', 'f-s4', 'f-s5']);
-    expect(layout.style).toMatchObject({ underside: 'framed', startStep: 'bullnose', treadColor: '#b5835a', riserColor: '#f1efe8', newel: 'box', handrail: 'round', nosing: 1 });
+  it('is framed underneath, in thick whitewashed pine treads over white risers', () => {
+    expect(layout.members).toEqual(['f-s2', 'f-s3', 'f-s4']);
+    expect(layout.style).toMatchObject({ underside: 'framed', startStep: 'square', treadColor: '#d8d0c2', treadThickness: 2, riserColor: '#f1efe8', newel: 'box', handrail: 'round', nosing: 1 });
     expect(layout.loose).toEqual([]);
+    expect(layout.bullnose).toBeNull();
   });
 
-  it('has three box newels: on the platform, on the landing at the turn, and on the floor above at the top', () => {
+  it('has two box newels: on the landing at the turn, and on the floor above at the top', () => {
     expect(layout.newels.map((n) => [n.at, n.bottom, n.size])).toEqual([
-      [{ x: 40.25, y: 46.25 }, 7.2, 5.5],
-      [{ x: 129.75, y: 46.25 }, 72, 5.5],
-      [{ x: 129.75, y: 93.75 }, 108, 5.5],
+      [{ x: 40.25, y: 46.25 }, 14.4, 5.5],
+      [{ x: 170.25, y: 46.25 }, 108, 5.5],
     ]);
-    // Each stands 4" over the highest rail that dies into it.
-    const R = 108 / 15;
-    const slope = R / 10.5;
-    expect(layout.newels[1].top).toBeCloseTo(72 + R - 2.75 * slope + 36 + 4, 6);
   });
 
-  it('runs two handrails 36" over the nosings, from newel face to newel face, with balusters at most 3 3/4" apart', () => {
+  it('runs one handrail 36" over the nosings up the open side of the run, with balusters at most 3 3/4" apart', () => {
     expect(layout.rails.map((r) => [r.a, r.b])).toEqual([
       [
         { x: 43, y: 46.25 },
-        { x: 127, y: 46.25 },
-      ],
-      [
-        { x: 129.75, y: 49 },
-        { x: 129.75, y: 91 },
+        { x: 167.5, y: 46.25 },
       ],
     ]);
-    // Flight 1's rail at its foot: the first nosing (14.4") plus 36.
-    expect(layout.rails[0].za).toBeCloseTo(108 / 15 + 108 / 15 + 36, 6);
-    // At the top it meets the balcony guard's cap, 36" over the floor above.
-    expect(layout.rails[1].zb).toBeCloseTo(108 + 36, 6);
+    // At its foot: the first nosing (21.6") plus 36; at the top it meets the guard's cap, 36" over the floor above.
+    expect(layout.rails[0].za).toBeCloseTo(3 * (108 / 15) + 36, 6);
+    expect(layout.rails[0].zb).toBeCloseTo(108 + 36, 6);
     const balusters = layout.solids.filter((x) => x.group === 'rail' && x.mat === 'paint' && Math.abs(x.poly[0].x - x.poly[1].x) + Math.abs(x.poly[0].y - x.poly[1].y) < STAIRCASE.baluster + 1e-6);
-    const ys = balusters.filter((b) => Math.abs(b.poly[0].x - 129.75) < 1).map((b) => Math.min(...b.poly.map((p) => p.y))).sort((a, b) => a - b);
-    for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1] - STAIRCASE.baluster).toBeLessThanOrEqual(3.75 + 1e-6);
+    const xs = balusters.filter((b) => Math.abs(b.poly[0].y - 46.25) < 2).map((b) => Math.min(...b.poly.map((p) => p.x))).sort((a, b) => a - b);
+    expect(xs.length).toBeGreaterThan(10);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1] - STAIRCASE.baluster).toBeLessThanOrEqual(3.75 + 1e-6);
   });
 
-  it('leaves room under the landing and the top flight, holds the landing on a post at its free corner, and closes the slope over the closet walls', () => {
-    expect(layout.landingPosts).toEqual([{ x: 128.75, y: 47.25 }]);
-    // Under the landing, over the closet (x 141..168): open from the floor to 61 3/4".
-    expect(solidAt(layout.solids, { x: 155, y: 28 }, 30)).toBe(false);
-    expect(solidAt(layout.solids, { x: 155, y: 28 }, 65)).toBe(true);
-    expect(heightAt(layout.undersides['f-s4']!, { x: 155, y: 28 })).toBeCloseTo(72 - 1 - 9.25, 6);
-    // The closet's walls stand to the underside, and panels close the rest.
+  it('holds the landing on a post at its free corner and leaves the space under the high end of the run open', () => {
+    expect(layout.landingPosts).toEqual([{ x: 41.25, y: 47.25 }]);
+    // Under the run near its top: open from the floor to its underside, about 6'10".
+    expect(solidAt(layout.solids, { x: 150, y: 28 }, 40)).toBe(false);
+    expect(heightAt(layout.undersides['f-s4']!, { x: 150, y: 28 })).toBeGreaterThan(80);
     expect(layout.wallsThrough).toEqual([]);
-    expect(layout.solids.filter((x) => x.group === 'frame').length).toBeGreaterThanOrEqual(3);
-  });
-
-  it('puts a bullnose in front of the platform round the starting newel, its tread past the platform\'s nosing', () => {
-    expect(layout.bullnose).not.toBeNull();
-    const ys = layout.bullnose!.map((p) => p.y);
-    // The platform climbs north from y 49; its nosing reaches y 50; the bullnose's tread starts there.
-    expect(Math.min(...ys)).toBeCloseTo(50, 6);
-    expect(Math.max(...ys)).toBeCloseTo(46.25 + STAIRCASE.bullnose + 1, 1);
   });
 
   it('dresses the balcony guard in its style, reaching on to its top newel with no post of its own beside it', () => {
     const fo = Object.values(starter.levels[s].floorOpenings)[0];
     const g = getFloorOpeningLayout(starter, s, fo.id, 'proposed')!;
-    expect(g.style).toEqual({ treadColor: '#b5835a', paintColor: '#f1efe8' });
+    expect(g.style).toEqual({ treadColor: '#d8d0c2', paintColor: '#f1efe8' });
     expect(g.rail.length).toBe(2);
     // The guard's posts are box newels; none stands within a newel's width of the stair's top newel.
     const posts = g.railing.filter((b) => Math.abs(b.poly[0].x - b.poly[1].x) + Math.abs(b.poly[0].y - b.poly[1].y) > 5);
@@ -97,7 +78,7 @@ describe("the starter's Grand stair", () => {
     for (const p of posts) {
       const cx = p.poly.reduce((t, q) => t + q.x, 0) / 4;
       const cy = p.poly.reduce((t, q) => t + q.y, 0) / 4;
-      expect(Math.hypot(cx - 129.75, cy - 93.75)).toBeGreaterThan(5.5);
+      expect(Math.hypot(cx - 170.25, cy - 46.25)).toBeGreaterThan(5.5);
     }
     const meshes = getFloorOpeningMeshes(starter, s, 'proposed');
     expect(meshes[0].rail).toBeDefined();
@@ -105,7 +86,7 @@ describe("the starter's Grand stair", () => {
 
   it('builds as one staircase mesh in parts, and exports Stairs, Stair framing and Stair railing in its colours', () => {
     const m = getLevelMeshes(starter, f, 'proposed');
-    expect(m.stairs.filter((x) => ['f-s2', 'f-s3', 'f-s4', 'f-s5'].includes(x.id))).toEqual([]);
+    expect(m.stairs.filter((x) => ['f-s2', 'f-s3', 'f-s4'].includes(x.id))).toEqual([]);
     expect(m.staircases).toHaveLength(1);
     expect(m.staircases[0].parts.map((p) => `${p.group} ${p.mat}`).sort()).toEqual(['frame paint', 'rail paint', 'rail tread', 'stair paint', 'stair tread']);
     const root = buildExportScene(starter, 'proposed', { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: f });
@@ -116,7 +97,7 @@ describe("the starter's Grand stair", () => {
     });
     expect([...names.keys()].sort()).toEqual(['Guard', 'Stair framing', 'Stair railing', 'Stairs']);
     // The Proposed view draws new work in its own finish (phase.ts shownPhase).
-    expect([...names.get('Stairs')!].sort()).toEqual(['stair_paint_existing_f1efe8', 'stair_tread_existing_b5835a']);
+    expect([...names.get('Stairs')!].sort()).toEqual(['stair_paint_existing_f1efe8', 'stair_tread_existing_d8d0c2']);
     disposeExportScene(root);
   });
 });

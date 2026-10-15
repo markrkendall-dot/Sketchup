@@ -31,8 +31,8 @@ export interface WallBand {
 }
 /** How a room dresses the faces of the walls round it (DESIGN.md "Interior finishes"). */
 export type RoomWallFinish = 'paint' | 'boards' | 'pine' | 'check';
-/** How a room's floor is dressed: a flat colour, painted boards, square tiles or parquet. */
-export type FloorFinish = 'plain' | 'boards' | 'tile' | 'parquet';
+/** How a room's floor is dressed: a flat colour, painted boards, square tiles, parquet, wide face-nailed pine or carpet. */
+export type FloorFinish = 'plain' | 'boards' | 'tile' | 'parquet' | 'pine' | 'carpet';
 /** A lower band of a room's walls in another finish, up to `height` above the floor top. */
 export interface Wainscot {
   height: Inches;
@@ -118,6 +118,12 @@ export interface Room {
   wainscot?: Wainscot;
   floorFinish?: FloorFinish;
   floorColor?: string;
+  /**
+   * The floor an existing room gets in the proposed design (a new floor laid in a room that is
+   * otherwise kept), shown in the Proposed view in place of floorFinish/floorColor. Absent: the
+   * room keeps its floor. Ignored on a new or demolished room (set their floor directly).
+   */
+  proposedFloor?: { finish: FloorFinish; color?: string };
 }
 
 export interface Stairs {

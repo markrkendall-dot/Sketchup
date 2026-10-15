@@ -592,7 +592,7 @@ const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color', 'bearing', 'band'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
-const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
+const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
@@ -725,6 +725,9 @@ function migrateRooms(raw: Json): Level['rooms'] {
     put(room, 'wainscot', isObject(w) && isNum(w.height) && w.height > 0 && wallFinishOk(w.finish) ? { height: w.height, finish: w.finish, ...(isHexColor(w.color) ? { color: w.color.toLowerCase() } : {}) } : undefined);
     put(room, 'floorFinish', typeof r.floorFinish === 'string' && FLOOR_FINISHES.includes(r.floorFinish as FloorFinish) ? r.floorFinish : undefined);
     put(room, 'floorColor', isHexColor(r.floorColor) ? r.floorColor.toLowerCase() : undefined);
+    const pf = r.proposedFloor;
+    const pfOk = isObject(pf) && typeof pf.finish === 'string' && FLOOR_FINISHES.includes(pf.finish as FloorFinish);
+    put(room, 'proposedFloor', pfOk ? { finish: pf.finish, ...(isHexColor(pf.color) ? { color: pf.color.toLowerCase() } : {}) } : undefined);
     out[rid] = room as unknown as Room;
   }
   return out;

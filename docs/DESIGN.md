@@ -68,13 +68,15 @@ export interface Room {
   // Interior finishes (see "Interior finishes"); absent: the walls and slab show as they are.
   wallFinish?: 'paint' | 'boards' | 'pine' | 'check'; wallColor?: string;
   wainscot?: { height: Inches; finish: 'paint' | 'boards' | 'pine' | 'check'; color?: string };
-  floorFinish?: 'plain' | 'boards' | 'tile' | 'parquet'; floorColor?: string;
+  floorFinish?: 'plain' | 'boards' | 'tile' | 'parquet' | 'pine' | 'carpet'; floorColor?: string;
+  proposedFloor?: { finish: FloorFinish; color?: string }; // an existing room's new floor, in the Proposed view
 }
 
 export interface Stairs {
   id: Id; origin: Vec2;      // middle of the bottom edge of the flight
   direction: Degrees;        // plan angle of travel going up: 0 = +x, 90 = +y (down the screen)
   width: Inches; run: Inches; // run = horizontal length; climbs to the next level's floor top
+                             // (STAIRS_LIMITS: width 24" to 96", run 36" to 360", a one-riser step from 10")
   phase: Phase; cutsFloorAbove: boolean;
   headroom?: Inches;         // clear height the floor opening above keeps; default 80"
   holeStart?: Inches;        // where that opening starts along the run; overrides the headroom rule
@@ -1020,10 +1022,14 @@ A room (its label) may set how the walls round it and its floor are dressed, all
 bump; `migrateRooms` keeps valid values and drops each malformed one): `wallFinish` (`paint | boards | pine | check`)
 and `wallColor` (a colour alone is paint; a check's colour is the check's, on the pale ground `CHECK_GROUND`), a
 `wainscot` (`{ height, finish, color? }`, a lower band in another finish up to `height`, dropped at or above the
-ceiling) and `floorFinish` (`plain | boards | tile | parquet`) with `floorColor`. Each finish has a default colour
-(`ROOM_WALL_COLOR`, `FLOOR_COLOR`); `roomWallLookOf`, `wainscotOf` and `floorLookOf` resolve them, null when unset.
-The room panel has Walls, Wall colour, Wainscot (finish, height, colour), Floor and Floor colour, each with
-"Default"; `updateRoom` sets and clears them (colours lower-case) as one undo step.
+ceiling) and `floorFinish` (`plain | boards | tile | parquet | pine | carpet`) with `floorColor`. Each finish has a
+default colour (`ROOM_WALL_COLOR`, `FLOOR_COLOR`: wide pine whitewashed `#d8d0c2`, carpet oatmeal `#b9ae9b`);
+`roomWallLookOf`, `wainscotOf` and `floorLookOf` resolve them, null when unset. An existing room may also carry a
+`proposedFloor` (`{ finish, color? }`): a new floor laid in a room the proposed design keeps. `floorLookIn(room,
+viewMode)` gives it in the Proposed view for a room whose phase is existing, else `floorLookOf`, so the Existing and
+All views keep today's floor; a new or demolished room ignores it. The room panel has Walls, Wall colour, Wainscot
+(finish, height, colour), Floor and Floor colour, each with "Default", and for an existing room Proposed floor ("Keep
+today's floor") and its colour; `updateRoom` sets and clears them (colours lower-case) as one undo step.
 
 **Walls.** The rooms labelled in the view mode (`getFaces`) give each wall the face on each side (`wallSideFaces`,
 one pass, the same rule as `facesBesideWall`). A side facing a room with a wall finish or a wainscot is split off the
@@ -1051,8 +1057,12 @@ dresses nothing.
 **Textures** (512 px for 48", like the siding): `check` 1" gingham (`checkTone`: the ground, a stripe at half
 strength, the full colour where two cross); `boards` the siding's 8" V-groove boards; `pine` 6" boards with grain,
 knots and grooves; floor `boards` 3" rows of 16" to 48" boards with staggered joints (`floorBoards`); `tile` 12"
-squares with 1/8" grout (`tileGrid`); `parquet` 6" basket-weave blocks of four slats (`parquetSlats`). Boards, pine,
-floor boards, tile and parquet have normal maps (`interiorHeight`). `roomWallMaterial` and `floorFinishMaterial` key by
+squares with 1/8" grout (`tileGrid`); `parquet` 6" basket-weave blocks of four slats (`parquetSlats`); floor `pine`
+6" rows (`WIDE_PINE_BOARD`), mostly one board the tile's length, else two (`widePineBoards`), with fine grain, a few
+small grey knots, dark joints and the square heads of old cut nails, two across each board at every 16" joist line
+(`JOIST_SPACING`) and at each end, 1" in (`widePineNails`); `carpet` the colour with a soft mottle and a dense
+speckle of loop tips, no relief. Boards, pine, floor boards, tile, parquet and wide pine have normal maps
+(`interiorHeight`). `roomWallMaterial` and `floorFinishMaterial` key by
 surface, phase, finish and colour; new work uses the green-washed variant; the flat colour (`interiorFlatColor`, a
 check's blended a little toward its ground) is kept for the export and node.
 
@@ -1825,10 +1835,12 @@ rest (`f-c1` ...). `example.test.ts` checks that every new fixture lies inside i
 proposed view, overlaps no wall footprint and shares no space with another fixture (plan and height),
 and that `counterRuns` gives the island one 66 x 37 top and the east run's three bases one each.
 
-The proposed layout of PLAN-v6-layout.md: the stair hall's wrap-around stair (a one-riser platform,
-a flight of 8, a one-riser landing, a flight of 4; 15 risers of 108 / 15 on 10.5" treads, railed on
-their open sides, cutting nothing) under the Second Floor's floor opening (floor opening ids `s-h1`
-...), its guard opening where the last flight arrives; the north band's walls, placed where they
+The proposed layout of PLAN-v6-layout.md, with MK's stair of 15 Oct 2026: the stair hall's stair (a
+one-riser bottom step 10 3/8" deep, a one-riser landing in the north-west corner, then one straight
+run of 12 east along the north wall to x 167.5; 15 risers of 108 / 15 on 10 3/8" treads, railed on
+the run's open side, cutting nothing, in 2" whitewashed pine treads) under the Second Floor's floor
+opening (floor opening ids `s-h1` ...), its guard opening where the run arrives, the old upstairs
+bath its top landing; a 14" peeled log post under the balcony header (a 6x6 on a footing under it); the north band's walls, placed where they
 meet the old walls outside the old openings (the band's wall at y 51.5 touches the old bath door's
 jamb, its divider at x 261.5 clears the old bath window), so nothing of the existing house moves;
 the laundry closet in the master bath; the stove's boxes on the First Floor; and, routed outside

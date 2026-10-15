@@ -1,6 +1,6 @@
 import { CanvasTexture, LinearMipmapLinearFilter, NoColorSpace, RepeatWrapping, SRGBColorSpace, type ColorSpace } from 'three';
 import { CHECK_GROUND, DEFAULT_WEATHERING, ROOF_TILE } from '../model/finish';
-import type { RoofFinish, WallFinish } from '../model/types';
+import type { RoofFinish, Vec2, WallFinish } from '../model/types';
 
 // Procedural siding textures (DESIGN.md "Exterior appearance"). One 512 x 512 canvas stands for
 // 48" x 48" of wall, so a texel is 3/32". Wall geometry carries UVs in inches (meshes.ts
@@ -921,6 +921,12 @@ export const CHECK_INCHES = 1;
 export const PINE_BOARD = 6;
 /** Floor boards, inches wide: 16 rows to the tile, running along u. */
 export const FLOOR_BOARD = 3;
+/** Wide pine floor boards, inches wide: 8 rows to the tile, face-nailed into joists every 16". */
+export const WIDE_PINE_BOARD = 6;
+export const JOIST_SPACING = 16;
+/** A cut nail's square head, inches, and its distance in from a board's edge and end. */
+export const NAIL_HEAD = 0.2;
+export const NAIL_INSET = 1;
 /** Floor tiles, inches square (16 to the tile), and the grout between them. */
 export const FLOOR_TILE = 12;
 export const GROUT = 0.125;
@@ -939,18 +945,49 @@ export const checkTone = (i: number, j: number): 0 | 1 | 2 => ((i & 1) + (j & 1)
  * add up to the tile, the joints staggered from row to row (a board's x1 may pass the tile's right
  * edge: it wraps).
  */
-export function floorBoards(rand: () => number = seeded(61)): TileRect[] {
+export function floorBoards(rand: () => number = seeded(61), width: number = FLOOR_BOARD, wide = false): TileRect[] {
   const out: TileRect[] = [];
-  const rows = Math.round(TILE_INCHES / FLOOR_BOARD);
+  const rows = Math.round(TILE_INCHES / width);
   for (let k = 0; k < rows; k++) {
     const shift = rand() * TILE_INCHES;
+    // Wide pine: one board the tile's length in most rows (a single joint), else two.
+    if (wide) {
+      const cut = rand() < 0.6 ? [TILE_INCHES] : [20 + rand() * 8];
+      if (cut[0] < TILE_INCHES) cut.push(TILE_INCHES - cut[0]);
+      let x = 0;
+      for (const len of cut) {
+        out.push({ x0: shift + x, y0: k * width, x1: shift + x + len, y1: (k + 1) * width });
+        x += len;
+      }
+      continue;
+    }
     let x = 0;
     while (TILE_INCHES - x > 0) {
       const left = TILE_INCHES - x;
       const len = left <= 32 ? left : 16 + rand() * (Math.min(48, left - 16) - 16);
-      out.push({ x0: shift + x, y0: k * FLOOR_BOARD, x1: shift + x + len, y1: (k + 1) * FLOOR_BOARD });
+      out.push({ x0: shift + x, y0: k * width, x1: shift + x + len, y1: (k + 1) * width });
       x += len;
     }
+  }
+  return out;
+}
+
+/** Wide pine floor boards over a tile: WIDE_PINE_BOARD rows, mostly one board to the tile's length. */
+export const widePineBoards = (): TileRect[] => floorBoards(seeded(89), WIDE_PINE_BOARD, true);
+
+/**
+ * The square heads of the cut nails in a tile of wide pine (inches, centres): two across each board
+ * at every joist line (every JOIST_SPACING along x) and two at each end of a board, NAIL_INSET in
+ * from its edges and end. Wrapped into the tile.
+ */
+export function widePineNails(): Vec2[] {
+  const out: Vec2[] = [];
+  const w = (v: number) => ((v % TILE_INCHES) + TILE_INCHES) % TILE_INCHES;
+  for (const b of widePineBoards()) {
+    const ys = [b.y0 + NAIL_INSET, b.y1 - NAIL_INSET];
+    const xs = [b.x0 + NAIL_INSET, b.x1 - NAIL_INSET];
+    for (let j = Math.ceil((b.x0 + 2 * NAIL_INSET) / JOIST_SPACING) * JOIST_SPACING; j < b.x1 - 2 * NAIL_INSET; j += JOIST_SPACING) xs.push(j);
+    for (const x of xs) for (const y of ys) out.push({ x: w(x), y: w(y) });
   }
   return out;
 }
@@ -983,7 +1020,7 @@ export function parquetSlats(): (TileRect & { along: 'x' | 'y' })[] {
 }
 
 /** Interior finishes with a texture: a room's walls (painted boards, knotty pine, check) and floors (boards, tile, parquet). */
-export type InteriorTexture = 'wall-boards' | 'wall-pine' | 'wall-check' | 'floor-boards' | 'floor-tile' | 'floor-parquet';
+export type InteriorTexture = 'wall-boards' | 'wall-pine' | 'wall-check' | 'floor-boards' | 'floor-tile' | 'floor-parquet' | 'floor-pine' | 'floor-carpet';
 
 /**
  * The relief of an interior finish over one tile, inches in canvas order like sidingHeight, or
@@ -1001,6 +1038,9 @@ export function interiorHeight(kind: InteriorTexture): Float32Array | null {
   } else if (kind === 'floor-boards') {
     f.fill(-RELIEF.groove / 2);
     for (const b of floorBoards()) heightRect(f, { x0: b.x0 + 0.06, y0: b.y0 + 0.06, x1: b.x1 - 0.06, y1: b.y1 - 0.06 }, () => 0);
+  } else if (kind === 'floor-pine') {
+    f.fill(-RELIEF.groove / 2);
+    for (const b of widePineBoards()) heightRect(f, { x0: b.x0 + 0.06, y0: b.y0 + 0.06, x1: b.x1 - 0.06, y1: b.y1 - 0.06 }, () => 0);
   } else if (kind === 'floor-tile') {
     f.fill(-RELIEF.mortar / 2);
     for (const t of tileGrid()) heightRect(f, t, () => 0);
@@ -1074,6 +1114,52 @@ function drawFloorBoards(ctx: Ctx, color: string): void {
   }
 }
 
+/**
+ * Wide whitewashed pine: 6" boards a shade apart along x, fine grain and a few small grey knots,
+ * dark joints, and the old square heads of the cut nails, two across each board at every joist and
+ * at its ends.
+ */
+function drawWidePine(ctx: Ctx, color: string): void {
+  const rand = seeded(97);
+  const boards = widePineBoards();
+  for (const bd of boards) {
+    rect(ctx, bd.x0, bd.y0, bd.x1, bd.y1, shade(color, 0.95 + rand() * 0.08));
+    grain(ctx, rand, 'x', bd, 40);
+    const knots = rand() < 0.4 ? 1 : 0;
+    for (let i = 0; i < knots; i++) {
+      const r = (0.2 + rand() * 0.25) * PX_PER_INCH;
+      ctx.fillStyle = shade(color, 0.72);
+      ctx.beginPath();
+      ctx.ellipse(colOf(bd.x0 + 2 + rand() * (bd.x1 - bd.x0 - 4)), rowOf(bd.y0 + 1.5 + rand() * (WIDE_PINE_BOARD - 3)), r * 1.6, r, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  for (const bd of boards) {
+    pixelRect(ctx, 0, rowOf(bd.y1), TEXTURE_PX, 1);
+    pixelRect(ctx, colOf(bd.x0), rowOf(bd.y1), 1, rowOf(bd.y0) - rowOf(bd.y1));
+  }
+  const s = Math.max(2, Math.round(NAIL_HEAD * PX_PER_INCH));
+  ctx.fillStyle = 'rgba(40, 34, 30, 0.85)';
+  for (const n of widePineNails()) pixelRect(ctx, colOf(n.x) - Math.floor(s / 2), rowOf(n.y) - Math.floor(s / 2), s, s);
+}
+
+/** Carpet: the colour with a soft mottle and a dense speckle of loop tips, lighter and darker. */
+function drawCarpet(ctx: Ctx, color: string): void {
+  const rand = seeded(101);
+  rect(ctx, 0, 0, TILE_INCHES, TILE_INCHES, color);
+  for (let i = 0; i < 40; i++) {
+    const x = rand() * TILE_INCHES;
+    const y = rand() * TILE_INCHES;
+    const r = 3 + rand() * 6;
+    ctx.fillStyle = rand() < 0.5 ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)';
+    ctx.beginPath();
+    ctx.arc(colOf(x), rowOf(y), r * PX_PER_INCH, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  speckle(ctx, rand, { x0: 0, y0: 0, x1: TILE_INCHES, y1: TILE_INCHES }, 40000);
+}
+
 /** Square tiles a shade apart, with pale grout and a mottle like vinyl. */
 function drawTile(ctx: Ctx, color: string): void {
   const rand = seeded(79);
@@ -1123,6 +1209,8 @@ export function interiorTextures(kind: InteriorTexture, color: string, variant: 
   else if (kind === 'wall-check') drawCheck(ctx, color);
   else if (kind === 'floor-boards') drawFloorBoards(ctx, color);
   else if (kind === 'floor-tile') drawTile(ctx, color);
+  else if (kind === 'floor-pine') drawWidePine(ctx, color);
+  else if (kind === 'floor-carpet') drawCarpet(ctx, color);
   else drawParquet(ctx, color);
   if (variant === 'new') {
     const img = ctx.getImageData(0, 0, TEXTURE_PX, TEXTURE_PX);

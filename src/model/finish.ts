@@ -1,4 +1,4 @@
-import type { Column, Deck, Fence, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, SiteSurface, SurfaceMaterial, Wall, WallFinish, WallKind } from './types';
+import type { Column, Deck, Fence, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, SiteSurface, SurfaceMaterial, ViewMode, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
@@ -60,9 +60,10 @@ export const ROOM_WALL_COLOR: Record<RoomWallFinish, string> = { paint: DEFAULT_
 /** The ground of a check wallpaper. */
 export const CHECK_GROUND = '#f2efe6';
 
-export const FLOOR_FINISHES: readonly FloorFinish[] = ['plain', 'boards', 'tile', 'parquet'];
-export const FLOOR_FINISH_LABEL: Record<FloorFinish, string> = { plain: 'Plain', boards: 'Boards', tile: 'Tile', parquet: 'Parquet' };
-export const FLOOR_COLOR: Record<FloorFinish, string> = { plain: '#c9a77c', boards: '#9a6a40', tile: '#d8cfbb', parquet: '#a8763e' };
+export const FLOOR_FINISHES: readonly FloorFinish[] = ['plain', 'boards', 'tile', 'parquet', 'pine', 'carpet'];
+export const FLOOR_FINISH_LABEL: Record<FloorFinish, string> = { plain: 'Plain', boards: 'Boards', tile: 'Tile', parquet: 'Parquet', pine: 'Wide pine, face-nailed', carpet: 'Carpet' };
+/** Default floor colours; wide pine is whitewashed (pale, not yellow) and carpet oatmeal. */
+export const FLOOR_COLOR: Record<FloorFinish, string> = { plain: '#c9a77c', boards: '#9a6a40', tile: '#d8cfbb', parquet: '#a8763e', pine: '#d8d0c2', carpet: '#b9ae9b' };
 
 /** A resolved interior look: the finish and its colour. */
 export interface InteriorLook<F extends string> {
@@ -89,6 +90,16 @@ export function floorLookOf(r: Pick<Room, 'floorFinish' | 'floorColor'>): Interi
   if (!r.floorFinish && !r.floorColor) return null;
   const finish = r.floorFinish ?? 'plain';
   return { finish, color: r.floorColor ?? FLOOR_COLOR[finish] };
+}
+
+/**
+ * The look of a room's floor in a view: an existing room's proposed floor (Room.proposedFloor) in
+ * the Proposed view, else floorLookOf.
+ */
+export function floorLookIn(r: Pick<Room, 'floorFinish' | 'floorColor' | 'phase' | 'proposedFloor'>, viewMode: ViewMode): InteriorLook<FloorFinish> | null {
+  const p = r.proposedFloor;
+  if (p && viewMode === 'proposed' && (r.phase ?? 'existing') === 'existing') return { finish: p.finish, color: p.color ?? FLOOR_COLOR[p.finish] };
+  return floorLookOf(r);
 }
 
 /** Roof surface colours by finish: corrugated metal grey-brown, asphalt shingle dark grey. */

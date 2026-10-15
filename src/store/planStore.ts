@@ -70,7 +70,7 @@ const OPTIONAL_OPENING_KEYS: ReadonlySet<keyof Opening> = new Set<keyof Opening>
 ]);
 export type RoomPatch = Partial<Omit<Room, 'id'>>;
 /** Room fields that a patch clears with undefined. */
-const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const;
+const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor'] as const;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 /** A flight's fields; its staircase is set by groupStairs and ungroupStaircase, not here. */
 export type StairsPatch = Partial<Omit<Stairs, 'id' | 'staircaseId'>>;
@@ -473,7 +473,7 @@ function clampOpeningHeights(level: Level, wallIds?: Set<Id>): void {
  */
 const validStairs = (s: Omit<Stairs, 'id'>, limits: { width: boolean; run: boolean } = { width: true, run: true }): boolean =>
   (!limits.width || stairsWidthOk(s.width)) &&
-  (!limits.run || stairsRunOk(s.run)) &&
+  (!limits.run || stairsRunOk(s.run, s.risers)) &&
   s.width > 0 &&
   s.run > 0 &&
   Number.isFinite(s.width) &&
@@ -920,6 +920,7 @@ export const usePlanStore = create<PlanState>()(
             const name = input.name.trim();
             if (!name || !Number.isFinite(input.anchor.x) || !Number.isFinite(input.anchor.y)) return false;
             const room: Room = { ...input, id: input.id ?? newId(), name, anchor: { x: input.anchor.x, y: input.anchor.y } };
+            if (input.proposedFloor) room.proposedFloor = { finish: input.proposedFloor.finish, ...(input.proposedFloor.color ? { color: input.proposedFloor.color.toLowerCase() } : {}) };
             level.rooms[room.id] = room;
             id = room.id;
           });
@@ -960,6 +961,11 @@ export const usePlanStore = create<PlanState>()(
                 r.wainscot = { height: w.height, finish: w.finish, ...(w.color ? { color: w.color.toLowerCase() } : {}) };
               } else (r as unknown as Record<string, string>)[key] = key.endsWith('Color') ? (v as string).toLowerCase() : (v as string);
             }
+            if ('proposedFloor' in patch) {
+              const p = patch.proposedFloor;
+              if (p === undefined) delete r.proposedFloor;
+              else r.proposedFloor = { finish: p.finish, ...(p.color ? { color: p.color.toLowerCase() } : {}) };
+            }
           }),
 
         deleteRooms: (levelId, ids) =>
@@ -994,7 +1000,7 @@ export const usePlanStore = create<PlanState>()(
             const st = level.stairs[id];
             if (!st) return false;
             const next = { ...st, ...patch };
-            if (!validStairs(next, { width: patch.width !== undefined, run: patch.run !== undefined })) return false;
+            if (!validStairs(next, { width: patch.width !== undefined, run: patch.run !== undefined || 'risers' in patch })) return false;
             // Heights are checked when they change, so an older flight can still move or change phase
             // after the level's height changed under it.
             if (STAIRS_HEIGHT_KEYS.some((k) => k in patch) && stairsHeightProblem(next, floorToFloor(plan, levelId), plan.levelOrder[0] === levelId)) return false;

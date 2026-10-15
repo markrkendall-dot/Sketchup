@@ -137,6 +137,17 @@ describe('stairs store actions', () => {
     expect(level().stairs[lo!]).toMatchObject({ width: 48, run: 200 });
   });
 
+  it('takes a single step (one riser) down to a 10" tread, but not a flight that short', () => {
+    expect(store().addStairs(levelId(), flight({ run: 9.5, rise: 7.2, risers: 1 }))).toBeNull();
+    const step = store().addStairs(levelId(), flight({ run: 10.375, rise: 7.2, risers: 1 }))!;
+    expect(step).toBeTruthy();
+    expect(store().addStairs(levelId(), flight({ run: 20, rise: 14.4, risers: 2, origin: { x: 300, y: 0 } }))).toBeNull();
+    // Giving the step more risers without a longer run is refused.
+    const plan = store().plan;
+    store().updateStairs(levelId(), step, { rise: 14.4, risers: 2 });
+    expect(store().plan).toBe(plan);
+  });
+
   it('an older flight outside the limits can still change phase', () => {
     const id = store().addStairs(levelId(), flight())!;
     usePlanStore.setState((s) => {

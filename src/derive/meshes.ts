@@ -9,7 +9,7 @@ import { memberAxis, memberBoxes, type AxisPoint } from './members';
 import { isLog, isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookOf, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookIn, isSlidingDoor, leafColorOf, roomWallLookOf, wainscotOf, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
@@ -1926,7 +1926,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const floorFinishes: FloorFinishMesh[] = [];
   for (const f of faces.faces) {
     const room = roomOf(f);
-    const look = room ? floorLookOf(room) : null;
+    const look = room ? floorLookIn(room, viewMode) : null;
     if (!room || !look) continue;
     const old = prevFinishes?.get(room.id);
     const entry: FloorFinishEntry =

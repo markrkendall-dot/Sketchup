@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { buildFloorFinishGeometry, clearMeshCache, FLOOR_FINISH_LIFT, getLevelMeshes, subtractConvex, triangleCount } from '../derive/meshes';
 import { facesBesideWall, faceOfRoom, getFaces, wallSideFaces } from '../derive/rooms';
 import { buildExportScene, disposeExportScene } from '../io/export3d';
-import { floorLookOf, ROOM_WALL_COLOR, roomWallLookOf, wainscotOf } from '../model/finish';
+import { FLOOR_COLOR, FLOOR_FINISH_LABEL, floorLookIn, floorLookOf, ROOM_WALL_COLOR, roomWallLookOf, wainscotOf } from '../model/finish';
 import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, migrate } from '../model/plan';
 import type { Id, Vec2 } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
-import { CHECK_INCHES, checkTone, FLOOR_BOARD, floorBoards, interiorHeight, interiorTextures, PARQUET_BLOCK, PARQUET_SLATS, parquetSlats, TILE_INCHES, tileGrid } from '../view3d/textures';
+import { CHECK_INCHES, checkTone, FLOOR_BOARD, floorBoards, interiorHeight, interiorTextures, JOIST_SPACING, PARQUET_BLOCK, PARQUET_SLATS, parquetSlats, TILE_INCHES, tileGrid, WIDE_PINE_BOARD, widePineBoards, widePineNails } from '../view3d/textures';
 import { floorFinishMaterial, interiorFlatColor, roomWallMaterial } from '../view3d/materials';
 
 // Interior finishes (DESIGN.md "Interior finishes"): a room dresses the long faces of the walls on
@@ -110,7 +110,7 @@ describe('the model: room finishes', () => {
     const text = JSON.stringify(store().plan);
     expect(JSON.stringify(migrate(JSON.parse(text)))).toBe(text);
     const broken = JSON.parse(text);
-    Object.assign(broken.levels[lid].rooms[west], { wallFinish: 'wallpaper', wallColor: 'blue', floorFinish: 'carpet', floorColor: '#12345' });
+    Object.assign(broken.levels[lid].rooms[west], { wallFinish: 'wallpaper', wallColor: 'blue', floorFinish: 'shag', floorColor: '#12345' });
     broken.levels[lid].rooms[west].wainscot = { height: -3, finish: 'pine' };
     const loaded = migrate(broken).levels[lid].rooms[west];
     for (const k of ['wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor']) expect(k in loaded, k).toBe(false);
@@ -130,6 +130,52 @@ describe('the model: room finishes', () => {
     const before = store().plan;
     store().updateRoom(lid, west, { name: 'West' });
     expect(store().plan).toBe(before);
+  });
+});
+
+describe('wide pine, carpet and the proposed floor', () => {
+  it('has wide face-nailed pine (whitewashed) and oatmeal carpet among the floors', () => {
+    expect([FLOOR_FINISH_LABEL.pine, FLOOR_COLOR.pine, FLOOR_FINISH_LABEL.carpet, FLOOR_COLOR.carpet]).toEqual(['Wide pine, face-nailed', '#d8d0c2', 'Carpet', '#b9ae9b']);
+    expect(floorLookOf({ floorFinish: 'carpet' })).toEqual({ finish: 'carpet', color: '#b9ae9b' });
+  });
+
+  it('lays 6" pine boards a tile long or in two, with two nails across each board at every joist and at its ends', () => {
+    const boards = widePineBoards();
+    expect(boards.every((b) => b.y1 - b.y0 === WIDE_PINE_BOARD)).toBe(true);
+    const rows = new Map<number, number>();
+    for (const b of boards) rows.set(b.y0, (rows.get(b.y0) ?? 0) + (b.x1 - b.x0));
+    expect([...rows.values()].every((len) => Math.abs(len - TILE_INCHES) < 1e-9)).toBe(true);
+    const nails = widePineNails();
+    expect(nails.every((n) => n.x >= 0 && n.x < TILE_INCHES && n.y >= 0 && n.y < TILE_INCHES)).toBe(true);
+    // At least two nails at each end of every board and two at each joist line a board crosses.
+    const joists = (b: { x0: number; x1: number }) => Math.max(0, Math.ceil((b.x1 - 2) / JOIST_SPACING) - Math.ceil((b.x0 + 2) / JOIST_SPACING));
+    expect(nails.length).toBe(boards.reduce((t, b) => t + 4 + 2 * joists(b), 0));
+    expect(interiorHeight('floor-pine')).not.toBeNull();
+    expect(interiorHeight('floor-carpet')).toBeNull();
+  });
+
+  it("shows an existing room's proposed floor in the Proposed view only, and keeps it through a save", () => {
+    const { lid, west } = boxRooms();
+    store().updateRoom(lid, west, { floorFinish: 'tile', proposedFloor: { finish: 'pine', color: '#D8D0C2' } });
+    const r = level(lid).rooms[west];
+    expect(r.proposedFloor).toEqual({ finish: 'pine', color: '#d8d0c2' });
+    expect(floorLookIn(r, 'proposed')).toEqual({ finish: 'pine', color: '#d8d0c2' });
+    expect(floorLookIn(r, 'existing')).toEqual({ finish: 'tile', color: '#d8cfbb' });
+    expect(floorLookIn(r, 'all')).toEqual({ finish: 'tile', color: '#d8cfbb' });
+    // A new room sets its floor directly.
+    expect(floorLookIn({ ...r, phase: 'new' }, 'proposed')).toEqual({ finish: 'tile', color: '#d8cfbb' });
+    expect(getLevelMeshes(store().plan, lid, 'proposed').floorFinishes.find((f) => f.roomId === west)).toMatchObject({ finish: 'pine', color: '#d8d0c2' });
+    expect(getLevelMeshes(store().plan, lid, 'existing').floorFinishes.find((f) => f.roomId === west)).toMatchObject({ finish: 'tile' });
+    const text = JSON.stringify(store().plan);
+    expect(JSON.stringify(migrate(JSON.parse(text)))).toBe(text);
+    const broken = JSON.parse(text);
+    broken.levels[lid].rooms[west].proposedFloor = { finish: 'shag' };
+    expect('proposedFloor' in migrate(broken).levels[lid].rooms[west]).toBe(false);
+    const badColor = JSON.parse(text);
+    badColor.levels[lid].rooms[west].proposedFloor.color = 'white';
+    expect(migrate(badColor).levels[lid].rooms[west].proposedFloor).toEqual({ finish: 'pine' });
+    store().updateRoom(lid, west, { proposedFloor: undefined });
+    expect('proposedFloor' in level(lid).rooms[west]).toBe(false);
   });
 });
 

@@ -9,10 +9,14 @@ import type { Degrees, Id, Plan, Stairs, Vec2 } from '../model/types';
 // a landing), and `risers` overrides the step count (a landing is one riser, one deep tread).
 
 export const STAIRS_DEFAULTS = { width: 36, run: 120 } as const;
-/** Sizes the store accepts: width 24" to 96", run 3' to 30'. */
-export const STAIRS_LIMITS = { minWidth: 24, maxWidth: 96, minRun: 36, maxRun: 360 } as const;
+/**
+ * Sizes the store accepts: width 24" to 96", run 3' to 30'; a single step (one riser) may be as
+ * shallow as a 10" tread (minStep), the bottom step before a landing.
+ */
+export const STAIRS_LIMITS = { minWidth: 24, maxWidth: 96, minRun: 36, maxRun: 360, minStep: 10 } as const;
 export const stairsWidthOk = (w: number): boolean => w >= STAIRS_LIMITS.minWidth && w <= STAIRS_LIMITS.maxWidth;
-export const stairsRunOk = (r: number): boolean => r >= STAIRS_LIMITS.minRun && r <= STAIRS_LIMITS.maxRun;
+/** The run is usable: within the limits, from minStep for a piece of one riser. */
+export const stairsRunOk = (r: number, risers?: number): boolean => r >= (risers === 1 ? STAIRS_LIMITS.minStep : STAIRS_LIMITS.minRun) && r <= STAIRS_LIMITS.maxRun;
 /** Riser height the step count aims for. */
 export const TARGET_RISE = 7.5;
 

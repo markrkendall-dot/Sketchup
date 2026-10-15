@@ -45,7 +45,7 @@ import { columnProblem, fenceProblem, MAX_DECK_ELEVATION, MAX_FENCE_RAILS, MAX_R
 import { boundsOf } from '../model/geometry';
 import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
-import { FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
+import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import type { Beam, Column, Deck, Fence, Fixture, FloorOpening, FrontStyle, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
@@ -1082,6 +1082,8 @@ type WainscotChoice = 'none' | (typeof ROOM_WALL_FINISHES)[number];
 const wainscotOptions: { value: WainscotChoice; label: string }[] = [{ value: 'none', label: 'None' }, ...ROOM_WALL_FINISHES.map((f) => ({ value: f, label: ROOM_WALL_FINISH_LABEL[f] }))];
 type FloorChoice = 'default' | (typeof FLOOR_FINISHES)[number];
 const floorOptions: { value: FloorChoice; label: string }[] = [{ value: 'default', label: 'Default (the slab)' }, ...FLOOR_FINISHES.map((f) => ({ value: f, label: FLOOR_FINISH_LABEL[f] }))];
+type ProposedFloorChoice = 'keep' | (typeof FLOOR_FINISHES)[number];
+const proposedFloorOptions: { value: ProposedFloorChoice; label: string }[] = [{ value: 'keep', label: 'Keep today\'s floor' }, ...FLOOR_FINISHES.map((f) => ({ value: f, label: FLOOR_FINISH_LABEL[f] }))];
 /** A new wainscot's height: a common chair-rail height. */
 const DEFAULT_WAINSCOT = 36;
 
@@ -1146,7 +1148,26 @@ function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; 
       {floor && (
         <ColorField label="Floor colour" value={floor.color} onCommit={(color) => set({ floorColor: color })} onReset={room.floorColor ? () => set({ floorColor: undefined }) : undefined} />
       )}
+      {(room.phase ?? 'existing') === 'existing' && (
+        <>
+          <SelectField
+            label="Proposed floor"
+            value={room.proposedFloor?.finish ?? 'keep'}
+            options={proposedFloorOptions}
+            onChange={(v) => set({ proposedFloor: v === 'keep' ? undefined : { finish: v, ...(room.proposedFloor?.color ? { color: room.proposedFloor.color } : {}) } })}
+          />
+          {room.proposedFloor && (
+            <ColorField
+              label="Proposed floor colour"
+              value={room.proposedFloor.color ?? FLOOR_COLOR[room.proposedFloor.finish]}
+              onCommit={(color) => set({ proposedFloor: { finish: room.proposedFloor!.finish, color } })}
+              onReset={room.proposedFloor.color ? () => set({ proposedFloor: { finish: room.proposedFloor!.finish } }) : undefined}
+            />
+          )}
+        </>
+      )}
       {(wall || w || floor) && <p className="panel-note">They dress the faces of the walls round the room, and its floor, in 3D; each wall keeps its own finish on its other side.</p>}
+      {room.proposedFloor && (room.phase ?? 'existing') === 'existing' && <p className="panel-note">The proposed floor is a new floor laid in this room in the proposed design; the Proposed view shows it.</p>}
     </>
   );
 }
@@ -1373,7 +1394,7 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         value={stairs.run}
         onCommit={(v) => {
           if (v === null) return null;
-          if (!stairsRunOk(v)) return `Between ${formatLength(STAIRS_LIMITS.minRun, denom)} and ${formatLength(STAIRS_LIMITS.maxRun, denom)}`;
+          if (!stairsRunOk(v, stairs.risers)) return `Between ${formatLength(stairs.risers === 1 ? STAIRS_LIMITS.minStep : STAIRS_LIMITS.minRun, denom)} and ${formatLength(STAIRS_LIMITS.maxRun, denom)}`;
           updateStairs(level.id, stairs.id, { run: v });
           return null;
         }}

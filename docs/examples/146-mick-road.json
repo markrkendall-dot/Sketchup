@@ -469,6 +469,23 @@
             "thickness": 12
           },
           "id": "b-m1"
+        },
+        "b-m2": {
+          "kind": "post",
+          "at": {
+            "x": 88,
+            "y": 92.75
+          },
+          "width": 5.5,
+          "depth": 5.5,
+          "rotation": 0,
+          "label": "6x6",
+          "phase": "new",
+          "footing": {
+            "width": 24,
+            "thickness": 12
+          },
+          "id": "b-m2"
         }
       },
       "framing": {
@@ -640,28 +657,13 @@
           "id": "f-n32",
           "x": 352.5,
           "y": 120
-        },
-        "f-n33": {
-          "id": "f-n33",
-          "x": 138.5,
-          "y": 3.5
-        },
-        "f-n34": {
-          "id": "f-n34",
-          "x": 138.5,
-          "y": 88.5
-        },
-        "f-n35": {
-          "id": "f-n35",
-          "x": 170.5,
-          "y": 88.5
         }
       },
       "walls": {
         "f-w1": {
           "id": "f-w1",
           "a": "f-n1",
-          "b": "f-n33",
+          "b": "f-n25",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -1013,7 +1015,7 @@
         "f-w37": {
           "id": "f-w37",
           "a": "f-n26",
-          "b": "f-n35",
+          "b": "f-n13",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1084,42 +1086,6 @@
           "id": "f-w45",
           "a": "f-n32",
           "b": "f-n19",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
-        },
-        "f-w46": {
-          "id": "f-w46",
-          "a": "f-n33",
-          "b": "f-n34",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new",
-          "heightOverride": 61.75
-        },
-        "f-w47": {
-          "id": "f-w47",
-          "a": "f-n33",
-          "b": "f-n25",
-          "thickness": 7,
-          "kind": "exterior",
-          "phase": "existing",
-          "finish": "shingle",
-          "color": "#5a3a35"
-        },
-        "f-w48": {
-          "id": "f-w48",
-          "a": "f-n34",
-          "b": "f-n35",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new",
-          "heightOverride": 92.25
-        },
-        "f-w49": {
-          "id": "f-w49",
-          "a": "f-n35",
-          "b": "f-n13",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1696,21 +1662,6 @@
             "rows": 3
           },
           "id": "f-o39"
-        },
-        "f-o40": {
-          "wallId": "f-w48",
-          "type": "door",
-          "offset": 16,
-          "width": 24,
-          "height": 80,
-          "sill": 0,
-          "phase": "new",
-          "swing": {
-            "hinge": "a",
-            "side": "right"
-          },
-          "leafColor": "#8a5a34",
-          "id": "f-o40"
         }
       },
       "rooms": {
@@ -1753,6 +1704,10 @@
           "wallColor": "#2e3f6b",
           "floorFinish": "tile",
           "floorColor": "#cbbd9c",
+          "proposedFloor": {
+            "finish": "pine",
+            "color": "#d8d0c2"
+          },
           "id": "f-r3"
         },
         "f-r4": {
@@ -1765,6 +1720,10 @@
           "wallColor": "#ddd6b4",
           "floorFinish": "boards",
           "floorColor": "#5e2a22",
+          "proposedFloor": {
+            "finish": "pine",
+            "color": "#d8d0c2"
+          },
           "id": "f-r4"
         },
         "f-r5": {
@@ -1796,8 +1755,8 @@
           },
           "phase": "new",
           "wallFinish": "paint",
-          "floorFinish": "boards",
-          "floorColor": "#a87a4c",
+          "floorFinish": "pine",
+          "floorColor": "#d8d0c2",
           "id": "f-r7"
         },
         "f-r8": {
@@ -1812,18 +1771,6 @@
           "id": "f-r8"
         },
         "f-r9": {
-          "name": "Coats (proposed)",
-          "anchor": {
-            "x": 154.5,
-            "y": 47
-          },
-          "phase": "new",
-          "wallFinish": "paint",
-          "floorFinish": "boards",
-          "floorColor": "#a87a4c",
-          "id": "f-r9"
-        },
-        "f-r10": {
           "name": "Powder room (proposed)",
           "anchor": {
             "x": 213,
@@ -1832,9 +1779,9 @@
           "phase": "new",
           "wallFinish": "paint",
           "floorFinish": "tile",
-          "id": "f-r10"
+          "id": "f-r9"
         },
-        "f-r11": {
+        "f-r10": {
           "name": "Pantry (proposed)",
           "anchor": {
             "x": 287,
@@ -1842,11 +1789,11 @@
           },
           "phase": "new",
           "wallFinish": "paint",
-          "floorFinish": "boards",
-          "floorColor": "#a87a4c",
-          "id": "f-r11"
+          "floorFinish": "pine",
+          "floorColor": "#d8d0c2",
+          "id": "f-r10"
         },
-        "f-r12": {
+        "f-r11": {
           "name": "Laundry (proposed)",
           "anchor": {
             "x": 334,
@@ -1854,11 +1801,11 @@
           },
           "phase": "new",
           "wallFinish": "paint",
-          "floorFinish": "boards",
-          "floorColor": "#a87a4c",
-          "id": "f-r12"
+          "floorFinish": "pine",
+          "floorColor": "#d8d0c2",
+          "id": "f-r11"
         },
-        "f-r13": {
+        "f-r12": {
           "name": "Foyer (proposed)",
           "anchor": {
             "x": -48,
@@ -1866,10 +1813,11 @@
           },
           "phase": "new",
           "wallFinish": "paint",
-          "floorFinish": "tile",
-          "id": "f-r13"
+          "floorFinish": "pine",
+          "floorColor": "#d8d0c2",
+          "id": "f-r12"
         },
-        "f-r14": {
+        "f-r13": {
           "name": "Screen porch (proposed)",
           "anchor": {
             "x": -48,
@@ -1878,7 +1826,7 @@
           "phase": "new",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
-          "id": "f-r14"
+          "id": "f-r13"
         }
       },
       "stairs": {
@@ -1897,11 +1845,11 @@
         "f-s2": {
           "origin": {
             "x": 25,
-            "y": 49
+            "y": 59.375
           },
           "direction": 270,
           "width": 36,
-          "run": 42,
+          "run": 10.375,
           "rise": 7.2,
           "risers": 1,
           "phase": "new",
@@ -1911,18 +1859,15 @@
         },
         "f-s3": {
           "origin": {
-            "x": 43,
-            "y": 28
+            "x": 25,
+            "y": 49
           },
-          "direction": 0,
-          "width": 42,
-          "run": 84,
+          "direction": 270,
+          "width": 36,
+          "run": 42,
           "base": 7.2,
-          "rise": 57.6,
-          "risers": 8,
-          "railings": {
-            "right": true
-          },
+          "rise": 7.2,
+          "risers": 1,
           "phase": "new",
           "cutsFloorAbove": false,
           "id": "f-s3",
@@ -1930,37 +1875,21 @@
         },
         "f-s4": {
           "origin": {
-            "x": 127,
+            "x": 43,
             "y": 28
           },
           "direction": 0,
           "width": 42,
-          "run": 41,
-          "base": 64.8,
-          "rise": 7.2,
-          "risers": 1,
-          "phase": "new",
-          "cutsFloorAbove": false,
-          "id": "f-s4",
-          "staircaseId": "f-x1"
-        },
-        "f-s5": {
-          "origin": {
-            "x": 147.5,
-            "y": 49
-          },
-          "direction": 90,
-          "width": 41,
-          "run": 42,
-          "base": 72,
-          "rise": 28.8,
-          "risers": 4,
+          "run": 124.5,
+          "base": 14.4,
+          "rise": 86.4,
+          "risers": 12,
           "railings": {
             "right": true
           },
           "phase": "new",
           "cutsFloorAbove": false,
-          "id": "f-s5",
+          "id": "f-s4",
           "staircaseId": "f-x1"
         }
       },
@@ -3297,7 +3226,8 @@
         "f-x1": {
           "name": "Grand stair",
           "underside": "framed",
-          "startStep": "bullnose",
+          "treadColor": "#d8d0c2",
+          "treadThickness": 2,
           "id": "f-x1"
         }
       },
@@ -3888,6 +3818,23 @@
         "f-m28": {
           "kind": "post",
           "at": {
+            "x": 88,
+            "y": 92.75
+          },
+          "width": 14,
+          "depth": 14,
+          "rotation": 0,
+          "base": 0,
+          "top": 96,
+          "color": "#c9ab7e",
+          "profile": "log",
+          "label": "14\" peeled log post",
+          "phase": "new",
+          "id": "f-m28"
+        },
+        "f-m29": {
+          "kind": "post",
+          "at": {
             "x": 170.5,
             "y": 92.75
           },
@@ -3896,9 +3843,9 @@
           "rotation": 0,
           "label": "(2) 2x4",
           "phase": "new",
-          "id": "f-m28"
+          "id": "f-m29"
         },
-        "f-m29": {
+        "f-m30": {
           "kind": "post",
           "at": {
             "x": 170.5,
@@ -3909,7 +3856,7 @@
           "rotation": 0,
           "label": "(2) 2x4",
           "phase": "new",
-          "id": "f-m29"
+          "id": "f-m30"
         }
       },
       "finishes": {
@@ -4088,7 +4035,7 @@
           "b": "s-n15",
           "thickness": 5,
           "kind": "interior",
-          "phase": "existing"
+          "phase": "demo"
         },
         "s-w8": {
           "id": "s-w8",
@@ -4166,7 +4113,7 @@
           "b": "s-n18",
           "thickness": 5,
           "kind": "interior",
-          "phase": "demo"
+          "phase": "existing"
         },
         "s-w17": {
           "id": "s-w17",
@@ -4184,7 +4131,7 @@
           "b": "s-n14",
           "thickness": 5,
           "kind": "interior",
-          "phase": "existing"
+          "phase": "demo"
         },
         "s-w19": {
           "id": "s-w19",
@@ -4234,7 +4181,7 @@
           "b": "s-n14",
           "thickness": 5,
           "kind": "interior",
-          "phase": "existing"
+          "phase": "demo"
         },
         "s-w25": {
           "id": "s-w25",
@@ -4341,7 +4288,7 @@
           "width": 24,
           "height": 80,
           "sill": 0,
-          "phase": "existing",
+          "phase": "demo",
           "swing": {
             "hinge": "a",
             "side": "right"
@@ -4482,6 +4429,21 @@
             "rows": 3
           },
           "id": "s-o16"
+        },
+        "s-o17": {
+          "wallId": "s-w16",
+          "type": "door",
+          "offset": 48.5,
+          "width": 28,
+          "height": 80,
+          "sill": 0,
+          "phase": "new",
+          "swing": {
+            "hinge": "a",
+            "side": "left"
+          },
+          "leafColor": "#8a5a34",
+          "id": "s-o17"
         }
       },
       "rooms": {
@@ -4505,7 +4467,8 @@
           },
           "wallFinish": "paint",
           "floorFinish": "tile",
-          "id": "s-r2"
+          "id": "s-r2",
+          "phase": "demo"
         },
         "s-r3": {
           "name": "Master closet",
@@ -4516,6 +4479,9 @@
           "wallFinish": "paint",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
+          "proposedFloor": {
+            "finish": "carpet"
+          },
           "id": "s-r3"
         },
         "s-r4": {
@@ -4527,6 +4493,9 @@
           "wallFinish": "paint",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
+          "proposedFloor": {
+            "finish": "carpet"
+          },
           "id": "s-r4"
         },
         "s-r5": {
@@ -4538,6 +4507,9 @@
           "wallFinish": "paint",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
+          "proposedFloor": {
+            "finish": "carpet"
+          },
           "id": "s-r5"
         },
         "s-r6": {
@@ -4549,7 +4521,22 @@
           "wallFinish": "paint",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
+          "proposedFloor": {
+            "finish": "pine",
+            "color": "#d8d0c2"
+          },
           "id": "s-r6"
+        },
+        "s-r7": {
+          "name": "Bath (proposed)",
+          "anchor": {
+            "x": 267,
+            "y": 40
+          },
+          "phase": "new",
+          "wallFinish": "paint",
+          "floorFinish": "tile",
+          "id": "s-r7"
         }
       },
       "stairs": {},
@@ -4644,20 +4631,6 @@
         },
         "s-c4": {
           "elevation": 0,
-          "kind": "sink",
-          "origin": {
-            "x": 174,
-            "y": 34
-          },
-          "direction": 0,
-          "width": 48,
-          "depth": 21,
-          "height": 34.5,
-          "phase": "new",
-          "id": "s-c4"
-        },
-        "s-c5": {
-          "elevation": 0,
           "kind": "box",
           "label": "WC",
           "width": 20,
@@ -4670,21 +4643,35 @@
           },
           "direction": 90,
           "phase": "new",
-          "id": "s-c5"
+          "id": "s-c4"
         },
-        "s-c6": {
+        "s-c5": {
           "elevation": 0,
           "kind": "box",
           "label": "Shower",
           "origin": {
             "x": 311,
-            "y": 31
+            "y": 25
           },
           "direction": 180,
-          "width": 48,
+          "width": 36,
           "depth": 36,
           "height": 78,
           "frontColor": "#f1efe8",
+          "phase": "new",
+          "id": "s-c5"
+        },
+        "s-c6": {
+          "elevation": 0,
+          "kind": "sink",
+          "origin": {
+            "x": 284,
+            "y": 70
+          },
+          "direction": 270,
+          "width": 48,
+          "depth": 21,
+          "height": 34.5,
           "phase": "new",
           "id": "s-c6"
         }
@@ -4699,15 +4686,11 @@
               "y": 7
             },
             {
-              "x": 169,
+              "x": 167.5,
               "y": 7
             },
             {
-              "x": 169,
-              "y": 86
-            },
-            {
-              "x": 169,
+              "x": 167.5,
               "y": 91
             },
             {
@@ -4716,7 +4699,6 @@
             }
           ],
           "railings": [
-            false,
             false,
             true,
             true,

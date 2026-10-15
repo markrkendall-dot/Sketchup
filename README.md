@@ -173,7 +173,9 @@ Once the walls are in, these make the 3D model look like the house.
   look.
 - **Interior finishes.** Select a room's label: its panel sets "Walls" (paint, painted boards,
   knotty pine or check wallpaper) with "Wall colour", a "Wainscot" (a lower band in another finish,
-  with its height and colour) and "Floor" (plain, boards, tile or parquet) with "Floor colour".
+  with its height and colour) and "Floor" (plain, boards, tile, parquet, wide face-nailed pine or
+  carpet) with "Floor colour". A room that is kept can have a "Proposed floor", a new floor laid in
+  it in the proposed design, which the Proposed view shows in place of today's.
   The walls round the room show its finish on the room's side only (an exterior wall keeps its
   siding outside, a partition shows each room's finish on its own side), and the floor covers the
   room inside the wall faces. "Default" clears each one. Ceilings are not drawn yet.
@@ -706,27 +708,29 @@ with the places where the built design differs from them):
 3. **Stair hall.** The old front room, the stair strip and the Bunk over them are one stair hall,
    13'5" x 10'8", **open through both floors** north of the balcony (a floor opening over x 7 to
    169, y 7 to 91). The old stair, the front room's walls (the y 99.5 line and the old bath's west
-   wall) and its 80" north window are demolished; upstairs the Bunk's south wall and door and the
-   stub of its east wall go. The new **stair wraps the hall** round an open court: 15 risers of
-   7.2" on 10.5" treads, 42" wide, one staircase (the "Grand stair") in oak treads with a 1"
-   nosing over white risers, box newels and a round oak handrail on white balusters, framed
-   underneath, with a bullnose round the starting newel:
-   - a one-riser **platform** in the north-west corner, two steps from the house door: you step up
-     onto it heading north and turn east;
-   - a flight of 8 risers **east along the north wall**, railed on its open side;
-   - a **landing** in the north-east corner at 6';
-   - a flight of 4 risers **south**, railed on its open side, arriving at the **balcony** (y 91 to
-     135), which has a guard along its edge in the stair's style, running on to the stair's top
-     newel, and leads straight to the upstairs bedroom's door and east into the upstairs hall;
-   - a **coat closet** under the landing and the top flight, 2'3" x 6'7" inside, with a 24" door
-     into the hall; its walls stand to the stair's underside. Its west wall is at x 138.5, not under
-     the landing's edge: there it would meet the north wall inside the span of the old 80" window,
-     which the model cannot split. The landing's free corner stands on a post.
+   wall) and its 80" north window are demolished; upstairs the Bunk's south wall and door, its
+   whole east wall and the old bath's south wall and door go. The new stair (MK, 15 Oct 2026) is
+   **a step up to a landing, then one straight run up the north wall** with no second turn: 15
+   risers of 7.2" on 10 3/8" treads, one staircase (the "Grand stair") in **thick pine treads**
+   (2", the floors' whitewashed pine) with a 1" nosing over white risers, box newels and a round
+   handrail on white balusters, framed underneath:
+   - one **step** up heading north from the hall, clear of the house door;
+   - a **landing** in the north-west corner, a step higher, where you turn east;
+   - a run of 12 risers **straight east along the north wall**, railed on its open side, arriving
+     at x 167.5, just short of the hall's east wall;
+   - a **top landing** upstairs where the old bath was, part of the upstairs hall (pine), with the
+     guard round the opening's east edge and along the **balcony** (y 91 to 135), which leads to the
+     upstairs bedroom's door and east into the upstairs hall;
+   - the space under the high end of the run is left open (the coat closet that stood under the
+     old landing went with it).
+   - a **peeled log post**, 14" across, pale and barkless, stands in the hall on the line of the old
+     wall between the front room and the Living, under the balcony's header, from the floor to the
+     ceiling, with a 6x6 on a footing under it in the basement.
 
    The house door (32", green) is in the west wall in the middle of the old stair strip, in line
    with the foyer's front door, and a new 32" cased opening at the strip's east end leads straight
-   on into the kitchen. New windows light the hall: a 24" one over the platform, a second casement
-   pair upstairs in the north wall over the landing and one in the upstairs west wall. The hall is
+   on into the kitchen. New windows light the hall: a 24" one over the landing, a second casement
+   pair upstairs in the north wall over the top of the run and one in the upstairs west wall. The hall is
    **open to the Living** (MK): no wall on the strip's south side, as today (photo 16).
 4. **North band** (MK: the kitchen stops short of the north wall): a 4' band along the north wall
    east of the stair hall holds the **powder room** (7'2" x 4', a 30" vanity and a WC as
@@ -761,17 +765,18 @@ with the places where the built design differs from them):
    passes through the bedroom upstairs. The code checklist is in
    `docs/history/PLAN-v7-exterior-flue.md`. The **masonry chimney** on the north wall is
    demolished.
-7. **Upstairs bath** (MK: a full bath with a stall shower in the north-east): the old bath opened
-   east across the Office's north end, 11'5" x 5'3" (6'2" at the old bath's end): a 48" vanity on its west wall, the WC under
-   the north window and a 36" x 48" stall shower in the north-east corner (placeholders). It keeps
-   the old bath's door; the Office keeps 7'4" x 6'3" south of it, with its transom.
+7. **Upstairs bath** (MK: a full bath with a stall shower in the north-east): east of the stair's
+   top landing, across the Office's north end, 7'4" x 5'3", the old bath's east wall its west wall:
+   the WC under the north window, a 36" x 36" stall shower in the north-east corner and a 48"
+   vanity on its south wall (placeholders), and a 28" door from the hall. The Office keeps 7'4" x
+   6'3" south of it, with its transom.
 8. **The Adirondack entry: foyer and screen porch** on the west face in place of the entry porch
    (MK: "thoroughly Adirondack", with the ends of exposed beams showing at the entry;
    `docs/history/PLAN-v10-adirondack.md`). An enclosed foyer (7'10" x 8') with the 36" front door
    in line with the house door, under a gable facing west, and south of it a screen porch (13'1" x
    8') with screens above knee walls, two screen doors and a shed roof high at the house wall. The
    Living's west window, which now looks into the porch, is replaced by the same window without
-   shutters. For coats (the closet under the stair is narrow), a 48" bench under the foyer's north
+   shutters. For coats (there is no closet under the stair), a 48" bench under the foyer's north
    window and a rail of hooks either side of it. All sizes are estimates.
    - **The style, from the research** (web search summaries; the full pages could not be fetched):
      native materials throughout (whole, split or peeled logs, bark and fieldstone); rough log
@@ -825,13 +830,20 @@ with the places where the built design differs from them):
     same poured concrete, its top 2" over the lawn behind it. The garage itself (24' x 26', 55' west
     of the house, 5' north of this wall) is not drawn. Walls that close no room, like this one, are
     left out of what the 3D view frames and shadows, so the house keeps its size on screen.
+12. **Floors** (MK, 15 Oct 2026): **6" pine, face-nailed** with old square cut nails, whitewashed
+    so it reads white and not yellow, through the **whole first floor** (the hall, the Living, the
+    kitchen, the foyer, the pantry, the laundry and the master bedroom) and the **upstairs hall**
+    with the stair's top landing and the balcony; **tile** in the bathrooms (the powder room, the
+    master bath and the upstairs bath); **oatmeal carpet** in the upstairs bedrooms and the master
+    closet. The screen porch keeps its outdoor boards. Rooms kept from today carry their new floor
+    as a proposed floor, so the Existing view still shows today's floors.
 **After the work** (MK, after his garage across the road), the Proposed view shows the whole house
 re-sided in brown painted engineered shakes (`#4b3a32`), under a dark hunter green standing-seam
 roof (`#2f4a36`) with its rake and fascia boards in the shake brown, with black windows (`#1c1c1c`)
 trimmed in red (`#a8322d`) and the shutters off. Existing and All keep today's look.
 
-The new rooms have **placeholder** finishes until you choose them (off-white paint, wood board
-floors, tile in the baths and the foyer, a wood floor on the screen porch), which also cover the
+The new rooms' walls have **placeholder** paint until you choose them (off-white), and their
+floors are MK's (item 12; a wood floor on the screen porch); the paint also covers the
 inside faces of the old outside walls the additions enclose. Interior doors are stained like the
 old Bath door.
 

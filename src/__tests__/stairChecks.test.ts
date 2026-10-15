@@ -145,14 +145,13 @@ describe('a stairway of pieces', () => {
 describe('the starter', () => {
   const starter = migrate(example as unknown) as Plan;
 
-  it('chains its grand stair: platform, flight east, landing, flight south', () => {
+  it('chains its grand stair: the bottom step, the landing, the straight run', () => {
     const fid = starter.levelOrder[1];
-    expect(stairChains(starter, fid, 'proposed')).toEqual([['f-s2', 'f-s3', 'f-s4', 'f-s5']]);
-    // Each leaves the piece below by its side but the first flight, which arrives at the landing's bottom.
+    expect(stairChains(starter, fid, 'proposed')).toEqual([['f-s2', 'f-s3', 'f-s4']]);
+    // The step arrives at the landing's bottom; the run leaves the landing by its side (the turn).
     expect(flightLinks(starter, fid, 'proposed').map((l) => [l.from, l.to, l.edge])).toEqual([
-      ['f-s2', 'f-s3', 2],
-      ['f-s3', 'f-s4', 1],
-      ['f-s4', 'f-s5', 2],
+      ['f-s2', 'f-s3', 1],
+      ['f-s3', 'f-s4', 2],
     ]);
   });
 

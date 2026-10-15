@@ -10,7 +10,6 @@
 import { getLevelElevations } from '../src/derive/levels';
 import { roofBearing, roofHeightAt } from '../src/derive/roofs';
 import { columnDefaults, FENCE_DEFAULTS, groundAt } from '../src/derive/site';
-import { getStaircaseLayout, heightAt } from '../src/derive/staircase';
 import { COLUMN_COLOR } from '../src/model/finish';
 import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
@@ -139,6 +138,18 @@ const WOOD_FLOOR = '#a87a4c';
  */
 const PLACEHOLDER_ROOM = { wallFinish: 'paint', floorFinish: 'boards', floorColor: WOOD_FLOOR } as const;
 const PLACEHOLDER_WET = { wallFinish: 'paint', floorFinish: 'tile' } as const;
+/**
+ * The proposed floors (MK, 15 Oct 2026): 6" pine, face-nailed, whitewashed so it reads white and
+ * not yellow, through the whole first floor and the upstairs hall, and on the stair's thick treads;
+ * oatmeal carpet in the upstairs bedrooms; tile in the bathrooms.
+ */
+const PINE_FLOOR = '#d8d0c2';
+const PROPOSED_PINE = { wallFinish: 'paint', floorFinish: 'pine', floorColor: PINE_FLOOR } as const;
+/** The same floors laid in a room that is kept (Room.proposedFloor). */
+const PINE_PROPOSED = { finish: 'pine', color: PINE_FLOOR } as const;
+const CARPET_PROPOSED = { finish: 'carpet' } as const;
+/** The peeled log post's pale, barkless wood (MK). */
+const PEELED_LOG = '#c9ab7e';
 /** The proposed shakes' brown (and the roof boards'): the dark chocolate of MK's garage. */
 const SHAKE_BROWN = '#4b3a32';
 /**
@@ -323,7 +334,7 @@ function fixture(levelId: Id, f: NewFixture): Id {
  * Name a room: a label anchored at `at`. A label of a new or demolished room shows only in the views
  * that show its phase. `finishes`: the room's interior finishes (DESIGN.md "Interior finishes").
  */
-function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE, finishes: Pick<Room, 'wallFinish' | 'wallColor' | 'wainscot' | 'floorFinish' | 'floorColor'> = {}): void {
+function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE, finishes: Pick<Room, 'wallFinish' | 'wallColor' | 'wainscot' | 'floorFinish' | 'floorColor' | 'proposedFloor'> = {}): void {
   if (!store().addRoom(levelId, { name, anchor: at, ...(phase === 'existing' ? {} : { phase }), ...finishes })) throw new Error(`room ${name} rejected`);
 }
 
@@ -761,8 +772,9 @@ export function buildExamplePlan(): Plan {
     wallColor: CHECK_BLUE,
     floorFinish: 'tile',
     floorColor: VINYL_BEIGE,
+    proposedFloor: PINE_PROPOSED,
   });
-  label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, { wallFinish: 'boards', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN });
+  label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, { wallFinish: 'boards', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN, proposedFloor: PINE_PROPOSED });
   // The stair strip is part of the Living (no wall on its south side), so it has no label of its own.
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: ENTRY_Y });
@@ -770,10 +782,11 @@ export function buildExamplePlan(): Plan {
   // Placeholder finishes (no photos of the Second Floor).
   label(sId, 'Bunk', { x: 90, y: 52 }, PHASE, PLACEHOLDER_ROOM);
   label(sId, 'Bath', { x: (UP.ew + 2.5 + (UP.bathEast - 2.5)) / 2, y: 45 }, PHASE, PLACEHOLDER_WET);
-  label(sId, 'Master closet', { x: (CL.x0 + HALF + (UP.closet - 2.5)) / 2, y: STRIP_MID }, PHASE, PLACEHOLDER_ROOM);
-  label(sId, 'Master', { x: 90, y: 225 }, PHASE, PLACEHOLDER_ROOM);
-  label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, PLACEHOLDER_ROOM);
-  label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
+  // The proposed design carpets the bedrooms and lays the pine in the hall (proposedFloor).
+  label(sId, 'Master closet', { x: (CL.x0 + HALF + (UP.closet - 2.5)) / 2, y: STRIP_MID }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED });
+  label(sId, 'Master', { x: 90, y: 225 }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED });
+  label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED });
+  label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: PINE_PROPOSED });
 
   proposed({ bId, fId, sId, stair, houseDoor, livingWest, frontWindow, eastWindow, eastUpstairs, wingSouth, wingRoof, porchRoof, bathWindow, chimney, fixtures: casework });
   return getPlan();
@@ -885,16 +898,19 @@ function proposed(ids: ExistingIds): void {
   });
   // Second Floor: the two east windows (the wing's new shed rises past their sills, so high
   // transoms replace them, below); the Bunk's south wall with its door (the Bunk is the upper half
-  // of the stair hall) and the stub of its east wall south of the old bath (y 83.5..99.5), so the
-  // top of the stair opens straight into the upstairs hall. The old bath's east wall goes once the
-  // new bath's wall has met it (section 9).
+  // of the stair hall) and its whole east wall, which was the old bath's west wall (x 171.5, y
+  // 3.5..99.5), and the old bath's south wall with its door (y 83.5): the stair runs straight up the
+  // north wall and arrives at x 169, so the old bath is its top landing and the upstairs hall, and
+  // the new bath, with its own label, keeps the old bath's east wall as its west wall (section 9).
   demolish(sId, {
     walls: [
       { x: 100, y: 99.5 },
       { x: 171.5, y: 92 },
+      { x: 171.5, y: 40 },
+      { x: 196, y: 83.5 },
     ],
     openings: ids.eastUpstairs,
-    rooms: ['Bunk'],
+    rooms: ['Bunk', 'Bath'],
   });
   // The site: the masonry chimney on the north wall (MK: a stainless flue serves the new stove).
   store().setPhase(fId, { walls: [], openings: [], columns: [ids.chimney] }, 'demo');
@@ -1007,8 +1023,8 @@ function proposed(ids: ExistingIds): void {
   // The hall to the kitchen: a 32" cased opening in the Kitchen/Living partition at the stair
   // strip's east end, on the line of the house door (y 118.5).
   add({ x: PART_KL, y: 118.5 }, { type: 'passage', width: 32, height: 80, sill: 0 });
-  // The stair hall: a 24" window over the stair's bottom platform in the north wall (x 13..37, sill
-  // 36, 2 x 3 lites); safety glass, being this near the steps.
+  // The stair hall: a 24" window over the stair's landing in the north wall (x 13..37, sill 36, 2 x
+  // 3 lites); safety glass, being this near the steps.
   add({ x: 25, y: CL.y0 }, { type: 'window', width: 24, height: 48, sill: 36, lites: { cols: 2, rows: 3 } });
   // Upstairs, the transoms in place of the two east windows: 46 x 24, two sashes of 2 x 2 lites,
   // sill 60, so the head is at 84. The wing's shed (below) meets the wall with its top 50.9" above
@@ -1017,75 +1033,52 @@ function proposed(ids: ExistingIds): void {
   for (const y of [110, 222]) {
     addOpeningAt(sId, { x: CL.x1, y }, { type: 'window', width: 46, height: 24, sill: 60, sashes: 2, lites: { cols: 2, rows: 2 }, phase: NEW });
   }
-  // Light for the stair hall's upper half: a second casement pair in the north wall over the stair's
-  // landing (x 140, like the Bunk's at x 78), and one in the west wall over the bottom of the stair,
+  // Light for the stair hall's upper half: a second casement pair in the north wall over the top of
+  // the run (x 140, like the Bunk's at x 78), and one in the west wall over the bottom of the stair,
   // north of the foyer's roof (y 36, 30 x 44, sill 36).
   addOpeningAt(sId, { x: 140, y: CL.y0 }, { type: 'window', width: 46, height: 44, sill: 36, sashes: 2, lites: { cols: 2, rows: 3 }, phase: NEW });
   addOpeningAt(sId, { x: CL.x0, y: 36 }, { type: 'window', width: 30, height: 44, sill: 36, lites: { cols: 2, rows: 3 }, phase: NEW });
 
-  // ---- 3. The grand stair (MK, 14 Oct 2026): the old front room and the Bunk over it are one stair
-  // hall, x 7..168, y 7..135, open through both floors north of y 91. 108" floor to floor in 15
-  // risers of 7.2" on 10.5" treads (2R + T = 24.9"), all 42" wide but the top flight (41"), solid
-  // under, wrapping the hall's north-west, north and east sides round an open court:
-  //   - a one-riser platform in the north-west corner (x 7..43, y 7..49, top 7.2"): you step up onto
-  //     it heading north from the entry, two steps from the house door, and turn east;
-  //   - flight 1 east along the north wall, x 43..127, 8 risers to 64.8", its south side railed;
-  //   - a landing in the north-east corner, x 127..168, y 7..49, at 72";
-  //   - flight 2 south along the hall's east wall, y 49..91, 4 risers to 100.8", its west side
-  //     railed; the Second Floor's edge at y 91 is the 15th riser.
-  // The floor opening (Second Floor) cuts the slab over the whole hall north of y 91, x 7..169, so
-  // the flights cut nothing themselves; its guard runs along y 91 west of the stair's arrival (and
-  // the 5" of its east edge south of the old bath's corner, y 86..91, where the Bunk's wall is gone)
-  // and the balcony, y 91..135, leads to the bedroom door (x 150) and east into the upstairs hall.
+  // ---- 3. The grand stair (MK, 14 and 15 Oct 2026): the old front room and the Bunk over it are one
+  // stair hall, x 7..168, y 7..135, open through both floors north of y 91. 108" floor to floor in
+  // 15 risers of 7.2" on 10 3/8" treads (2R + T = 24.8"), solid under. One step up heading north from
+  // the hall to a landing in the north-west corner, a turn east there, and one straight run up the
+  // north wall with no second turn:
+  //   - the bottom step, x 7..43, y 49..59 3/8, top 7.2", clear of the house door (y 100.5..136.5);
+  //   - the landing in the north-west corner (x 7..43, y 7..49, top 14.4");
+  //   - the run east along the north wall, x 43..167.5, 42" wide, 12 risers to 100.8", its south
+  //     side railed; the Second Floor's edge at x 167.5, just short of the hall's east wall (x 170.5,
+  //     faces 168..173), is the 15th riser. The old bath upstairs is its top landing (the demolition
+  //     above).
+  // The floor opening (Second Floor) cuts the slab over the whole hall north of y 91, x 7..167.5, so
+  // the pieces cut nothing themselves; its guard runs along y 91 and up the east edge, open where
+  // the run arrives (y 7..49), and the balcony, y 91..135, leads to the bedroom door (x 150) and east
+  // into the upstairs hall.
   const R = 108 / 15;
-  const TREAD = 10.5;
+  const TREAD = 10.375;
   const flight = (s: Omit<NewStairs, 'phase' | 'cutsFloorAbove'>): Id => {
     const id = store().addStairs(fId, { ...s, phase: NEW, cutsFloorAbove: false });
     if (!id) throw new Error(`stairs at ${JSON.stringify(s.origin)} rejected`);
     return id;
   };
-  const STAIR = { platformEast: 43, landingWest: 127, east: 168, south: 49, top: 91 };
+  const STAIR = { landingEast: 43, south: 49, top: 167.5, run: 12 };
+  const LANDING_X = (CL.x0 + HALF + STAIR.landingEast) / 2;
   const pieces = [
-    flight({ origin: { x: (CL.x0 + HALF + STAIR.platformEast) / 2, y: STAIR.south }, direction: 270, width: STAIR.platformEast - (CL.x0 + HALF), run: STAIR.south - (CL.y0 + HALF), rise: R, risers: 1 }),
-    flight({ origin: { x: STAIR.platformEast, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: 8 * TREAD, base: R, rise: 8 * R, risers: 8, railings: { right: true } }),
-    flight({ origin: { x: STAIR.landingWest, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: STAIR.east - STAIR.landingWest, base: 9 * R, rise: R, risers: 1 }),
-    flight({ origin: { x: (STAIR.landingWest + STAIR.east) / 2, y: STAIR.south }, direction: 90, width: STAIR.east - STAIR.landingWest, run: 4 * TREAD, base: 10 * R, rise: 4 * R, risers: 4, railings: { right: true } }),
+    flight({ origin: { x: LANDING_X, y: STAIR.south + TREAD }, direction: 270, width: STAIR.landingEast - (CL.x0 + HALF), run: TREAD, rise: R, risers: 1 }),
+    flight({ origin: { x: LANDING_X, y: STAIR.south }, direction: 270, width: STAIR.landingEast - (CL.x0 + HALF), run: STAIR.south - (CL.y0 + HALF), base: R, rise: R, risers: 1 }),
+    flight({ origin: { x: STAIR.landingEast, y: (CL.y0 + HALF + STAIR.south) / 2 }, direction: 0, width: 42, run: STAIR.run * TREAD, base: 2 * R, rise: STAIR.run * R, risers: STAIR.run, railings: { right: true } }),
   ];
-  // The four pieces are one staircase (Level.staircases), selected, moved and styled together: oak
-  // treads with a 1" nosing over white risers, closed stringers, box newels and a round 36" rail
-  // (the defaults, model/stairStyle.ts), framed underneath so the space under the landing and the
-  // top flight is a room, and a bullnose round the starting newel on the platform.
-  const grand = store().groupStairs(fId, pieces, { name: 'Grand stair', underside: 'framed', startStep: 'bullnose' });
+  if (STAIR.landingEast + STAIR.run * TREAD !== STAIR.top) throw new Error('the run does not reach the Second Floor edge');
+  // The three pieces are one staircase (Level.staircases), selected, moved and styled together: thick
+  // pine treads (2", in the floors' whitewashed pine) with a 1" nosing over white risers, closed
+  // stringers, box newels and a round 36" rail (model/stairStyle.ts), framed underneath. The rail
+  // starts at the landing's newel; the bottom step is a plain square step below it.
+  const grand = store().groupStairs(fId, pieces, { name: 'Grand stair', underside: 'framed', treadColor: PINE_FLOOR, treadThickness: 2 });
   if (!grand) throw new Error('staircase rejected');
-  const well = { x0: CL.x0 + HALF, x1: 169, y0: CL.y0 + HALF, y1: STAIR.top, bathCorner: 86 };
-  const wellOutline = [
-    { x: well.x0, y: well.y0 },
-    { x: well.x1, y: well.y0 },
-    { x: well.x1, y: well.bathCorner },
-    { x: well.x1, y: well.y1 },
-    { x: well.x0, y: well.y1 },
-  ];
-  if (!store().addFloorOpening(sId, { outline: wellOutline, railings: [false, false, true, true, false], phase: NEW })) throw new Error('floor opening rejected');
-
-  // ---- The coat closet under the stair (MK, 14 Oct 2026: the design had none). The framed
-  // underside leaves a room under the landing (61 3/4" clear) and the top flight (its soffit rising
-  // to about 7'8" at its top). The closet's west wall cannot stand under the landing's edge (x 129.5):
-  // it would meet the north wall inside the old front room's 80" window (jambs 56..136), which keeps
-  // its place in the existing view only if that wall is not split there. So the wall is at x 138.5
-  // (faces 136..141), its face at the old window's east jamb, and the closet is 2'3" x 6'7" inside
-  // (x 141..168, y 7..86). Its front wall, under the top flight at y 88.5 (faces 86..91), takes a 24"
-  // door swinging out into the hall. Each wall stands to the stair's underside over it (the west one
-  // to the landing's; the stair's panels close the slope above it, derive/staircase.ts).
-  const CLOSET = { west: 138.5, front: 88.5 };
-  partition(fId, { x: CLOSET.west, y: CL.y0 }, { x: CLOSET.west, y: CLOSET.front }, NEW);
-  partition(fId, { x: CLOSET.west, y: CLOSET.front }, { x: PART_KL, y: CLOSET.front }, NEW);
-  const under = getStaircaseLayout(getPlan(), fId, grand, 'proposed')!.undersides;
-  const quarter = (v: number) => Math.floor(v * 4) / 4;
-  const landingUnder = quarter(heightAt(under[pieces[2]]!, { x: 150, y: 28 }));
-  const frontUnder = quarter(heightAt(under[pieces[3]]!, { x: 150, y: CLOSET.front - TI / 2 }));
-  store().updateWalls(fId, [wallAt(fId, { x: CLOSET.west, y: 30 }).wallId], { heightOverride: landingUnder });
-  store().updateWalls(fId, [wallAt(fId, { x: 150, y: CLOSET.front }).wallId], { heightOverride: frontUnder });
-  add({ x: (CLOSET.west + TI / 2 + PART_KL - TI / 2) / 2, y: CLOSET.front }, { type: 'door', width: 24, height: 80, into: SOUTH, leafColor: STAINED_DOOR });
+  const wellOutline = outline({ x0: CL.x0 + HALF, x1: STAIR.top, y0: CL.y0 + HALF, y1: 91 });
+  if (!store().addFloorOpening(sId, { outline: wellOutline, railings: [false, true, true, false], phase: NEW })) throw new Error('floor opening rejected');
+  // The space under the high end of the run stays open under its framed underside (the coat closet
+  // under the old landing went with it).
 
   // ---- Roofs, new sheet (little rust). The wing: one shed over the whole east side, 5:12 in the
   // wing roof's colour, high at the main block's east wall and down to 96" at the wing's east wall:
@@ -1103,7 +1096,7 @@ function proposed(ids: ExistingIds): void {
   // door (below). Its heights depend only on y, so the foyer's gable wall and its door stay as they are.
   const CANOPY_X0 = FOYER.x0 - 60;
   roof(fId, { shape: 'gable', outline: outline({ x0: CANOPY_X0, x1: ROOF_EAST, y0: FOYER.y0, y1: FOYER.y1 }), ridgeAngle: 0, pitch: 8, overhang: 18 }, ROOF_GALVANIZED, 0.1, NEW);
-  // Coats in the foyer (MK, 14 Oct 2026; the closet under the stair is narrow): a 48" bench 16" deep
+  // Coats in the foyer (MK, 14 Oct 2026; there is no closet under the stair): a 48" bench 16" deep
   // and 18" high under the north window (sill 36), clear of the front door's swing, and a 24" rail
   // of hooks at 60" either side of the window. Stained like the trim.
   const foyerNorth = FOYER.y0 + T;
@@ -1371,21 +1364,22 @@ function proposed(ids: ExistingIds): void {
   const flueTop = round2(Math.max(roofTop(FLUE) + 36, roofTop({ x: FLUE.x, y: FLUE.y - ft(10) }) + 24));
   if (!store().addColumn({ at: FLUE, kind: 'flue', phase: NEW, width: 8, depth: 8, rotation: 0, base: FLOOR_TOP + THIMBLE - 10, top: flueTop, cap: true })) throw new Error('flue rejected');
 
-  // ---- 9. The second floor's full bath (MK, 14 Oct 2026), across the north-east: the old bath
-  // (x 174..218, y 7..81) opened east across the old Office's north end, x 174..311, y 7..70 inside
-  // (11'5" x 5'3", 6'2" at the old bath's end). Its new south wall runs at y 72.5 (faces 70..75)
-  // from the old bath's east wall line to the east wall, south of where it meets the old east window
-  // (y 75..121) so that window keeps its place in the existing view; a stub of the old east wall
-  // stays between y 72.5 and the old bath's south wall. The old 24" door (x 184..208, swinging out
-  // into the hall) stays. Placeholders: a 48" vanity on the west wall, the WC on the north wall
-  // under the window (x 225..271), a 36 x 48 stall shower in the north-east corner (x 275..311, y
-  // 7..55). The Office keeps x 223..311, y 75..150 (7'4" x 6'3") with its transom.
+  // ---- 9. The second floor's full bath (MK, 14 and 15 Oct 2026), across the north-east, east of the
+  // stair's top landing: the old bath's east wall (x 220.5) is its west wall, so it is x 223..311,
+  // y 7..70 inside (7'4" x 5'3"). Its new south wall runs at y 72.5 (faces 70..75) from that wall
+  // to the east wall, south of where it meets the old east window (y 75..121) so that window keeps
+  // its place in the existing view; the old east wall's stub south of it (y 72.5..83.5) goes. A 28"
+  // door in its west wall from the hall, south of the landing, swinging in. Placeholders: the WC on
+  // the north wall under the window (x 238..258), a 36 x 36 stall shower in the north-east corner,
+  // a 48" vanity on the south wall east of the door's swing. The Office keeps x 223..311, y 75..150
+  // (7'4" x 6'3") with its transom.
   partition(sId, { x: UP_BATH.east, y: UP_BATH.south }, { x: CL.x1, y: UP_BATH.south }, NEW);
-  demolish(sId, { walls: [{ x: UP_BATH.east, y: 40 }] });
+  demolish(sId, { walls: [{ x: UP_BATH.east, y: 78 }] });
+  addOpeningAt(sId, { x: UP_BATH.east, y: 52 }, { type: 'door', width: 28, height: 80, into: EAST, leafColor: STAINED_DOOR, phase: NEW });
   const upstairs = (f: Omit<NewFixture, 'phase' | 'elevation'> & { elevation?: number }) => fixture(sId, { elevation: 0, ...f, phase: NEW });
-  upstairs({ kind: 'sink', origin: { x: UP_BATH.west, y: 34 }, direction: 0, width: 48, depth: 21, height: 34.5 });
   upstairs({ ...WC, origin: { x: 248, y: CL.y0 + HALF }, direction: 90 });
-  upstairs({ kind: 'box', label: 'Shower', origin: { x: KITCHEN_EAST, y: 31 }, direction: 180, width: 48, depth: 36, height: 78, frontColor: WHITE });
+  upstairs({ kind: 'box', label: 'Shower', origin: { x: KITCHEN_EAST, y: 25 }, direction: 180, width: 36, depth: 36, height: 78, frontColor: WHITE });
+  upstairs({ kind: 'sink', origin: { x: 284, y: UP_BATH.south - 2.5 }, direction: 270, width: 48, depth: 21, height: 34.5 });
 
   // ---- Structure (docs/history/PLAN-v8-stair-structure.md; estimates for MK and the engineer).
   // MK, 14 Oct 2026: the house was built in stages and its joists run north-south generally, so
@@ -1400,8 +1394,10 @@ function proposed(ids: ExistingIds): void {
   // top tread, from the west wall to the x 170.5 partition; and the kitchen beam on the old wall's
   // line, from that partition to the east wall. Both land on the partition, so a post under the
   // landing points carries them down through the basement to a 24" x 12" footing: two 6x6s side
-  // by side (5 1/2" x 11"), centred between the two ends (y 96.125), so each end is over it. The new
-  // y 137.5 wall (the stair hall's south side) is not bearing.
+  // by side (5 1/2" x 11"), centred between the two ends (y 96.125), so each end is over it. The
+  // balcony header also rests on a peeled log post (MK, 15 Oct 2026) in the middle of the hall, on
+  // the line of the old wall between the front room and the Living, carried down to its own footing
+  // by a 6x6 in the basement.
   for (const lid of [bId, fId, sId]) store().setLevelFraming(lid, { joists: 90 });
   const wingZones: [Rect, Phase][] = [
     [{ x0: WING.x0, x1: WING.x1, y0: WING.y0, y1: WING.y1 }, 'existing'],
@@ -1416,6 +1412,9 @@ function proposed(ids: ExistingIds): void {
   beam({ x: PART_KL, y: FRONT_LINE }, { x: CL.x1, y: FRONT_LINE });
   const POST = MEMBER_DEFAULTS.post;
   if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: (92.75 + FRONT_LINE) / 2 }, width: POST.width, depth: 2 * POST.width, rotation: 0, label: '(2) 6x6', phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post rejected');
+  const LOG_POST = { at: { x: 88, y: 92.75 }, d: 14 };
+  if (!store().addMember(fId, { kind: 'post', at: LOG_POST.at, width: LOG_POST.d, depth: LOG_POST.d, rotation: 0, base: 0, top: level(fId).wallHeight, color: PEELED_LOG, profile: 'log', label: '14" peeled log post', phase: NEW })) throw new Error('log post rejected');
+  if (!store().addMember(bId, { kind: 'post', at: LOG_POST.at, width: POST.width, depth: POST.width, rotation: 0, label: '6x6', phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post under the log rejected');
   // Studs under each beam end in the partition (two 2x4s, 3 1/2" square), so each end has its own
   // path down to the basement post.
   for (const y of [92.75, FRONT_LINE]) {
@@ -1423,17 +1422,19 @@ function proposed(ids: ExistingIds): void {
   }
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two
-  // never share a face there. Placeholder finishes (MK), which also dress the faces of the old
-  // exterior walls the additions enclose; the screen porch keeps its shingle inside. The upstairs
-  // Bath and Office / hall keep their labels (the hall now runs out onto the balcony round the stair
-  // hall's opening).
-  label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW, PLACEHOLDER_ROOM);
+  // never share a face there. The proposed floors (MK, 15 Oct 2026): whitewashed 6" pine through
+  // the first floor and the upstairs hall, tile in the bathrooms, oatmeal carpet in the upstairs
+  // bedrooms; painted walls, which also dress the faces of the old exterior walls the additions
+  // enclose; the screen porch keeps its shingle inside and its outdoor boards. The rooms that are
+  // kept (the Kitchen, the Living, the upstairs rooms) take their new floors as proposed floors
+  // (Room.proposedFloor, set with their labels above).
+  label(fId, 'Master bedroom (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 155 }, NEW, PROPOSED_PINE);
   label(fId, 'Master bath (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 62 }, NEW, PLACEHOLDER_WET);
-  label(fId, 'Coats (proposed)', { x: 154.5, y: 47 }, NEW, PLACEHOLDER_ROOM);
   label(fId, 'Powder room (proposed)', { x: 213, y: 28 }, NEW, PLACEHOLDER_WET);
-  label(fId, 'Pantry (proposed)', { x: 287, y: 30 }, NEW, PLACEHOLDER_ROOM);
-  label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PLACEHOLDER_ROOM);
-  label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW, PLACEHOLDER_WET);
+  label(fId, 'Pantry (proposed)', { x: 287, y: 30 }, NEW, PROPOSED_PINE);
+  label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PROPOSED_PINE);
+  label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW, PROPOSED_PINE);
+  label(sId, 'Bath (proposed)', { x: 267, y: 40 }, NEW, PLACEHOLDER_WET);
   label(fId, 'Screen porch (proposed)', { x: -48, y: 236 }, NEW, { floorFinish: 'boards', floorColor: WOOD_FLOOR });
   label(bId, 'Crawl space (proposed)', { x: (WING.x0 + WING.x1) / 2, y: 97 }, NEW);
   label(bId, 'Crawl space under the foyer (proposed)', { x: -48, y: 111 }, NEW);
