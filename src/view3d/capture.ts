@@ -1,4 +1,5 @@
 import { BufferAttribute, BufferGeometry, DirectionalLight, Mesh, OrthographicCamera, ShaderMaterial, Vector3, type Scene, type WebGLRenderer } from 'three';
+import { flushTextures } from './textureQueue';
 import { planTerrain, type TerrainGrid } from '../derive/site';
 import { getPlan } from '../store/planStore';
 import { useUiStore, type ElevationFace } from '../store/uiStore';
@@ -118,6 +119,8 @@ function aimSun(scene: Scene, sun: Xyz, box: Box3d): () => void {
 export function captureElevation(face: ElevationFace, scale = 2): string | null {
   const state = live?.();
   if (!state) return null;
+  // The picture shows every texture, painted or not yet (textureQueue.ts).
+  flushTextures();
   const { gl, scene, size, invalidate } = state;
   const plan = getPlan();
   const ui = useUiStore.getState();

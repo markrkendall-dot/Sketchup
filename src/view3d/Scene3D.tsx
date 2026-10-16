@@ -1,5 +1,6 @@
 import { Grid, Sky } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
+import { setTextureRedraw } from './textureQueue';
 import { useEffect, useMemo } from 'react';
 import { BackSide, Color, DirectionalLight, Mesh, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry, type Object3D } from 'three';
 import { lowestGround } from '../derive/site';
@@ -84,9 +85,12 @@ function InvalidateOnChange() {
       )
         invalidate();
     });
+    // Textures painted after the first frame (textureQueue.ts) redraw the view as they arrive.
+    setTextureRedraw(invalidate);
     return () => {
       offPlan();
       offUi();
+      setTextureRedraw(null);
     };
   }, [invalidate]);
   return null;

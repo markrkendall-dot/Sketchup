@@ -11,12 +11,15 @@ import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFA
 import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, SurfaceMaterial, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture, surfaceTexture } from './groundTexture';
 import { brickTextures, interiorTextures, NORMAL_SCALE, newWorkColor, quantizeWeathering, roofTexture, sidingTexture, sidingTextures, type InteriorTexture } from './textures';
+import { deferTexture } from './textureQueue';
 
 // Shared materials, created once. FrontSide everywhere: derive/meshes.ts guarantees outward
 // winding, so a missing or black face is a geometry bug to fix, never something to paper over.
 //
 // A material that carries a texture records the colour it stands for in `userData.flatColor`
 // (`#rrggbb`): the export is colours only (io/export3d.ts drops every map and uses that colour).
+// Its textures are painted after the first frame (textureQueue.ts): until then it shows that flat
+// colour, then the white tint over the map, with the normal map, as if made with them.
 
 /**
  * The sky environment map (Scene3D's PMREM gradient) is carried only by materials that reflect it
@@ -68,6 +71,29 @@ function make(color: string, opts: { transparent?: boolean; opacity?: number } =
   return m;
 }
 
+/** Textures as the generators hand them back: a colour map and, where the finish has relief, a normal map. */
+type Maps = { map: Texture | null; normalMap?: Texture | null } | null;
+
+/**
+ * Give `m` the textures `paint` makes, once the texture queue gets to them: a white tint over the
+ * map and the normal map at NORMAL_SCALE. Until then (and for good where `paint` makes none) `m`
+ * keeps its flat colour. `then` adjusts the material once textured (a screen's opacity).
+ */
+function texture(m: MeshStandardMaterial, paint: () => Maps, then?: (m: MeshStandardMaterial) => void): void {
+  deferTexture(() => {
+    const tex = paint();
+    if (!tex?.map) return;
+    m.color.set('#ffffff');
+    m.map = tex.map;
+    if (tex.normalMap) {
+      m.normalMap = tex.normalMap;
+      m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
+    }
+    then?.(m);
+    m.needsUpdate = true;
+  });
+}
+
 const wallMaterials = new Map<string, MeshStandardMaterial>();
 
 /**
@@ -107,15 +133,8 @@ export function wallMaterial(
   if (!m) {
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
-      const tex = textured ? sidingTextures(finish, color, phase === 'new' ? 'new' : 'plain') : null;
-      m = make(tex ? '#ffffff' : wallFlatColor(phase, finish, color));
-      if (tex) {
-        m.map = tex.map;
-        if (tex.normalMap) {
-          m.normalMap = tex.normalMap;
-          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
-        }
-      }
+      m = make(wallFlatColor(phase, finish, color));
+      if (textured) texture(m, () => sidingTextures(finish, color, phase === 'new' ? 'new' : 'plain'));
       if (finish === 'screen') {
         m.transparent = true;
         m.opacity = 0.4;
@@ -156,24 +175,18 @@ function interiorMaterial(surface: 'wall' | 'floor', phase: Phase, finish: RoomW
   if (!m) {
     const kind = interiorTextureOf(surface, finish);
     const variant = phase === 'new' ? 'new' : 'plain';
+    m = make(interiorFlatColor(phase, finish, color));
     // The wide pine floor is Nordic natural pine (proceduralTextures.ts); painted walls carry an
     // eggshell stipple; the rest are textures.ts drawings.
-    const tex =
+    texture(m, () =>
       surface === 'floor' && finish === 'pine'
         ? pineFloorTextures(color, variant)
         : surface === 'wall' && finish === 'paint'
           ? paintTextures(color, variant)
           : kind
             ? interiorTextures(kind, color, variant)
-            : null;
-    m = make(tex ? '#ffffff' : interiorFlatColor(phase, finish, color));
-    if (tex) {
-      m.map = tex.map;
-      if (tex.normalMap) {
-        m.normalMap = tex.normalMap;
-        m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
-      }
-    }
+            : null,
+    );
     if (surface === 'floor' && finish === 'pine') m.roughness = 0.7; // a matte water-based finish
     if (surface === 'floor') {
       // The finish sits 1/16" over the slab top (meshes.ts FLOOR_FINISH_LIFT); the offset keeps it
@@ -227,16 +240,8 @@ export function roofMaterial(finish: RoofFinish, phase: Phase, color: string = R
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
       const flat = roofFlatColor(phase, color);
-      const tex = roofTexture(finish, flat, w);
-      m = make(tex ? '#ffffff' : flat);
-      if (tex) {
-        m.map = tex.map;
-        if (tex.normalMap) {
-          m.normalMap = tex.normalMap;
-          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
-        }
-        m.userData.flatColor = flat;
-      }
+      m = make(flat);
+      texture(m, () => roofTexture(finish, flat, w), (t) => (t.userData.flatColor = flat));
       if (isMetalRoof(finish)) {
         m.metalness = 0.35;
         m.roughness = 0.55;
@@ -286,16 +291,9 @@ function woodLike(key: string, wood: WoodId | { grain: (typeof WOODS)[WoodId]['g
   if (!m) {
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
-      const tex = woodTextures(wood, phase === 'new' ? 'new' : 'plain');
       const flatColor = phase === 'new' ? newWorkColor(flat) : flat;
-      m = make(tex ? '#ffffff' : flatColor);
-      if (tex) {
-        m.map = tex.map;
-        if (tex.normalMap) {
-          m.normalMap = tex.normalMap;
-          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
-        }
-      }
+      m = make(flatColor);
+      texture(m, () => woodTextures(wood, phase === 'new' ? 'new' : 'plain'));
       m.roughness = 0.75;
       m.userData.flatColor = flatColor;
     }
@@ -341,16 +339,11 @@ export function furnitureMaterial(part: FixturePart, phase: Phase, wood: WoodId,
   const k = `furniture|${part}|${id ?? ''}|${phase}`;
   let m = woodMaterials.get(k);
   if (!m) {
-    const tex = id ? fabricTextures(id, phase === 'new' ? 'new' : 'plain') : null;
-    const flatColor = phase === 'new' ? (tex ? newWorkColor(flat) : pullGreen(flat)) : flat;
-    m = make(tex ? '#ffffff' : flatColor);
-    if (tex) {
-      m.map = tex.map;
-      if (tex.normalMap) {
-        m.normalMap = tex.normalMap;
-        m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
-      }
-    }
+    // A fabric is textured wherever there is a canvas (proceduralTextures.ts).
+    const textured = id !== null && typeof document !== 'undefined';
+    const flatColor = phase === 'new' ? (textured ? newWorkColor(flat) : pullGreen(flat)) : flat;
+    m = make(flatColor);
+    if (id) texture(m, () => fabricTextures(id, phase === 'new' ? 'new' : 'plain'));
     if (part === 'metal') {
       m.metalness = 0.5;
       m.roughness = 0.5;
@@ -410,13 +403,16 @@ function screenMaterial(phase: Phase): MeshStandardMaterial {
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
       const flat = phase === 'new' ? newWorkColor(SCREEN_COLOR) : SCREEN_COLOR;
-      const tex = sidingTexture('screen', SCREEN_COLOR, phase === 'new' ? 'new' : 'plain');
-      // Without a canvas (node), a flat translucent grey.
-      m = make(tex ? '#ffffff' : flat, { transparent: true, opacity: tex ? SCREEN_OPACITY : 0.6 });
-      if (tex) {
-        m.map = tex;
-        m.userData.flatColor = flat;
-      }
+      // Until its texture is painted, and for good without a canvas (node), a flat translucent grey.
+      m = make(flat, { transparent: true, opacity: 0.6 });
+      texture(
+        m,
+        () => ({ map: sidingTexture('screen', SCREEN_COLOR, phase === 'new' ? 'new' : 'plain') }),
+        (t) => {
+          t.opacity = SCREEN_OPACITY;
+          t.userData.flatColor = flat;
+        },
+      );
     }
     partMaterials.set(key, m);
   }
@@ -473,10 +469,8 @@ function glassMaterial(phase: Phase): MeshPhysicalMaterial {
  * tint, matte, smooth shaded (the terrain geometry has smooth normals); the flat lawn colour where
  * there is no canvas.
  */
-const lawn = grassTexture();
 export const terrainMaterial = new MeshStandardMaterial({
-  color: new Color(lawn ? '#ffffff' : GRASS_COLOR),
-  map: lawn,
+  color: new Color(GRASS_COLOR),
   roughness: 1,
   metalness: 0,
   side: FrontSide,
@@ -492,6 +486,8 @@ export const farGroundMaterial = terrainMaterial.clone();
 farGroundMaterial.polygonOffset = true;
 farGroundMaterial.polygonOffsetFactor = -1;
 farGroundMaterial.polygonOffsetUnits = -4;
+// The lawn texture for both, once painted.
+for (const m of [terrainMaterial, farGroundMaterial]) texture(m, () => ({ map: grassTexture() }));
 
 /**
  * Casework (DESIGN.md "Casework"): painted cabinet carcasses and fronts in the fixture's front
@@ -547,8 +543,7 @@ export function columnMaterial(kind: Column['kind'], phase: Phase, color: string
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
       const flat = phase === 'new' ? pullGreen(color) : color;
-      const tex = kind === 'chimney' ? brickTextures(flat) : kind === 'pier' ? sidingTextures('stone', color, phase === 'new' ? 'new' : 'plain') : null;
-      m = make(tex ? '#ffffff' : flat);
+      m = make(flat);
       // A flue is brushed stainless steel: metal that reflects the sky, shaded smooth round.
       if (kind === 'flue') {
         m.metalness = 0.8;
@@ -556,13 +551,8 @@ export function columnMaterial(kind: Column['kind'], phase: Phase, color: string
         m.flatShading = false;
         reflectSky(m, 1);
       }
-      if (tex) {
-        m.map = tex.map;
-        if (tex.normalMap) {
-          m.normalMap = tex.normalMap;
-          m.normalScale.set(NORMAL_SCALE, NORMAL_SCALE);
-        }
-      }
+      if (kind === 'chimney') texture(m, () => brickTextures(flat));
+      else if (kind === 'pier') texture(m, () => sidingTextures('stone', color, phase === 'new' ? 'new' : 'plain'));
       m.userData.flatColor = flat;
     }
     columnMaterials.set(key, m);
@@ -599,9 +589,9 @@ export function surfaceMaterial(material: SurfaceMaterial, phase: Phase, color: 
     if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
     else {
       const flat = phase === 'new' ? pullGreen(color) : color;
-      const map = material === 'gravel' || material === 'asphalt' ? surfaceTexture(material, flat) : material === 'stone' ? (sidingTextures('stone', color, phase === 'new' ? 'new' : 'plain')?.map ?? null) : null;
-      m = make(map ? '#ffffff' : flat);
-      m.map = map;
+      m = make(flat);
+      if (material === 'gravel' || material === 'asphalt') texture(m, () => ({ map: surfaceTexture(material, flat) }));
+      else if (material === 'stone') texture(m, () => ({ map: sidingTextures('stone', color, phase === 'new' ? 'new' : 'plain')?.map ?? null }));
       m.roughness = material === 'asphalt' ? 0.85 : 1;
       m.userData.flatColor = flat;
     }

@@ -1748,6 +1748,23 @@ these changes drew a demand frame in about 125 to 145 ms, now about 310 to 330 m
 shadow map about 30 to 60 ms more). The additions: PCF shadow lookups about 80 ms, the lawn texture about
 45 ms, the sky about 25 ms.
 
+**Load time** (16 Oct 2026; the viewer of the starter, headless SwiftShader, 1400 x 900): the first frame
+came about 2.4 s after the page loaded, with a blank canvas until then. Most of that went into painting
+the procedural textures (about 26 at 512 px, `woodPixels` alone about 0.7 s) during React render, and
+into compiling the shader programs on the first frame. Two changes:
+- `proceduralTextures.ts` generates each texture's pixels once for both variants, makes one normal map
+  per texture (one for all paint colours, whose relief does not depend on the colour) and works out the
+  paint's noise field once. `textureGolden.test.ts` pins every pixel generator's output by hash, so a
+  speedup that changes a pixel fails.
+- `textureQueue.ts`: a material is made in its flat colour (`userData.flatColor`), and its textures are
+  painted after the first frame, a batch at a time between frames (about 40 ms each), and swapped in
+  with a white tint, exactly as if made at once. The view redraws after about 250 ms of texture work and
+  when the queue empties. Without a window (node, tests) a job runs at once, so materials are what they
+  were. A capture (`capture.ts`) flushes the queue first.
+The first frame now comes at about 0.9 s; under SwiftShader the textures are all in by about 6 s, since
+each redraw there costs half a second (on a GPU a redraw takes milliseconds). Once they are in, the
+picture matches the one before to within one level of one channel.
+
 First-person walk (`uiStore.cameraMode`, overlay "Walk" button or `F` while the 3D view shows;
 `view3d/FirstPerson.tsx`, pure helpers in `view3d/walk.ts`): the orbit controls unmount (saving
 their pose) and drei `PointerLockControls` mount, so only one controls component exists at a time.
