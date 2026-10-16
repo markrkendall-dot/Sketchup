@@ -766,9 +766,13 @@ where the built design differs from them):
      ceiling is low (4'3" to 5'10" over it); a narrow 18" x 12" vanity is on the east wall, where it
      is 7'3" to 7'11" (placeholders). The run west of it stays open underneath (the coat closet that
      stood under the old landing went with it).
-   - a **peeled log post**, 14" across, pale and barkless, stands in the hall on the line of the old
-     wall between the front room and the Living, under the stair hall's header, from the floor to
-     the ceiling, with a 6x6 on a footing under it in the basement.
+   - **steel I-beams where the old front room wall was** (MK, 16 Oct 2026): on its line, flush in
+     the second floor's framing, 13'11" from the west wall to the Kitchen/Living corner and 12' on to
+     the east wall, so the hall, the Living and the Kitchen have flat 8' ceilings with no post in the
+     room. The one post you see is at that corner, by the powder room: a **peeled log**, 14" across,
+     pale and barkless, from the floor to the ceiling, dressing the structural post inside it, with
+     a post on a 3' square footing under it in the basement. The beams' other ends rest on posts
+     built into the end walls (see "The engineer").
 
    Upstairs the rooms take the old hall: the **Master** takes the balcony (its north wall, solid, on
    the stair hall's edge), 13'6" x 17'2", with a **wardrobe** along that wall (7'4" x 2', an 80"
@@ -799,9 +803,9 @@ where the built design differs from them):
      end to the south side of today's 48" Living doorway, in place of the hall's cased opening, the
      4'5" wall and that doorway; the 16" wall south of it and the pass-through stay. The wall bears
      (the upstairs Master/Guest partition stands on it and two ceiling beams' ends land on it), so a
-     flush beam over the opening carries that to its ends: the studs at y 99.5, and studs in the
-     middle of the 16" wall, each with a post on a footing under it in the basement, on the middle
-     girder's line. No post stands in a room (see "The engineer");
+     flush beam over the opening carries that to its ends: the log post at the corner (y 99.5), and
+     studs in the middle of the 16" wall, each with a post on a footing under it in the basement, on
+     the middle girder's line. No other post stands in a room (see "The engineer");
    - on the **north wall** (the pantry's): west of the pantry door a 24" base for trash and
      recycling, then a 15" base, the **range** with its hood and a 20" base into the corner, wall
      cabinets over the bases. The hood's 8" duct runs straight north through the pantry, across its
@@ -1002,11 +1006,27 @@ the engineer, the trades and the tape measure):
   Floor, **Draw as: new**, the Box tool (`B`, `24' x 26'`, Enter).
 
 **The engineer** (the tool draws and checks the load path; it sizes nothing)
-- Size the stair hall's header and the kitchen beam (both on y 99.5), the studs in the partition
-  under their shared end, the basement post (two 6x6s) and its 24" x 12" footing; the 6x6 and
-  footing under the peeled log post; and upstairs the two ceiling beams on the Master's and the
-  Guest's old north walls' lines (y 137.5 and y 152.5). The checks find nothing missing in that
-  load path.
+- Size the stair hall's header and the kitchen beam (both on y 99.5), drawn as **W8x15 steel**
+  flush in the second floor's framing (MK, 16 Oct 2026: I-beams, flat 8' ceilings, one post); the
+  post inside the log at their shared end, the basement post under it (two 6x6s) and its footing,
+  drawn 36" x 36" x 12"; the posts in the end walls, drawn (3) 2x6; and upstairs the two ceiling
+  beams on the Master's and the Guest's old north walls' lines (y 137.5 and y 152.5). The checks
+  find nothing missing in that load path. The estimate behind the drawn sizes, to check:
+  - Loads: the second floor's joists bearing on y 99.5 from both sides (about 4' of floor north
+    and 9' south, 40 psf live and 12 dead), the Master's north wall over the line and its ceiling:
+    about 900 plf. More if the rafters or ceiling joists bear on that wall upstairs.
+  - The 13'11" span: about 21 kip-ft, 6.1 kips at each end; the 12' span about 16 kip-ft and 5.3
+    kips. A W8x15 (Zx 13.6 in3, I 48 in4) needs Zx 8.5 and I 33 (L/360 live). At 8" deep it fits
+    flush in 2x10 framing (the joists hung off wood nailers bolted to its web); wood would take a
+    3-ply 1 3/4 x 11 7/8 LVL, which drops below 2x10s. **Measure the joists' size** first.
+  - The corner post carries both beams' ends and the opening beam's north end: about 14 to 16
+    kips. Its own post and footing in the basement, not on the middle girder; about 10 sq ft of
+    footing at the code's 1,500 psf without a soil test.
+  - The end walls: about 6 kips each into a built-up post, carried down to the foundation wall by
+    solid blocking through the first floor. The west one stands against the **house door's north
+    jamb** (its opening from y 102.5): build it into the door's king studs, or move the door 2"
+    south.
+  - Two pieces bolted at the corner post go in easier than one 26' beam.
 - The flush beam over the 11'1 1/2" Kitchen/Living opening, 12' from y 99.5 into the 16" wall: it
   carries the upstairs Master/Guest partition and the two ceiling beams' inner ends to its ends,
   the studs and (2) 6x6 at y 99.5 and new studs in the 16" wall with a 6x6 and footing under them.
@@ -1014,8 +1034,8 @@ the engineer, the trades and the tape measure):
 - **Where posts go, and whether one has to stand in a room upstairs.** Every new beam ends on a
   wall, with studs in it and a post on a footing straight under them in the basement (never on a
   joist between girders, never on the slab without a footing). As drawn, no post has to stand in an
-  open room on either floor; the peeled log post is MK's choice, and whether the header can span
-  13'-11" without it is the engineer's. That holds in both cases below, so long as each beam can be
+  open room on either floor except the log-dressed post at the Kitchen/Living corner, MK's choice.
+  That holds in both cases below, so long as each beam can be
   sized (LVL, PSL, glulam or steel; deeper, or dropped as a soffit, where flush depth is not enough)
   to span from wall to wall.
 - **Which way the Second Floor's joists run** (over the First Floor) decides which walls come out

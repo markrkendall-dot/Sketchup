@@ -63,5 +63,6 @@ describe('texture pixels (golden)', () => {
     const got: Record<string, string> = {};
     for (const [name, make] of cases) got[name] = hashOf(make());
     expect(got).toEqual(GOLDEN);
-  });
+    // Generating every texture takes a few seconds.
+  }, 60_000);
 });

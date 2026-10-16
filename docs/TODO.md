@@ -13,3 +13,7 @@ Nothing open.
       north of the Master's west window upstairs, so it starts in the foyer's south-east corner and
       passes through the foyer roof. The bookcase went to the south-west corner and the Living's
       furniture was rearranged to face the stove.
+- [x] 16 Oct 2026: steel I-beams (W8x15, flush, for the engineer to size) on the old front room
+      wall's line, 14' and 12', with one post at the Kitchen/Living corner dressed as a 14" peeled
+      log; the log post in the middle of the hall is gone. Posts in both end walls; a 3' footing
+      under the corner post.

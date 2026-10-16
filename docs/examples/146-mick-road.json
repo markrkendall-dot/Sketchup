@@ -516,29 +516,12 @@
           "label": "(2) 6x6",
           "phase": "new",
           "footing": {
-            "width": 24,
+            "width": 36,
             "thickness": 12
           },
           "id": "b-m4"
         },
         "b-m5": {
-          "kind": "post",
-          "at": {
-            "x": 88,
-            "y": 99.5
-          },
-          "width": 5.5,
-          "depth": 5.5,
-          "rotation": 0,
-          "label": "6x6",
-          "phase": "new",
-          "footing": {
-            "width": 24,
-            "thickness": 12
-          },
-          "id": "b-m5"
-        },
-        "b-m6": {
           "kind": "post",
           "at": {
             "x": 170.5,
@@ -553,7 +536,7 @@
             "width": 24,
             "thickness": 12
           },
-          "id": "b-m6"
+          "id": "b-m5"
         }
       },
       "framing": {
@@ -4392,10 +4375,11 @@
             "x": 170.5,
             "y": 99.5
           },
-          "width": 3.5,
-          "depth": 11.875,
+          "width": 4,
+          "depth": 8.125,
           "mount": "flush",
-          "label": "(2) 1 3/4 x 11 7/8 LVL",
+          "label": "W8x15 steel, flush (engineer to size)",
+          "color": "#6e7378",
           "phase": "new",
           "id": "f-m26"
         },
@@ -4409,17 +4393,18 @@
             "x": 314.5,
             "y": 99.5
           },
-          "width": 3.5,
-          "depth": 11.875,
+          "width": 4,
+          "depth": 8.125,
           "mount": "flush",
-          "label": "(2) 1 3/4 x 11 7/8 LVL",
+          "label": "W8x15 steel, flush (engineer to size)",
+          "color": "#6e7378",
           "phase": "new",
           "id": "f-m27"
         },
         "f-m28": {
           "kind": "post",
           "at": {
-            "x": 88,
+            "x": 170.5,
             "y": 99.5
           },
           "width": 14,
@@ -4434,6 +4419,32 @@
           "id": "f-m28"
         },
         "f-m29": {
+          "kind": "post",
+          "at": {
+            "x": 3.5,
+            "y": 99.5
+          },
+          "width": 4.5,
+          "depth": 5.5,
+          "rotation": 0,
+          "label": "(3) 2x6 in wall",
+          "phase": "new",
+          "id": "f-m29"
+        },
+        "f-m30": {
+          "kind": "post",
+          "at": {
+            "x": 314.5,
+            "y": 99.5
+          },
+          "width": 4.5,
+          "depth": 5.5,
+          "rotation": 0,
+          "label": "(3) 2x6 in wall",
+          "phase": "new",
+          "id": "f-m30"
+        },
+        "f-m31": {
           "kind": "beam",
           "a": {
             "x": 170.5,
@@ -4448,22 +4459,9 @@
           "mount": "flush",
           "label": "(2) 1 3/4 x 11 7/8 LVL",
           "phase": "new",
-          "id": "f-m29"
+          "id": "f-m31"
         },
-        "f-m30": {
-          "kind": "post",
-          "at": {
-            "x": 170.5,
-            "y": 99.5
-          },
-          "width": 3.5,
-          "depth": 3.5,
-          "rotation": 0,
-          "label": "(2) 2x4",
-          "phase": "new",
-          "id": "f-m30"
-        },
-        "f-m31": {
+        "f-m32": {
           "kind": "post",
           "at": {
             "x": 170.5,
@@ -4474,7 +4472,7 @@
           "rotation": 0,
           "label": "(2) 2x4",
           "phase": "new",
-          "id": "f-m31"
+          "id": "f-m32"
         }
       },
       "finishes": {
