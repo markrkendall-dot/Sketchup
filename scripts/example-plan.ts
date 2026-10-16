@@ -1483,9 +1483,15 @@ function proposed(ids: ExistingIds): void {
   // and then; an ordinary wall-mounted TV). The room (x 7..168, y 102..308) has one full wall: the
   // south is the lake window, the east the Kitchen/Living opening and the pass-through, the north
   // open to the stair hall. So the west wall is the media and hearth wall: the stove at its north
-  // end, a 65" TV at its south end (centred y 240, 57" x 33", its centre 42" up) over a pine media
-  // console (y 207..273), its edge 37" from the stove's side (never over it; the TV maker's heat
-  // limits to check). The group faces it with the lake beside it:
+  // end, a 65" TV at its south end (centred y 240, 57" x 33", its centre 42" up), its edge 37" from
+  // the stove's side (never over it; the TV maker's heat limits to check). Built-in Nordic pine
+  // shelves under it and to its left (MK, 16 Oct 2026): a low unit under the TV, y 207..276, 16"
+  // deep, 20" high (media gear and books; 33" from the stove's side), and a tall one to its left,
+  // y 276..302, 10" deep, 84" high, stopping 6" short of the lake wall, as deep as the lake window's
+  // casing, so it frames the window and covers no glass. The TV is on a full-motion arm: folded it
+  // lies flat over the low unit (6" above it); pulled out about 20" it turns to the sofa, the view
+  // chairs or the kitchen (solid blocking in the wall for the arm, power and cable behind it). The
+  // group faces it with the lake beside it:
   //   - the log sofa in red buffalo check facing west, its back to the kitchen opening and the
   //     pass-through (sill 42", over the 34" back), x 124..160, y 198..282, 11' from the TV, the
   //     stove ahead-right and the lake on the left;
@@ -1495,18 +1501,20 @@ function proposed(ids: ExistingIds): void {
   //     turned south-west to both the lake window and the TV, 38" from the stove for fire nights,
   //     and the armchair (x 120..154, y 146..180) facing the lake straight on: the daytime view seats;
   //   - the iron floor lamp at the sofa's north end, the side table at its south end by the window;
-  //   - the pine bookcase on the west wall between the stair hall and the stove (y 102..138).
+  //   - a firewood holder on the west wall by the stair hall (y 102..126), 24" from the stove's
+  //     side and off the hearth (the stove's listing sets the final clearance).
   // The way from the house door to the kitchen passes north and east of the log post, clear of it.
   furnish(fId, 'rug', { x: 132, y: 240 }, 180, { width: 96, depth: 72, fabric: 'navajo' });
   furnish(fId, 'sofa', { x: 160, y: 240 }, 180);
   furnish(fId, 'coffeeTable', { x: 108, y: 240 }, 180);
   furnish(fId, 'armchair', { x: 137, y: 146 }, 90, { fabric: 'woolPlaid' });
   furnish(fId, 'rocker', { x: 104, y: 150 }, 120);
-  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 120 }, 0, { width: 36 });
+  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 241.5 }, 0, { width: 69, depth: 16, height: 20, builtIn: true });
+  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 289 }, 0, { width: 26, depth: 10, height: 84, builtIn: true });
+  kitchen({ kind: 'box', label: 'Firewood', origin: { x: CL.x0 + HALF, y: 114 }, direction: 0, width: 24, depth: 14, height: 24, frontColor: DARK_LOG });
   furnish(fId, 'floorLamp', { x: 158, y: 190 }, 180);
   furnish(fId, 'sideTable', { x: 158, y: 294 }, 180);
   const TV_Y = 240;
-  kitchen({ kind: 'box', label: 'Media console', origin: { x: CL.x0 + HALF, y: TV_Y }, direction: 0, width: 66, depth: 18, height: 24, frontColor: PINE_FLOOR });
   kitchen({ kind: 'box', label: 'TV', origin: { x: CL.x0 + HALF, y: TV_Y }, direction: 0, width: 57, depth: 2.5, height: 33, elevation: 26, frontColor: '#1c1c1e' });
 
   // ---- The pantry's fittings (x 173..311, y 7..55): shelves 12" deep and 84" high on its north

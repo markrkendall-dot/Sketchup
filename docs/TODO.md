@@ -27,3 +27,6 @@ Nothing open.
       west wall is the media and hearth wall (stove north, a 65" TV south on a media console), the
       sofa faces it from the kitchen side with the lake on the left, the rocker and armchair are
       the view seats on the north side, the bookcase by the stair hall.
+- [x] 16 Oct 2026: built-in pine shelves under the TV (low) and to its left (tall, framing the lake
+      window), the TV on a fold-out full-motion arm; the loose bookcase and media console gone, a
+      firewood holder by the stair hall.

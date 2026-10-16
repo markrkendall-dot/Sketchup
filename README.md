@@ -945,13 +945,16 @@ where the built design differs from them):
     - the **Living** (laid out 16 Oct 2026 for how it is used: the lake view first, the family's TV
       at night, the stove now and then). The room's one full wall is the west one (the lake window
       is the south, the kitchen opening and pass-through the east, the stair hall the north), so it
-      is the media and hearth wall: the stove at its north end and a **65" TV** at its south end
-      over a pine media console, 3' from the stove's side (never over it). The peeled-log sofa in
+      is the media and hearth wall: the stove at its north end and a **65" TV** at its south end,
+      3' from the stove's side (never over it), on a full-motion arm that folds out about 20" to
+      turn to the sofa, the chairs or the kitchen, over **built-in Nordic pine shelves**: a low unit
+      under the TV (16" deep, 20" high) and a tall one to its left (10" deep, 7' high), stopping 6"
+      short of the lake wall so it frames the window. The peeled-log sofa in
       red buffalo check faces it from the kitchen side, 11' away, the stove ahead-right and the
       lake on the left; a log coffee table on the Navajo rug between; the hickory rocker (turned
       toward the window and the TV, 3' from the stove) and the wool-plaid armchair (facing the lake)
       on the north side are the daytime view seats; an iron floor lamp and a side table at the
-      sofa's ends; the pine bookcase on the west wall between the stair hall and the stove;
+      sofa's ends; a firewood holder on the west wall by the stair hall, 2' from the stove's side;
     - the **kitchen**: the pine farm table and four hickory ladder-back chairs with cane seats;
     - the **foyer**: the built-in coat bench (shown with the furniture layer off too); the **screen porch**: two green Adirondack
       chairs and a side table facing the lake;

@@ -136,13 +136,13 @@ describe('docs/examples/146-mick-road.json', () => {
     // the pantry's shelves, the stove with its stovepipe and tee, and the placeholder bath and
     // laundry fixtures (the walk-in shower in four pieces), the foyer's bench and hooks, the dryer's
     // vent and the range hood's duct, the master bedroom's wardrobes, king bed and nightstands, and
-    // seven alarms, all new; the Living's TV and media console (MK, 16 Oct 2026); and the furniture
-    // (MK, 15 Oct 2026): 8 pieces in the Living, 3 on the
+    // seven alarms, all new; the Living's TV and firewood holder (MK, 16 Oct 2026); and the furniture
+    // (MK, 15 and 16 Oct 2026): 9 pieces in the Living (its two built-in bookcases among them), 3 on the
     // screen porch, a rug in the master bedroom, 5 in the upstairs west room (two full beds, a
     // nightstand, a dresser, a rug) and 7 in the east room (a queen bed, two nightstands, a desk and
     // its chair, a dresser, a rug).
     // The foyer's coat bench (built in) replaces its loose bench and two hook rails: two fewer.
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 91 });
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 92 });
     // The masonry chimney is demolished; the stove's connector and its flue are new, and six
     // fieldstone piers: two under the entry canopy's log posts, its stoop, and one under each of the
     // screen porch's three log posts.
@@ -1075,10 +1075,11 @@ describe('docs/examples/146-mick-road.json', () => {
       'Laundry: Washer',
       'Living: Armchair',
       'Living: Bookcase',
+      'Living: Bookcase',
       'Living: Coffee table',
+      'Living: Firewood',
       'Living: Floor lamp',
       'Living: Hearth',
-      'Living: Media console',
       'Living: Rocking chair',
       'Living: Rug',
       'Living: Side table',
@@ -1290,10 +1291,10 @@ describe('docs/examples/146-mick-road.json', () => {
     // fixtures (the walk-in shower's floor, bench, glass and end wall among them), whose two vanities
     // carry a counter each; the master bedroom's two wardrobes, king bed and two nightstands, the
     // foyer's bench and hooks, the five pieces of the two vents and three alarms; and the furniture
-    // added since (the Living's eight pieces, the screen porch's three, the bedroom's rug); the
-    // Living's TV and its media console.
+    // added since (the Living's nine pieces, its two built-in bookcases among them, the screen
+    // porch's three, the bedroom's rug); the Living's TV and firewood holder.
     // (The foyer's coat bench in place of its bench and two hook rails: two fewer.)
-    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([72, 7]);
+    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([73, 7]);
   });
 
   it('has the wood stove on the Living\'s west wall on a stainless flue up the screen porch and the gable that clears the roof by the 3-2-10 rule, and no chimney', () => {
