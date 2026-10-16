@@ -112,7 +112,7 @@ function OrbitView() {
     if (fitRequest !== first.current) fit();
   }, [fitRequest, fit]);
 
-  return <OrbitControls ref={ref} makeDefault enableDamping={false} maxPolarAngle={Math.PI * 0.495} maxDistance={MAX_DISTANCE} />;
+  return <OrbitControls ref={ref} makeDefault regress enableDamping={false} maxPolarAngle={Math.PI * 0.495} maxDistance={MAX_DISTANCE} />;
 }
 
 /**
@@ -163,6 +163,7 @@ function ElevationView({ face }: { face: ElevationFace }) {
       <OrbitControls
         ref={ref}
         makeDefault
+        regress
         enableRotate={false}
         enableDamping={false}
         minPolarAngle={Math.PI / 2}

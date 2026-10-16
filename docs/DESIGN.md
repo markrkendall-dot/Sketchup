@@ -1764,6 +1764,8 @@ into compiling the shader programs on the first frame. Two changes:
 The first frame now comes at about 0.9 s; under SwiftShader the textures are all in by about 6 s, since
 each redraw there costs half a second (on a GPU a redraw takes milliseconds). Once they are in, the
 picture matches the one before to within one level of one channel.
+While the camera moves, the orbit controls (`regress`) drop r3f's performance to its `min` of 0.5 and
+drei's `AdaptiveDpr` renders at half the pixel ratio; 200 ms after the camera stops, the full one is back.
 
 First-person walk (`uiStore.cameraMode`, overlay "Walk" button or `F` while the 3D view shows;
 `view3d/FirstPerson.tsx`, pure helpers in `view3d/walk.ts`): the orbit controls unmount (saving

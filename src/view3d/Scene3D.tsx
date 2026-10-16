@@ -1,4 +1,4 @@
-import { Grid, Sky } from '@react-three/drei';
+import { AdaptiveDpr, Grid, Sky } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import { setTextureRedraw } from './textureQueue';
 import { useEffect, useMemo } from 'react';
@@ -461,6 +461,9 @@ export default function Scene3D() {
         className="view3d-canvas"
         frameloop={walking ? 'always' : 'demand'}
         dpr={viewer ? [1, 1.5] : [1, 2]}
+        // While the camera moves (the orbit controls' `regress`), AdaptiveDpr renders at half the
+        // resolution, and the full one again once it stops (DESIGN.md "Load time").
+        performance={{ min: 0.5 }}
         // PCF filtering: what r3f's default "soft" falls back to in three 0.186, without the warning.
         shadows="percentage"
         camera={{ fov: 50, near: 1, far: CAMERA_FAR, position: [900, 700, 1200] }}
@@ -480,6 +483,7 @@ export default function Scene3D() {
         <SiteFences />
         <Controls />
         <InvalidateOnChange />
+        <AdaptiveDpr />
         <CaptureHandle />
         <DebugHandle />
       </Canvas>
