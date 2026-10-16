@@ -228,11 +228,15 @@ function partition(levelId: Id, a: Vec2, b: Vec2, phase: Phase = PHASE): void {
   if (!store().addWall(levelId, a, b, { kind: 'interior', thickness: TI, phase })) throw new Error(`partition ${JSON.stringify([a, b])} was rejected`);
 }
 
-/** The wall whose centerline passes through p (the opening's centre), and p's distance from its start. */
-function wallAt(levelId: Id, p: Vec2): { wallId: Id; offset: number } {
+/**
+ * The wall whose centerline passes through p (the opening's centre), and p's distance from its
+ * start. `standing`: only walls that are not demolished (a new wall drawn where a demolished one was).
+ */
+function wallAt(levelId: Id, p: Vec2, standing = false): { wallId: Id; offset: number } {
   const lvl = level(levelId);
   let best: { wallId: Id; offset: number; d: number } | null = null;
   for (const w of Object.values(lvl.walls)) {
+    if (standing && w.phase === 'demo') continue;
     const a = lvl.nodes[w.a];
     const b = lvl.nodes[w.b];
     const len = dist(a, b);
@@ -280,7 +284,8 @@ interface OpeningSpec {
 
 /** Add an opening centred at p (on a wall's centerline); throws when it does not fit the wall where it is. */
 function addOpeningAt(levelId: Id, p: Vec2, o: OpeningSpec): Id {
-  const { wallId, offset } = wallAt(levelId, p);
+  // New work goes in a standing wall, never in the demolished one it replaces.
+  const { wallId, offset } = wallAt(levelId, p, o.phase === 'new');
   let swing = o.swing;
   if (o.type === 'door' && o.into) {
     const lvl = level(levelId);
@@ -588,6 +593,10 @@ export function buildExamplePlan(): Plan {
   gp((WING.x0 + WING.x1) / 2 + 36, WING.y1 + 6, -100);
   gp(MAIN.x1 / 4, MAIN.y0 - ft(30), 6);
   gp((MAIN.x1 * 3) / 4, MAIN.y0 - ft(30), 6);
+  // The lawn west of the entry falls away from it (the foyer's stoop, MK 16 Oct 2026, is a step up
+  // from the ground all round, and the ground sheds water away from the house): -2 two feet past
+  // the stoop's outer edge, opposite the front door.
+  gp(-180, 65, -2);
   // The retaining wall itself (photos 02 and 23, its line from the site sketch): poured concrete,
   // about 10" thick, its top 2" over the terrace (96" from the basement floor), from its free west end
   // east, then angled, to the corner of the main block and the wing, then north to it. Its west end
@@ -1017,24 +1026,33 @@ function proposed(ids: ExistingIds): void {
   const footing = drawWalls(bId, [{ x: CL.x1, y: CL.y0 }, { x: wing.x1, y: CL.y0 }, { x: wing.x1, y: wing.y0 }], TB, false, NEW);
   store().updateWalls(bId, footing, { finish: 'block', color: BLOCK_COLOR });
 
-  // ---- 5. Foyer and screen porch on the west face, outside x -96..0: foyer y 46.25..158 (9'4" x
-  // 8' outside, 8'1 3/4" x 7'5" inside), the screen porch y 158..315 (13'1" x 8'). MK, 15 Oct 2026:
-  // the foyer's north wall (on your left as you come in the front door) moves 18" toward the
-  // driveway, from y 64.25 to 46.25. Its south wall stops north of the Living's west window (y
-  // 158..248), so that window keeps its place in the existing view. A new wall crosses a demolished
-  // one without a node (plan.ts splitsWall), so the old porch's walls and openings keep theirs too.
-  const FOYER = { x0: -96, y0: 46.25, y1: 158 };
+  // ---- 5. Foyer and screen porch on the west face, outside x -96..0: foyer y 10..120 (9'2" x 8'
+  // outside, 8' x 7'5" inside), the screen porch y 120..315 (16'3" x 8'). MK, 16 Oct 2026: the foyer
+  // moves 3' north (it was y 46.25..158) so the house door can stand north of the stair hall's beam
+  // post, its north face 10" short of the house's north face so it still reads as an entry added to
+  // the side, and 2" shorter, so its roof's south eave (y 138) stops 3" short of the stove's chimney
+  // (y 141..149), which now rises outdoors in the screen porch. A new wall crosses a demolished one
+  // without a node (plan.ts splitsWall), so the old porch's walls and openings keep theirs too.
+  const FOYER = { x0: -96, y0: 10, y1: 120 };
   const fy = { west: FOYER.x0 + HALF, north: FOYER.y0 + HALF, south: FOYER.y1 - HALF };
-  // The foyer's north wall now meets the house across today's front door (y 30..66, demolished): a
-  // new wall ending there would split today's wall through that door. So that piece of today's west
-  // wall, y 26 to the old porch's south wall (y 92.5), goes, and a new piece closes the doorway in
-  // its place, in two parts meeting the foyer's wall (the existing view keeps today's door).
-  const DOORWAY = { north: 26, south: 92.5 };
-  const today = wallAt(fId, { x: CL.x0, y: DOORWAY.north });
-  const splitProblem = store().splitWall(fId, today.wallId, today.offset);
-  if (splitProblem) throw new Error(`west wall split: ${splitProblem}`);
-  const oldPiece = level(fId).walls[wallAt(fId, { x: CL.x0, y: (DOORWAY.north + DOORWAY.south) / 2 }).wallId];
-  demolish(fId, { walls: [{ x: CL.x0, y: (DOORWAY.north + DOORWAY.south) / 2 }] });
+  /** The foyer gable's ridge, over its middle: the front door is centred under it (MK, 16 Oct 2026). */
+  const FOYER_RIDGE = (FOYER.y0 + FOYER.y1) / 2;
+  // The house door moves north past the beam post at y 99.5 (y 97.25..101.75) into the old front
+  // door's piece of today's west wall (y 30..66, demolished), and the foyer's north wall meets the
+  // house at y 13.5. A new wall ending on today's wall would leave the existing view's front room
+  // unbounded at the joint, so today's west wall from y 8 to the old y 99.5 wall's joint goes and is
+  // rebuilt as new wall, in two parts meeting the foyer's wall, with the new door in it and the beam
+  // post at its south end (the existing view keeps today's wall and door). The old porch's south
+  // wall met it at y 92.5, and it was split at y 26, so it comes down in three pieces.
+  const DOORWAY = { north: 8, south: 99.5 };
+  for (const y of [DOORWAY.north, 26, DOORWAY.south]) {
+    const at = wallAt(fId, { x: CL.x0, y });
+    if (Math.abs(at.offset) < 1e-6 || Math.abs(at.offset - dist(level(fId).nodes[level(fId).walls[at.wallId].a], level(fId).nodes[level(fId).walls[at.wallId].b])) < 1e-6) continue;
+    const splitProblem = store().splitWall(fId, at.wallId, at.offset);
+    if (splitProblem) throw new Error(`west wall split at y ${y}: ${splitProblem}`);
+  }
+  const oldPiece = level(fId).walls[wallAt(fId, { x: CL.x0, y: 60 }).wallId];
+  demolish(fId, { walls: [{ x: CL.x0, y: 17 }, { x: CL.x0, y: 60 }, { x: CL.x0, y: 96 }] });
   const infill = drawWalls(fId, [{ x: CL.x0, y: DOORWAY.north }, { x: CL.x0, y: fy.north }, { x: CL.x0, y: DOORWAY.south }], T, false, NEW, true);
   store().updateWalls(fId, infill, { finish: oldPiece.finish, color: oldPiece.color, ...(oldPiece.band ? { band: oldPiece.band } : {}) });
   const foyer = drawWalls(fId, [{ x: CL.x0, y: fy.north }, { x: fy.west, y: fy.north }, { x: fy.west, y: fy.south }, { x: CL.x0, y: fy.south }], T, false, NEW);
@@ -1097,24 +1115,28 @@ function proposed(ids: ExistingIds): void {
   // 72" double door below, two panels of 2 x 4 lites. No transom over it: under the 96" ceiling it
   // could be 12" at most with its head at the ceiling (no room for a header or a casing).
   add({ x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, { type: 'door', width: 72, height: 80, sliding: true, lites: { cols: 2, rows: 4 } });
-  // The house door moves to the middle of the old stair strip (y 118.5): 32", so its jambs (102.5 to
-  // 134.5) clear the strip's partition faces at 102 and 135; green, nine lites over two panels.
+  // The house door (MK, 16 Oct 2026: further north, normal stairs kept): 32", y 63.5..95.5, in the
+  // new piece of wall, its south jack stud against the beam post at y 99.5 (the post its king stud).
+  // The stair's bottom step (x 7..43, y 49..59.4) is 4" north of it and clear of its trim, with a 36"
+  // landing inside; hinged on its north jamb, it opens against the wall south of the step. Green,
+  // nine lites over two panels.
   const halfLite = { lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN };
-  add({ x: CL.x0, y: 118.5 }, { type: 'door', width: 32, height: 80, into: EAST, ...halfLite });
-  // The foyer: the 36" front door in its west wall in line with the house door, and a transom in its
-  // north wall facing the driveway (MK, 15 Oct 2026), centred on the foyer: 60 x 18, two sashes of
-  // 2 x 1 lites, sill 70 (head 88), high over the coat bench under it.
-  add({ x: fy.west, y: 118.5 }, { type: 'door', width: 36, height: 80, into: EAST, ...halfLite });
+  add({ x: CL.x0, y: 79.5 }, { type: 'door', width: 32, height: 80, into: EAST, ...halfLite });
+  // The foyer: the 36" front door in its west wall centred under the gable's peak (MK, 16 Oct 2026),
+  // and a transom in its north wall facing the driveway (MK, 15 Oct 2026), centred on the foyer:
+  // 60 x 18, two sashes of 2 x 1 lites, sill 70 (head 88), high over the coat bench under it.
+  add({ x: fy.west, y: FOYER_RIDGE }, { type: 'door', width: 36, height: 80, into: EAST, ...halfLite });
   add({ x: (fy.west + CL.x0) / 2, y: fy.north }, { type: 'window', width: 60, height: 18, sill: 70, sashes: 2, lites: { cols: 2, rows: 1 } });
   // No door from the Living to the screen porch (MK, 15 Oct 2026: the livability review's 60" French
   // doors there are gone, and the wood stove has that wall): the porch is reached from the foyer.
-  // Screen porch: screens above 36" knee walls, two 56" bays in the west wall either side of the
-  // middle post and one 44" in the south wall; screen doors from the foyer and out to the lawn. The
+  // Screen porch: screens above 36" knee walls in the west wall, a 94" bay between the north and
+  // middle posts (y 133..227) and a 56" one south of the middle post, and one 44" in the south wall;
+  // screen doors from the foyer and out to the lawn. The
   // lawn door is at the south wall's west end (x -86..-50) and the screen at its east end (it was
   // put there to keep clear of the stove's chimney when the stove stood in the Living's south-west
   // corner; the chimney is now at the porch's north-east corner, and the door stays).
   const screen = { type: 'window' as const, height: 44, sill: 36, glazing: 'screen' as const, trim: 0 };
-  add({ x: fy.west, y: 199 }, { ...screen, width: 56 });
+  add({ x: fy.west, y: 180 }, { ...screen, width: 94 });
   add({ x: fy.west, y: 273 }, { ...screen, width: 56 });
   add({ x: -24, y: CL.y1 }, { ...screen, width: 44 });
   const screenDoor = { type: 'door' as const, width: 36, height: 80, leafColor: FINISH_COLOR, glazing: 'screen' as const, trim: 0 };
@@ -1239,12 +1261,13 @@ function proposed(ids: ExistingIds): void {
   // Coats in the foyer (MK, 14 and 15 Oct 2026; there is no closet under the stair): a built-in
   // coat bench in Nordic pine along the north wall under the transom, wall to wall (x -89..0), 18"
   // deep, 66" high (its top shelf 4" under the transom's sill): boot cubbies under a cushioned seat,
-  // a beadboard back, iron hooks at 58". Clear of the front door's swing (y 100.5..136.5).
+  // a beadboard back, iron hooks at 58". Clear of the front door's swing (y 47..83).
   const foyerNorth = FOYER.y0 + T;
   furnish(fId, 'coatBench', { x: (fy.west + CL.x0) / 2, y: foyerNorth }, 90, { width: CL.x0 - HALF - (fy.west + HALF), depth: 18, height: 66, builtIn: true });
   // The screen porch (MK, 15 Oct 2026): two green Adirondack chairs facing the lake (south), a side
-  // table between them, x -84..-2, y 226..260: clear of the foyer's screen door swing (to y 194)
-  // and the way to the lawn door (x -86..-50 at the south wall).
+  // table between them, x -84..-2, y 226..260: clear of the foyer's screen door swing (to y 153),
+  // the stove's chimney (x -10..-2, y 141..149) and the way to the lawn door (x -86..-50 at the
+  // south wall).
   furnish(fId, 'adirondackChair', { x: -69, y: 226 }, 90);
   furnish(fId, 'sideTable', { x: -43, y: 234 }, 90, { width: 18, depth: 18, wood: 'paintedGreen' });
   furnish(fId, 'adirondackChair', { x: -17, y: 226 }, 90);
@@ -1337,21 +1360,21 @@ function proposed(ids: ExistingIds): void {
     }
   }
   logPost({ x: CX, y: ridgeY }, TIE, RIDGE, LOG8, '8" log king post');
-  pier({ x: (CANOPY_X0 + FOYER.x0) / 2, y: 118.5 }, FOYER.x0 - CANOPY_X0, 72, 1.5);
+  pier({ x: (CANOPY_X0 + FOYER.x0) / 2, y: FOYER_RIDGE }, FOYER.x0 - CANOPY_X0, 72, 1.5);
 
   // The screen porch: three 10" log posts on the line of its west wall's outside face (x -97, 6"
-  // proud of it, the rest in the wall), at its north end (y 164, between the foyer and the north
+  // proud of it, the rest in the wall), at its north end (y 126, between the foyer and the north
   // screen), between the two screen bays (y 236) and at its south-west corner (y 310, flush with the
   // south face), each on a 16" fieldstone pier from the ground to +12. A 10" log plate along the eave
   // line rests on the middle and south posts, as high as the shed's rafter tails allow (they bear on
-  // it), from the foyer gable's south eave (y 177; the gable's overhang comes down lower than the
+  // it), from the foyer gable's south eave (y 139; the gable's overhang comes down lower than the
   // plate north of that) to 12" past the porch's south corner, so its end shows under the shed's
   // rake. The north post stops under the gable's eave, its top inside the roof's thickness. 6" log
   // knee braces at 45 degrees from the posts to the plate, 18" each way (the north post's, 21",
   // passes under the gable's eave).
   const shed = Object.values(level(fId).roofs).find((r) => r.phase === NEW && r.shape === 'shed' && r.ridgeAngle === 180)!;
   const PX = FOYER.x0 - 1;
-  const porchPosts = [164, 236, 310];
+  const porchPosts = [FOYER.y1 + 6, 236, 310];
   const tailBottom = roofHeightAt(shed, roofBearing(level(fId).wallHeight, shed), { x: PX, y: 236 })! - shed.rafter!.depth;
   const PLATE = Math.floor((tailBottom - offsetUnder(shed.pitch / 12, LOG / 2)) * 4) / 4;
   const plateNorth = FOYER.y1 + gable.overhang + 1;
@@ -1573,19 +1596,17 @@ function proposed(ids: ExistingIds): void {
   // Its flue runs outside the Living (MK, 14 Oct 2026), to the 2025 Residential Code of New York
   // State (docs/history/PLAN-v7-exterior-flue.md), and goes up the gable wall just north of the
   // Master's west window upstairs (MK, 15 Oct 2026: y 176..224, its trim and 18" north shutter to
-  // y 154). Below that spot is the foyer, so the chimney starts in the foyer. Inside the Living, a 6"
+  // y 154). Inside the Living, a 6"
   // double-wall black connector, 8" outside, rises from the stove's collar (x 19, 6" in from its
   // back) to an elbow, runs 17" north over the stone and turns west into a listed wall thimble
   // (centre 66" up, y 145): it passes through no floor or ceiling, and the bedroom upstairs needs
-  // no chase. In the foyer, an insulated 6" chimney (UL 103 HT, 8" outside) starts at a tee with a
-  // cleanout below the thimble in its south-east corner (x -10..-2, y 141..149: 2" off the siding,
-  // 2" off the foyer's south wall, 2 1/2" off the house door's trim) and rises straight (no
-  // offsets) through the foyer roof where it meets the house, up the gable wall and through the
-  // main roof's 24" rake overhang 12 1/2" north of the ridge, with a rain cap. Its top follows the
-  // 3-2-10 rule: 3' over where it leaves the roof, and 2' over any roof within 10' (the ridge),
-  // braced to the roof. For the chimney maker: whether it needs a guard or an enclosure where it
-  // stands in the foyer (a chase would not fit beside the house door), and the flashing where it
-  // passes the foyer roof against the gable wall.
+  // no chase. Outdoors in the screen porch's north-east corner (the foyer stops at y 120 since MK
+  // moved it north, 16 Oct 2026), an insulated 6" chimney (UL 103 HT, 8" outside) starts at a tee
+  // with a cleanout below the thimble (x -10..-2, y 141..149: 2" off the siding) and rises straight
+  // (no offsets) through the porch's shed roof by the house wall, 3" south of the foyer roof's eave
+  // (y 138), up the gable wall and through the main roof's 24" rake overhang 12 1/2" north of the
+  // ridge, with a rain cap. Its top follows the 3-2-10 rule: 3' over where it leaves the roof, and
+  // 2' over any roof within 10' (the ridge), braced to the roof.
   const THIMBLE = 66;
   const THIMBLE_Y = 145;
   const COLLAR = { x: CL.x0 + HALF + 12, y: STOVE.y };
@@ -1728,8 +1749,8 @@ function proposed(ids: ExistingIds): void {
   // end, about 14 to 16 kips) down through the basement on its own post, west of the middle girder, to a
   // 36" x 36" x 12" footing (about 10 sq ft at the code's 1,500 psf without a soil test); and a
   // post of (3) 2x6 built into each end wall, carried down to the foundation wall by solid blocking.
-  // The west one stands against the house door's north jamb (its opening from y 102.5): the
-  // framer builds it into the door's king studs, or the door moves 2" south.
+  // The west one stands just south of the house door (y 63.5..95.5; MK moved it north past the
+  // post, 16 Oct 2026) and serves as its south king stud.
   store().setLevelFraming(bId, { joists: 0 });
   for (const lid of [fId, sId]) store().setLevelFraming(lid, { joists: 90 });
   for (const x of GIRDERS) {
@@ -1801,7 +1822,7 @@ function proposed(ids: ExistingIds): void {
   label(fId, 'Laundry (proposed)', { x: 334, y: 86 }, NEW, PLACEHOLDER_WET);
   label(sId, 'Master wardrobe (proposed)', { x: 86, y: 114 }, NEW, PROPOSED_CARPET);
   label(sId, 'Guest closet (proposed)', { x: 235, y: 84 }, NEW, PROPOSED_CARPET);
-  label(fId, 'Foyer (proposed)', { x: -48, y: 125 }, NEW, PROPOSED_PINE);
+  label(fId, 'Foyer (proposed)', { x: -48, y: 105 }, NEW, PROPOSED_PINE);
   label(sId, 'Bath (proposed)', { x: 267, y: 40 }, NEW, PLACEHOLDER_WET);
   label(sId, 'Landing (proposed)', { x: 196, y: 105 }, NEW, PROPOSED_PINE);
   label(fId, 'Screen porch (proposed)', { x: -48, y: 236 }, NEW, { floorFinish: 'boards', floorColor: WOOD_FLOOR });

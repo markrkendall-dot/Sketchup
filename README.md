@@ -786,9 +786,12 @@ where the built design differs from them):
    picks them up, down the Master/Guest partition onto the beam over the Kitchen/Living opening
    below (placeholders for the engineer).
 
-   The house door (32", green) is in the west wall in the middle of the old stair strip, in line
-   with the foyer's front door, and the strip runs straight on into the kitchen through the wide
-   opening in the Kitchen/Living wall (item 5). New windows light the hall: a 24" one over the
+   The house door (32", green) is in the west wall at the foot of the stair (MK, 16 Oct 2026:
+   moved 39" north), between the stair's bottom step (4" north of its opening) and the post under
+   the steel beam's end (its south king stud), with a 36" landing inside; it swings into the hall,
+   hinged on its north side. From it the hall runs east and the Living opens south, into the
+   kitchen through the wide opening in the Kitchen/Living wall (item 5). The stair is unchanged
+   (7.2" risers, 10 3/8" treads). New windows light the hall: a 24" one over the
    landing, a second casement pair upstairs in the north wall over the top of the run and one in the
    upstairs west wall. The hall is **open to the Living** (MK): no wall on the strip's south side,
    as today (photo 16).
@@ -832,15 +835,14 @@ where the built design differs from them):
    First Floor's casework defaults: change them in the Level panel, or per cabinet in its panel.
 6. **Wood stove** (MK) on the Living's **west wall** where the bookcase was (moved there from the
    south-west corner on 15 Oct 2026), its back to the wall, facing east into the room, centred
-   13'6" from the north wall's outside face, its stone surround just clear of the house door's
-   trim: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it. Its flue
+   13'6" from the north wall's outside face: a stone hearth 4'2" x 3'4", a stone surround behind it and the stove 6" off it. Its flue
    runs **outside the Living** (MK), to the 2025 Residential Code of New York State, and goes up
-   the gable wall **just north of the Master's west window** upstairs (MK). Below that spot is the
-   foyer, so: a black double-wall stovepipe rises from the stove, runs 17" north over the stone and
-   turns west into a listed wall thimble; in the foyer's south-east corner, beside the house door,
+   the gable wall **just north of the Master's west window** upstairs (MK): a black double-wall
+   stovepipe rises from the stove, runs 17" north over the stone and turns west into a listed wall
+   thimble; outdoors in the screen porch's north-east corner (since the foyer moved north, item 8),
    an insulated **stainless chimney** (8", an insulated 6" chimney, UL 103 Type HT) rises straight
-   from a tee with a cleanout, 2" off the siding, through the foyer roof where it meets the house,
-   up the gable wall and through the main roof's rake overhang a foot north of the ridge, with a
+   from a tee with a cleanout, 2" off the siding, through the porch roof by the house wall, 3" south
+   of the foyer roof's eave, up the gable wall and through the main roof's rake overhang a foot north of the ridge, with a
    rain cap. It stands 3' over the rake, 2'6" over the ridge (the 3-2-10 rule). Nothing passes
    through the bedroom upstairs. The code checklist is in
    `docs/history/PLAN-v7-exterior-flue.md`. The **masonry chimney** on the north wall is
@@ -853,20 +855,22 @@ where the built design differs from them):
    landing. South of it the old Office is now the Guest room's alcove, with its transom.
 8. **The Adirondack entry: foyer and screen porch** on the west face in place of the entry porch
    (MK: "thoroughly Adirondack", with the ends of exposed beams showing at the entry;
-   `docs/history/PLAN-v10-adirondack.md`). An enclosed foyer (9'4" x 8' outside, 8'1 3/4" x 7'5"
-   inside; MK, 15 Oct 2026: its north wall, on your left as you come in, 18" closer to the
-   driveway than first drawn) with the 36" front door in
-   line with the house door, under a gable facing west, and south of it a screen porch (13'1" x 8')
+   `docs/history/PLAN-v10-adirondack.md`). An enclosed foyer (9'2" x 8' outside, 8' x 7'5" inside;
+   MK, 16 Oct 2026: moved 3' north, toward the driveway, its north face 10" short of the house's so
+   it still reads as an entry added to the side) with the 36" front door centred under its
+   gable's peak (MK), the house door 15" north of that line, and south of it a screen porch (16'3" x 8')
    with screens above knee walls, two screen doors and a shed roof high at the house wall. The
    Living's west window, which would only look into the porch, goes and the wall is closed (the
-   stove's stone is there; its chimney stands in the foyer's south-east corner); the porch is reached from the foyer. (The livability review's 60" French
+   stove's stone is there); the porch is reached from the foyer. (The livability review's 60" French
    doors from the Living were taken out on 15 Oct 2026, MK.) The porch's lawn door is at the west
    end of its south wall. For coats (there is no closet under the stair), a
    **transom** high in the foyer's north wall facing the driveway (60" x 18", sill 70") and under
    it a **built-in coat bench** wall to wall in Nordic pine: boot cubbies under a cushioned seat, a
-   beadboard back, iron hooks at 58", a shelf along the top 4" under the transom. The foyer's
-   north wall meets the house across today's front door, so that stretch of today's wall is shown
-   demolished and rebuilt closed (the Existing view keeps today's door). All sizes are estimates.
+   beadboard back, iron hooks at 58", a shelf along the top 4" under the transom. Today's west wall
+   from the house's north-west corner to the old front room's wall (today's front door among it) is
+   shown demolished and rebuilt, with the house door in it (the Existing view keeps today's wall and
+   door). The lawn west of the stoop is graded down to -2, so the stoop is a step up all round and
+   the ground sheds water away from the house. All sizes are estimates.
    - **The style, from the research** (web search summaries; the full pages could not be fetched):
      native materials throughout (whole, split or peeled logs, bark and fieldstone); rough log
      posts with twig and branch work on railings and gables; the structure left showing, with log
@@ -893,7 +897,8 @@ where the built design differs from them):
      beyond it. A sunburst of 3" twigs fills the gable over the tie, and a fieldstone stoop
      (60" x 72") sits under it, its top 1/2" under the threshold.
    - **The screen porch:** three 10" log posts on 16" fieldstone piers (to +12), a 10" log plate
-     along the eave line whose end shows 12" past the south corner, and log knee braces. The
+     along the eave line whose end shows 12" past the south corner, and log knee braces; a 94"
+     screen bay between the north and middle posts and a 56" one south of the middle post. The
      porch's west and south walls are a river-stone knee wall up to the screens' sills (36"), with
      the shakes above.
    - **Stone base:** the foyer stands on 8" walls (a crawl space) like the east addition, faced in
@@ -1027,9 +1032,9 @@ the engineer, the trades and the tape measure):
     14 to 16 kips. Its own post and footing in the basement, 15" west of the middle girder; about 10 sq ft of
     footing at the code's 1,500 psf without a soil test.
   - The end walls: about 6 kips each into a built-up post, carried down to the foundation wall by
-    solid blocking through the first floor. The west one stands against the **house door's north
-    jamb** (its opening from y 102.5): build it into the door's king studs, or move the door 2"
-    south.
+    solid blocking through the first floor. The west one is the house door's south king stud (MK
+    moved the door north past it, 16 Oct 2026; a door straddling it would need a header carrying
+    that 6 kips).
   - Two pieces bolted at the corner post go in easier than one 26' beam.
 - The flush beam over the 11'1 1/2" Kitchen/Living opening, 12' from y 99.5 into the 16" wall: it
   carries the upstairs Master/Guest partition and the two ceiling beams' inner ends to its ends,
@@ -1063,10 +1068,9 @@ the engineer, the trades and the tape measure):
 **The trades and the makers' instructions**
 - The stove and its chimney: the stove's listing and the chimney maker's instructions set the
   clearances (to the surround, to the furniture), the thimble, the supports and the top, and win
-  over the plan's numbers. The chimney's 3' over the rake needs a roof brace; where it passes the
-  foyer roof against the gable wall the flashing has to be worked into the wall's; and in the
-  foyer it stands 2 1/2" from the house door's trim, so whether it needs a guard or an enclosure
-  there (a chase would not fit without moving the door) is for the chimney maker. See
+  over the plan's numbers. The chimney's 3' over the rake needs a roof brace, and where it passes
+  the porch roof against the gable wall, 3" from the foyer roof's eave, the flashing has to be
+  worked into the wall's. See
   `docs/history/PLAN-v7-exterior-flue.md`.
 - The alarms: hard-wired and interconnected or not (exceptions in alterations), for the electrician
   and the inspector.

@@ -72,22 +72,22 @@
         "b-n12": {
           "id": "b-n12",
           "x": 3.5,
-          "y": 49.75
+          "y": 13.5
         },
         "b-n13": {
           "id": "b-n13",
           "x": -92.5,
-          "y": 49.75
+          "y": 13.5
         },
         "b-n14": {
           "id": "b-n14",
           "x": -92.5,
-          "y": 154.5
+          "y": 116.5
         },
         "b-n15": {
           "id": "b-n15",
           "x": 3.5,
-          "y": 154.5
+          "y": 116.5
         },
         "b-n16": {
           "id": "b-n16",
@@ -647,75 +647,80 @@
         "f-n20": {
           "id": "f-n20",
           "x": 3.5,
-          "y": 26
+          "y": 8
         },
         "f-n21": {
           "id": "f-n21",
           "x": 3.5,
-          "y": 49.75
+          "y": 26
         },
         "f-n22": {
           "id": "f-n22",
-          "x": -92.5,
-          "y": 49.75
+          "x": 3.5,
+          "y": 13.5
         },
         "f-n23": {
           "id": "f-n23",
           "x": -92.5,
-          "y": 154.5
+          "y": 13.5
         },
         "f-n24": {
           "id": "f-n24",
-          "x": 3.5,
-          "y": 154.5
+          "x": -92.5,
+          "y": 116.5
         },
         "f-n25": {
           "id": "f-n25",
-          "x": -92.5,
-          "y": 311.5
+          "x": 3.5,
+          "y": 116.5
         },
         "f-n26": {
           "id": "f-n26",
-          "x": 170.5,
-          "y": 3.5
+          "x": -92.5,
+          "y": 311.5
         },
         "f-n27": {
           "id": "f-n27",
           "x": 170.5,
-          "y": 57.5
+          "y": 3.5
         },
         "f-n28": {
           "id": "f-n28",
-          "x": 314.5,
+          "x": 170.5,
           "y": 57.5
         },
         "f-n29": {
           "id": "f-n29",
-          "x": 352.5,
+          "x": 314.5,
           "y": 57.5
         },
         "f-n30": {
           "id": "f-n30",
           "x": 352.5,
-          "y": 135
+          "y": 57.5
         },
         "f-n31": {
           "id": "f-n31",
-          "x": 102,
-          "y": 46.5
+          "x": 352.5,
+          "y": 135
         },
         "f-n32": {
           "id": "f-n32",
-          "x": 142,
+          "x": 102,
           "y": 46.5
         },
         "f-n33": {
           "id": "f-n33",
-          "x": 170.5,
+          "x": 142,
           "y": 46.5
         },
         "f-n34": {
           "id": "f-n34",
+          "x": 170.5,
+          "y": 46.5
+        },
+        "f-n35": {
+          "id": "f-n35",
           "x": 102,
           "y": 3.5
         }
@@ -724,7 +729,7 @@
         "f-w1": {
           "id": "f-w1",
           "a": "f-n1",
-          "b": "f-n34",
+          "b": "f-n35",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -734,7 +739,7 @@
         "f-w2": {
           "id": "f-w2",
           "a": "f-n2",
-          "b": "f-n28",
+          "b": "f-n29",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -754,7 +759,7 @@
         "f-w4": {
           "id": "f-w4",
           "a": "f-n4",
-          "b": "f-n24",
+          "b": "f-n25",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -834,7 +839,7 @@
         "f-w12": {
           "id": "f-w12",
           "a": "f-n10",
-          "b": "f-n20",
+          "b": "f-n21",
           "thickness": 7,
           "kind": "exterior",
           "phase": "demo",
@@ -881,7 +886,7 @@
           "b": "f-n10",
           "thickness": 7,
           "kind": "exterior",
-          "phase": "existing",
+          "phase": "demo",
           "finish": "shingle",
           "color": "#5a3a35"
         },
@@ -944,7 +949,7 @@
         "f-w24": {
           "id": "f-w24",
           "a": "f-n18",
-          "b": "f-n30",
+          "b": "f-n31",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -981,18 +986,18 @@
         },
         "f-w28": {
           "id": "f-w28",
-          "a": "f-n20",
-          "b": "f-n21",
+          "a": "f-n21",
+          "b": "f-n20",
           "thickness": 7,
           "kind": "exterior",
-          "phase": "new",
+          "phase": "demo",
           "finish": "shingle",
           "color": "#5a3a35"
         },
         "f-w29": {
           "id": "f-w29",
-          "a": "f-n21",
-          "b": "f-n10",
+          "a": "f-n20",
+          "b": "f-n22",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -1001,8 +1006,8 @@
         },
         "f-w30": {
           "id": "f-w30",
-          "a": "f-n21",
-          "b": "f-n22",
+          "a": "f-n22",
+          "b": "f-n14",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -1032,6 +1037,16 @@
         "f-w33": {
           "id": "f-w33",
           "a": "f-n24",
+          "b": "f-n25",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new",
+          "finish": "shingle",
+          "color": "#5a3a35"
+        },
+        "f-w34": {
+          "id": "f-w34",
+          "a": "f-n25",
           "b": "f-n14",
           "thickness": 7,
           "kind": "exterior",
@@ -1039,24 +1054,10 @@
           "finish": "shingle",
           "color": "#5a3a35"
         },
-        "f-w34": {
-          "id": "f-w34",
-          "a": "f-n23",
-          "b": "f-n25",
-          "thickness": 7,
-          "kind": "exterior",
-          "phase": "new",
-          "finish": "shingle",
-          "color": "#5a3a35",
-          "band": {
-            "finish": "riverstone",
-            "height": 36
-          }
-        },
         "f-w35": {
           "id": "f-w35",
-          "a": "f-n25",
-          "b": "f-n4",
+          "a": "f-n24",
+          "b": "f-n26",
           "thickness": 7,
           "kind": "exterior",
           "phase": "new",
@@ -1070,14 +1071,28 @@
         "f-w36": {
           "id": "f-w36",
           "a": "f-n26",
-          "b": "f-n33",
+          "b": "f-n4",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new",
+          "finish": "shingle",
+          "color": "#5a3a35",
+          "band": {
+            "finish": "riverstone",
+            "height": 36
+          }
+        },
+        "f-w37": {
+          "id": "f-w37",
+          "a": "f-n27",
+          "b": "f-n34",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
         },
-        "f-w37": {
-          "id": "f-w37",
-          "a": "f-n26",
+        "f-w38": {
+          "id": "f-w38",
+          "a": "f-n27",
           "b": "f-n16",
           "thickness": 7,
           "kind": "exterior",
@@ -1085,18 +1100,10 @@
           "finish": "shingle",
           "color": "#5a3a35"
         },
-        "f-w38": {
-          "id": "f-w38",
-          "a": "f-n27",
-          "b": "f-n28",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
-        },
         "f-w39": {
           "id": "f-w39",
-          "a": "f-n27",
-          "b": "f-n13",
+          "a": "f-n28",
+          "b": "f-n29",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1104,20 +1111,20 @@
         "f-w40": {
           "id": "f-w40",
           "a": "f-n28",
+          "b": "f-n13",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w41": {
+          "id": "f-w41",
+          "a": "f-n29",
           "b": "f-n11",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
           "finish": "shingle",
           "color": "#5a3a35"
-        },
-        "f-w41": {
-          "id": "f-w41",
-          "a": "f-n28",
-          "b": "f-n29",
-          "thickness": 5,
-          "kind": "interior",
-          "phase": "new"
         },
         "f-w42": {
           "id": "f-w42",
@@ -1130,7 +1137,7 @@
         "f-w43": {
           "id": "f-w43",
           "a": "f-n30",
-          "b": "f-n19",
+          "b": "f-n31",
           "thickness": 5,
           "kind": "interior",
           "phase": "new"
@@ -1138,11 +1145,10 @@
         "f-w44": {
           "id": "f-w44",
           "a": "f-n31",
-          "b": "f-n32",
+          "b": "f-n19",
           "thickness": 5,
           "kind": "interior",
-          "phase": "new",
-          "heightOverride": 47.5
+          "phase": "new"
         },
         "f-w45": {
           "id": "f-w45",
@@ -1151,29 +1157,38 @@
           "thickness": 5,
           "kind": "interior",
           "phase": "new",
-          "heightOverride": 77
+          "heightOverride": 47.5
         },
         "f-w46": {
           "id": "f-w46",
           "a": "f-n33",
-          "b": "f-n27",
+          "b": "f-n34",
           "thickness": 5,
           "kind": "interior",
-          "phase": "new"
+          "phase": "new",
+          "heightOverride": 77
         },
         "f-w47": {
           "id": "f-w47",
           "a": "f-n34",
-          "b": "f-n31",
+          "b": "f-n28",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "new"
+        },
+        "f-w48": {
+          "id": "f-w48",
+          "a": "f-n35",
+          "b": "f-n32",
           "thickness": 5,
           "kind": "interior",
           "phase": "new",
           "heightOverride": 47.5
         },
-        "f-w48": {
-          "id": "f-w48",
-          "a": "f-n34",
-          "b": "f-n26",
+        "f-w49": {
+          "id": "f-w49",
+          "a": "f-n35",
+          "b": "f-n27",
           "thickness": 7,
           "kind": "exterior",
           "phase": "existing",
@@ -1457,7 +1472,7 @@
           "id": "f-o19"
         },
         "f-o20": {
-          "wallId": "f-w43",
+          "wallId": "f-w44",
           "type": "door",
           "offset": 36.5,
           "width": 28,
@@ -1487,7 +1502,7 @@
           "id": "f-o21"
         },
         "f-o22": {
-          "wallId": "f-w42",
+          "wallId": "f-w43",
           "type": "passage",
           "offset": 38.75,
           "width": 56,
@@ -1574,16 +1589,16 @@
           "id": "f-o27"
         },
         "f-o28": {
-          "wallId": "f-w33",
+          "wallId": "f-w30",
           "type": "door",
-          "offset": 36,
+          "offset": 66,
           "width": 32,
           "height": 80,
           "sill": 0,
           "phase": "new",
           "swing": {
             "hinge": "a",
-            "side": "right"
+            "side": "left"
           },
           "lites": {
             "cols": 3,
@@ -1594,9 +1609,9 @@
           "id": "f-o28"
         },
         "f-o29": {
-          "wallId": "f-w31",
+          "wallId": "f-w32",
           "type": "door",
-          "offset": 68.75,
+          "offset": 51.5,
           "width": 36,
           "height": 80,
           "sill": 0,
@@ -1614,7 +1629,7 @@
           "id": "f-o29"
         },
         "f-o30": {
-          "wallId": "f-w30",
+          "wallId": "f-w31",
           "type": "window",
           "offset": 48,
           "width": 60,
@@ -1629,10 +1644,10 @@
           "id": "f-o30"
         },
         "f-o31": {
-          "wallId": "f-w34",
+          "wallId": "f-w35",
           "type": "window",
-          "offset": 44.5,
-          "width": 56,
+          "offset": 63.5,
+          "width": 94,
           "height": 44,
           "sill": 36,
           "phase": "new",
@@ -1641,9 +1656,9 @@
           "id": "f-o31"
         },
         "f-o32": {
-          "wallId": "f-w34",
+          "wallId": "f-w35",
           "type": "window",
-          "offset": 118.5,
+          "offset": 156.5,
           "width": 56,
           "height": 44,
           "sill": 36,
@@ -1653,7 +1668,7 @@
           "id": "f-o32"
         },
         "f-o33": {
-          "wallId": "f-w35",
+          "wallId": "f-w36",
           "type": "window",
           "offset": 68.5,
           "width": 44,
@@ -1665,7 +1680,7 @@
           "id": "f-o33"
         },
         "f-o34": {
-          "wallId": "f-w32",
+          "wallId": "f-w33",
           "type": "door",
           "offset": 44.5,
           "width": 36,
@@ -1682,7 +1697,7 @@
           "id": "f-o34"
         },
         "f-o35": {
-          "wallId": "f-w35",
+          "wallId": "f-w36",
           "type": "door",
           "offset": 24.5,
           "width": 36,
@@ -1699,7 +1714,7 @@
           "id": "f-o35"
         },
         "f-o36": {
-          "wallId": "f-w38",
+          "wallId": "f-w39",
           "type": "door",
           "offset": 39.5,
           "width": 24,
@@ -1738,7 +1753,7 @@
           "id": "f-o38"
         },
         "f-o39": {
-          "wallId": "f-w45",
+          "wallId": "f-w46",
           "type": "door",
           "offset": 13.5,
           "width": 24,
@@ -1905,7 +1920,7 @@
           "name": "Foyer (proposed)",
           "anchor": {
             "x": -48,
-            "y": 125
+            "y": 105
           },
           "phase": "new",
           "wallFinish": "paint",
@@ -2109,19 +2124,19 @@
           "outline": [
             {
               "x": -156,
-              "y": 46.25
+              "y": 10
             },
             {
               "x": -18,
-              "y": 46.25
+              "y": 10
             },
             {
               "x": -18,
-              "y": 158
+              "y": 120
             },
             {
               "x": -156,
-              "y": 158
+              "y": 120
             }
           ],
           "ridgeAngle": 0,
@@ -2147,11 +2162,11 @@
           "outline": [
             {
               "x": -96,
-              "y": 158
+              "y": 120
             },
             {
               "x": -18,
-              "y": 158
+              "y": 120
             },
             {
               "x": -18,
@@ -2684,7 +2699,7 @@
           "piece": "coatBench",
           "origin": {
             "x": -44.5,
-            "y": 53.25
+            "y": 17
           },
           "direction": 90,
           "width": 89,
@@ -3868,7 +3883,7 @@
           "kind": "post",
           "at": {
             "x": -150,
-            "y": 51.25
+            "y": 15
           },
           "width": 10,
           "depth": 10,
@@ -3885,7 +3900,7 @@
           "kind": "post",
           "at": {
             "x": -150,
-            "y": 153
+            "y": 115
           },
           "width": 10,
           "depth": 10,
@@ -3902,11 +3917,11 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 38.25
+            "y": 2
           },
           "b": {
             "x": -150,
-            "y": 166
+            "y": 128
           },
           "width": 10,
           "depth": 10,
@@ -3923,11 +3938,11 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 51.25
+            "y": 15
           },
           "b": {
             "x": -150,
-            "y": 75.25
+            "y": 39
           },
           "width": 6,
           "depth": 6,
@@ -3944,11 +3959,11 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 153
+            "y": 115
           },
           "b": {
             "x": -150,
-            "y": 129
+            "y": 91
           },
           "width": 6,
           "depth": 6,
@@ -3965,17 +3980,17 @@
           "kind": "beam",
           "a": {
             "x": -94,
-            "y": 102.13
+            "y": 65
           },
           "b": {
             "x": -182,
-            "y": 102.13
+            "y": 65
           },
           "width": 10,
           "depth": 10,
           "mount": "dropped",
-          "za": 131.94,
-          "zb": 131.94,
+          "za": 131.36,
+          "zb": 131.36,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "10\" ridge log",
@@ -3986,17 +4001,17 @@
           "kind": "beam",
           "a": {
             "x": -94,
-            "y": 74.19
+            "y": 37.5
           },
           "b": {
             "x": -182,
-            "y": 74.19
+            "y": 37.5
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
-          "za": 113.52,
-          "zb": 113.52,
+          "za": 113.23,
+          "zb": 113.23,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log purlin",
@@ -4007,17 +4022,17 @@
           "kind": "beam",
           "a": {
             "x": -94,
-            "y": 130.06
+            "y": 92.5
           },
           "b": {
             "x": -182,
-            "y": 130.06
+            "y": 92.5
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
-          "za": 113.52,
-          "zb": 113.52,
+          "za": 113.23,
+          "zb": 113.23,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log purlin",
@@ -4028,17 +4043,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 51.83
+            "y": 15.58
           },
           "b": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
           "za": 89.81,
-          "zb": 123.33,
+          "zb": 122.75,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log rafter",
@@ -4049,17 +4064,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "b": {
             "x": -150,
-            "y": 66.92
+            "y": 30.41
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.56,
-          "zb": 96.62,
+          "zb": 96.44,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4070,17 +4085,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "b": {
             "x": -150,
-            "y": 79.49
+            "y": 42.76
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.93,
-          "zb": 105.37,
+          "zb": 105.05,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4091,17 +4106,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "b": {
             "x": -150,
-            "y": 92.07
+            "y": 55.12
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 89.27,
-          "zb": 116.09,
+          "zb": 115.63,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4112,17 +4127,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 152.42
+            "y": 114.42
           },
           "b": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "width": 8,
           "depth": 8,
           "mount": "dropped",
           "za": 89.81,
-          "zb": 123.33,
+          "zb": 122.75,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log rafter",
@@ -4133,17 +4148,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "b": {
             "x": -150,
-            "y": 137.33
+            "y": 99.59
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.56,
-          "zb": 96.62,
+          "zb": 96.44,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4154,17 +4169,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "b": {
             "x": -150,
-            "y": 124.76
+            "y": 87.24
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 86.93,
-          "zb": 105.37,
+          "zb": 105.05,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4175,17 +4190,17 @@
           "kind": "beam",
           "a": {
             "x": -150,
-            "y": 102.13
+            "y": 65
           },
           "b": {
             "x": -150,
-            "y": 112.18
+            "y": 74.88
           },
           "width": 3,
           "depth": 3,
           "mount": "dropped",
           "za": 89.27,
-          "zb": 116.09,
+          "zb": 115.63,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "3\" twig",
@@ -4196,13 +4211,13 @@
           "kind": "post",
           "at": {
             "x": -150,
-            "y": 102.125
+            "y": 65
           },
           "width": 8,
           "depth": 8,
           "rotation": 0,
           "base": 85,
-          "top": 126.94,
+          "top": 126.36,
           "color": "#3f2c1f",
           "profile": "log",
           "label": "8\" log king post",
@@ -4213,7 +4228,7 @@
           "kind": "post",
           "at": {
             "x": -97,
-            "y": 164
+            "y": 126
           },
           "width": 10,
           "depth": 10,
@@ -4264,7 +4279,7 @@
           "kind": "beam",
           "a": {
             "x": -97,
-            "y": 177
+            "y": 139
           },
           "b": {
             "x": -97,
@@ -4285,11 +4300,11 @@
           "kind": "beam",
           "a": {
             "x": -97,
-            "y": 164
+            "y": 126
           },
           "b": {
             "x": -97,
-            "y": 185
+            "y": 147
           },
           "width": 6,
           "depth": 6,
@@ -6163,6 +6178,14 @@
           "y": -360
         },
         "elevation": 6
+      },
+      "grade-49": {
+        "id": "grade-49",
+        "at": {
+          "x": -180,
+          "y": 65
+        },
+        "elevation": -2
       }
     },
     "columns": {
@@ -6185,22 +6208,7 @@
       "column-2": {
         "at": {
           "x": -150,
-          "y": 51.25
-        },
-        "kind": "pier",
-        "phase": "new",
-        "width": 18,
-        "depth": 18,
-        "rotation": 0,
-        "base": -3,
-        "top": 20,
-        "color": "#8e8579",
-        "id": "column-2"
-      },
-      "column-3": {
-        "at": {
-          "x": -150,
-          "y": 153
+          "y": 15
         },
         "kind": "pier",
         "phase": "new",
@@ -6210,19 +6218,34 @@
         "base": -4,
         "top": 20,
         "color": "#8e8579",
+        "id": "column-2"
+      },
+      "column-3": {
+        "at": {
+          "x": -150,
+          "y": 115
+        },
+        "kind": "pier",
+        "phase": "new",
+        "width": 18,
+        "depth": 18,
+        "rotation": 0,
+        "base": -5,
+        "top": 20,
+        "color": "#8e8579",
         "id": "column-3"
       },
       "column-4": {
         "at": {
           "x": -126,
-          "y": 118.5
+          "y": 65
         },
         "kind": "pier",
         "phase": "new",
         "width": 60,
         "depth": 72,
         "rotation": 0,
-        "base": -3,
+        "base": -5,
         "top": 1.5,
         "color": "#8e8579",
         "id": "column-4"
@@ -6230,7 +6253,7 @@
       "column-5": {
         "at": {
           "x": -97,
-          "y": 164
+          "y": 126
         },
         "kind": "pier",
         "phase": "new",

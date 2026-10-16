@@ -17,3 +17,7 @@ Nothing open.
       wall's line, with one post dressed as a 14" peeled log, slid 15" west of the Kitchen/Living
       corner into the Living to half hide the powder room door; the log post in the middle of the
       hall is gone. Posts in both end walls; a 3' footing under the log's post.
+- [x] 16 Oct 2026: the house door moved 39" north to the foot of the stair, north of the steel
+      beam's post (y 63.5..95.5), the stairs unchanged; the foyer moved 3' north (its north face
+      10" short of the house's), its front door centred under the gable's peak; the chimney now
+      rises outdoors in the screen porch, which is 3' longer.

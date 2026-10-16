@@ -1960,7 +1960,7 @@ meet the old walls outside the old openings (the band's wall at y 51.5 touches t
 jamb, its divider at x 261.5 clears the old bath window), so nothing of the existing house moves;
 the laundry closet in the master bath; the stove's boxes on the First Floor; and, routed outside
 the house (PLAN-v7-exterior-flue.md), its black connector (an uncapped flue column from the stove's
-top, and a box into the west wall), the tee (a box in the foyer) and its flue column outside
+top, and a box into the west wall), the tee (a box in the screen porch) and its flue column outside
 the west wall (`kind: 'flue'`, capped, 2" off the siding), whose top the script sets by the 3-2-10
 rule from the main roof (`roofHeightAt`: 3' over the rake where it passes, 2' over the highest roof
 within 10', here the ridge);
