@@ -827,15 +827,17 @@ describe('docs/examples/146-mick-road.json', () => {
     const beams = members.filter((m) => m.kind === 'beam' && !isTimber(m));
     // The stair hall's header and the kitchen beam, both on the old wall's line (y 99.5): steel
     // I-beams flush in the floor framing (MK, 16 Oct 2026), 8 1/8" deep so they fit in 2x10s; and the
-    // beam over the Kitchen/Living opening (y 102.5..236), from their shared end into the 16" wall.
+    // beam over the Kitchen/Living opening (y 102.5..236), hung off the kitchen beam into the 16"
+    // wall. The two steel beams meet over the log post, 15" west of the corner (x 155.5).
     expect(beams.map((m) => m.kind === 'beam' && [m.a, m.b, m.mount, m.phase, m.label, m.depth])).toEqual([
-      [{ x: 3.5, y: 99.5 }, { x: 170.5, y: 99.5 }, 'flush', 'new', 'W8x15 steel, flush (engineer to size)', 8.125],
-      [{ x: 170.5, y: 99.5 }, { x: 314.5, y: 99.5 }, 'flush', 'new', 'W8x15 steel, flush (engineer to size)', 8.125],
+      [{ x: 3.5, y: 99.5 }, { x: 155.5, y: 99.5 }, 'flush', 'new', 'W8x15 steel, flush (engineer to size)', 8.125],
+      [{ x: 155.5, y: 99.5 }, { x: 314.5, y: 99.5 }, 'flush', 'new', 'W8x15 steel, flush (engineer to size)', 8.125],
       [{ x: 170.5, y: 99.5 }, { x: 170.5, y: 244 }, 'flush', 'new', '(2) 1 3/4 x 11 7/8 LVL', 11.875],
     ]);
-    // Posts in the walls under the beams' ends: (3) 2x6 in each end wall and (2) 2x4 in the 16"
-    // wall; the corner's post is the log (below). No other post stands in a room.
+    // Posts under the beams' ends: the one inside the log (below) where the two steel beams meet,
+    // (3) 2x6 in each end wall and (2) 2x4 in the 16" wall. No other post stands in a room.
     expect(members.filter((m) => m.kind === 'post' && !isTimber(m)).map((m) => m.kind === 'post' && [m.at, m.width, m.label])).toEqual([
+      [{ x: 155.5, y: 99.5 }, 5.5, 'post inside the log (engineer to size)'],
       [{ x: 3.5, y: 99.5 }, 4.5, '(3) 2x6 in wall'],
       [{ x: 314.5, y: 99.5 }, 4.5, '(3) 2x6 in wall'],
       [{ x: 170.5, y: 244 }, 3.5, '(2) 2x4'],
@@ -850,10 +852,11 @@ describe('docs/examples/146-mick-road.json', () => {
     // The Adirondack entry's logs, all timbers: the canopy's two posts, tie, two knee braces, king
     // post, two rafters, ridge log, two purlins and six twigs of its sunburst; the screen porch's
     // three posts, plate and four knee braces.
-    // The peeled log post (MK, 15 and 16 Oct 2026): 14", at the Kitchen/Living corner under both
-    // beams' ends, floor to ceiling, pale; nothing in the middle of the hall.
+    // The peeled log post (MK, 15 and 16 Oct 2026): 14", under both beams' ends, slid 15" west of the
+    // Kitchen/Living corner into the Living, on the powder room door's centre line, so it half hides
+    // the door from the Living; floor to ceiling, pale; nothing in the middle of the hall.
     const peeled = members.filter((m) => m.label === '14" peeled log post');
-    expect(peeled.map((m) => m.kind === 'post' && [m.at, m.width, m.depth, m.base, m.top, m.profile, m.color, m.phase])).toEqual([[{ x: 170.5, y: 99.5 }, 14, 14, 0, 96, 'log', '#c9ab7e', 'new']]);
+    expect(peeled.map((m) => m.kind === 'post' && [m.at, m.width, m.depth, m.base, m.top, m.profile, m.color, m.phase])).toEqual([[{ x: 155.5, y: 99.5 }, 14, 14, 0, 96, 'log', '#c9ab7e', 'new']]);
     const timbers = members.filter((m) => isTimber(m) && !peeled.includes(m));
     const tally: Record<string, number> = {};
     for (const m of timbers) tally[m.label ?? ''] = (tally[m.label ?? ''] ?? 0) + 1;
@@ -871,13 +874,13 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(timbers.every((m) => m.profile === 'log' && m.color === '#3f2c1f' && m.phase === 'new')).toBe(true);
     // The basement: the three existing north-south girders (placeholders from MK's sketch, the middle
     // one under the partition), then new posts on footings: under the log post at the beams' shared
-    // end (about 14 to 16 kips, so a 36" footing), and under the opening beam's south end, both on
-    // the middle girder's line.
+    // end (about 14 to 16 kips, so a 36" footing), 15" west of the middle girder, and under the
+    // opening beam's south end, on the girder's line.
     expect(Object.values(plan.levels[bId].members)).toEqual([
       ...[77.5, 170.5, 259.5].map((x) =>
         expect.objectContaining({ kind: 'beam', a: { x, y: 3.5 }, b: { x, y: 311.5 }, mount: 'dropped', phase: 'existing', label: 'existing girder (size and place to measure)' }),
       ),
-      expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 99.5 }, width: 5.5, depth: 11, footing: { width: 36, thickness: 12 }, phase: 'new' }),
+      expect.objectContaining({ kind: 'post', at: { x: 155.5, y: 99.5 }, width: 5.5, depth: 11, footing: { width: 36, thickness: 12 }, phase: 'new' }),
       expect.objectContaining({ kind: 'post', at: { x: 170.5, y: 244 }, width: 5.5, depth: 5.5, footing: { width: 24, thickness: 12 }, phase: 'new' }),
     ]);
     // No wall is marked: the tool infers them all.

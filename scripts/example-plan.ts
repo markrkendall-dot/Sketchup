@@ -1711,16 +1711,21 @@ function proposed(ids: ExistingIds): void {
   // west wall to the x 170.5 partition (13'11" between bearings), and the kitchen beam, from that
   // partition to the east wall (12').
   // MK, 16 Oct 2026: steel I-beams, so both spans clear with no post in the hall and the 8' ceilings
-  // stay flat, and one post, dressed as a log, at the Kitchen/Living corner by the powder room. The
+  // stay flat, and one post, dressed as a log, at the Kitchen/Living corner by the powder room; then
+  // slid west into the Living, 15" from the corner (x 155.5, on the powder room door's centre), so
+  // it half hides that door from the Living. It stays on the beams' line: south of it the beams
+  // would have nothing under them. The kitchen beam runs on past the corner to it, and the opening
+  // beam's north end hangs off the kitchen beam 15" from the post (a hanger). The
   // estimate for the engineer (README "Still open"): the Second Floor's joists bearing on the line
   // from both sides (about 4' of floor north of it and 9' south, 40 psf live and 12 dead) plus the
-  // Master's north wall and its ceiling come to about 900 plf: on the 14' span about 21 kip-ft and
-  // 6.1 kips at each end, on the 12' about 16 kip-ft and 5.3 kips. A W8x15 (Zx 13.6 in3, I 48 in4)
-  // takes that at L/360 under live load (it needs about 8.5 and 33), and at 8" deep it sits flush in
+  // Master's north wall and its ceiling come to about 900 plf. The spans are 12'8" (west wall to the
+  // post) and 13'4" (post to east wall, with the opening beam's end, about 2.5 kips, near the post):
+  // about 22 kip-ft at most, 5.5 to 8 kips at the ends. A W8x15 (Zx 13.6 in3, I 48 in4)
+  // takes that at L/360 under live load (it needs about 9 and 35), and at 8" deep it sits flush in
   // 2x10 floor framing, the joists hung off wood nailers bolted to its web. Wood would take a
   // 3-ply 1 3/4 x 11 7/8 LVL, which drops below 2x10s. The joists' depth is still to measure.
-  // The bearings: the corner post (the two beams' ends and the north end of the opening beam,
-  // about 14 to 16 kips) down through the basement on its own post, past the middle girder, to a
+  // The bearings: the log-dressed post (the two beams' ends and most of the opening beam's north
+  // end, about 14 to 16 kips) down through the basement on its own post, west of the middle girder, to a
   // 36" x 36" x 12" footing (about 10 sq ft at the code's 1,500 psf without a soil test); and a
   // post of (3) 2x6 built into each end wall, carried down to the foundation wall by solid blocking.
   // The west one stands against the house door's north jamb (its opening from y 102.5): the
@@ -1740,17 +1745,22 @@ function proposed(ids: ExistingIds): void {
     if (!store().addMember(fId, { kind: 'beam', a, b, width: BEAM.width, depth: BEAM.depth, mount: 'flush', label: BEAM.label, phase: NEW })) throw new Error('beam rejected');
   };
   const STEEL = { width: 4, depth: 8.125, label: 'W8x15 steel, flush (engineer to size)', color: '#6e7378' };
+  /** The log-dressed post, on the powder room door's centre line (x 155.5), 15" west of the corner. */
+  const LOG_X = 155.5;
   for (const [a, b] of [
-    [{ x: CL.x0, y: FRONT_LINE }, { x: PART_KL, y: FRONT_LINE }],
-    [{ x: PART_KL, y: FRONT_LINE }, { x: CL.x1, y: FRONT_LINE }],
+    [{ x: CL.x0, y: FRONT_LINE }, { x: LOG_X, y: FRONT_LINE }],
+    [{ x: LOG_X, y: FRONT_LINE }, { x: CL.x1, y: FRONT_LINE }],
   ]) {
     if (!store().addMember(fId, { kind: 'beam', a, b, width: STEEL.width, depth: STEEL.depth, mount: 'flush', label: STEEL.label, color: STEEL.color, phase: NEW })) throw new Error('steel beam rejected');
   }
   const POST = MEMBER_DEFAULTS.post;
-  if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: FRONT_LINE }, width: POST.width, depth: 2 * POST.width, rotation: 0, label: '(2) 6x6', phase: NEW, footing: { width: 36, thickness: 12 } })) throw new Error('post rejected');
-  // The corner post dressed as a 14" peeled log (the structural post inside it), and the end posts in the walls.
-  const LOG_POST = { at: { x: PART_KL, y: FRONT_LINE }, d: 14 };
+  if (!store().addMember(bId, { kind: 'post', at: { x: LOG_X, y: FRONT_LINE }, width: POST.width, depth: 2 * POST.width, rotation: 0, label: '(2) 6x6', phase: NEW, footing: { width: 36, thickness: 12 } })) throw new Error('post rejected');
+  // The post dressed as a 14" peeled log (the structural post inside it), and the end posts in the walls.
+  const LOG_POST = { at: { x: LOG_X, y: FRONT_LINE }, d: 14 };
   if (!store().addMember(fId, { kind: 'post', at: LOG_POST.at, width: LOG_POST.d, depth: LOG_POST.d, rotation: 0, base: 0, top: level(fId).wallHeight, color: PEELED_LOG, profile: 'log', label: '14" peeled log post', phase: NEW })) throw new Error('log post rejected');
+  // The structural post inside the log (the log is dressing, so the checks look past it): a 6x6
+  // placeholder, steel or wood for the engineer to size.
+  if (!store().addMember(fId, { kind: 'post', at: LOG_POST.at, width: POST.width, depth: POST.width, rotation: 0, label: 'post inside the log (engineer to size)', phase: NEW })) throw new Error('post in the log rejected');
   for (const x of [CL.x0, CL.x1]) {
     if (!store().addMember(fId, { kind: 'post', at: { x, y: FRONT_LINE }, width: 4.5, depth: 5.5, rotation: 0, label: '(3) 2x6 in wall', phase: NEW })) throw new Error('wall post rejected');
   }
@@ -1765,13 +1775,14 @@ function proposed(ids: ExistingIds): void {
   // Their inner ends come down the upstairs partition (x 171.5) onto the Kitchen/Living wall, which
   // the opening (y 102.5..236) cuts, so a flush beam over the opening carries them, and the
   // partition, to its ends: the studs at y 99.5, and new studs in the middle of the 16" wall south of
-  // it. Both ends stand over the middle girder; a post on a footing under each takes them to the
-  // ground (the (2) 6x6 at y 99.5, and a 6x6 at the south end). No post stands in a room upstairs.
+  // it. Its north end hangs off the kitchen beam (steel, y 99.5) 15" from the log-dressed post; its
+  // south end stands over the middle girder, with a 6x6 on a footing under it. No post stands in a
+  // room upstairs.
   const KL_SOUTH = KL_OPEN.south + 8;
   beam({ x: PART_KL, y: FRONT_LINE }, { x: PART_KL, y: KL_SOUTH });
   if (!store().addMember(bId, { kind: 'post', at: { x: PART_KL, y: KL_SOUTH }, width: POST.width, depth: POST.width, rotation: 0, label: '6x6', phase: NEW, footing: { ...MEMBER_DEFAULTS.footing } })) throw new Error('post under the opening beam rejected');
   // Studs under the opening beam's south end in the partition (two 2x4s, 3 1/2" square), down to
-  // the basement post; its north end rests on the log-dressed corner post.
+  // the basement post.
   if (!store().addMember(fId, { kind: 'post', at: { x: PART_KL, y: KL_SOUTH }, width: 3.5, depth: 3.5, rotation: 0, label: '(2) 2x4', phase: NEW })) throw new Error('studs rejected');
 
   // ---- Labels, anchored where the room it replaces in the All view did not reach, so the two

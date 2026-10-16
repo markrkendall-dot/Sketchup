@@ -14,6 +14,6 @@ Nothing open.
       passes through the foyer roof. The bookcase went to the south-west corner and the Living's
       furniture was rearranged to face the stove.
 - [x] 16 Oct 2026: steel I-beams (W8x15, flush, for the engineer to size) on the old front room
-      wall's line, 14' and 12', with one post at the Kitchen/Living corner dressed as a 14" peeled
-      log; the log post in the middle of the hall is gone. Posts in both end walls; a 3' footing
-      under the corner post.
+      wall's line, with one post dressed as a 14" peeled log, slid 15" west of the Kitchen/Living
+      corner into the Living to half hide the powder room door; the log post in the middle of the
+      hall is gone. Posts in both end walls; a 3' footing under the log's post.
