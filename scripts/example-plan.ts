@@ -1478,22 +1478,36 @@ function proposed(ids: ExistingIds): void {
     furnish(fId, 'diningChair', { x, y: TABLE.south + 18 }, 270);
   }
 
-  // ---- The Living (MK, 15 Oct 2026: furnish the house, Adirondack camp style; rearranged the same
-  // day round the stove on the west wall, its front at x 39, y 150..174): a log sofa in red buffalo
-  // check facing the lake window, x 80..164, y 144..180, its back to the way from the house door to
-  // the kitchen and its west end 41" from the stove; a Navajo rug before the hearth (x 58..154, y
-  // 126..198, clear of the hearth at x 57); a peeled-log coffee table (x 98..146, y 196..220); a
-  // hickory rocker (about x 51..87, y 200..241) and a plaid armchair (about x 118..166, y 225..272)
-  // turned to face the stove, a side table between them; an iron floor lamp by the rocker, 40" from
-  // the stove; a pine bookcase on the west wall in the south-west corner, y 262..298.
-  furnish(fId, 'rug', { x: 106, y: 126 }, 90, { width: 96, depth: 72, fabric: 'navajo' });
-  furnish(fId, 'sofa', { x: 122, y: 144 }, 90);
-  furnish(fId, 'coffeeTable', { x: 122, y: 196 }, 90);
-  furnish(fId, 'armchair', { x: 156, y: 258 }, 215, { fabric: 'woolPlaid' });
-  furnish(fId, 'rocker', { x: 76, y: 236 }, 245);
-  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 280 }, 0, { width: 36 });
-  furnish(fId, 'floorLamp', { x: 24, y: 214 }, 90);
-  furnish(fId, 'sideTable', { x: 104, y: 246 }, 90);
+  // ---- The Living (MK, 15 Oct 2026: furnish the house, Adirondack camp style; laid out again 16
+  // Oct 2026 for how the room is used: the lake view first, the family's TV at night, the stove now
+  // and then; an ordinary wall-mounted TV). The room (x 7..168, y 102..308) has one full wall: the
+  // south is the lake window, the east the Kitchen/Living opening and the pass-through, the north
+  // open to the stair hall. So the west wall is the media and hearth wall: the stove at its north
+  // end, a 65" TV at its south end (centred y 240, 57" x 33", its centre 42" up) over a pine media
+  // console (y 207..273), its edge 37" from the stove's side (never over it; the TV maker's heat
+  // limits to check). The group faces it with the lake beside it:
+  //   - the log sofa in red buffalo check facing west, its back to the kitchen opening and the
+  //     pass-through (sill 42", over the 34" back), x 124..160, y 198..282, 11' from the TV, the
+  //     stove ahead-right and the lake on the left;
+  //   - a peeled-log coffee table between (x 84..108, y 216..264) on the Navajo rug (x 60..132,
+  //     y 192..288);
+  //   - the hickory rocker and the plaid armchair on the north side (about y 144..185): the rocker
+  //     turned south-west to both the lake window and the TV, 38" from the stove for fire nights,
+  //     and the armchair (x 120..154, y 146..180) facing the lake straight on: the daytime view seats;
+  //   - the iron floor lamp at the sofa's north end, the side table at its south end by the window;
+  //   - the pine bookcase on the west wall between the stair hall and the stove (y 102..138).
+  // The way from the house door to the kitchen passes north and east of the log post, clear of it.
+  furnish(fId, 'rug', { x: 132, y: 240 }, 180, { width: 96, depth: 72, fabric: 'navajo' });
+  furnish(fId, 'sofa', { x: 160, y: 240 }, 180);
+  furnish(fId, 'coffeeTable', { x: 108, y: 240 }, 180);
+  furnish(fId, 'armchair', { x: 137, y: 146 }, 90, { fabric: 'woolPlaid' });
+  furnish(fId, 'rocker', { x: 104, y: 150 }, 120);
+  furnish(fId, 'bookcase', { x: CL.x0 + HALF, y: 120 }, 0, { width: 36 });
+  furnish(fId, 'floorLamp', { x: 158, y: 190 }, 180);
+  furnish(fId, 'sideTable', { x: 158, y: 294 }, 180);
+  const TV_Y = 240;
+  kitchen({ kind: 'box', label: 'Media console', origin: { x: CL.x0 + HALF, y: TV_Y }, direction: 0, width: 66, depth: 18, height: 24, frontColor: PINE_FLOOR });
+  kitchen({ kind: 'box', label: 'TV', origin: { x: CL.x0 + HALF, y: TV_Y }, direction: 0, width: 57, depth: 2.5, height: 33, elevation: 26, frontColor: '#1c1c1e' });
 
   // ---- The pantry's fittings (x 173..311, y 7..55): shelves 12" deep and 84" high on its north
   // wall and on its end walls south of them, clear of its door's swing (x 198..222). The powder room

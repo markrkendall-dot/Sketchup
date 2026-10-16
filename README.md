@@ -942,11 +942,16 @@ where the built design differs from them):
     proposed **cabinets** (kitchen, island, wardrobes, vanities, pantry shelves) are in the same
     Nordic pine.
 13. **Furniture** (MK, 15 Oct 2026; Adirondack camp style, on the furniture layer, Shift+F):
-    - the **Living** (rearranged round the stove on the west wall, 15 Oct 2026): a peeled-log sofa
-      in red buffalo check facing the lake window, its end 3'5" from the stove; a Navajo rug before
-      the hearth with a log coffee table; a hickory rocker and a wool-plaid armchair turned to face
-      the stove, a side table between them; an iron floor lamp by the rocker; a pine bookcase in
-      the south-west corner;
+    - the **Living** (laid out 16 Oct 2026 for how it is used: the lake view first, the family's TV
+      at night, the stove now and then). The room's one full wall is the west one (the lake window
+      is the south, the kitchen opening and pass-through the east, the stair hall the north), so it
+      is the media and hearth wall: the stove at its north end and a **65" TV** at its south end
+      over a pine media console, 3' from the stove's side (never over it). The peeled-log sofa in
+      red buffalo check faces it from the kitchen side, 11' away, the stove ahead-right and the
+      lake on the left; a log coffee table on the Navajo rug between; the hickory rocker (turned
+      toward the window and the TV, 3' from the stove) and the wool-plaid armchair (facing the lake)
+      on the north side are the daytime view seats; an iron floor lamp and a side table at the
+      sofa's ends; the pine bookcase on the west wall between the stair hall and the stove;
     - the **kitchen**: the pine farm table and four hickory ladder-back chairs with cane seats;
     - the **foyer**: the built-in coat bench (shown with the furniture layer off too); the **screen porch**: two green Adirondack
       chairs and a side table facing the lake;

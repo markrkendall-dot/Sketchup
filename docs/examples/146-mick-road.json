@@ -3144,10 +3144,10 @@
           "kind": "furniture",
           "piece": "rug",
           "origin": {
-            "x": 106,
-            "y": 126
+            "x": 132,
+            "y": 240
           },
-          "direction": 90,
+          "direction": 180,
           "width": 96,
           "depth": 72,
           "height": 0.375,
@@ -3160,10 +3160,10 @@
           "kind": "furniture",
           "piece": "sofa",
           "origin": {
-            "x": 122,
-            "y": 144
+            "x": 160,
+            "y": 240
           },
-          "direction": 90,
+          "direction": 180,
           "width": 84,
           "depth": 36,
           "height": 34,
@@ -3175,10 +3175,10 @@
           "kind": "furniture",
           "piece": "coffeeTable",
           "origin": {
-            "x": 122,
-            "y": 196
+            "x": 108,
+            "y": 240
           },
-          "direction": 90,
+          "direction": 180,
           "width": 48,
           "depth": 24,
           "height": 18,
@@ -3190,10 +3190,10 @@
           "kind": "furniture",
           "piece": "armchair",
           "origin": {
-            "x": 156,
-            "y": 258
+            "x": 137,
+            "y": 146
           },
-          "direction": 215,
+          "direction": 90,
           "width": 34,
           "depth": 34,
           "height": 34,
@@ -3206,10 +3206,10 @@
           "kind": "furniture",
           "piece": "rocker",
           "origin": {
-            "x": 76,
-            "y": 236
+            "x": 104,
+            "y": 150
           },
-          "direction": 245,
+          "direction": 120,
           "width": 24,
           "depth": 34,
           "height": 42,
@@ -3222,7 +3222,7 @@
           "piece": "bookcase",
           "origin": {
             "x": 7,
-            "y": 280
+            "y": 120
           },
           "direction": 0,
           "width": 36,
@@ -3236,10 +3236,10 @@
           "kind": "furniture",
           "piece": "floorLamp",
           "origin": {
-            "x": 24,
-            "y": 214
+            "x": 158,
+            "y": 190
           },
-          "direction": 90,
+          "direction": 180,
           "width": 16,
           "depth": 16,
           "height": 60,
@@ -3251,10 +3251,10 @@
           "kind": "furniture",
           "piece": "sideTable",
           "origin": {
-            "x": 104,
-            "y": 246
+            "x": 158,
+            "y": 294
           },
-          "direction": 90,
+          "direction": 180,
           "width": 20,
           "depth": 20,
           "height": 24,
@@ -3263,6 +3263,38 @@
           "id": "f-c71"
         },
         "f-c72": {
+          "elevation": 0,
+          "kind": "box",
+          "label": "Media console",
+          "origin": {
+            "x": 7,
+            "y": 240
+          },
+          "direction": 0,
+          "width": 66,
+          "depth": 18,
+          "height": 24,
+          "frontColor": "#d8d0c2",
+          "phase": "new",
+          "id": "f-c72"
+        },
+        "f-c73": {
+          "elevation": 26,
+          "kind": "box",
+          "label": "TV",
+          "origin": {
+            "x": 7,
+            "y": 240
+          },
+          "direction": 0,
+          "width": 57,
+          "depth": 2.5,
+          "height": 33,
+          "frontColor": "#1c1c1e",
+          "phase": "new",
+          "id": "f-c73"
+        },
+        "f-c74": {
           "elevation": 0,
           "kind": "box",
           "label": "Shelves",
@@ -3276,10 +3308,10 @@
           "direction": 90,
           "width": 138,
           "phase": "new",
-          "id": "f-c72",
+          "id": "f-c74",
           "wood": "nordicPine"
         },
-        "f-c73": {
+        "f-c75": {
           "elevation": 0,
           "kind": "box",
           "label": "Shelves",
@@ -3293,10 +3325,10 @@
           "direction": 180,
           "width": 36,
           "phase": "new",
-          "id": "f-c73",
+          "id": "f-c75",
           "wood": "nordicPine"
         },
-        "f-c74": {
+        "f-c76": {
           "elevation": 0,
           "kind": "box",
           "label": "Shelves",
@@ -3310,10 +3342,10 @@
           "direction": 0,
           "width": 36,
           "phase": "new",
-          "id": "f-c74",
+          "id": "f-c76",
           "wood": "nordicPine"
         },
-        "f-c75": {
+        "f-c77": {
           "elevation": 0,
           "kind": "box",
           "label": "WC",
@@ -3327,9 +3359,9 @@
           },
           "direction": 0,
           "phase": "new",
-          "id": "f-c75"
+          "id": "f-c77"
         },
-        "f-c76": {
+        "f-c78": {
           "elevation": 0,
           "kind": "sink",
           "origin": {
@@ -3341,10 +3373,10 @@
           "depth": 12,
           "height": 31.5,
           "phase": "new",
-          "id": "f-c76",
+          "id": "f-c78",
           "wood": "nordicPine"
         },
-        "f-c77": {
+        "f-c79": {
           "elevation": 0,
           "kind": "box",
           "label": "Walk-in shower",
@@ -3358,9 +3390,9 @@
           "height": 1,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c77"
+          "id": "f-c79"
         },
-        "f-c78": {
+        "f-c80": {
           "elevation": 0,
           "kind": "box",
           "label": "Bench",
@@ -3374,9 +3406,9 @@
           "height": 18,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c78"
+          "id": "f-c80"
         },
-        "f-c79": {
+        "f-c81": {
           "elevation": 0,
           "kind": "box",
           "label": "Glass",
@@ -3390,9 +3422,9 @@
           "height": 78,
           "frontColor": "#cfe2e6",
           "phase": "new",
-          "id": "f-c79"
+          "id": "f-c81"
         },
-        "f-c80": {
+        "f-c82": {
           "elevation": 0,
           "kind": "box",
           "label": "Wall",
@@ -3406,9 +3438,9 @@
           "height": 96,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c80"
+          "id": "f-c82"
         },
-        "f-c81": {
+        "f-c83": {
           "elevation": 0,
           "kind": "sink",
           "origin": {
@@ -3420,10 +3452,10 @@
           "depth": 21,
           "height": 34.5,
           "phase": "new",
-          "id": "f-c81",
+          "id": "f-c83",
           "wood": "nordicPine"
         },
-        "f-c82": {
+        "f-c84": {
           "elevation": 0,
           "kind": "box",
           "label": "WC",
@@ -3437,9 +3469,9 @@
           },
           "direction": 180,
           "phase": "new",
-          "id": "f-c82"
+          "id": "f-c84"
         },
-        "f-c83": {
+        "f-c85": {
           "elevation": 0,
           "kind": "box",
           "label": "Dryer",
@@ -3453,9 +3485,9 @@
           "height": 38,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c83"
+          "id": "f-c85"
         },
-        "f-c84": {
+        "f-c86": {
           "elevation": 0,
           "kind": "box",
           "label": "Washer",
@@ -3469,9 +3501,9 @@
           "height": 38,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c84"
+          "id": "f-c86"
         },
-        "f-c85": {
+        "f-c87": {
           "elevation": 0,
           "kind": "tall",
           "origin": {
@@ -3484,10 +3516,10 @@
           "height": 84,
           "frontColor": "#c4884e",
           "phase": "new",
-          "id": "f-c85",
+          "id": "f-c87",
           "wood": "nordicPine"
         },
-        "f-c86": {
+        "f-c88": {
           "elevation": 0,
           "kind": "tall",
           "origin": {
@@ -3500,10 +3532,10 @@
           "height": 84,
           "frontColor": "#c4884e",
           "phase": "new",
-          "id": "f-c86",
+          "id": "f-c88",
           "wood": "nordicPine"
         },
-        "f-c87": {
+        "f-c89": {
           "kind": "furniture",
           "piece": "rug",
           "origin": {
@@ -3517,9 +3549,9 @@
           "elevation": 0,
           "phase": "new",
           "fabric": "braided",
-          "id": "f-c87"
+          "id": "f-c89"
         },
-        "f-c88": {
+        "f-c90": {
           "kind": "furniture",
           "piece": "bed",
           "origin": {
@@ -3532,9 +3564,9 @@
           "height": 48,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c88"
+          "id": "f-c90"
         },
-        "f-c89": {
+        "f-c91": {
           "kind": "furniture",
           "piece": "nightstand",
           "origin": {
@@ -3547,9 +3579,9 @@
           "height": 26,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c89"
+          "id": "f-c91"
         },
-        "f-c90": {
+        "f-c92": {
           "kind": "furniture",
           "piece": "nightstand",
           "origin": {
@@ -3562,9 +3594,9 @@
           "height": 26,
           "elevation": 0,
           "phase": "new",
-          "id": "f-c90"
+          "id": "f-c92"
         },
-        "f-c91": {
+        "f-c93": {
           "elevation": 30,
           "kind": "box",
           "label": "Dryer vent",
@@ -3578,9 +3610,9 @@
           "height": 60,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c91"
+          "id": "f-c93"
         },
-        "f-c92": {
+        "f-c94": {
           "elevation": 86,
           "kind": "box",
           "label": "Dryer vent",
@@ -3594,9 +3626,9 @@
           "height": 4,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c92"
+          "id": "f-c94"
         },
-        "f-c93": {
+        "f-c95": {
           "elevation": 84,
           "kind": "box",
           "label": "Vent hood",
@@ -3610,9 +3642,9 @@
           "height": 8,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c93"
+          "id": "f-c95"
         },
-        "f-c94": {
+        "f-c96": {
           "elevation": 86,
           "kind": "box",
           "label": "Hood duct",
@@ -3626,9 +3658,9 @@
           "height": 8,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c94"
+          "id": "f-c96"
         },
-        "f-c95": {
+        "f-c97": {
           "elevation": 84,
           "kind": "box",
           "label": "Duct cap",
@@ -3642,9 +3674,9 @@
           "height": 12,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c95"
+          "id": "f-c97"
         },
-        "f-c96": {
+        "f-c98": {
           "kind": "box",
           "label": "Smoke",
           "origin": {
@@ -3658,9 +3690,9 @@
           "elevation": 94,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c96"
+          "id": "f-c98"
         },
-        "f-c97": {
+        "f-c99": {
           "kind": "box",
           "label": "Smoke/CO",
           "origin": {
@@ -3674,9 +3706,9 @@
           "elevation": 94,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c97"
+          "id": "f-c99"
         },
-        "f-c98": {
+        "f-c100": {
           "kind": "box",
           "label": "Smoke/CO",
           "origin": {
@@ -3690,9 +3722,9 @@
           "elevation": 94,
           "frontColor": "#f1efe8",
           "phase": "new",
-          "id": "f-c98"
+          "id": "f-c100"
         },
-        "f-c99": {
+        "f-c101": {
           "elevation": 0,
           "kind": "box",
           "label": "Hearth",
@@ -3706,9 +3738,9 @@
           "height": 1,
           "frontColor": "#7d7a73",
           "phase": "new",
-          "id": "f-c99"
+          "id": "f-c101"
         },
-        "f-c100": {
+        "f-c102": {
           "elevation": 1,
           "kind": "box",
           "label": "Stone",
@@ -3722,9 +3754,9 @@
           "height": 59,
           "frontColor": "#7d7a73",
           "phase": "new",
-          "id": "f-c100"
+          "id": "f-c102"
         },
-        "f-c101": {
+        "f-c103": {
           "elevation": 1,
           "kind": "box",
           "label": "Wood stove",
@@ -3738,9 +3770,9 @@
           "height": 30,
           "frontColor": "#26241f",
           "phase": "new",
-          "id": "f-c101"
+          "id": "f-c103"
         },
-        "f-c102": {
+        "f-c104": {
           "elevation": 62,
           "kind": "box",
           "label": "Stovepipe",
@@ -3754,9 +3786,9 @@
           "height": 8,
           "frontColor": "#26241f",
           "phase": "new",
-          "id": "f-c102"
+          "id": "f-c104"
         },
-        "f-c103": {
+        "f-c105": {
           "elevation": 62,
           "kind": "box",
           "label": "Stovepipe",
@@ -3770,9 +3802,9 @@
           "height": 8,
           "frontColor": "#26241f",
           "phase": "new",
-          "id": "f-c103"
+          "id": "f-c105"
         },
-        "f-c104": {
+        "f-c106": {
           "elevation": 62,
           "kind": "box",
           "label": "Tee",
@@ -3786,7 +3818,7 @@
           "height": 8,
           "frontColor": "#b9bdc1",
           "phase": "new",
-          "id": "f-c104"
+          "id": "f-c106"
         }
       },
       "decks": {
