@@ -1,4 +1,4 @@
-import { NoColorSpace, SRGBColorSpace } from 'three';
+import { NoColorSpace, SRGBColorSpace, type CanvasTexture } from 'three';
 import { CANE_COLOR, FABRICS, LINEN_COLOR, WOODS, type WoodSpec } from '../model/furniture';
 import type { FabricId, WoodId } from '../model/types';
 import {
@@ -57,11 +57,15 @@ export function periodicNoise(x: number, y: number, px: number, py: number, seed
   const iy = Math.floor(y);
   const fx = smooth(x - ix);
   const fy = smooth(y - iy);
-  const w = (v: number, p: number) => ((v % p) + p) % p;
-  const a = hash(w(ix, px), w(iy, py), seed);
-  const b = hash(w(ix + 1, px), w(iy, py), seed);
-  const c = hash(w(ix, px), w(iy + 1, py), seed);
-  const d = hash(w(ix + 1, px), w(iy + 1, py), seed);
+  // The lattice corners wrapped into the period (hot: written out, no closure).
+  const x0 = ((ix % px) + px) % px;
+  const x1 = (((ix + 1) % px) + px) % px;
+  const y0 = ((iy % py) + py) % py;
+  const y1 = (((iy + 1) % py) + py) % py;
+  const a = hash(x0, y0, seed);
+  const b = hash(x1, y0, seed);
+  const c = hash(x0, y1, seed);
+  const d = hash(x1, y1, seed);
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
 
@@ -402,7 +406,25 @@ export function fabricPixels(id: FabricTexture): Pixels {
  */
 export function paintPixels(color: string): Pixels {
   const [r, g, b] = hexToRgb(color);
+  const { shade, height } = paintField();
   const rgba = new Uint8ClampedArray(N * N * 4);
+  for (let j = 0; j < N * N; j++) {
+    const k = shade[j];
+    const i = j * 4;
+    rgba[i] = r * k;
+    rgba[i + 1] = g * k;
+    rgba[i + 2] = b * k;
+    rgba[i + 3] = 255;
+  }
+  return { rgba, height };
+}
+
+let paintFieldCache: { shade: Float64Array; height: Float32Array } | null = null;
+
+/** The paint's stipple and roll, which do not depend on its colour: worked out once and shared. */
+function paintField(): { shade: Float64Array; height: Float32Array } {
+  if (paintFieldCache) return paintFieldCache;
+  const shade = new Float64Array(N * N);
   const height = new Float32Array(N * N);
   const P = TILE_INCHES;
   for (let py = 0; py < N; py++) {
@@ -411,29 +433,37 @@ export function paintPixels(color: string): Pixels {
       const Y = inchY(py);
       const stipple = periodicNoise(X * 6, Y * 6, P * 6, P * 6, 41) - 0.5;
       const roll = fbm(X / 9, Y / 2, P / 9, P / 2, 43, 2) - 0.5;
-      const k = 1 + stipple * 0.025 + roll * 0.02;
-      const i = (py * N + px) * 4;
-      rgba[i] = r * k;
-      rgba[i + 1] = g * k;
-      rgba[i + 2] = b * k;
-      rgba[i + 3] = 255;
+      shade[py * N + px] = 1 + stipple * 0.025 + roll * 0.02;
       height[py * N + px] = stipple * 0.006;
     }
   }
-  return { rgba, height };
+  paintFieldCache = { shade, height };
+  return paintFieldCache;
 }
 
 // ---------------------------------------------------------------------------------------------
 // Textures (need a canvas)
 
 const pixelCache = new Map<string, SidingTextures | null>();
+/** Each key's pixels, generated once for both variants. */
+const generated = new Map<string, Pixels>();
+/** Normal maps by key (or by a shared relief key, as for paint), one for both variants. */
+const pixelNormals = new Map<string, CanvasTexture | null>();
 
 /**
  * Textures from a pixel generator, made once per key and variant: the colour map (the `new` variant
  * blended toward NEW_WORK_GREEN like every other texture) and the normal map of its height field.
+ * The pixels are generated once per key, and the normal map is made once per key (or per
+ * `reliefKey`, for generators whose relief does not depend on the key) and shared by both variants.
  * Null wherever there is no DOM canvas (node, tests).
  */
-export function texturesFromPixels(key: string, make: () => Pixels, variant: TextureVariant = 'plain', strength: number = PX_PER_INCH): SidingTextures | null {
+export function texturesFromPixels(
+  key: string,
+  make: () => Pixels,
+  variant: TextureVariant = 'plain',
+  strength: number = PX_PER_INCH,
+  reliefKey: string = key,
+): SidingTextures | null {
   if (typeof document === 'undefined') return null;
   const k = `${key}|${variant}`;
   const hit = pixelCache.get(k);
@@ -443,20 +473,29 @@ export function texturesFromPixels(key: string, make: () => Pixels, variant: Tex
     pixelCache.set(k, null);
     return null;
   }
-  const px = make();
+  let px = generated.get(key);
+  if (!px) {
+    px = make();
+    generated.set(key, px);
+  }
   const img = tile.ctx.createImageData(TEXTURE_PX, TEXTURE_PX);
   img.data.set(px.rgba);
   if (variant === 'new') blendPixels(img.data, hexToRgb(NEW_WORK_GREEN), NEW_WORK_BLEND);
   tile.ctx.putImageData(img, 0, 0);
-  let normalMap = null;
-  if (px.height) {
-    const n = tileCanvas();
-    if (n) {
-      const nimg = n.ctx.createImageData(TEXTURE_PX, TEXTURE_PX);
-      normalFromHeight(px.height, TEXTURE_PX, strength, nimg.data);
-      n.ctx.putImageData(nimg, 0, 0);
-      normalMap = tileTexture(n.canvas, NoColorSpace);
+  const nk = `${reliefKey}|${strength}`;
+  let normalMap = pixelNormals.get(nk);
+  if (normalMap === undefined) {
+    normalMap = null;
+    if (px.height) {
+      const n = tileCanvas();
+      if (n) {
+        const nimg = n.ctx.createImageData(TEXTURE_PX, TEXTURE_PX);
+        normalFromHeight(px.height, TEXTURE_PX, strength, nimg.data);
+        n.ctx.putImageData(nimg, 0, 0);
+        normalMap = tileTexture(n.canvas, NoColorSpace);
+      }
     }
+    pixelNormals.set(nk, normalMap);
   }
   const out = { map: tileTexture(tile.canvas, SRGBColorSpace), normalMap };
   pixelCache.set(k, out);
@@ -479,5 +518,5 @@ export function fabricTextures(id: FabricTexture, variant: TextureVariant = 'pla
 }
 
 export function paintTextures(color: string, variant: TextureVariant = 'plain'): SidingTextures | null {
-  return texturesFromPixels(`paint|${color}`, () => paintPixels(color), variant);
+  return texturesFromPixels(`paint|${color}`, () => paintPixels(color), variant, PX_PER_INCH, 'paint');
 }
