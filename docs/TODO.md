@@ -21,3 +21,5 @@ Nothing open.
       beam's post (y 63.5..95.5), the stairs unchanged; the foyer moved 3' north (its north face
       10" short of the house's), its front door centred under the gable's peak; the chimney now
       rises outdoors in the screen porch, which is 3' longer.
+- [x] 16 Oct 2026: the house door swings out into the foyer, so nothing swings over the foot of
+      the stair (one more tread on the run would have dropped the powder room's door to 5'8").

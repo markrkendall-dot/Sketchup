@@ -1117,11 +1117,14 @@ function proposed(ids: ExistingIds): void {
   add({ x: (WING.x0 + WING.x1) / 2, y: wing.y1 }, { type: 'door', width: 72, height: 80, sliding: true, lites: { cols: 2, rows: 4 } });
   // The house door (MK, 16 Oct 2026: further north, normal stairs kept): 32", y 63.5..95.5, in the
   // new piece of wall, its south jack stud against the beam post at y 99.5 (the post its king stud).
-  // The stair's bottom step (x 7..43, y 49..59.4) is 4" north of it and clear of its trim, with a 36"
-  // landing inside; hinged on its north jamb, it opens against the wall south of the step. Green,
-  // nine lites over two panels.
+  // The stair's bottom step (x 7..43, y 49..59.4) is 4" north of it and clear of its trim. It swings
+  // out into the foyer (MK, 16 Oct 2026: the stair's foot felt tight with the leaf swinging over
+  // where you step off), hinged on its north jamb: its leaf sweeps x -32..0, clear of the coat bench
+  // and the front door's swing, and the hall keeps a clear 36" landing at the stair's foot. (One more
+  // tread on the run in place of the bottom step would drop the whole run 7.2" and the powder room's
+  // door under it to about 5'8".) Green, nine lites over two panels.
   const halfLite = { lites: { cols: 3, rows: 3 }, halfLite: true, leafColor: DOOR_GREEN };
-  add({ x: CL.x0, y: 79.5 }, { type: 'door', width: 32, height: 80, into: EAST, ...halfLite });
+  add({ x: CL.x0, y: 79.5 }, { type: 'door', width: 32, height: 80, into: WEST, ...halfLite });
   // The foyer: the 36" front door in its west wall centred under the gable's peak (MK, 16 Oct 2026),
   // and a transom in its north wall facing the driveway (MK, 15 Oct 2026), centred on the foyer:
   // 60 x 18, two sashes of 2 x 1 lites, sill 70 (head 88), high over the coat bench under it.

@@ -788,8 +788,11 @@ where the built design differs from them):
 
    The house door (32", green) is in the west wall at the foot of the stair (MK, 16 Oct 2026:
    moved 39" north), between the stair's bottom step (4" north of its opening) and the post under
-   the steel beam's end (its south king stud), with a 36" landing inside; it swings into the hall,
-   hinged on its north side. From it the hall runs east and the Living opens south, into the
+   the steel beam's end (its south king stud). It swings out into the foyer, hinged on its north
+   side (MK: the stair's foot felt tight with the leaf swinging over where you step off), so the
+   hall keeps a clear 36" landing at the foot of the stair. One more tread on the run in place of
+   the bottom step was weighed: it drops the whole run 7.2", and the powder room's door under it to
+   about 5'8". From it the hall runs east and the Living opens south, into the
    kitchen through the wide opening in the Kitchen/Living wall (item 5). The stair is unchanged
    (7.2" risers, 10 3/8" treads). New windows light the hall: a 24" one over the
    landing, a second casement pair upstairs in the north wall over the top of the run and one in the

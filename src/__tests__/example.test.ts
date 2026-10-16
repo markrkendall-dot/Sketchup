@@ -746,9 +746,19 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(f.nodes[f.walls[house.wallId].a].y).toBeLessThan(at(house).y);
     expect(house.swing?.hinge).toBe('a');
     expect(bench.origin.y + bench.depth).toBeLessThan(at(house).y - house.width / 2);
+    // It swings into the foyer (MK, 16 Oct 2026): its leaf sweeps x -32..0, clear of the front
+    // door's swing (x -92.5 + 36 at most), and the hall at the stair's foot stays clear.
+    const hw = f.walls[house.wallId];
+    const dir = normalize(sub(f.nodes[hw.b], f.nodes[hw.a]));
+    const left = perpLeft(dir);
+    const side = house.swing!.side === 'left' ? left : { x: -left.x, y: -left.y };
+    expect(side.x).toBe(-1);
     // The front door, 36", centred under the foyer gable's peak (its ridge at y 65).
     const front = doors.find((o) => at(o).x === -92.5)!;
     expect([at(front).y, front.width]).toEqual([65, 36]);
+    // Its leaf reaches west to the wall's outside face (x 0) less its width; the front door's to its
+    // inside face (x -89) plus its width.
+    expect(0 - house.width).toBeGreaterThan(-89 + front.width);
     const gable = Object.values(f.roofs).find((r) => r.phase === 'new' && r.shape === 'gable')!;
     const gys = gable.outline.map((q) => q.y);
     expect((Math.min(...gys) + Math.max(...gys)) / 2).toBe(at(front).y);
@@ -921,11 +931,13 @@ describe('docs/examples/146-mick-road.json', () => {
     };
     // The powder room's door swings out, into the stair hall (the Living's face; clear of its WC and
     // vanity); the pantry's swings in. No door from the Living to the screen porch (MK, 15 Oct 2026).
+    // The house door swings out into the foyer, so nothing swings over the stair's foot (MK, 16 Oct
+    // 2026).
     expect(doors.map((o) => `${o.width} ${into(o)}`).sort()).toEqual([
       '24 Living',
       '24 Pantry',
       '28 Master bath',
-      '32 Living',
+      '32 Foyer',
       '32 Master bedroom',
       '36 Foyer',
       '36 Screen porch',
