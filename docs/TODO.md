@@ -30,3 +30,6 @@ Nothing open.
 - [x] 16 Oct 2026: built-in pine shelves under the TV (low) and to its left (tall, framing the lake
       window), the TV on a fold-out full-motion arm; the loose bookcase and media console gone, a
       firewood holder by the stair hall.
+- [x] 20 Oct 2026: the walls painted wood paneling (warm white V-groove boards) in every dry room,
+      and the stove's hearth and surround in fieldstone, after MK's photo of a paneled lake house
+      living room (`docs/photos/28-inspiration-paneled-living-room.jpg`).

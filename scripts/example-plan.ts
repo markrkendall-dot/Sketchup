@@ -142,23 +142,27 @@ const WOOD_FLOOR = '#a87a4c';
 const PLACEHOLDER_ROOM = { wallFinish: 'paint', floorFinish: 'boards', floorColor: WOOD_FLOOR } as const;
 const PLACEHOLDER_WET = { wallFinish: 'paint', floorFinish: 'tile' } as const;
 /**
+ * The proposed walls (MK, 20 Oct 2026, from a photo of a lake house living room): painted wood
+ * paneling, vertical V-groove boards in a warm white, through every dry room (the wet rooms stay
+ * painted). Kept light (MK, 15 Oct 2026): the wood shows in the floors, the stair, the beams, the
+ * cabinets and the furniture.
+ */
+const PANEL_WHITE = '#ece6da';
+/**
  * The proposed floors (MK, 15 Oct 2026): 6" pine, face-nailed, through the whole first floor but
  * the baths and the laundry (tile) and the upstairs hall, and on the stair's thick treads; oatmeal
  * carpet in the upstairs bedrooms. The pine must not turn yellow: Nordic natural, pale and cool as
  * under a water-white (non-ambering, water-based) finish, drawn so (view3d/proceduralTextures.ts).
  */
 const PINE_FLOOR = '#d8d0c2';
-const PROPOSED_PINE = { wallFinish: 'paint', floorFinish: 'pine', floorColor: PINE_FLOOR } as const;
+const PROPOSED_PINE = { wallFinish: 'boards', wallColor: PANEL_WHITE, floorFinish: 'pine', floorColor: PINE_FLOOR } as const;
 /** The same floors laid in a room that is kept (Room.proposedFloor). */
 const PINE_PROPOSED = { finish: 'pine', color: PINE_FLOOR } as const;
 const CARPET_PROPOSED = { finish: 'carpet' } as const;
-/**
- * The kept rooms' walls in the proposed design (MK, 15 Oct 2026: painted, kept light; the wood shows
- * in the floors, the stair, the beams, the cabinets and the furniture): a warm white.
- */
-const PAINT_PROPOSED = { finish: 'paint', color: '#ece6da' } as const;
+/** The same walls in a room that is kept (Room.proposedWall). */
+const BOARDS_PROPOSED = { finish: 'boards', color: PANEL_WHITE } as const;
 /** A new room carpeted like the upstairs bedrooms. */
-const PROPOSED_CARPET = { wallFinish: 'paint', floorFinish: 'carpet' } as const;
+const PROPOSED_CARPET = { wallFinish: 'boards', wallColor: PANEL_WHITE, floorFinish: 'carpet' } as const;
 /** The peeled log post's pale, barkless wood (MK). */
 const PEELED_LOG = '#c9ab7e';
 /** The proposed shakes' brown (and the roof boards'): the dark chocolate of MK's garage. */
@@ -830,7 +834,7 @@ export function buildExamplePlan(): Plan {
   // pine wainscot about 40" high and its parquet; the Utility's pine paneling and wood floor. The
   // ceilings (pine in the Kitchen and the Bath) are not drawn.
   // MK calls the old entry hall the front room (photos 19 and 20).
-  label(fId, 'Front room', { x: 100, y: 52 }, PHASE, { wallFinish: 'paint', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN });
+  label(fId, 'Front room', { x: 100, y: 52 }, PHASE, { wallFinish: 'paint', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN, proposedWall: BOARDS_PROPOSED });
   label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: 70 }, PHASE, { wallFinish: 'paint', wallColor: BATH_GREEN, wainscot: { height: 40, finish: 'pine' }, floorFinish: 'parquet' });
   // Its label sits between the proposed island and table (y 159..204), clear of both.
   label(fId, 'Kitchen (17\'2" adjusted: re-measure)', { x: (PART.kl + 2.5 + (CL.x1 - HALF)) / 2, y: 182 }, PHASE, {
@@ -839,7 +843,7 @@ export function buildExamplePlan(): Plan {
     floorFinish: 'tile',
     floorColor: VINYL_BEIGE,
     proposedFloor: PINE_PROPOSED,
-    proposedWall: PAINT_PROPOSED,
+    proposedWall: BOARDS_PROPOSED,
   });
   label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, {
     wallFinish: 'boards',
@@ -847,7 +851,7 @@ export function buildExamplePlan(): Plan {
     floorFinish: 'boards',
     floorColor: FLOOR_RED_BROWN,
     proposedFloor: PINE_PROPOSED,
-    proposedWall: PAINT_PROPOSED,
+    proposedWall: BOARDS_PROPOSED,
   });
   // The stair strip is part of the Living (no wall on its south side), so it has no label of its own.
   label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
@@ -855,13 +859,14 @@ export function buildExamplePlan(): Plan {
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: 26 });
   // Second Floor. The Office / hall is one face with the landing and the stair well.
   // Placeholder finishes (no photos of the Second Floor).
-  label(sId, 'Bunk', { x: 90, y: 52 }, PHASE, PLACEHOLDER_ROOM);
+  label(sId, 'Bunk', { x: 90, y: 52 }, PHASE, { ...PLACEHOLDER_ROOM, proposedWall: BOARDS_PROPOSED });
   label(sId, 'Bath', { x: (UP.ew + 2.5 + (UP.bathEast - 2.5)) / 2, y: 45 }, PHASE, PLACEHOLDER_WET);
-  // The proposed design carpets the bedrooms and lays the pine in the hall (proposedFloor).
-  label(sId, 'Master closet', { x: (CL.x0 + HALF + (UP.closet - 2.5)) / 2, y: STRIP_MID }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED });
-  label(sId, 'Master', { x: 90, y: 225 }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED });
-  label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED });
-  label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, PLACEHOLDER_ROOM);
+  // The proposed design carpets the bedrooms and lays the pine in the hall (proposedFloor), and
+  // panels the dry rooms' walls (proposedWall).
+  label(sId, 'Master closet', { x: (CL.x0 + HALF + (UP.closet - 2.5)) / 2, y: STRIP_MID }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED, proposedWall: BOARDS_PROPOSED });
+  label(sId, 'Master', { x: 90, y: 225 }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED, proposedWall: BOARDS_PROPOSED });
+  label(sId, 'Guest (11\'5" adjusted)', { x: 242, y: 235 }, PHASE, { ...PLACEHOLDER_ROOM, proposedFloor: CARPET_PROPOSED, proposedWall: BOARDS_PROPOSED });
+  label(sId, 'Office / hall (11\'11" adjusted)', { x: 267, y: 110 }, PHASE, { ...PLACEHOLDER_ROOM, proposedWall: BOARDS_PROPOSED });
 
   proposed({ bId, fId, sId, stair, houseDoor, livingWest, frontWindow, eastWindow, eastUpstairs, wingSouth, wingRoof, porchRoof, bathWindow, chimney, fixtures: casework });
   return getPlan();
@@ -1613,10 +1618,14 @@ function proposed(ids: ExistingIds): void {
   // (46" wide, y 139..185, to 60" up), and the stove 24" wide, 26" deep, 30" high, 6" off the
   // surround. The surround stops clear of the house door's trim (to y 138.5). Its stove's listed
   // clearances decide the final spacing.
+  // The hearth and the surround are fieldstone (MK, 20 Oct 2026, from the same photo as the paneled
+  // walls: rounded grey-brown stones in mortar), drawn as stone piers on the floor.
   const STOVE = { y: 162 };
-  const STONE = '#7d7a73';
-  kitchen({ kind: 'box', label: 'Hearth', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 40, depth: 50, height: 1, frontColor: STONE });
-  kitchen({ kind: 'box', label: 'Stone', origin: { x: CL.x0 + HALF, y: STOVE.y }, direction: 0, width: 46, depth: 3, height: 59, elevation: 1, frontColor: STONE });
+  const stone = (x0: number, x1: number, y0: number, y1: number, height: number, label: string) => {
+    if (!store().addColumn({ at: { x: (x0 + x1) / 2, y: (y0 + y1) / 2 }, kind: 'pier', phase: NEW, width: x1 - x0, depth: y1 - y0, rotation: 0, base: FLOOR_TOP, top: FLOOR_TOP + height, color: FIELDSTONE })) throw new Error(`${label} rejected`);
+  };
+  stone(CL.x0 + HALF, CL.x0 + HALF + 50, STOVE.y - 20, STOVE.y + 20, 1, 'hearth');
+  stone(CL.x0 + HALF, CL.x0 + HALF + 3, STOVE.y - 23, STOVE.y + 23, 60, 'stone surround');
   kitchen({ kind: 'box', label: 'Wood stove', origin: { x: CL.x0 + HALF + 6, y: STOVE.y }, direction: 0, width: 24, depth: 26, height: 30, elevation: 1, frontColor: STOVE_BLACK });
   // Its flue runs outside the Living (MK, 14 Oct 2026), to the 2025 Residential Code of New York
   // State (docs/history/PLAN-v7-exterior-flue.md), and goes up the gable wall just north of the

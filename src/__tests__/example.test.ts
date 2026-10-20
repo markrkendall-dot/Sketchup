@@ -12,7 +12,7 @@ import { shutterWidth, SILL_THICKNESS } from '../derive/openings3d';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { roofBearing, roofExtremes, roofHeightAt } from '../derive/roofs';
 import { faceAt, getFaces } from '../derive/rooms';
-import { fenceLayout, groundAt } from '../derive/site';
+import { columnOutline, fenceLayout, groundAt } from '../derive/site';
 import { flightSteps, floorToFloor, stairsBase, stairsRise } from '../derive/stairs';
 import { normalize, perpLeft, pointInPolygon, polygonSignedArea, sub } from '../model/geometry';
 import { counterRuns, fixtureOutline } from '../derive/casework';
@@ -141,12 +141,13 @@ describe('docs/examples/146-mick-road.json', () => {
     // screen porch, a rug in the master bedroom, 5 in the upstairs west room (two full beds, a
     // nightstand, a dresser, a rug) and 7 in the east room (a queen bed, two nightstands, a desk and
     // its chair, a dresser, a rug).
-    // The foyer's coat bench (built in) replaces its loose bench and two hook rails: two fewer.
-    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 92 });
-    // The masonry chimney is demolished; the stove's connector and its flue are new, and six
-    // fieldstone piers: two under the entry canopy's log posts, its stoop, and one under each of the
-    // screen porch's three log posts.
-    expect(count(Object.values(plan.site.columns))).toEqual({ existing: 0, demo: 1, new: 8 });
+    // The foyer's coat bench (built in) replaces its loose bench and two hook rails: two fewer. The
+    // stove's hearth and stone surround are fieldstone piers (site columns), not fixtures.
+    expect(count(all('fixtures'))).toEqual({ existing: 0, demo: 34, new: 90 });
+    // The masonry chimney is demolished; the stove's connector and its flue are new, and eight
+    // fieldstone piers: two under the entry canopy's log posts, its stoop, one under each of the
+    // screen porch's three log posts, and the stove's hearth and surround.
+    expect(count(Object.values(plan.site.columns))).toEqual({ existing: 0, demo: 1, new: 10 });
     // Demolished: the stair, the house door, the entry porch with its five screen openings, its roof
     // and label, the wing's north wall (it has no window), the wing's roof and its south window (a
     // sliding door replaces it), the east window into the new bedroom, the front room's walls with
@@ -775,7 +776,8 @@ describe('docs/examples/146-mick-road.json', () => {
     const f = plan.levels[plan.levelOrder[1]];
     const floorTop = getLevelElevations(plan)[f.id].floorTop;
     expect(floorTop).toBe(2);
-    const piers = Object.values(plan.site.columns).filter((c) => c.kind === 'pier');
+    // Outdoors (the stove's hearth and surround stand on the Living's floor).
+    const piers = Object.values(plan.site.columns).filter((c) => c.kind === 'pier' && c.base !== floorTop);
     // Fieldstone, new: 18" square to +20 under the canopy's posts, 16" square to +12 under the
     // porch's, and the stoop, 60" x 72" in front of the door, 1/2" under its threshold.
     expect(piers.map((c) => [c.at, c.width, c.depth, c.top, c.color, c.phase])).toEqual([
@@ -1079,13 +1081,11 @@ describe('docs/examples/146-mick-road.json', () => {
       'Living: Coffee table',
       'Living: Firewood',
       'Living: Floor lamp',
-      'Living: Hearth',
       'Living: Rocking chair',
       'Living: Rug',
       'Living: Side table',
       'Living: Smoke/CO',
       'Living: Sofa',
-      'Living: Stone',
       'Living: Stovepipe',
       'Living: Stovepipe',
       'Living: TV',
@@ -1293,8 +1293,9 @@ describe('docs/examples/146-mick-road.json', () => {
     // foyer's bench and hooks, the five pieces of the two vents and three alarms; and the furniture
     // added since (the Living's nine pieces, its two built-in bookcases among them, the screen
     // porch's three, the bedroom's rug); the Living's TV and firewood holder.
-    // (The foyer's coat bench in place of its bench and two hook rails: two fewer.)
-    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([73, 7]);
+    // (The foyer's coat bench in place of its bench and two hook rails: two fewer. The stove's hearth
+    // and surround are stone piers, not fixtures: two fewer.)
+    expect([proposedMeshes.fixtures.length, proposedMeshes.counters.length]).toEqual([71, 7]);
   });
 
   it('has the wood stove on the Living\'s west wall on a stainless flue up the screen porch and the gable that clears the roof by the 3-2-10 rule, and no chimney', () => {
@@ -1309,8 +1310,9 @@ describe('docs/examples/146-mick-road.json', () => {
     // (MK, 15 Oct 2026): the stove 6" off a 3" stone surround, on a hearth 18" deeper than the stove
     // and 8" wider each side.
     expect(bounds(fixtureOutline(named(f, 'Wood stove')))).toEqual([13, 39, 150, 174]);
-    expect(bounds(fixtureOutline(named(f, 'Stone')))).toEqual([7, 10, 139, 185]);
-    expect(bounds(fixtureOutline(named(f, 'Hearth')))).toEqual([7, 57, 142, 182]);
+    // The surround and the hearth are fieldstone piers on the floor (MK, 20 Oct 2026).
+    const stone = Object.values(plan.site.columns).filter((c) => c.kind === 'pier' && c.base === 2).map((c) => [...bounds(columnOutline(c)), c.top]);
+    expect(stone).toEqual(expect.arrayContaining([[7, 10, 139, 185, 62], [7, 57, 142, 182, 3]]));
     expect(f.rooms[faceAt(getFaces(f, 'proposed'), { x: 26, y: 162 })!.roomId!].name).toBe('Living');
     // The west wall's openings: the house door (y 63.5..95.5, north of the beam post) and none in the
     // Living.

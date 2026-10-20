@@ -937,8 +937,11 @@ where the built design differs from them):
     rooms (the powder room, the master bath and its laundry, the upstairs bath); **oatmeal carpet**
     in the upstairs bedrooms and the master closet. The screen porch keeps its outdoor boards. Rooms
     kept from today carry their new floor as a proposed floor, so the Existing view still shows
-    today's floors. **Walls** are painted and kept light (MK): the kept Kitchen and Living are
-    repainted a warm white in the Proposed view (`proposedWall`), the new rooms are painted. The
+    today's floors. **Walls** are kept light (MK): painted wood paneling, vertical V-groove boards
+    in a warm white (MK, 20 Oct 2026, from `docs/photos/28-inspiration-paneled-living-room.jpg`, not
+    of this house), in every dry room, new or kept (kept rooms carry it as `proposedWall`, so the
+    Existing view keeps today's walls); the wet rooms stay painted. The stove's hearth and wall
+    surround are fieldstone, as in that photo. The
     proposed **cabinets** (kitchen, island, wardrobes, vanities, pantry shelves) are in the same
     Nordic pine.
 13. **Furniture** (MK, 15 Oct 2026; Adirondack camp style, on the furniture layer, Shift+F):
