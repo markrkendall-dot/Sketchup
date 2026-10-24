@@ -10,14 +10,17 @@
 
 ## Generated files
 
-`docs/examples/146-mick-road.json` and `docs/viewer/146-mick-road-viewer.html` are generated from
-`scripts/example-plan.ts` and the app. After a merge or rebase, do not hand-merge their conflicts:
-take either side, then regenerate them.
+`docs/examples/146-mick-road.json`, `docs/examples/146-mick-road-rebuild.json` and the two viewers
+`docs/viewer/146-mick-road-viewer.html` and `docs/viewer/146-mick-road-rebuild-viewer.html` are
+generated from `scripts/example-plan.ts`, `scripts/rebuild-plan.ts` (both on `scripts/planLib.ts`)
+and the app. After a merge or rebase, do not hand-merge their conflicts: take either side, then
+regenerate them.
 
 ```
 npm run build:example
 npm run build:viewer
 cp dist-viewer/146-mick-road-viewer.html docs/viewer/146-mick-road-viewer.html
+cp dist-viewer/146-mick-road-rebuild-viewer.html docs/viewer/146-mick-road-rebuild-viewer.html
 ```
 
 ## Before pushing

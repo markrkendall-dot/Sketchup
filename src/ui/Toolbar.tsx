@@ -317,6 +317,14 @@ export function Toolbar() {
             <span className="lbl-long">Open example</span>
             <span className="lbl-short">Example</span>
           </button>
+          <button
+            aria-label="Open rebuild"
+            onClick={() => afterAction(() => void openExample('rebuild'))}
+            title="Open the 146 Mick Road rebuild (the house rebuilt on its foundation; design study); replaces this plan"
+          >
+            <span className="lbl-long">Open rebuild</span>
+            <span className="lbl-short">Rebuild</span>
+          </button>
           <button onClick={() => afterAction(savePlan)} title="Download the plan as a JSON file (Ctrl+S)">
             Save
           </button>

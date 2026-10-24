@@ -88,23 +88,24 @@ export function newPlan(): void {
   showNotice('Started a new plan.');
 }
 
+/** The bundled 146 Mick Road plans (docs/examples): the starter with its renovation, and the house rebuilt on its foundation. */
+export type ExamplePlan = 'starter' | 'rebuild';
+
 /**
- * Open the bundled 146 Mick Road starter plan (docs/examples), after confirming when the current
- * plan has content. The JSON loads on demand, so it is not part of the first download.
+ * Open a bundled 146 Mick Road plan (docs/examples), after confirming when the current plan has
+ * content. The JSON loads on demand, so it is not part of the first download.
  */
-export async function openExample(): Promise<void> {
+export async function openExample(which: ExamplePlan = 'starter'): Promise<void> {
   const current = getPlan();
-  if (
-    planHasContent(current) &&
-    !window.confirm(`Open the 146 Mick Road example? "${current.name}" will be replaced and Undo cannot bring it back. Use Save first to keep a copy.`)
-  ) {
+  const what = which === 'rebuild' ? 'the 146 Mick Road rebuild' : 'the 146 Mick Road example';
+  if (planHasContent(current) && !window.confirm(`Open ${what}? "${current.name}" will be replaced and Undo cannot bring it back. Use Save first to keep a copy.`)) {
     return;
   }
   try {
-    const { default: example } = await import('../../docs/examples/146-mick-road.json');
+    const { default: example } = which === 'rebuild' ? await import('../../docs/examples/146-mick-road-rebuild.json') : await import('../../docs/examples/146-mick-road.json');
     const plan = migrate(example);
     replacePlan(plan);
-    showNotice(`Opened the example: ${plan.name}. Replace its estimates with your measurements.`);
+    showNotice(which === 'rebuild' ? `Opened ${plan.name}: today's house in the Existing view, the rebuild in Proposed.` : `Opened the example: ${plan.name}. Replace its estimates with your measurements.`);
   } catch (err) {
     showNotice(`Could not open the example: ${err instanceof Error ? err.message : String(err)}`, true);
   }

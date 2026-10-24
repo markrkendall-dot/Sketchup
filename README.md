@@ -60,7 +60,9 @@ unit tests. `npm run build:example` rebuilds `docs/examples/146-mick-road.json` 
 [Modelling 146 Mick Road](#modelling-146-mick-road)).
 
 To see what the tool does before drawing anything, click **Open example** in the toolbar: it
-loads the starter plan of 146 Mick Road, then press the **3D** button.
+loads the starter plan of 146 Mick Road, then press the **3D** button. **Open rebuild** loads the
+second plan, the same house knocked down and rebuilt on its foundation (see
+[The rebuild](#the-rebuild-a-second-plan)).
 
 Every load opens on the **Proposed** view with the **roofs** and the **furniture** off (tick Roofs
 and Furniture in the 3D bar, or press Shift+F for the furniture, to show them); the viewer opens
@@ -368,7 +370,8 @@ it from the editor and run `node scripts/build-viewer.mjs that-plan.json` after 
 
 A built copy of the starter's viewer is kept at `docs/viewer/146-mick-road-viewer.html` so it can
 be downloaded from GitHub (the download button on the file's page) and passed on by AirDrop or
-mail; rebuild and copy it over after changing the starter.
+mail; rebuild and copy it over after changing the starter. The rebuild plan's viewer is beside it,
+`docs/viewer/146-mick-road-rebuild-viewer.html` (`npm run build:viewer` makes both).
 
 ## Export the plan
 
@@ -1116,6 +1119,118 @@ the engineer, the trades and the tape measure):
 
 To change the design, edit it in the app (select, move, **Mark demolish**, draw with **Draw as:
 new**) or edit `proposed()` in the script and run `npm run build:example`.
+
+## The rebuild (a second plan)
+
+`docs/examples/146-mick-road-rebuild.json` is a second plan of the same house (MK's brief of 24 Oct
+2026; `docs/history/PLAN-v14-rebuild.md`): the house knocked down and rebuilt on the main block's
+foundation, with the bump under the Utility wing gone and every addition on a foundation of its
+own. Its **Existing** view is today's house, the same as the starter's (both plans build it from
+`buildExistingHouse` in `scripts/example-plan.ts`, on the helpers in `scripts/planLib.ts`), with
+everything above the block ring marked demolished; its **Proposed** view is the new house, drawn as
+new work in `scripts/rebuild-plan.ts`. Open it with **Open rebuild**, or send the viewer
+`docs/viewer/146-mick-road-rebuild-viewer.html`. The starter plan and its renovation are untouched.
+
+MK's reference was a floor plan of a 52' x 26' main house with a 26' x 14' bedroom-suite addition,
+an 8' x 10' screen room and an 8' x 10' covered entry: a main-floor master suite (bedroom, closet,
+bath with a shower), a great room, dining, a kitchen with an island, a pantry, a powder room, a
+laundry, an entry and a stair with a landing; and still two bedrooms upstairs with a full bath
+(shower). The main block here is 26'6" x 26'3" on two floors, so the public rooms fill its first
+floor and the suite is a one-storey addition the block's full depth, 14' out on the east where the
+wing was, as in the reference. Every size is from the plan, not measured; the look is the
+renovation's (brown painted shakes, hunter green standing-seam roof, black windows with red trim).
+
+**The main block.** New 2x6 walls on the old centerlines (3 1/2" inside the block's faces), inside
+25'4 1/2" x 25'1 1/2"; the same levels and floor heights as today (basement 90", floors 96", the
+first floor top 2" over grade on the road side).
+
+- **First Floor.** A north band 8' deep along the road wall: the **entry** (about 5'7" square)
+  with a 5'7" x 2' coat closet in the north-west corner, the front door (36", green, nine lites) in the west wall
+  under the covered entry; the **stair** straight up the north wall from the entry, 36" wide, 15
+  risers of 7.2" on 10" treads, railed on its open side, pine treads; the **hall**, 5' wide along
+  it, with a 7' cased opening into the great room and a 3' corridor at its east end past the top of
+  the basement stair to the kitchen; the **powder room** (4'4" x 5', a transom high in the road
+  wall) and a **pantry** (4'4" x 2'7") east of the corridor, both entered from it. The **basement
+  stair** is stacked under the stair up, climbing the same way (36" wide, 14 risers), with a 30"
+  door at its top at the corridor's north end; the stair above spans its hole with about 90" of
+  headroom all the way, and low walls under the stair above close the hole's sides. South of the
+  band, on the lake side: the **great room** (13'6" x 16'9 1/2") west of a partition on the middle
+  basement girder's line, with a 12' picture window to the lake, a door to the screen room in its
+  west wall and a wood stove on that wall at its south end on a fieldstone hearth; the **kitchen
+  and dining** (11'6" x 16'9 1/2") east of it, open to the great room through a 94" cased opening
+  with a flush beam over it: a counter-depth refrigerator in the north-west corner, the range in
+  the west run (its hood ducting north in the ceiling to the road wall), a 30" base on the north
+  wall, the island (60" x 26" top, sink and dishwasher) facing the range with 53" and 41" aisles,
+  and the table for six at the 8' lake window. The suite's door is in the kitchen's east wall.
+- **Second Floor.** The stair's top landing at the north wall; the **hall**, 5' wide along the
+  well's south side (over the First Floor's hall wall, so the ceiling joists bear down through it),
+  with a window over the well; the **bath** (6' x 7'11 1/2") in the north-west corner over the
+  entry: a 60" tub-shower across its north end, the WC and a 24" vanity; a **linen closet** (4'4" x
+  7'11 1/2") in the north-east over the powder room and pantry, a wet stack if the laundry is ever
+  wanted upstairs; and the two **bedrooms** on the lake side, west 13'6" and east 11'6 1/2" by
+  16'9 1/2", each with a 6' x 2' closet along its north wall against the outside wall, a casement
+  pair to the lake (sill 34", a way out in a fire, R310 to verify) and a second window west or
+  east. The east one's east window sits 42" up, over the suite's shed.
+- **Roof.** The main gable as today's: ridge east-west, 6:12, 24" overhang, open eaves.
+
+**The master suite** (one storey, outside x 318..486 and the block's full depth, inside 13'5 3/4"
+wide): the **bath** across the north end (7' deep): a 60" x 42" walk-in shower in the north-west
+corner, a 72" double vanity, the WC under a 36" east window, a 48" transom high in the road wall;
+a 5' band of **suite hall** (3', entered from the kitchen; the bath's door at its north end), a
+**walk-in closet** (4'9" x 5', rods and shelves) and the **laundry** (5' x 5', washer and dryer on
+its north wall, 56" bifolds from the bedroom, the dryer venting east); and the **bedroom** (13'5
+3/4" x 12'4 1/2") at the lake end: a king bed on the east wall between two 30" windows over the
+nightstands, and a 72" sliding door in the lake wall onto the **deck** (8' deep, the suite's width
+from the retaining wall's east face, its top flush with the wall's top, railings east and south,
+posts to the ground, no stair of its own). The suite's roof is a shed, 3:12 down to the east, its
+top meeting the main wall 30" over the second floor; any steeper and the upstairs east window
+would have to be a transom, as in the renovation design. Under it, 8" block walls full height,
+like the old bump's, since the ground in front of its lake wall is at the basement floor: a
+**basement under the suite** with a 72" walkout double door, so the house keeps its walkout. The
+bump's own three walls and door are gone; the main block's block ring, the retaining wall, the
+fence and the yard stay.
+
+**The covered entry and the screen room** on the west face. The **covered entry** (8' out x 10'
+along, flush with the road face) is an open porch under a gable facing west: a fieldstone stoop
+its whole size (its top 1/2" under the threshold), two 10" dark-stained log posts on 18" fieldstone
+piers at its outer corners, a 10" log plate between them under the eave with 6" knee braces (the
+renovation's Adirondack entry, simplified), and a flagstone landing between it and the gravel
+pull-off; today's porch pad and stones go. The **screen room** (8' x 12', south of it) has screens
+above a 36" river-stone knee wall, three bays west, two north and one south beside a screen door to
+the lawn, a door from the great room, and a shed roof 3:12 down to the west; the two roofs overlap
+at their junction (no valley, a known limitation). The stove's stainless chimney rises outside the
+west wall south of the screen room's roof, 3' over the rake and 2' over the ridge.
+
+**Outside.** The outdoor wooden stair is rebuilt along the suite's east side, 23" east of today's
+(the suite is that much wider than the wing): an open flight with rails both sides from a boardwalk
+landing on the lawn down to a landing at the walkout's level, and on down the bank to the lower
+lawn. Four grade points were added along the suite's east side at today's heights so it lands on
+the lawn. The retaining wall's extension west and the garage belong to the yard plan and are not in
+this plan.
+
+**Structure (placeholders, for the engineer).** The First Floor's joists run east-west on the three
+basement girders, as today; the basement stair passes under the middle girder's line, so that
+girder is cut back to the stair's south edge, where a flush header between the two outer girders
+picks up its north end (the old girder is shown demolished). The Second Floor's joists run east-west
+south of the hall wall, bearing on the west wall, the kitchen partition (over the middle girder) and
+the east wall, with a flush beam over the 94" dining opening; over the north band they run
+north-south from the road wall to the hall wall, so nothing crosses the stair well, and the hall
+wall bears them (a doubled joist under it). The ceiling joists run north-south like the rafters
+and bear on the upstairs hall wall over the First Floor's. The demolished walls are marked not
+bearing (nothing new rests on the old framing). In the Proposed view the checks report only two
+header notes, at the basement stair's hole. Smoke alarms in each bedroom and the basement, smoke
+and CO alarms in the kitchen by the suite's door, in the hall upstairs and in the great room.
+
+**Choices MK may want otherwise:** the laundry on the main floor in the suite (the upstairs linen
+closet is plumbing-ready); the screen room on the west face beside the entry rather than on the
+lake face, where it would take the great room's view; a full-height basement under the suite rather
+than a crawl space; the kitchen with no outside wall (the reference's is interior too), lit from
+the dining's lake window and the hall; the suite 14' out, as the reference's addition.
+
+Not drawn: the suite's and the porch's ceilings, trim and baseboards; the stair's basement door is
+a plain stained leaf. The rooms carry the renovation's finishes as placeholders (painted V-groove
+boards and pale pine floors in the dry rooms, tile in the wet ones, carpet in the upstairs
+bedrooms); change them in each room's panel.
 
 ## Known limitations
 

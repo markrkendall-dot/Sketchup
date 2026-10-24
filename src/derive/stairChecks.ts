@@ -89,7 +89,10 @@ export function stairIssues(plan: Plan): Issue[] {
     const holes: Vec2[][] = above ? floorOpeningHoles(plan, above.id, VIEW) : [];
     for (const s of all) if (s.cutsFloorAbove) holes.push(...[stairsHoleOutline(s, ftf, level.wallHeight)].filter((h): h is Vec2[] => !!h));
     const ceiling = level.wallHeight;
-    const underSlab = (p: Vec2) => !!above && !holes.some((h) => pointInPolygon(p, h));
+    // The slab above lies within the level above's outside walls (its outer faces); outdoor steps
+    // beside the house on the lowest level have the sky over them.
+    const aboveFloor = above ? getFaces(above, VIEW).outerFaces : [];
+    const underSlab = (p: Vec2) => aboveFloor.some((poly) => pointInPolygon(p, poly)) && !holes.some((h) => pointInPolygon(p, h));
     // Beams over this level hang below the ceiling (a dropped one, or a flush one deeper than the joists).
     const beams = Object.values(level.members ?? {}).flatMap((m) => (m.kind === 'beam' && isVisible(m.phase, VIEW) ? [{ poly: beamOutline(m), bottom: memberBoxes(plan, levelId, m, VIEW).body.bottom }] : []));
     /** What is over a point: the slab's underside, a beam's, or nothing. */

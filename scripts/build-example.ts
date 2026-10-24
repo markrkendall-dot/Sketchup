@@ -1,10 +1,18 @@
-// Writes docs/examples/146-mick-road.json. Run with `npm run build:example`; running it twice gives
-// the same file (ids are renamed to stable ones and the date is fixed).
+// Writes docs/examples/146-mick-road.json (the starter: the house as it stands with its proposed
+// renovation) and docs/examples/146-mick-road-rebuild.json (the house rebuilt on its foundation).
+// Run with `npm run build:example`; running it twice gives the same files (ids are renamed to stable
+// ones and the date is fixed).
 import { writeFileSync } from 'node:fs';
 import { buildExampleJson } from './example-plan';
+import { buildRebuildJson } from './rebuild-plan';
 
 export function main(): void {
-  const target = new URL('../docs/examples/146-mick-road.json', import.meta.url);
-  writeFileSync(target, buildExampleJson());
-  console.log(`Wrote ${target.pathname}`);
+  for (const [file, build] of [
+    ['146-mick-road.json', buildExampleJson],
+    ['146-mick-road-rebuild.json', buildRebuildJson],
+  ] as const) {
+    const target = new URL(`../docs/examples/${file}`, import.meta.url);
+    writeFileSync(target, build());
+    console.log(`Wrote ${target.pathname}`);
+  }
 }

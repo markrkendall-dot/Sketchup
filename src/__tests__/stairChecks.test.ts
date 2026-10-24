@@ -92,6 +92,18 @@ describe('a flight against the code', () => {
     expect(codes()).not.toContain('stair.headroom');
   });
 
+  it('measures headroom only under the floor above: outdoor steps on the lowest level beside the house have the sky over them', () => {
+    const [b] = plan().levelOrder;
+    // A new flight on the Basement climbing to 80" under the First Floor's slab (its wall height 90")...
+    const flight = (x: number) => store().addStairs(b, { origin: { x, y: 120 }, direction: 270, width: 36, run: 110, rise: 80, risers: 11, phase: 'new', cutsFloorAbove: false, open: true, railings: { left: true, right: true } });
+    flight(120);
+    expect(codes()).toContain('stair.headroom');
+    reset();
+    // ...and the same flight outside the house, where the First Floor has no floor.
+    flight(300);
+    expect(codes()).not.toContain('stair.headroom');
+  });
+
   it('counts a beam over the flight in the headroom', () => {
     east();
     expect(codes()).not.toContain('stair.headroom');
