@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Cpath d=%22M2 14V7l6-5 6 5v7z%22 fill=%22%235b6170%22/%3E%3C/svg%3E" />
+    <title>146 Mick Road</title>
+    <style>
+      :root {
+        --bg: #f6f6f4;
+        --card: #ffffff;
+        --text: #1f2430;
+        --muted: #5b6170;
+        --line: #d9dbe0;
+        --link: #1a56b8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15171c;
+          --card: #1f222a;
+          --text: #e8e9ec;
+          --muted: #a2a7b4;
+          --line: #353a46;
+          --link: #7fb0ff;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      main { max-width: 680px; margin: 0 auto; padding: 32px 16px 48px; }
+      h1 { font-size: 28px; margin: 0 0 4px; }
+      .lead { color: var(--muted); margin: 0 0 24px; }
+      .plan {
+        display: block;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 0 0 14px;
+        color: inherit;
+        text-decoration: none;
+      }
+      .plan:hover, .plan:focus { border-color: var(--link); outline: none; }
+      .plan strong { display: block; font-size: 20px; color: var(--link); margin-bottom: 2px; }
+      .plan span { color: var(--muted); }
+      h2 { font-size: 18px; margin: 32px 0 8px; }
+      dl { margin: 0; }
+      dt { font-weight: 600; margin-top: 10px; }
+      dd { margin: 0; color: var(--muted); }
+      footer { margin-top: 36px; color: var(--muted); font-size: 15px; }
+      a { color: var(--link); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>146 Mick Road</h1>
+      <p class="lead">Two plans of the house, each in 3D and as floor plans. They open in the browser,
+        on a phone, an iPad or a computer, with nothing to install.</p>
+
+      <a class="plan" href="viewer/146-mick-road-viewer.html">
+        <strong>The house and its renovation</strong>
+        <span>The house as it stands, and the planned renovation.</span>
+      </a>
+      <a class="plan" href="viewer/146-mick-road-rebuild-viewer.html">
+        <strong>The rebuild</strong>
+        <span>A design study: the house taken down and rebuilt on its foundation.</span>
+      </a>
+
+      <h2>Looking around</h2>
+      <dl>
+        <dt>3D</dt>
+        <dd>Drag to orbit (one finger on a touch screen), pinch or scroll to zoom, two fingers to
+          pan. <b>Fit 3D</b> brings the whole house back into view. <b>N</b>, <b>S</b>, <b>E</b>
+          and <b>W</b> show the four sides straight on; <b>Perspective</b> goes back to orbiting.</dd>
+        <dt>Existing, Proposed, All</dt>
+        <dd><b>Existing</b> is the house as it is. <b>Proposed</b> is the design. <b>All</b> overlays
+          the two, with work to demolish in red and new work in green.</dd>
+        <dt>Levels, Roofs, Furniture</dt>
+        <dd>Tick or untick the Basement, First Floor and Second Floor to show each level.
+          <b>Roofs</b> puts the roofs on; leave it off to look down into the rooms. <b>Furniture</b>
+          adds the furniture.</dd>
+        <dt>Plan</dt>
+        <dd>The floor plan of each level. Pinch or scroll to zoom, drag to pan, double-tap to reset.</dd>
+      </dl>
+
+      <footer>Drawn in <a href="https://github.com/markrkendall-dot/Sketchup">HomePlan</a>. The
+        viewers are read-only; the plans are edited in the app.</footer>
+    </main>
+  </body>
+</html>

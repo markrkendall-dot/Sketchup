@@ -40,3 +40,6 @@ Both must pass. `npm test` also checks the example JSON against the script, so a
 - `docs/history/`: past plans and reviews (records; branch names in them are historical).
 - `docs/TODO.md`: changes MK has asked for that are not yet made.
 - `docs/photos/`: the reference photos the starter is built from, numbered as the script cites them.
+- `docs/index.html`, `docs/.nojekyll` and `docs/viewer/`: the GitHub Pages site. GitHub publishes
+  `docs/` from `main` at https://markrkendall-dot.github.io/Sketchup/, so the viewers must be rebuilt
+  and copied over (above) for the site to show a change.

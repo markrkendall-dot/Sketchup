@@ -373,6 +373,16 @@ be downloaded from GitHub (the download button on the file's page) and passed on
 mail; rebuild and copy it over after changing the starter. The rebuild plan's viewer is beside it,
 `docs/viewer/146-mick-road-rebuild-viewer.html` (`npm run build:viewer` makes both).
 
+The same two files are also a web site, so a link is enough: GitHub Pages publishes the `docs`
+folder of `main` at https://markrkendall-dot.github.io/Sketchup/ (in the repository's Settings >
+Pages, Build and deployment, Source: Deploy from a branch, branch `main`, folder `/docs`). The
+front page, `docs/index.html`, links the two viewers and says how to look around; the viewers
+themselves are at https://markrkendall-dot.github.io/Sketchup/viewer/146-mick-road-viewer.html
+and https://markrkendall-dot.github.io/Sketchup/viewer/146-mick-road-rebuild-viewer.html. Every
+push to `main` republishes the folder in a minute or two (`docs/.nojekyll` makes GitHub serve it
+as it is, without Jekyll), so the site shows a change once the viewer is rebuilt, copied over and
+pushed.
+
 ## Export the plan
 
 **Export > Export plan (.svg)** saves the active level's 2D plan as a drawing for a contractor or a
