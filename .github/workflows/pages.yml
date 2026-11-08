@@ -1,0 +1,66 @@
+# Publishes the viewers as the GitHub Pages site, https://markrkendall-dot.github.io/Sketchup/,
+# when the repository's Pages source is "GitHub Actions" (Settings > Pages > Build and deployment).
+# With the source set to a branch instead, GitHub publishes docs/ by itself and this workflow only
+# says so. It runs on every push to main that touches the site, and from the Actions tab
+# ("Run workflow").
+name: Publish the viewers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/index.html
+      - docs/viewer/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check how Pages is set up
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          type=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>/dev/null || echo none)
+          echo "build_type=$type" >> "$GITHUB_OUTPUT"
+          case "$type" in
+            workflow) echo "Pages source is GitHub Actions: publishing the site." ;;
+            legacy) echo "::notice::Pages publishes a branch folder by itself (Settings > Pages); nothing to do here." ;;
+            *) echo "::warning::GitHub Pages is not switched on. Open https://github.com/$GITHUB_REPOSITORY/settings/pages and choose a source." ;;
+          esac
+
+      - name: Gather the site (the front page and the two viewers)
+        if: steps.pages.outputs.build_type == 'workflow'
+        run: |
+          mkdir -p _site/viewer
+          cp docs/index.html _site/
+          cp docs/viewer/*.html _site/viewer/
+          ls -lR _site
+
+      - uses: actions/configure-pages@v6
+        if: steps.pages.outputs.build_type == 'workflow'
+
+      - uses: actions/upload-pages-artifact@v5
+        if: steps.pages.outputs.build_type == 'workflow'
+        with:
+          path: _site
+
+      - id: deployment
+        if: steps.pages.outputs.build_type == 'workflow'
+        uses: actions/deploy-pages@v5
