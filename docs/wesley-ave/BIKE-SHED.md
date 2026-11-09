@@ -24,10 +24,11 @@ the racks, the lot and the permits; the differences are these.
 | Rafters | 2x6 at 24" o.c., seven commons plus two fly rafters, 12" eaves and rakes |
 | Floor | 2x6 PT joists at 16" (ten) on three PT 4x4 skids, 3/4" T&G; 96 sq ft is three sheets |
 | Door | RO 62" x 83" centred at 41 to 103" on the yard wall, two 30.75" leaves swinging out; cripples over the header |
-| Bikes | six Steadyracks on the back wall as before, 20 to 100" from the left inside face, low/high 84"/96"; the e-bike in bay 3 |
+| Bikes | six Steadyracks on the back wall as before, 20 to 100" from the left inside face, low/high 84"/96"; the e-bike in bay 3. Parked swung on their pivots (about 22" out); straight out only to load |
+| Ergonomics at 6'2" (MK) | a low bay's bar hangs at 67" when the bike is straight out, face height, hence the park-swung rule; raising the low row to 90" only moves it to 73", and raising both rows enough to clear a 74" head kills the wheel shelf. The shelf at 104" is above a 6'2" standing reach (about 95"), so a two-step stool lives under the bench. Loading the 96" racks is fine: the hands hold the bike about 30" below the front tyre |
 | Wheel shelf | 3/4" plywood 137" x 30" at 104" on a 2x4 ledger, a 2x4 rim and five 2x4 brackets at the studs between racks; it clears the high racks and leaves 15" to the plates, enough for six wheels flat per stack, four stacks, about two dozen wheels, with every cradle still reachable from the floor |
 | Parts tower | 20.5" x 24" x 102" in the spare wall at the right end of the back wall, six 3/4" plywood shelves at 20" |
-| Bench | 24" x 36" at 36" high on the left end wall, in front of the bikes' bar line, with a 1/4" pegboard panel above it and pegboard either side of the door |
+| Bench | 24" x 36" at 40" high (elbow height for 6'2") on the left end wall, in front of the bikes' bar line, with a 1/4" pegboard panel above it and pegboard either side of the door |
 | Repair stand | parks in a 30" circle in the right front corner; works in the aisle with the doors open, an 80" bike clamped parallel to the wall |
 | Aisle | 43" from the hung bikes' bars to the yard wall, 67" with the bikes swung |
 | Siting | same string line from the old shed's corner, parallel to the wall, about 3' off the wall face; near end about 9' along it, far end 12' further, 8' square off toward the yard; nearest front corner about 20.5' from the house, 2.2' walkway to the old shed |
@@ -280,13 +281,14 @@ These only move the shed on the site; the shed itself does not change.
 ## The SketchUp model
 
 **12' x 8' shop version:** `wesley-bike-shop-12x8.skp`, saved 9 November 2026 through the
-Trimble SketchUp connector, 142 solid parts: floor, four framed walls with the door opening and
+Trimble SketchUp connector, 143 solid parts: floor, four framed walls with the door opening and
 cripples, seven 2x6 rafters with bird's mouths plus fly rafters, blocking, deck, metal, siding,
 doors, six Steadyracks and six bikes (780 mm bars), the wheel shelf with 24 wheels stacked flat,
-the parts tower, the bench, pegboard, the parked repair stand, the site blocks and dimension
-labels, in three scenes (Complete, Framing, Bike shop inside). Download link (tokenised, may
-expire; the save also sits in the connector's session):
-https://api.sketchup.com/mcp/v1/sketchup/dl/540b12e3-68c3-4fde-b68f-27d6c36ba301/003-save/wesley-bike-shop-12x8.skp?t=gvzCfeoygk-y9e7ANFkLBg
+the parts tower, the 40" bench with the step stool under it, pegboard, the parked repair stand,
+the site blocks and dimension labels (including the face-height note on the low-bay bars), in
+three scenes (Complete, Framing, Bike shop inside). Download link (tokenised, may expire; the
+save also sits in the connector's session):
+https://api.sketchup.com/mcp/v1/sketchup/dl/540b12e3-68c3-4fde-b68f-27d6c36ba301/005-save/wesley-bike-shop-12x8.skp?t=pVr6BfPDbESd81QRAXihFw
 
 **Earlier 10' x 7' version:** `wesley-bike-shed-10x7.skp`, built through the Trimble SketchUp
 connector in inches at the coordinates above and saved on 9 November 2026. The connector's download link is
