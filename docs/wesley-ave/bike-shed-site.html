@@ -39,6 +39,9 @@
   .controls label { display: grid; gap: 4px; font-size: 0.85rem; min-width: 0; }
   .controls input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--new); }
   .controls output { font-family: var(--font-mono); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+  .controls label.check { display: flex; gap: 8px; align-items: center; max-width: 34ch; }
+  .controls input[type=checkbox] { accent-color: var(--new); width: 16px; height: 16px; }
+  .controls input:disabled { opacity: 0.45; }
   .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 20px; font-size: 0.9rem; }
   .readouts div { display: grid; gap: 2px; border-top: 1px solid var(--rule); padding-top: 6px; }
   .readouts b { font-family: var(--font-mono); font-weight: 500; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
@@ -99,10 +102,11 @@
         <input type="range" id="newGap" min="1" max="6" step="0.5" value="3"> <output id="newGapOut">3.0 ft</output></label>
       <label>New shed slid along the wall (from the end of the 13.19' flat segment)
         <input type="range" id="slide" min="0" max="30" step="0.5" value="7.5"> <output id="slideOut">7.5 ft</output></label>
+      <label class="check"><input type="checkbox" id="snapCorner" checked> Back wall on the line from the existing shed's back corner, parallel to the wall</label>
     </div>
     <div class="sheet"><svg id="site" role="img" aria-label="Site plan of the lot with the house, the existing shed and the proposed bike shed along the Matheson Avenue retaining wall"></svg></div>
     <div class="readouts" id="readouts"></div>
-    <figcaption>Lot lines, bearings and distances are the plat's; arcs along Matheson are drawn as their chords. The house footprint is simplified from the plat (28.4' wide at the back, 58.4' along the east side, stepped on the west). The existing shed is 8.2' x 10.1' on the plat, set 1.2' off the west line; its gap to the Matheson line is not on the plat, so it is the first slider. The retaining wall is drawn 10" thick on the right-of-way line. Page up is N6°05'W; true north is the arrow.</figcaption>
+    <figcaption>To set the new shed out on site: run a string line from the existing shed's back-right corner parallel to the retaining wall (by the plat it sits about 3' off the wall face); that is the new shed's back wall. Measure along it from the corner to the near end (the second readout), then 10' more for the far end, and square 7' off toward the yard. Lot lines, bearings and distances are the plat's; arcs along Matheson are drawn as their chords. The house footprint is simplified from the plat (28.4' wide at the back, 58.4' along the east side, stepped on the west). The existing shed is 8.2' x 10.1' on the plat, set 1.2' off the west line; its gap to the Matheson line is not on the plat, so it is the first slider. The retaining wall is drawn 10" thick on the right-of-way line. Page up is N6°05'W; true north is the arrow.</figcaption>
   </figure>
 
   <figure>
@@ -191,8 +195,15 @@
 
   function drawSite() {
     const gapBehind = +document.getElementById('gapBehind').value;
-    const newGap = +document.getElementById('newGap').value;
     const slide = +document.getElementById('slide').value;
+    const top = 107.34 - gapBehind, bot = top - 10.1;
+    const cornerNE = [9.4, top];
+    const cornerDist = (cornerNE[0] - P7[0]) * nin[0] + (cornerNE[1] - P7[1]) * nin[1] - WALL_T;
+    const snap = document.getElementById('snapCorner').checked;
+    const gapSlider = document.getElementById('newGap');
+    gapSlider.disabled = snap;
+    const newGap = snap ? Math.max(0.5, cornerDist) : +gapSlider.value;
+    if (snap) gapSlider.value = String(Math.round(newGap * 2) / 2);
     document.getElementById('gapBehindOut').value = f1(gapBehind) + ' ft';
     document.getElementById('newGapOut').value = f1(newGap) + ' ft';
     document.getElementById('slideOut').value = f1(slide) + ' ft';
@@ -250,8 +261,12 @@
     textAt(svg, X(52.8), Y(30), 'sewer line (plat)', 't-s', 'middle', -90);
 
     // Existing shed
-    const top = 107.34 - gapBehind, bot = top - 10.1;
     el(svg, 'rect', { x: X(1.2), y: Y(top), width: 8.2 * S, height: 10.1 * S, 'class': 'shed' });
+    // the string line: from the shed's back-right corner, parallel to the wall
+    const lineEnd = add(cornerNE, e, 26);
+    el(svg, 'line', { x1: X(cornerNE[0]), y1: Y(cornerNE[1]), x2: X(lineEnd[0]), y2: Y(lineEnd[1]), 'class': 'swing', style: 'stroke:var(--new)' });
+    const lt = add(add(cornerNE, e, 21), nin, -1.6);
+    textAt(svg, X(lt[0]), Y(lt[1]), 'string line from the shed corner, parallel to the wall', 't-s', 'middle', -Math.atan2(e[1], e[0]) * 180 / Math.PI);
     el(svg, 'line', { x1: X(3.0), y1: Y(bot), x2: X(7.6), y2: Y(bot), 'class': 'fr', 'stroke-width': 3 });
     textAt(svg, X(5.3), Y(bot - 2.6), 'existing shed', 't-s');
     textAt(svg, X(5.3), Y(bot - 4.8), "8.2' x 10.1'", 't-s');
@@ -293,9 +308,13 @@
     if (gapPt) dimLine(svg, X(9.4), Y(gapPt[1]), X(gapPt[0]), Y(gapPt[1]), f1(gapSheds) + ' ft', 'dim-new', 't-new', gapPt === D ? -9 : 9);
     dimLine(svg, X(31), Y(bot), X(31), Y(65.4), f1(bot - 65.4) + ' ft of yard, shed to house', 'dim', 't', 9);
     const frontToHouse = Math.min(C[1], D[1]) - 65.4;
+    const alongLine = (A[0] - cornerNE[0]) * e[0] + (A[1] - cornerNE[1]) * e[1];
+    const offLine = (A[0] - cornerNE[0]) * nin[0] + (A[1] - cornerNE[1]) * nin[1];
     const ro = document.getElementById('readouts');
     ro.innerHTML = '';
-    [[f1(wedge) + ' ft', 'wedge width: existing shed front corner to the wall face, square to the wall'],
+    [[f1(cornerDist) + ' ft', 'string line to the wall face: the line from the existing shed’s back corner, parallel to the wall'],
+     [f1(alongLine) + ' ft', 'along that line from the shed corner to the new shed’s near back corner' + (Math.abs(offLine) > 0.05 ? ' (new shed is ' + f1(Math.abs(offLine)) + ' ft ' + (offLine > 0 ? 'inside' : 'outside') + ' the line)' : '')],
+     [f1(wedge) + ' ft', 'wedge width: existing shed front corner to the wall face, square to the wall'],
      [f1(gapSheds) + ' ft', 'gap between the existing shed and the new shed, at its nearest corner'],
      [f1(bot - 65.4) + ' ft', 'yard depth: existing shed front to the house'],
      [f1(frontToHouse) + ' ft', 'new shed front corner to the house']].forEach(r => {
@@ -312,7 +331,7 @@
     el(svg, 'line', { x1: X(-20), y1: Y(-13), x2: X(0), y2: Y(-13), 'class': 'dim', 'stroke-width': 2 });
     textAt(svg, X(-10), Y(-15.6), '20 ft', 't-s');
   }
-  ['gapBehind', 'newGap', 'slide'].forEach(id => document.getElementById(id).addEventListener('input', drawSite));
+  ['gapBehind', 'newGap', 'slide', 'snapCorner'].forEach(id => document.getElementById(id).addEventListener('input', drawSite));
   drawSite();
 
   /* ---------------- Bike dimensions (inches) ---------------- */
