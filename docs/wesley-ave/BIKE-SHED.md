@@ -31,7 +31,10 @@ From the 2012 Lineberger plat ([photo 10](photos/10-plat-2012-lineberger.jpg)), 
   trash cans where it widens toward the house
   ([photo 01](photos/01-yard-from-upstairs-shed-and-wall.jpg)). The photos suggest the wall
   pulls away from the shed at about 30°; the plat's bearings put the right of way itself at
-  about 52° to the west line. MK's tape settles it (see "Still to measure").
+  about 52° to the west line, which makes the wedge about 11' wide at the shed's front corner
+  (measured square to the wall) and puts the shed's front about 30' from the house. MK's tape
+  settles it (see "Still to measure"). [bike-shed-site.html](bike-shed-site.html) draws the lot,
+  both sheds and the bikes to scale, with sliders for the gaps not on the plat.
 - A sewer line runs north-south through the yard east of the house, about 40' east of the
   shed. A 15' drainage easement sits at the south-west corner. Neither touches the wedge.
 
@@ -76,7 +79,7 @@ fits in the room. Both methods land on the same 10' x 7' footprint.
 walls and the roof plane 6' toward the yard, put the door wall back on the new front; bikes on
 the tall fence-side wall in the front 10', mower and tools in the back 6'. One building,
 128 sq ft, no new roof to design, the cheapest way to a tall 10' wall. Against: it eats 6' of
-the turf (the yard between shed and house is only about 15' deep), the bikes share a room with
+the turf (about 30' deep between shed and house by the plat), the bikes share a room with
 gas and the mower, and the tool chest and shelving on that wall have to move to the back.
 
 **B. A twin shed beside the existing one.** A second 8' x 10' lean-to style shed on the
