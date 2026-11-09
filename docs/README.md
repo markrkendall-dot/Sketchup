@@ -10,6 +10,10 @@
   owner's first- and second-floor measurement sketches (11, 12), and the first floor as it is today,
   room by room, with the lake side from below (13 to 23). File names give the face or the room and
   the direction the camera faces; the starter plan was built from these.
+- **[wesley-ave/](wesley-ave/)**: a different house, MK's at 2926 Wesley Ave in Charlotte. `BIKE-SHED.md`
+  thinks through where six XL mountain bikes can live and works up a 10' x 7' bike shed to build
+  from (framing schedule, cut list, budget, permits); `photos/` holds the yard, the shed, the
+  aerial, the parcel map and the 2012 plat.
 - **[history/](history/)**: planning and review records, kept for the reasoning behind decisions.
   - `PLAN-v2.md`: the plan for roofs, terrain, finishes and the starter house.
   - `PLAN-v3-realism.md`: the plan for making the exterior and the elevations read like the photos
