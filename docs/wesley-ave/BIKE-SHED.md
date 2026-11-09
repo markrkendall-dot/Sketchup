@@ -278,6 +278,17 @@ These only move the shed on the site; the shed itself does not change.
 - Clear wall length from the sawhorse corner along the base of the wall toward the house.
 - The gap behind the existing shed, and its tall and low wall heights, for the site model.
 
+## The 3D view
+
+[bike-shop-3d.html](bike-shop-3d.html) is an interactive three.js model of the 12' x 8' shop on
+its site, built from the same numbers as the drawings: orbit, zoom and pan; toggles for the
+siding and doors, roof, bikes, fit-out and site; doors open; bikes swung on their pivots; and
+camera presets (from the yard, from the upstairs window, door corner, eye level at 6'2", inside
+at the door, framing, from above, along the wall). The site is placed from the plat: the
+existing shed at its true angle, the retaining wall and fence along the Matheson right of way,
+the house footprint three storeys tall, Wesley Ave. Stills: [from the yard](bike-shop-3d-hero.png),
+[from the upstairs window](bike-shop-3d-from-upstairs.png), [framing](bike-shop-3d-framing.png).
+
 ## The SketchUp model
 
 **12' x 8' shop version:** `wesley-bike-shop-12x8.skp`, saved 9 November 2026 through the
