@@ -89,8 +89,8 @@
 <main>
   <header>
     <div class="eyebrow">2926 Wesley Ave, Charlotte &middot; drawn from the 2012 Lineberger plat</div>
-    <h1>Wesley Ave bike shed: where it sits and how six bikes fit</h1>
-    <p class="lede">Site plan to scale from the plat's bearings, with the house, the existing shed and the proposed 10' x 7' bike shed in the wedge below the Matheson Ave retaining wall. Then the shed itself in plan, back-wall elevation and section with six XL 29ers drawn at 2,000 mm long, 780 mm bars and 1,120 mm bar height. Move the sliders to match what your tape says.</p>
+    <h1>Wesley Ave bike shed: a 12' x 12' bike shop, no permit</h1>
+    <p class="lede">The biggest box North Carolina lets you build without a building permit is 12' in every direction, height included. This page sizes that box in the wedge below the Matheson Ave retaining wall and lays it out as a small bike shop: six XL 29ers hung on the back wall (2,000 mm long, 780 mm bars), wheelsets stored flat on a shelf above them, a parts tower, a bench, and room for a tower repair stand with a bike in it. Move the sliders to match your tape.</p>
   </header>
 
   <figure>
@@ -101,31 +101,48 @@
       <label>New shed's gap to the retaining wall face
         <input type="range" id="newGap" min="1" max="6" step="0.5" value="3"> <output id="newGapOut">3.0 ft</output></label>
       <label>New shed slid along the wall (from the end of the 13.19' flat segment)
-        <input type="range" id="slide" min="0" max="30" step="0.5" value="7.5"> <output id="slideOut">7.5 ft</output></label>
+        <input type="range" id="slide" min="0" max="30" step="0.5" value="10.5"> <output id="slideOut">10.5 ft</output></label>
+      <label>Length along the wall
+        <input type="range" id="lenFt" min="10" max="12" step="1" value="12"> <output id="lenFtOut">12 ft</output></label>
+      <label>Depth toward the yard
+        <input type="range" id="depFt" min="7" max="12" step="1" value="12"> <output id="depFtOut">12 ft</output></label>
       <label class="check"><input type="checkbox" id="snapCorner" checked> Back wall on the line from the existing shed's back corner, parallel to the wall</label>
     </div>
     <div class="sheet"><svg id="site" role="img" aria-label="Site plan of the lot with the house, the existing shed and the proposed bike shed along the Matheson Avenue retaining wall"></svg></div>
     <div class="readouts" id="readouts"></div>
-    <figcaption>To set the new shed out on site: run a string line from the existing shed's back-right corner parallel to the retaining wall (by the plat it sits about 3' off the wall face); that is the new shed's back wall. Measure along it from the corner to the near end (the second readout), then 10' more for the far end, and square 7' off toward the yard. Lot lines, bearings and distances are the plat's; arcs along Matheson are drawn as their chords. The house footprint is simplified from the plat (28.4' wide at the back, 58.4' along the east side, stepped on the west). The existing shed is 8.2' x 10.1' on the plat, set 1.2' off the west line; its gap to the Matheson line is not on the plat, so it is the first slider. The retaining wall is drawn 10" thick on the right-of-way line. Page up is N6°05'W; true north is the arrow.</figcaption>
+    <figcaption>To set the new shed out on site: run a string line from the existing shed's back-right corner parallel to the retaining wall (by the plat it sits about 3' off the wall face); that is the new shed's back wall. Measure along it from the corner to the near end (the second readout), then the length, and square the depth off toward the yard. Lot lines, bearings and distances are the plat's; arcs along Matheson are drawn as their chords. The house footprint is simplified from the plat. The existing shed is 8.2' x 10.1' on the plat, 1.2' off the west line; its gap to the Matheson line is the first slider. The retaining wall is drawn 10" thick on the right-of-way line. Page up is N6°05'W; true north is the arrow.</figcaption>
   </figure>
 
   <figure>
-    <h2>Shed plan with six hung bikes</h2>
-    <div class="sheet"><svg id="plan" role="img" aria-label="Plan of the bike shed interior with six vertically hung bikes on the back wall and the double door on the yard side"></svg></div>
-    <figcaption>Interior 113" x 77". Six Steadyracks at 16" centres (20, 36, 52, 68, 84, 100" from the left inside face). A hung bike seen from above: tyres against the wall, pedals at 13", saddle at 37", bars 780 mm wide at 1,120 mm (44.1") from the wall. Dark bays hang low, pale bays 12" higher, so neighbouring bars pass over and under each other. Bay 6 is also shown swung on its Steadyrack pivot, which pulls the projection back to about 22". Clear aisle: 31" in front of a bike hung straight out, 55" with the bikes swung.</figcaption>
+    <h2>Shop plan, 12' x 12'</h2>
+    <div class="sheet"><svg id="plan" role="img" aria-label="Plan of the 12 by 12 foot bike shop: six hung bikes on the back wall, a wheel shelf above them, a parts tower, a bench, a repair stand with a bike in it, and the door on the yard side"></svg></div>
+    <figcaption>Interior 137" x 137". Six Steadyracks at 16" centres on the back wall, 20" in from the left; the bikes hang low and high alternately (dark and pale), 780 mm bars at 1,120 mm from the wall. Above them, dashed, a 30"-deep shelf at 104" where wheelsets lie flat. The spare 20" at the right end of the back wall takes a 24"-deep parts tower. A 24" x 60" bench sits on the left end wall with pegboard above; the tower repair stand lives in the right front with an 80" bike in its clamp, pointing at the yard wall so the door stays clear. The door is at the left of the yard wall, two leaves swinging out. Aisle in front of the bikes: 91" straight out, 113" swung.</figcaption>
   </figure>
 
   <figure>
     <h2>Back wall, seen from inside</h2>
-    <div class="sheet"><svg id="elev" role="img" aria-label="Elevation of the back wall with six bikes hanging by their front wheels at alternating heights"></svg></div>
-    <figcaption>Bikes hang by the front wheel, so the wall sees them end-on: two tyres in line, the frame between, and the 780 mm bar as the wide mark. Low bays 1, 3 and 5 have the tyre top at 84" and the bar at 67"; high bays 2, 4 and 6 are 12" up, so bars 12" apart never meet even though they overlap by 374 mm. Bay 3 is the e-bike, on the low rack straight inside the door. Wall plates top out at 114" (9'6"); rear tyres clear the floor by 5" and 17".</figcaption>
+    <div class="sheet"><svg id="elev" role="img" aria-label="Elevation of the back wall with six bikes hanging at alternating heights, a wheel shelf above them with stacked wheels, and the parts tower at the right"></svg></div>
+    <figcaption>Wall plates top out at 122" (10'2"), the most the 12' rule allows once the rafters and the 12" eave sit on top. Low bays have the tyre top at 84" and the bar at 67"; high bays are 12" up. The shelf at 104" clears the high racks and leaves 15" to the plates: six wheels flat per stack, four stacks across, about two dozen wheels, with the bikes' cradles still reachable from the floor. The parts tower at the right is 20" x 24" with five shelves. Bay 3 is the e-bike.</figcaption>
   </figure>
 
   <figure>
     <h2>Section through the door, looking along the wall</h2>
-    <div class="sheet"><svg id="sect" role="img" aria-label="Cross-section of the bike shed showing the roof slope, a hung bike in profile, the aisle, the door and the retaining wall behind"></svg></div>
-    <figcaption>The hung bike in true profile: 2,000 mm tall on the wall, bars 1,120 mm out from it. Back wall 114" to the top of its plates, front wall 91.5", 2x6 rafters at 3.35:12 draining to the yard, 12" eaves. Floor 9.75" above the gravel pad. The retaining wall (about 84" above the yard, the Matheson sidewalk and fence above it) is drawn 36" behind the shed as a placeholder for the setback still to confirm. The figure is 5'10".</figcaption>
+    <div class="sheet"><svg id="sect" role="img" aria-label="Cross-section of the 12 foot deep shop showing the low-slope roof, a hung bike in profile, the wheel shelf, the aisle with the repair stand beyond, the door and the retaining wall behind"></svg></div>
+    <figcaption>Back wall 122", front wall 98.5", roof at 2:12 so the front stays tall enough for the door; that pitch wants a standing-seam panel or an exposed-fastener panel rated for 2:12 with sealed laps. 2x8 rafters at 16" for the 12' span, 12" eaves. The hung bike projects 1,120 mm; the shelf above it is 30" deep. The stand and its bike are shown beyond the section line. Floor 9.75" above the gravel pad (2x6 joists on four skids); eave top about 11'10" above the pad, under the 12' limit with two inches to spare. The retaining wall is 36" behind the shed as a placeholder for the setback still to confirm.</figcaption>
   </figure>
+
+  <section>
+    <h2>What the box holds</h2>
+    <table>
+      <tr><th>Zone</th><th>Size</th><th>Holds</th></tr>
+      <tr><td>Back wall racks</td><td class="n">112" of wall, 44" out</td><td>six XL bikes, one an e-bike, on Steadyracks</td></tr>
+      <tr><td>Wheel shelf over the bikes</td><td class="n">137" x 30", 15" clear</td><td>about 24 wheels flat in four stacks, or boxed parts</td></tr>
+      <tr><td>Parts tower</td><td class="n">20" x 24" x 102"</td><td>five shelves of boxes</td></tr>
+      <tr><td>Bench and pegboard</td><td class="n">60" x 24", wall above to 95"</td><td>tools, small parts, a vice</td></tr>
+      <tr><td>Stand zone</td><td class="n">about 6' x 7'</td><td>tower repair stand with an 80" bike clamped, walk-round on three sides</td></tr>
+      <tr><td>Aisle</td><td class="n">91" from bars to the yard wall</td><td>rolling bikes in and out; a second bike on the floor if needed</td></tr>
+    </table>
+  </section>
 
   <section>
     <h2>Bike dimensions used</h2>
@@ -144,8 +161,8 @@
     <h2>Still to confirm on site</h2>
     <ul>
       <li>Tape from the existing shed's front-right corner straight across to the retaining wall, and the gap behind the shed; set the first slider to the gap and compare the wedge readout with the tape.</li>
-      <li>Tape the clear wall length from the sawhorse corner toward the house; the new shed needs about 11' of it.</li>
-      <li>Ask Charlotte Planning which setback applies at the Matheson right of way before fixing the 36" gap.</li>
+      <li>Tape the clear wall length from the sawhorse corner toward the house; the shop needs about 12' of it starting about 12' along the string line.</li>
+      <li>Ask Charlotte Planning which setback applies at the Matheson right of way before fixing the 36" gap. The 12' rule is the state building code; zoning is separate.</li>
     </ul>
   </section>
 </main>
@@ -189,13 +206,15 @@
   const WALL_T = 0.83;
   function edgeFrame(a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); const d = [dx / L, dy / L]; return { d, nin: [-d[1], d[0]], L }; }
   const P7 = LOT[7], P6 = LOT[6];
-  const seg = edgeFrame(P6, P7);           // polygon order P6 -> P7, inward normal points to the yard
-  const e = [-seg.d[0], -seg.d[1]];         // along the wall from the flat segment's end toward the house
+  const seg = edgeFrame(P6, P7);
+  const e = [-seg.d[0], -seg.d[1]];
   const nin = seg.nin;
 
   function drawSite() {
     const gapBehind = +document.getElementById('gapBehind').value;
     const slide = +document.getElementById('slide').value;
+    const LEN = +document.getElementById('lenFt').value;
+    const DEP = +document.getElementById('depFt').value;
     const top = 107.34 - gapBehind, bot = top - 10.1;
     const cornerNE = [9.4, top];
     const cornerDist = (cornerNE[0] - P7[0]) * nin[0] + (cornerNE[1] - P7[1]) * nin[1] - WALL_T;
@@ -207,11 +226,12 @@
     document.getElementById('gapBehindOut').value = f1(gapBehind) + ' ft';
     document.getElementById('newGapOut').value = f1(newGap) + ' ft';
     document.getElementById('slideOut').value = f1(slide) + ' ft';
+    document.getElementById('lenFtOut').value = LEN + ' ft';
+    document.getElementById('depFtOut').value = DEP + ' ft';
     const svg = document.getElementById('site');
     clear(svg);
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-    // Streets
     el(svg, 'rect', { x: X(U0), y: Y(-4), width: W, height: 12 * S, 'class': 'ground' });
     textAt(svg, X(57), Y(-10.5), 'WESLEY AVENUE', 't-b');
     const bandPts = [];
@@ -228,59 +248,48 @@
     textAt(svg, X(74), Y(86.5), 'MATHESON AVENUE', 't-b', 'middle', -37);
     textAt(svg, X(77), Y(83.5), 'sidewalk 6 to 7 ft above the yard', 't-s', 'middle', -37);
 
-    // Lot
     el(svg, 'polygon', { points: P(LOT), 'class': 'lot' });
-    // Retaining wall band on the Matheson edges
     for (let i = 2; i < 7; i++) {
       const a = LOT[i], b = LOT[i + 1], fr = edgeFrame(a, b);
       el(svg, 'polygon', { points: P([a, b, add(b, fr.nin, WALL_T), add(a, fr.nin, WALL_T)]), 'class': 'wallband' });
     }
     textAt(svg, X(53), Y(60.5), 'concrete retaining wall on the right-of-way line', 't-s', 'middle', -37);
-
-    // Bearings and distances
     textAt(svg, X(57), Y(-2.6), "N83°55'E  114.36'", 't-s');
     textAt(svg, X(117.5), Y(16), "N6°13'W 32.04'", 't-s', 'middle', -90);
     textAt(svg, X(-2.6), Y(54), "S6°10'E  107.35'  (board fence)", 't-s', 'middle', -90);
     textAt(svg, X(6.5), Y(109.2), "13.19'", 't-s');
-    const chord = (i, s) => { const a = LOT[i], b = LOT[i + 1], fr = edgeFrame(a, b); const m = add(add(a, b), [0, 0]); textAt(svg, X((a[0] + b[0]) / 2 - fr.nin[0] * 2.2), Y((a[1] + b[1]) / 2 - fr.nin[1] * 2.2), s, 't-s', 'middle', -Math.atan2(fr.d[1], fr.d[0]) * 180 / Math.PI + 180); };
+    const chord = (i, s) => { const a = LOT[i], b = LOT[i + 1], fr = edgeFrame(a, b); textAt(svg, X((a[0] + b[0]) / 2 - fr.nin[0] * 2.2), Y((a[1] + b[1]) / 2 - fr.nin[1] * 2.2), s, 't-s', 'middle', -Math.atan2(fr.d[1], fr.d[0]) * 180 / Math.PI + 180); };
     chord(2, "arc 37.45'  R 1470.39'");
     chord(4, "arc 44.24'  R 1529.08'");
     chord(6, "arc 35.07'  new R/W");
     textAt(svg, X(79.5), Y(55.6), "7.73'", 't-s');
     textAt(svg, X(43.3), Y(82.8), "5.44'", 't-s');
 
-    // House
     el(svg, 'polygon', { points: P(HOUSE), 'class': 'house' });
     textAt(svg, X(24), Y(47), 'house #2926', 't-b');
     textAt(svg, X(24), Y(43.5), 'three storeys, footprint simplified', 't-s');
     textAt(svg, X(21.5), Y(67.2), "28.4'", 't-s');
     textAt(svg, X(37.4), Y(36), "58.4'", 't-s', 'middle', -90);
     textAt(svg, X(28.3), Y(4), "7.0' to the right of way", 't-s');
-    // Sewer line
     el(svg, 'line', { x1: X(51), y1: Y(-4), x2: X(51), y2: Y(72.2), 'class': 'sewer' });
     textAt(svg, X(52.8), Y(30), 'sewer line (plat)', 't-s', 'middle', -90);
 
-    // Existing shed
     el(svg, 'rect', { x: X(1.2), y: Y(top), width: 8.2 * S, height: 10.1 * S, 'class': 'shed' });
-    // the string line: from the shed's back-right corner, parallel to the wall
-    const lineEnd = add(cornerNE, e, 26);
+    const lineEnd = add(cornerNE, e, 40);
     el(svg, 'line', { x1: X(cornerNE[0]), y1: Y(cornerNE[1]), x2: X(lineEnd[0]), y2: Y(lineEnd[1]), 'class': 'swing', style: 'stroke:var(--new)' });
-    const lt = add(add(cornerNE, e, 21), nin, -1.6);
+    const lt = add(add(cornerNE, e, 33), nin, -1.6);
     textAt(svg, X(lt[0]), Y(lt[1]), 'string line from the shed corner, parallel to the wall', 't-s', 'middle', -Math.atan2(e[1], e[0]) * 180 / Math.PI);
     el(svg, 'line', { x1: X(3.0), y1: Y(bot), x2: X(7.6), y2: Y(bot), 'class': 'fr', 'stroke-width': 3 });
     textAt(svg, X(5.3), Y(bot - 2.6), 'existing shed', 't-s');
     textAt(svg, X(5.3), Y(bot - 4.8), "8.2' x 10.1'", 't-s');
 
-    // New shed: back wall parallel to the wall face, 10 ft along it, 7 ft deep
     const Q = add(add(P7, nin, WALL_T + newGap), e, slide);
-    const A = Q, B = add(Q, e, 10), C = add(B, nin, 7), D = add(Q, nin, 7);
+    const A = Q, B = add(Q, e, LEN), C = add(B, nin, DEP), D = add(Q, nin, DEP);
     el(svg, 'polygon', { points: P([add(add(A, e, -1), nin, -1), add(add(B, e, 1), nin, -1), add(add(C, e, 1), nin, 1), add(add(D, e, -1), nin, 1)]), 'class': 'overhang' });
     el(svg, 'polygon', { points: P([A, B, C, D]), 'class': 'newshed' });
-    // door 5 ft wide centred on the front wall, leaves swung out
-    const j1 = add(D, e, 2.5), j2 = add(D, e, 7.5);
+    const j1 = add(D, e, 1.0), j2 = add(D, e, 6.17);
     el(svg, 'line', { x1: X(j1[0]), y1: Y(j1[1]), x2: X(j2[0]), y2: Y(j2[1]), 'class': 'fr', 'stroke-width': 3 });
     [j1, j2].forEach(j => { const k = add(j, nin, 2.5); el(svg, 'line', { x1: X(j[0]), y1: Y(j[1]), x2: X(k[0]), y2: Y(k[1]), 'class': 'dim-new' }); });
-    // racks and bars at the back wall, 780 mm wide, 44.1 in out
     [20, 36, 52, 68, 84, 100].forEach((c, i) => {
       const cf = (3.5 + c) / 12, bar = 4.11, low = i % 2 === 0;
       const s0 = add(add(A, e, cf), nin, 0.35), s1 = add(add(A, e, cf), nin, bar);
@@ -289,11 +298,16 @@
       el(svg, 'line', { x1: X(s0[0]), y1: Y(s0[1]), x2: X(s1[0]), y2: Y(s1[1]), 'class': cls });
       el(svg, 'line', { x1: X(b0[0]), y1: Y(b0[1]), x2: X(b1[0]), y2: Y(b1[1]), 'class': cls });
     });
+    if (DEP >= 10) {
+      const st = add(add(A, e, LEN - 2.8), nin, DEP - 4.0);
+      el(svg, 'circle', { cx: X(st[0]), cy: Y(st[1]), r: 1.25 * S, 'class': 'swing' });
+      const bk0 = add(st, nin, -3.3), bk1 = add(st, nin, 3.3);
+      el(svg, 'line', { x1: X(bk0[0]), y1: Y(bk0[1]), x2: X(bk1[0]), y2: Y(bk1[1]), 'class': 'swing' });
+    }
     const lab = [Math.max(10.5, D[0] - 2), Math.min(C[1], D[1]) - 3.2];
-    textAt(svg, X(lab[0]), Y(lab[1]), "new bike shed 10' x 7'", 't-new', 'start');
+    textAt(svg, X(lab[0]), Y(lab[1]), `new bike shop ${LEN}' x ${DEP}'`, 't-new', 'start');
     textAt(svg, X(lab[0]), Y(lab[1] - 2.4), 'door to the yard, racks on the wall side', 't-s', 'start');
 
-    // Readouts and dimension lines
     const corner = [9.4, bot];
     const L0 = add(P7, nin, WALL_T);
     const wv = [corner[0] - L0[0], corner[1] - L0[1]];
@@ -317,12 +331,12 @@
      [f1(wedge) + ' ft', 'wedge width: existing shed front corner to the wall face, square to the wall'],
      [f1(gapSheds) + ' ft', 'gap between the existing shed and the new shed, at its nearest corner'],
      [f1(bot - 65.4) + ' ft', 'yard depth: existing shed front to the house'],
-     [f1(frontToHouse) + ' ft', 'new shed front corner to the house']].forEach(r => {
+     [f1(frontToHouse) + ' ft', 'new shed’s nearest front corner to the house'],
+     [(LEN * DEP) + ' sq ft', 'footprint outside the studs; the permit exemption allows 12 ft in any direction']].forEach(r => {
       const d = document.createElement('div'); const b = document.createElement('b'); b.textContent = r[0];
       const s = document.createElement('span'); s.textContent = r[1]; d.appendChild(b); d.appendChild(s); ro.appendChild(d);
     });
 
-    // North arrow and scale
     const nx = X(122), ny = Y(104);
     const g = el(svg, 'g', { transform: `rotate(6.1 ${nx} ${ny})` });
     el(g, 'line', { x1: nx, y1: ny + 60, x2: nx, y2: ny - 50, 'class': 'dim' });
@@ -331,31 +345,35 @@
     el(svg, 'line', { x1: X(-20), y1: Y(-13), x2: X(0), y2: Y(-13), 'class': 'dim', 'stroke-width': 2 });
     textAt(svg, X(-10), Y(-15.6), '20 ft', 't-s');
   }
-  ['gapBehind', 'newGap', 'slide', 'snapCorner'].forEach(id => document.getElementById(id).addEventListener('input', drawSite));
+  ['gapBehind', 'newGap', 'slide', 'lenFt', 'depFt', 'snapCorner'].forEach(id => document.getElementById(id).addEventListener('input', drawSite));
   drawSite();
 
-  /* ---------------- Bike dimensions (inches) ---------------- */
+  /* ---------------- Shop geometry (inches) ---------------- */
   const BIKE = { len: 78.74, wb: 49.21, od: 29.53, bar: 30.71, barH: 44.09, saddleH: 37.4, bbH: 13.4, pedals: 14.17, tyre: 2.44 };
   const BAYS = [20, 36, 52, 68, 84, 100];
   const LOW = [true, false, true, false, true, false];
-  const CR = i => (LOW[i] ? 84 : 96);               // cradle top above the floor
+  const CR = i => (LOW[i] ? 84 : 96);
   const clsFor = (i, outline) => (i === 2 ? 'ebike' : LOW[i] ? 'bike' : 'bike-high') + (outline ? '-o' : '');
+  const OUT = 144, IN = 137, HB = 122, HF = 98.5, SHELF_Z = 104, SHELF_D = 30;
 
-  /* ---------------- Shed plan ---------------- */
+  /* ---------------- Shop plan ---------------- */
   (function plan() {
-    const svg = document.getElementById('plan'), K = 4;
-    const x = v => (v + 22) * K, y = v => (v + 26) * K;
-    svg.setAttribute('viewBox', `0 0 ${(120 + 60) * K} ${(84 + 31 + 2 + 38) * K}`);
+    const svg = document.getElementById('plan'), K = 3.4;
+    const x = v => (v + 24) * K, y = v => (v + 26) * K;
+    svg.setAttribute('viewBox', `0 0 ${(OUT + 66) * K} ${(OUT + 31 + 2 + 38) * K}`);
     const r = (x0, y0, w, h, cls) => el(svg, 'rect', { x: x(x0), y: y(y0), width: w * K, height: h * K, 'class': cls });
-    r(0, 0, 120, 3.5, 'lumber-f'); r(0, 80.5, 29, 3.5, 'lumber-f'); r(91, 80.5, 29, 3.5, 'lumber-f');
-    r(0, 3.5, 3.5, 77, 'lumber-f'); r(116.5, 3.5, 3.5, 77, 'lumber-f');
-    r(-0.625, -0.625, 121.25, 0.625, 'lumber'); r(-0.625, 84, 29.625, 0.625, 'lumber'); r(91, 84, 29.625, 0.625, 'lumber');
-    r(-0.625, 0, 0.625, 84, 'lumber'); r(120, 0, 0.625, 84, 'lumber');
-    r(3.5, 3.5, 113, 1.5, 'lumber');  // ledgers seen from above
-    // door leaves swung out 90 degrees, with swing arcs
-    r(27.5, 84.625, 1.5, 30.75, 'lumber-f'); r(91, 84.625, 1.5, 30.75, 'lumber-f');
-    el(svg, 'path', { d: `M ${x(29)} ${y(115.4)} A ${30.75 * K} ${30.75 * K} 0 0 0 ${x(59.75)} ${y(84.625)}`, 'class': 'swing' });
-    el(svg, 'path', { d: `M ${x(91)} ${y(115.4)} A ${30.75 * K} ${30.75 * K} 0 0 1 ${x(60.25)} ${y(84.625)}`, 'class': 'swing' });
+    const DOOR0 = 12, DOOR1 = 74;
+    r(0, 0, OUT, 3.5, 'lumber-f'); r(0, OUT - 3.5, DOOR0, 3.5, 'lumber-f'); r(DOOR1, OUT - 3.5, OUT - DOOR1, 3.5, 'lumber-f');
+    r(0, 3.5, 3.5, IN, 'lumber-f'); r(OUT - 3.5, 3.5, 3.5, IN, 'lumber-f');
+    r(-0.625, -0.625, OUT + 1.25, 0.625, 'lumber'); r(-0.625, OUT, DOOR0 + 0.625, 0.625, 'lumber'); r(DOOR1, OUT, OUT - DOOR1 + 0.625, 0.625, 'lumber');
+    r(-0.625, 0, 0.625, OUT, 'lumber'); r(OUT, 0, 0.625, OUT, 'lumber');
+    r(3.5, 3.5, IN, 1.5, 'lumber');
+    r(DOOR0 - 1.5, OUT + 0.625, 1.5, 30.75, 'lumber-f'); r(DOOR1, OUT + 0.625, 1.5, 30.75, 'lumber-f');
+    el(svg, 'path', { d: `M ${x(DOOR0)} ${y(OUT + 31.4)} A ${30.75 * K} ${30.75 * K} 0 0 0 ${x(DOOR0 + 30.75)} ${y(OUT + 0.625)}`, 'class': 'swing' });
+    el(svg, 'path', { d: `M ${x(DOOR1)} ${y(OUT + 31.4)} A ${30.75 * K} ${30.75 * K} 0 0 1 ${x(DOOR1 - 30.75)} ${y(OUT + 0.625)}`, 'class': 'swing' });
+    // wheel shelf above the bikes (dashed outline)
+    el(svg, 'rect', { x: x(3.5), y: y(3.5), width: IN * K, height: SHELF_D * K, 'class': 'swing' });
+    textAt(svg, x(8), y(62), 'dashed: wheel shelf above at 104 in, 30 in deep', 't-s', 'start');
     BAYS.forEach((c, i) => {
       const cx = 3.5 + c, cls = clsFor(i, false);
       r(cx - 1.75, 5.0, 3.5, 0.25, 'rack'); r(cx - 3, 5.25, 1, 12, 'rack'); r(cx + 2, 5.25, 1, 12, 'rack');
@@ -366,36 +384,59 @@
       r(cx - 2.5, 5.25 + BIKE.saddleH - 1, 5, 2, cls);
       textAt(svg, x(cx), y(-4), String(i + 1), 't-s');
     });
-    // bay 6 swung on its pivot
-    const sw = el(svg, 'g', { transform: `rotate(70 ${x(103.5)} ${y(5.25)})` });
-    el(sw, 'rect', { x: x(103.5 - BIKE.tyre / 2), y: y(5.25), width: BIKE.tyre * K, height: BIKE.barH * K, 'class': 'swing' });
-    el(sw, 'rect', { x: x(103.5 - BIKE.bar / 2), y: y(5.25 + BIKE.barH - 0.6), width: BIKE.bar * K, height: 1.2 * K, 'class': 'swing' });
-    textAt(svg, x(70), y(60), 'bay 6 swung left on its pivot: 22 in off the wall, nesting over bay 5', 't-s', 'end');
+    // parts tower at the right end of the back wall
+    r(OUT - 3.5 - 20.5, 5.0, 20.5, 24, 'lumber-f');
+    textAt(svg, x(OUT - 3.5 - 10.25), y(14), 'parts', 't-s'); textAt(svg, x(OUT - 3.5 - 10.25), y(18.5), 'tower', 't-s'); textAt(svg, x(OUT - 3.5 - 10.25), y(23), '20 x 24', 't-s');
+    // bench on the left end wall with pegboard
+    r(3.5, 70, 24, 60, 'lumber-f');
+    textAt(svg, x(15.5), y(98), 'bench', 't-s'); textAt(svg, x(15.5), y(102.5), '24 x 60', 't-s');
+    r(3.5, 70, 1, 60, 'rack');
+    textAt(svg, x(6.5), y(100), 'pegboard above', 't-s', 'middle', -90);
+    // pegboard on the yard wall right of the door
+    r(DOOR1 + 4, OUT - 4.5, OUT - 3.5 - DOOR1 - 8, 1, 'rack');
+    textAt(svg, x(OUT - 14), y(OUT - 7), 'pegboard', 't-s');
+    // repair stand with a bike clamped, pointing at the yard wall
+    const sx = 110, sy = 96;
+    el(svg, 'circle', { cx: x(sx), cy: y(sy), r: 15 * K, 'class': 'swing' });
+    el(svg, 'circle', { cx: x(sx), cy: y(sy), r: 1.5 * K, 'class': 'rack' });
+    el(svg, 'rect', { x: x(sx - BIKE.tyre / 2), y: y(56), width: BIKE.tyre * K, height: BIKE.len * K, 'class': 'swing' });
+    el(svg, 'rect', { x: x(sx - BIKE.bar / 2), y: y(56 + BIKE.len - 16), width: BIKE.bar * K, height: 1.2 * K, 'class': 'swing' });
+    el(svg, 'rect', { x: x(sx - 2.5), y: y(56 + 10), width: 5 * K, height: 10 * K, 'class': 'swing' });
+    el(svg, 'rect', { x: x(sx - BIKE.pedals / 2), y: y(56 + 33), width: BIKE.pedals * K, height: 3 * K, 'class': 'swing' });
+    textAt(svg, x(OUT - 10), y(96), 'repair stand, bike clamped at 52 in', 't-s', 'middle', -90);
     // dimensions
     dimLine(svg, x(23.5), y(-9), x(39.5), y(-9), '16 in centres', 'dim', 't-s', 6);
-    dimLine(svg, x(3.5), y(-14), x(116.5), y(-14), '113 in interior', 'dim', 't', 6);
-    dimLine(svg, x(136), y(3.5), x(136), y(80.5), '77 in interior', 'dim', 't', 8);
-    dimLine(svg, x(126), y(5.25), x(126), y(5.25 + BIKE.barH), '44.1 in (1,120 mm) out', 'dim-new', 't-new', 8);
-    dimLine(svg, x(126), y(5.25 + BIKE.barH), x(126), y(80.5), '31 in clear', 'dim', 't', 8);
+    dimLine(svg, x(3.5), y(-14), x(OUT - 3.5), y(-14), '137 in interior', 'dim', 't', 6);
+    dimLine(svg, x(OUT + 16), y(3.5), x(OUT + 16), y(OUT - 3.5), '137 in interior', 'dim', 't', 8);
+    dimLine(svg, x(OUT + 6), y(5.25), x(OUT + 6), y(5.25 + BIKE.barH), '44.1 in (1,120 mm)', 'dim-new', 't-new', 8);
+    dimLine(svg, x(OUT + 6), y(5.25 + BIKE.barH), x(OUT + 6), y(OUT - 3.5), '91 in clear aisle', 'dim', 't', 8);
     dimLine(svg, x(23.5 - BIKE.bar / 2), y(5.25 + BIKE.barH + 4), x(23.5 + BIKE.bar / 2), y(5.25 + BIKE.barH + 4), '780 mm bar', 'dim', 't-s', -6);
-    dimLine(svg, x(29), y(104), x(91), y(104), 'door RO 62 in, two 30.75 in leaves', 'dim', 't', -7);
-    textAt(svg, x(60), y(-21), 'back wall, racks and ledgers (Matheson side)', 't-s');
-    textAt(svg, x(60), y(124), 'yard side', 't-s');
-    textAt(svg, x(150), y(42), 'bays 1, 3, 5 hang low; 2, 4, 6 hang 12 in higher; 3 is the e-bike', 't-s', 'middle', -90);
+    dimLine(svg, x(DOOR0), y(OUT + 36), x(DOOR1), y(OUT + 36), 'door RO 62 in, two 30.75 in leaves', 'dim', 't', -7);
+    textAt(svg, x(72), y(-21), 'back wall against the retaining wall: racks, ledgers, wheel shelf above', 't-s');
+    textAt(svg, x(72), y(OUT + 44), 'yard side', 't-s');
+    textAt(svg, x(OUT + 30), y(70), 'bays 1, 3, 5 hang low; 2, 4, 6 hang 12 in higher; 3 is the e-bike', 't-s', 'middle', -90);
   })();
 
   /* ---------------- Back wall elevation ---------------- */
   (function elev() {
-    const svg = document.getElementById('elev'), K = 4;
-    const x = v => (v + 22) * K, z = v => (130 - v) * K;
-    svg.setAttribute('viewBox', `0 0 ${(113 + 7 + 52) * K} ${(130 + 14) * K}`);
+    const svg = document.getElementById('elev'), K = 3.4;
+    const x = v => (v + 22) * K, z = v => (138 - v) * K;
+    svg.setAttribute('viewBox', `0 0 ${(IN + 7 + 54) * K} ${(138 + 14) * K}`);
     const r = (x0, z0, w, h, cls) => el(svg, 'rect', { x: x(x0), y: z(z0 + h), width: w * K, height: h * K, 'class': cls });
-    r(-3.5, -12, 120, 12, 'ground');
-    r(-3.5, 0, 3.5, 114, 'lumber-f'); r(113, 0, 3.5, 114, 'lumber-f');
-    r(0, 0, 113, 1.5, 'lumber-f'); r(0, 111, 113, 3, 'lumber-f');
-    [11.75, 27.75, 43.75, 59.75, 75.75, 91.75, 107.75].forEach(s => r(s, 1.5, 1.5, 109.5, 'lumber'));
-    r(0, 72, 113, 7.25, 'lumber-f'); r(0, 84, 113, 7.25, 'lumber-f');
-    textAt(svg, x(56.5), z(118), 'top plates 114 in (9 ft 6 in); rafters and deck above', 't-s');
+    r(-3.5, -12, IN + 7, 12, 'ground');
+    r(-3.5, 0, 3.5, HB, 'lumber-f'); r(IN, 0, 3.5, HB, 'lumber-f');
+    r(0, 0, IN, 1.5, 'lumber-f'); r(0, HB - 3, IN, 3, 'lumber-f');
+    for (let s = 11.75; s < IN - 1; s += 16) r(s, 1.5, 1.5, HB - 4.5, 'lumber');
+    r(0, 72, IN, 7.25, 'lumber-f'); r(0, 84, IN, 7.25, 'lumber-f');
+    textAt(svg, x(IN / 2), z(HB + 4), 'top plates 122 in (10 ft 2 in); 2x8 rafters and the deck above', 't-s');
+    // shelf at 104 with wheels stacked flat
+    r(0, SHELF_Z, IN, 1.5, 'lumber-f');
+    r(0, SHELF_Z - 3.5, IN, 3.5, 'lumber');
+    for (let k = 0; k < 4; k++) {
+      const x0 = 2 + k * 33.5;
+      for (let w = 0; w < 6; w++) r(x0, SHELF_Z + 1.5 + w * 2.5, BIKE.od, 2.2, w % 2 ? 'bike-high' : 'bike');
+    }
+    textAt(svg, x(IN / 2), z(HB + 9), 'wheel shelf at 104 in: six wheels flat per stack, 15 in to the plates', 't-s');
     BAYS.forEach((c, i) => {
       const zc = CR(i), zb = zc - BIKE.len, cls = clsFor(i, false);
       r(c - 1.75, zc - 14, 3.5, 16, 'rack'); r(c - 3, zc - 9.5, 1, 1, 'rack'); r(c + 2, zc - 9.5, 1, 1, 'rack');
@@ -408,52 +449,55 @@
       if (i === 2) r(c - 1.75, zb + 20, 3.5, 17, 'ebike');
       textAt(svg, x(c), z(-6), 'bay ' + (i + 1), 't-s');
     });
+    // parts tower
+    r(IN - 20.5, 0, 20.5, 102, 'lumber-f');
+    for (let s = 1; s < 5; s++) r(IN - 20.5, s * 20, 20.5, 1, 'lumber');
+    textAt(svg, x(IN - 10.25), z(-6), 'parts tower', 't-s');
     dimLine(svg, x(2), z(84 - BIKE.len), x(2), z(84), '2,000 mm (78.7 in)', 'dim-new', 't-new', 8);
     dimLine(svg, x(-9), z(0), x(-9), z(84), '84 in low cradle', 'dim', 't-s', 8);
     dimLine(svg, x(-15), z(0), x(-15), z(96), '96 in high cradle', 'dim', 't-s', 8);
-    dimLine(svg, x(123), z(0), x(123), z(84 - BIKE.len), '5.3 in', 'dim', 't-s', -8);
-    dimLine(svg, x(128), z(0), x(128), z(96 - BIKE.len), '17.3 in', 'dim', 't-s', -8);
-    dimLine(svg, x(123), z(84 - BIKE.len + 61.95), x(123), z(96 - BIKE.len + 61.95), '12 in between bars', 'dim', 't-s', -8);
-    dimLine(svg, x(20 - BIKE.bar / 2), z(130 - 2), x(20 + BIKE.bar / 2), z(130 - 2), '780 mm', 'dim', 't-s', -6);
-    dimLine(svg, x(20), z(126), x(36), z(126), '16 in', 'dim', 't-s', -6);
-    textAt(svg, x(56.5), z(-10), 'floor; tyres clear it by 5 in (low) and 17 in (high)', 't-s');
+    dimLine(svg, x(IN + 12), z(0), x(IN + 12), z(SHELF_Z), '104 in shelf', 'dim', 't-s', -8);
+    dimLine(svg, x(IN + 18), z(0), x(IN + 18), z(HB), '122 in plates', 'dim', 't-s', -8);
+    dimLine(svg, x(IN + 12), z(84 - BIKE.len + 61.95), x(IN + 12), z(96 - BIKE.len + 61.95), '12 in', 'dim', 't-s', -8);
+    dimLine(svg, x(20 - BIKE.bar / 2), z(134), x(20 + BIKE.bar / 2), z(134), '780 mm', 'dim', 't-s', -6);
+    dimLine(svg, x(20), z(130), x(36), z(130), '16 in', 'dim', 't-s', -6);
+    textAt(svg, x(IN / 2), z(-10), 'floor; tyres clear it by 5 in (low) and 17 in (high)', 't-s');
   })();
 
   /* ---------------- Section ---------------- */
   (function sect() {
-    const svg = document.getElementById('sect'), K = 3.6;
-    const y = v => (v + 66) * K, z = v => (166 - v) * K;   // y: depth from the back wall's outer face; z: height above the pad
-    svg.setAttribute('viewBox', `0 0 ${(66 + 104) * K} ${(166 + 14) * K}`);
+    const svg = document.getElementById('sect'), K = 3.0;
+    const y = v => (v + 66) * K, z = v => (168 - v) * K;
+    svg.setAttribute('viewBox', `0 0 ${(66 + OUT + 24) * K} ${(168 + 14) * K}`);
     const r = (y0, z0, w, h, cls) => el(svg, 'rect', { x: y(y0), y: z(z0 + h), width: w * K, height: h * K, 'class': cls });
-    const Z0 = 9.75, Sl = 0.2795, DV = 5.711;
-    const vu = u => 114 - Sl * u, vt = u => vu(u) + DV;
-    // ground, pad, retaining wall, sidewalk and fence
-    r(-66, -12, 170, 8, 'ground'); r(-12, -4, 108, 4, 'ground'); r(96, -4, 8, 4, 'ground');
+    const Z0 = 9.75, Sl = (HB - HF) / (OUT - 3.5), DV = 7.25 * Math.sqrt(1 + Sl * Sl);
+    const vu = u => HB - Sl * u, vt = u => vu(u) + DV;
+    r(-66, -12, 66 + OUT + 24, 8, 'ground'); r(-12, -4, OUT + 24, 4, 'ground');
     r(-66, -4, 20, 88, 'ground'); r(-46, -4, 10, 88, 'concrete'); r(-46, 84, 1.5, 72, 'lumber-f');
     textAt(svg, y(-64), z(90), 'Matheson sidewalk', 't-s', 'start'); textAt(svg, y(-64), z(86), 'and fence above', 't-s', 'start');
     textAt(svg, y(-41), z(40), 'retaining wall 84 in', 't-s', 'middle', -90);
-    // floor build-up
-    [0, 40.25, 80.5].forEach(s => r(s, 0, 3.5, 3.5, 'lumber-f'));
-    r(0, 3.5, 84, 5.5, 'lumber-f'); r(0, 9, 84, 0.75, 'lumber');
-    // walls: back full height, front only header and plates above the door opening
-    r(0, Z0, 3.5, 114, 'lumber-f'); r(-0.625, 3.5, 0.625, Z0 + 114 - 3.5, 'lumber');
-    r(80.5, Z0 + 83, 3.5, 5.5, 'lumber-f'); r(80.5, Z0 + 88.5, 3.5, 3, 'lumber-f'); r(84, Z0 + 83, 0.625, 8.5, 'lumber');
-    el(svg, 'rect', { x: y(80.5), y: z(Z0 + 83), width: 3.5 * K, height: 83 * K, 'class': 'swing' });
-    textAt(svg, y(82.2), z(Z0 + 40), 'door opening 83 in', 't-s', 'middle', -90);
-    // rafter with bird's mouths, deck and metal
-    const pts = [[-12, vu(-12)], [0, 114], [3.5, 114], [3.5, vu(3.5)], [80.5, 91.5], [84, 91.5], [84, vu(84)], [96, vu(96)], [96, vt(96)], [-12, vt(-12)]];
-    el(svg, 'polygon', { points: pts.map(p => y(p[0]) + ',' + z(Z0 + p[1])).join(' '), 'class': 'lumber-f' });
-    const deck = [[-13.5, vt(-13.5)], [97.5, vt(97.5)], [97.5, vt(97.5) + 1.25], [-13.5, vt(-13.5) + 1.25]];
-    el(svg, 'polygon', { points: deck.map(p => y(p[0]) + ',' + z(Z0 + p[1])).join(' '), 'class': 'lumber-f' });
-    r(96, Z0 + vu(96), 1.5, vt(97.5) - vu(96), 'lumber-f'); r(-13.5, Z0 + vu(-12), 1.5, vt(-12) - vu(-12), 'lumber-f');
-    textAt(svg, y(42), z(Z0 + 112), '2x6 rafters at 24 in, 3.35:12', 't-s', 'middle', -15.6);
-    // racks and ledgers
-    r(3.5, Z0 + 72, 1.5, 7.25, 'lumber-f'); r(3.5, Z0 + 84, 1.5, 7.25, 'lumber-f');
-    r(5, Z0 + 70, 0.25, 16, 'rack'); r(5.25, Z0 + 74.5, 12, 1, 'rack');
-    // hung bike in profile (low bay), high bay dashed
+    [0, 46.75, 93.5, OUT - 3.5].forEach(s => r(s, 0, 3.5, 3.5, 'lumber-f'));
+    r(0, 3.5, OUT, 5.5, 'lumber-f'); r(0, 9, OUT, 0.75, 'lumber');
+    const F0 = 9.75;
+    r(0, F0, 3.5, HB, 'lumber-f'); r(-0.625, 3.5, 0.625, F0 + HB - 3.5, 'lumber');
+    r(OUT - 3.5, F0 + 83, 3.5, 5.5, 'lumber-f'); r(OUT - 3.5, F0 + 88.5, 3.5, HF - 88.5, 'lumber'); r(OUT, F0 + 83, 0.625, HF - 83, 'lumber');
+    el(svg, 'rect', { x: y(OUT - 3.5), y: z(F0 + 83), width: 3.5 * K, height: 83 * K, 'class': 'swing' });
+    textAt(svg, y(OUT - 1.8), z(F0 + 40), 'door opening 83 in', 't-s', 'middle', -90);
+    const pts = [[-12, vu(-12)], [0, HB], [3.5, HB], [3.5, vu(3.5)], [OUT - 3.5, HF], [OUT, HF], [OUT, vu(OUT)], [OUT + 12, vu(OUT + 12)], [OUT + 12, vt(OUT + 12)], [-12, vt(-12)]];
+    el(svg, 'polygon', { points: pts.map(p => y(p[0]) + ',' + z(F0 + p[1])).join(' '), 'class': 'lumber-f' });
+    const deck = [[-13.5, vt(-13.5)], [OUT + 13.5, vt(OUT + 13.5)], [OUT + 13.5, vt(OUT + 13.5) + 1.25], [-13.5, vt(-13.5) + 1.25]];
+    el(svg, 'polygon', { points: deck.map(p => y(p[0]) + ',' + z(F0 + p[1])).join(' '), 'class': 'lumber-f' });
+    textAt(svg, y(92), z(F0 + vu(92) + 3.6), '2x8 rafters at 16 in, 2:12 (standing seam or sealed-lap panel)', 't-s', 'middle', -9.5);
+    // ledgers, racks, shelf with wheels
+    r(3.5, F0 + 72, 1.5, 7.25, 'lumber-f'); r(3.5, F0 + 84, 1.5, 7.25, 'lumber-f');
+    r(5, F0 + 70, 0.25, 16, 'rack'); r(5.25, F0 + 74.5, 12, 1, 'rack');
+    r(3.5, F0 + SHELF_Z, SHELF_D, 1.5, 'lumber-f'); r(3.5, F0 + SHELF_Z - 3.5, 1.5, 3.5, 'lumber');
+    r(3.5 + SHELF_D - 1.5, F0 + SHELF_Z - 3.5, 1.5, 3.5, 'lumber');
+    for (let w = 0; w < 6; w++) el(svg, 'circle', { cx: y(3.5 + SHELF_D / 2), cy: z(F0 + SHELF_Z + 1.5 + w * 2.5 + 1.1), r: 1.1 * K, 'class': w % 2 ? 'bike-high-o' : 'bike-o' });
+    textAt(svg, y(3.5 + SHELF_D / 2), z(F0 + SHELF_Z + 20), 'wheels flat', 't-s');
     function bike(zb, cls, dashed) {
       const g = el(svg, 'g', { 'class': dashed ? 'swing' : cls });
-      const pt = (u, v) => [y(5.25 + v), z(Z0 + zb + u)];
+      const pt = (u, v) => [y(5.25 + v), z(F0 + zb + u)];
       const A = [0, 14.77], B = [16.9, 13.4], ST = [12, 31.7], HTt = [37.2, 39.8], HTb = [39.2, 35.8], F = [49.21, 14.77];
       [A, F].forEach(c => { const p = pt(c[0], c[1]); el(g, 'circle', { cx: p[0], cy: p[1], r: BIKE.od / 2 * K }); });
       [[A, B], [A, ST], [B, ST], [B, HTb], [ST, HTt], [HTb, HTt], [HTb, F], [ST, [10.5, 37.4]], [HTt, [38.2, 44.09]]].forEach(s => {
@@ -466,23 +510,34 @@
     }
     bike(84 - BIKE.len, 'bike-o', false);
     bike(96 - BIKE.len, 'bike-high-o', true);
-    // person 70 in tall in the aisle
+    // repair stand with a bike, beyond the section line (dashed): clamp at 52 in, bike level
+    const sg = el(svg, 'g', { 'class': 'swing' });
+    const cx0 = 100, bz = F0 + 52;
+    el(sg, 'line', { x1: y(cx0), y1: z(F0), x2: y(cx0), y2: z(bz) });
+    el(sg, 'line', { x1: y(cx0 - 14), y1: z(F0), x2: y(cx0 + 14), y2: z(F0) });
+    [[-24.6, 0], [24.6, 0]].forEach(w => el(sg, 'circle', { cx: y(cx0 + w[0]), cy: z(bz - 18 + 14.77), r: 14.77 * K }));
+    el(sg, 'line', { x1: y(cx0 - 24.6), y1: z(bz - 3), x2: y(cx0 + 24.6), y2: z(bz - 3) });
+    el(sg, 'line', { x1: y(cx0 + 22), y1: z(bz - 3), x2: y(cx0 + 20), y2: z(bz + 24) });
+    el(sg, 'line', { x1: y(cx0 - 12), y1: z(bz - 3), x2: y(cx0 - 14), y2: z(bz + 20) });
+    textAt(svg, y(cx0), z(bz + 36), 'stand and bike beyond, clamp at 52 in', 't-s');
+    // person
     const pg = el(svg, 'g', { 'class': 'person' });
-    el(pg, 'circle', { cx: y(64), cy: z(Z0 + 65.5), r: 4.5 * K });
-    el(pg, 'line', { x1: y(64), y1: z(Z0 + 61), x2: y(64), y2: z(Z0 + 32) });
-    el(pg, 'line', { x1: y(64), y1: z(Z0 + 32), x2: y(60), y2: z(Z0) }); el(pg, 'line', { x1: y(64), y1: z(Z0 + 32), x2: y(68), y2: z(Z0) });
-    el(pg, 'line', { x1: y(64), y1: z(Z0 + 56), x2: y(56), y2: z(Z0 + 38) }); el(pg, 'line', { x1: y(64), y1: z(Z0 + 56), x2: y(72), y2: z(Z0 + 38) });
-    textAt(svg, y(64), z(Z0 + 73), "5'10\"", 't-s');
-    // dimensions
-    dimLine(svg, y(-7), z(Z0), y(-7), z(Z0 + 114), '114 in (9 ft 6 in)', 'dim', 't', 9);
-    dimLine(svg, y(90), z(Z0), y(90), z(Z0 + 91.5), '91.5 in', 'dim', 't', -9);
-    dimLine(svg, y(3.5), z(Z0 + 100), y(5.25 + BIKE.barH), z(Z0 + 100), '44.1 in (1,120 mm)', 'dim-new', 't-new', 7);
-    dimLine(svg, y(5.25 + BIKE.barH), z(Z0 + 100), y(80.5), z(Z0 + 100), '31 in clear', 'dim', 't', 7);
-    dimLine(svg, y(-2.4), z(Z0 + 84 - BIKE.len), y(-2.4), z(Z0 + 84), '2,000 mm (78.7 in)', 'dim-new', 't-new', 8);
+    const py = 52;
+    el(pg, 'circle', { cx: y(py), cy: z(F0 + 65.5), r: 4.5 * K });
+    el(pg, 'line', { x1: y(py), y1: z(F0 + 61), x2: y(py), y2: z(F0 + 32) });
+    el(pg, 'line', { x1: y(py), y1: z(F0 + 32), x2: y(py - 4), y2: z(F0) }); el(pg, 'line', { x1: y(py), y1: z(F0 + 32), x2: y(py + 4), y2: z(F0) });
+    el(pg, 'line', { x1: y(py), y1: z(F0 + 56), x2: y(py - 8), y2: z(F0 + 38) }); el(pg, 'line', { x1: y(py), y1: z(F0 + 56), x2: y(py + 8), y2: z(F0 + 38) });
+    textAt(svg, y(py), z(F0 + 73), "5'10\"", 't-s');
+    dimLine(svg, y(-7), z(F0), y(-7), z(F0 + HB), '122 in (10 ft 2 in)', 'dim', 't', 9);
+    dimLine(svg, y(OUT + 6), z(F0), y(OUT + 6), z(F0 + HF), '98.5 in', 'dim', 't', -9);
+    dimLine(svg, y(3.5), z(F0 + 100), y(5.25 + BIKE.barH), z(F0 + 100), '44.1 in (1,120 mm)', 'dim-new', 't-new', 7);
+    dimLine(svg, y(5.25 + BIKE.barH), z(F0 + 100), y(OUT - 3.5), z(F0 + 100), '91 in clear', 'dim', 't', 7);
+    dimLine(svg, y(-2.4), z(F0 + 84 - BIKE.len), y(-2.4), z(F0 + 84), '2,000 mm (78.7 in)', 'dim-new', 't-new', 8);
     dimLine(svg, y(-36), z(30), y(0), z(30), '36 in gap, to confirm', 'dim-new', 't-new', 7);
     dimLine(svg, y(-20), z(0), y(-20), z(84), '84 in', 'dim', 't-s', -7);
-    dimLine(svg, y(100), z(0), y(100), z(Z0), '9.75 in', 'dim', 't-s', -7);
-    textAt(svg, y(42), z(-9), 'gravel pad; yard side to the right', 't-s');
+    dimLine(svg, y(OUT + 16), z(0), y(OUT + 16), z(F0), '9.75 in', 'dim', 't-s', -7);
+    dimLine(svg, y(OUT + 20), z(0), y(OUT + 20), z(F0 + vt(-12) + 1.25), 'eave top 142 in, under the 144 in limit', 'dim', 't-s', -7);
+    textAt(svg, y(OUT / 2), z(-9), 'gravel pad; yard side to the right', 't-s');
   })();
 })();
 </script>
