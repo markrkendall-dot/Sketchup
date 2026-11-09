@@ -4,6 +4,48 @@
 SketchUp model he can build from. This is MK's Charlotte house, not 146 Mick Road, so nothing
 here touches the HomePlan app or its plans; the photos and plat are in [photos/](photos/).
 
+## Update, 9 November: a 12' x 8' bike shop instead
+
+After the 10' x 7' design below was modelled, MK asked for as much space as the footprint can
+realistically give without a building permit: boxes of parts, wheelsets, tools and a tower
+repair stand, a little bike shop, while the old shed keeps the tools and machines. North
+Carolina's exemption is "no dimension over 12 feet", height included, so the box can grow to
+12' x 12' x 12'. A 12' x 12' layout was drawn and rejected as too big for the yard; **12' x 8'
+is the chosen version**, drawn to scale in [bike-shed-site.html](bike-shed-site.html) and
+modelled as `wesley-bike-shop-12x8.skp` (link in "The SketchUp model" below). Everything that
+follows this section describes the earlier 10' x 7' version and still holds for the bikes,
+the racks, the lot and the permits; the differences are these.
+
+| Item | 12' x 8' shop |
+|---|---|
+| Outside the studs | 144" x 96"; interior 137" x 89"; 96 sq ft |
+| Back wall | 122" (10'2") to the top of its plates, the most the 12' rule allows: with 2x6 rafters and the 12" eave on top the roof edge is 142.8" above the pad |
+| Front wall | 96" (8'0"); roof 3.35:12 as before, so an ordinary screw-down panel still works |
+| Rafters | 2x6 at 24" o.c., seven commons plus two fly rafters, 12" eaves and rakes |
+| Floor | 2x6 PT joists at 16" (ten) on three PT 4x4 skids, 3/4" T&G; 96 sq ft is three sheets |
+| Door | RO 62" x 83" centred at 41 to 103" on the yard wall, two 30.75" leaves swinging out; cripples over the header |
+| Bikes | six Steadyracks on the back wall as before, 20 to 100" from the left inside face, low/high 84"/96"; the e-bike in bay 3 |
+| Wheel shelf | 3/4" plywood 137" x 30" at 104" on a 2x4 ledger, a 2x4 rim and five 2x4 brackets at the studs between racks; it clears the high racks and leaves 15" to the plates, enough for six wheels flat per stack, four stacks, about two dozen wheels, with every cradle still reachable from the floor |
+| Parts tower | 20.5" x 24" x 102" in the spare wall at the right end of the back wall, six 3/4" plywood shelves at 20" |
+| Bench | 24" x 36" at 36" high on the left end wall, in front of the bikes' bar line, with a 1/4" pegboard panel above it and pegboard either side of the door |
+| Repair stand | parks in a 30" circle in the right front corner; works in the aisle with the doors open, an 80" bike clamped parallel to the wall |
+| Aisle | 43" from the hung bikes' bars to the yard wall, 67" with the bikes swung |
+| Siting | same string line from the old shed's corner, parallel to the wall, about 3' off the wall face; near end about 9' along it, far end 12' further, 8' square off toward the yard; nearest front corner about 20.5' from the house, 2.2' walkway to the old shed |
+
+Cut list changes against the 10' x 7' list: 2x4 10' pieces become 12' (back studs 117.5", end
+studs up to 116.6", plates 12'); front studs and kings 91.5" (8' stock); add four 4.5"
+cripples; ten joists instead of nine; rafters and blocking from nine 2x6 10' instead of ten
+(seven commons, two fly, blocking from the offcuts plus one more 10'); fascias 2x6 14' x2; roof
+deck 168" x 112" is five sheets of OSB; metal five 10' panels at 36" coverage; siding about
+fourteen 4x8 and 4x10 panels (the back wall needs 4x10 plus a flashed band, the end walls
+reach 10'8" at the back corner); add one sheet 3/4" plywood and five 2x4 8' for the wheel
+shelf, two sheets 3/4" plywood for the tower, one sheet and four 2x4 for the bench, three
+sheets of 1/4" pegboard. Rough materials budget on the same November 2026 web prices: about
+**$3,700** including the six racks, against $2,700 for the 10' x 7'.
+
+Still to check before building: the eave height counts toward the 12' rule, so keep the pad
+level and the skids at 3.5"; any build-up under the floor eats the 1.2" of margin.
+
 ## The brief
 
 Six XL 29er mountain bikes, at least one of them an e-bike, need a home. The existing 8' x 10'
@@ -237,8 +279,17 @@ These only move the shed on the site; the shed itself does not change.
 
 ## The SketchUp model
 
-`wesley-bike-shed-10x7.skp`, built through the Trimble SketchUp connector in inches at the
-coordinates above and saved on 9 November 2026. The connector's download link is
+**12' x 8' shop version:** `wesley-bike-shop-12x8.skp`, saved 9 November 2026 through the
+Trimble SketchUp connector, 142 solid parts: floor, four framed walls with the door opening and
+cripples, seven 2x6 rafters with bird's mouths plus fly rafters, blocking, deck, metal, siding,
+doors, six Steadyracks and six bikes (780 mm bars), the wheel shelf with 24 wheels stacked flat,
+the parts tower, the bench, pegboard, the parked repair stand, the site blocks and dimension
+labels, in three scenes (Complete, Framing, Bike shop inside). Download link (tokenised, may
+expire; the save also sits in the connector's session):
+https://api.sketchup.com/mcp/v1/sketchup/dl/540b12e3-68c3-4fde-b68f-27d6c36ba301/003-save/wesley-bike-shop-12x8.skp?t=gvzCfeoygk-y9e7ANFkLBg
+
+**Earlier 10' x 7' version:** `wesley-bike-shed-10x7.skp`, built through the Trimble SketchUp
+connector in inches at the coordinates above and saved on 9 November 2026. The connector's download link is
 https://api.sketchup.com/mcp/v1/sketchup/dl/0a911798-dbe2-474a-b7ee-98ca3c458917/004-save/wesley-bike-shed-10x7.skp?t=QlkT_dOCv7t0Q-UpZnnHRA
 (tokenised, so it may expire; the save also sits in the connector's session). The file is not
 in this folder because the sandbox that wrote this page could not reach api.sketchup.com; drop
