@@ -4,6 +4,37 @@
 SketchUp model he can build from. This is MK's Charlotte house, not 146 Mick Road, so nothing
 here touches the HomePlan app or its plans; the photos and plat are in [photos/](photos/).
 
+## Update, 10 November, later: the shop cut to 6' deep
+
+With the yard half as deep as first drawn, MK asked for the shop to go from 8' to 6' deep to get
+lawn back. The drawings page and the 3D page now show 12' x 6'. The SketchUp model is still the
+8' version and has not been rebuilt.
+
+| Item | 12' x 8' | 12' x 6' |
+|---|---|---|
+| Outside the studs / interior | 144" x 96" / 137" x 89" | 144" x 72" / 137" x 65" |
+| Floor area | 96 sq ft | 72 sq ft |
+| Shop's nearest corner to the house (17.5' lawn, 3' strip) | 6.7' | 8.3' |
+| Aisle, bars to the yard wall: bikes straight out / swung | 43" / 67" | 19" / 41" |
+| Roof | 2.08:12, 2x6 x 12' rafters | 2.8:12 (the same 16" rise), 2x6 x 10' rafters |
+| Roof top above the pad | 141" | 142", 2" under the 12' limit |
+| Bench | 24" x 36" on the left end wall | 36" x 20" on the yard wall, left of the door |
+| Shelf at 100" | over the bench | on the left end wall, 12" clear at its back edge |
+| Repair stand | works in the aisle | parks inside, works out in front of the open doors |
+
+What 6' costs, plainly: it stops being a shop you can work in. Six bikes, the parts tower, the
+bench, the shelf and the parked stand all still fit, and the covered strip behind is unchanged.
+But a bike hung straight out leaves 19" to the door wall, so a bike is loaded with its neighbours
+swung aside, the bench has standing room only when the bikes near it are swung, and an 80" bike
+cannot be clamped in the stand inside. The bench had to leave the end wall because bay 1's saddle
+and rear wheel would hit it. A 7' depth is the middle: 7.5' to the house and a 31" aisle.
+
+Unchanged: both wall heights (122" door wall, 106" rack wall), the door and transom, the racks,
+the 26" cantilever and gutter, the covered strip. Still under 3:12, so the sealed laps stay.
+Framing changes: nine rafters from 10' stock instead of 12', floor joists 69" instead of 93",
+skids at 0, 34.25" and 68.5", six studs in each end wall instead of seven, and the floor,
+roof deck and metal shrink by a quarter.
+
 ## Update, 10 November: the deck photos correct the site
 
 MK sent two photos taken from the third-floor deck
@@ -421,7 +452,7 @@ west-south-west. Stills: [from over the west fence](bike-shop-3d-hero.png),
 
 ## The SketchUp model
 
-**Flipped-roof version (current):** `wesley-bike-shop-12x8-flipped.skp`, saved 10 November 2026
+**Flipped-roof version, still 8' deep (the 6' depth above is not modelled yet):** `wesley-bike-shop-12x8-flipped.skp`, saved 10 November 2026
 through the Trimble SketchUp connector, 178 solid parts plus the label group: floor, the 122" door
 wall with the door and transom framing, the 106" rack wall, raked end walls, nine 2x6 x 12'
 rafters with the 26" cantilever over the strip, blocking, deck, metal, the gutter and downspout,

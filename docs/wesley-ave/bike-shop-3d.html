@@ -39,9 +39,9 @@
 
 <main>
   <header>
-    <div class="eyebrow">2926 Wesley Ave, Charlotte &middot; 12' x 8' bike shop, no permit</div>
+    <div class="eyebrow">2926 Wesley Ave, Charlotte &middot; 12' x 6' bike shop, no permit</div>
     <h1>Wesley Ave bike shop in 3D</h1>
-    <p class="lede">The shop as it would stand along the retaining wall behind the house: tall door wall facing the yard with a transom, the roof pitched 2:12 toward the wall and carried 26" past the back wall to cover the strip behind it, six XL 29ers on Steadyracks, the bench, parts tower and stand inside, wheels and long tools hung under the overhang outside. The site was corrected on 10 November from two photos taken on the third-floor deck: the wall is inside the lot with a planted bank and the sidewalk fence behind it, the old shed's back corner nearly touches the wall, and the lawn between the house and the old shed is about 17.5 ft deep, so the shop's nearest corner is about 6.7 ft from the house. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
+    <p class="lede">The shop as it would stand along the retaining wall behind the house: tall door wall facing the yard with a transom, the roof pitched 2.8:12 toward the wall and carried 26" past the back wall to cover the strip behind it, six XL 29ers on Steadyracks, the bench by the door, the parts tower and the parked stand inside, wheels and long tools hung under the overhang outside. The site was corrected on 10 November from two photos taken on the third-floor deck: the wall is inside the lot with a planted bank and the sidewalk fence behind it, the old shed's back corner nearly touches the wall, and the lawn between the house and the old shed is about 17.5 ft deep, so the shop was cut from 8 ft to 6 ft deep, which puts its nearest corner about 8.3 ft from the house. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
   </header>
 
   <div class="bar" role="group" aria-label="What is shown">
@@ -72,13 +72,13 @@
   </div>
 
   <div class="facts">
-    <div><b>144" x 96"</b><span>outside the studs; interior 137" x 89"; 96 sq ft of floor, which is what the 12' rule counts</span></div>
-    <div><b>122" / 106"</b><span>door wall and rack wall to the top of plates; 2:12 toward the retaining wall, sealed-lap screw-down metal</span></div>
+    <div><b>144" x 72"</b><span>outside the studs; interior 137" x 65"; 72 sq ft of floor, which is what the 12' rule counts</span></div>
+    <div><b>122" / 106"</b><span>door wall and rack wall to the top of plates; 2.8:12 toward the retaining wall, sealed-lap screw-down metal</span></div>
     <div><b>26" cantilever</b><span>roof carried past the back wall, edge 10" off the wall face; gutter there, downspout to the yard</span></div>
     <div><b>6 bays at 16"</b><span>Steadyracks, cradle tops 82" low and 94" high; bay 3 is the e-bike</span></div>
     <div><b>60" x 20" transom</b><span>fixed glazing above the door, facing the yard</span></div>
-    <div><b>141" roof top</b><span>highest point above the pad, at the front lip of the metal; 3" under the 12' line</span></div>
-    <div><b>6.7 ft to the house</b><span>from the shop's nearest corner, with the lawn 17.5 ft deep and the shop 3 ft off the wall; tape both before building</span></div>
+    <div><b>142" roof top</b><span>highest point above the pad, at the front lip of the metal; 2" under the 12' line</span></div>
+    <div><b>8.3 ft to the house</b><span>from the shop's nearest corner, with the lawn 17.5 ft deep and the shop 3 ft off the wall; tape both before building</span></div>
   </div>
   <p class="lede">Drawings, dimensions and the write-up: <a href="bike-shed-site.html">bike-shed-site.html</a> and <a href="BIKE-SHED.md">BIKE-SHED.md</a> in the same folder.</p>
 </main>
@@ -97,7 +97,7 @@
   THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 
   // ---------- constants (inches; design frame: X along the wall toward the house, Y toward the yard, Z up from the pad) ----------
-  const L = 144, D = 96, Z0 = 9.75, HB = 106, HF = 122;        // back (rack) wall low, front (door) wall tall
+  const L = 144, D = 72, Z0 = 9.75, HB = 106, HF = 122;        // back (rack) wall low, front (door) wall tall
   const S = (HF - HB) / (D - 3.5), SL = Math.sqrt(1 + S * S), RAF_V = 5.5 * SL;
   const vU = u => HB + S * (u - 3.5), vT = u => vU(u) + RAF_V;   // rafter underside and top, relative to Z0
   const BACK_OH = 26, FRONT_OH = 12;                              // roof past the back wall, past the front wall
@@ -179,14 +179,14 @@
   box(gWalls, mat.spf, DOOR0 - 1.5, D - 3.5, Z0 + 113.5, DOOR1 - DOOR0 + 3, 3.5, 5.5);                    // transom header
   box(gWalls, mat.spf, 0, D - 3.5, Z0 + HF - 3, L, 3.5, 3);
   // end walls, raked, tallest at the front
-  const endYs = [3.5].concat([0, 1, 2, 3, 4].map(k => 15.25 + 16 * k), [D - 5]);
+  const endYs = [3.5].concat([0, 1, 2, 3, 4].map(k => 15.25 + 16 * k).filter(y => y < D - 7), [D - 5]);
   const tilt = Math.atan(S);
   [0, L - 3.5].forEach(x0 => {
     box(gWalls, mat.spf, x0, 3.5, Z0, 3.5, D - 7, 1.5);
     endYs.forEach(y => box(gWalls, mat.spf, x0, y, Z0 + 1.5, 3.5, 1.5, vU(y + 0.75) - 3 * SL - 1.5));
-    slabX(gWalls, mat.spf, x0 + 1.75, 48, Z0 + vU(48) - 1.5 * SL, 3.5, 89 * SL, 3, tilt);
+    slabX(gWalls, mat.spf, x0 + 1.75, D / 2, Z0 + vU(D / 2) - 1.5 * SL, 3.5, (D - 7) * SL, 3, tilt);
   });
-  // rafters: 2x6 x 12', 26" past the back wall, 12" past the front
+  // rafters: 2x6 x 10', 26" past the back wall, 12" past the front
   const rafXs = [0, 24, 48, 72, 96, 120, L - 1.5];
   const uMid = (D + FRONT_OH - BACK_OH) / 2, run = D + FRONT_OH + BACK_OH;
   rafXs.concat([-12, L + 10.5]).forEach(x => slabX(gRoofF, mat.spf, x + 0.75, uMid, Z0 + vU(uMid) + RAF_V / 2, 1.5, run * SL, 5.5, tilt));
@@ -281,24 +281,24 @@
     bikePivots.push(piv);
   });
 
-  // fit-out: shelf over the bench, parts tower, bench with stool, pegboard, stand, figure
-  const SH = Z0 + 100;
-  box(gFit, mat.spf, 3.5, 56.5, SH - 3.5, 1.5, 36, 3.5); box(gFit, mat.spf, 32, 56.5, SH - 3.5, 1.5, 36, 3.5);
-  box(gFit, mat.spf, 5, 58, SH - 3.5, 27, 1.5, 3.5); box(gFit, mat.spf, 5, 89.5, SH - 3.5, 27, 1.5, 3.5);
-  box(gFit, mat.ply, 3.5, 56.5, SH, 30, 36, 0.75);
-  box(gFit, mat.white, 6, 60, SH + 0.75, 12, 14, 9); box(gFit, mat.white, 20, 62, SH + 0.75, 10, 24, 8);
+  // fit-out: shelf on the left end wall, parts tower, bench on the yard wall left of the door with the stool, pegboard, stand, figure
+  const SH = Z0 + 100, YS = D - 39.5, YB = D - 23.5;
+  box(gFit, mat.spf, 3.5, YS, SH - 3.5, 1.5, 36, 3.5); box(gFit, mat.spf, 32, YS, SH - 3.5, 1.5, 36, 3.5);
+  box(gFit, mat.spf, 5, YS + 1.5, SH - 3.5, 27, 1.5, 3.5); box(gFit, mat.spf, 5, YS + 33, SH - 3.5, 27, 1.5, 3.5);
+  box(gFit, mat.ply, 3.5, YS, SH, 30, 36, 0.75);
+  box(gFit, mat.white, 6, YS + 3.5, SH + 0.75, 12, 14, 9); box(gFit, mat.white, 20, YS + 5.5, SH + 0.75, 10, 24, 8);
   const TX = 120;
   box(gFit, mat.ply, TX, 5, Z0, 0.75, 24, 96); box(gFit, mat.ply, TX + 19.75, 5, Z0, 0.75, 24, 96);
   [0, 19, 38, 57, 76, 95.25].forEach(z => box(gFit, mat.ply, TX + 0.75, 5, Z0 + z, 19, 24, 0.75));
   [[TX + 2, 19.75], [TX + 10, 38.75], [TX + 1.5, 57.75], [TX + 9, 0.75], [TX + 3, 76.75]].forEach(([x, z]) => box(gFit, mat.white, x, 7, Z0 + z, 8, 13, 10));
-  [[3.5, 56.5], [24, 56.5], [3.5, 89], [24, 89]].forEach(([x, y]) => box(gFit, mat.spf, x, y, Z0, 3.5, 3.5, 38.5));
-  box(gFit, mat.ply, 3.5, 56.5, Z0 + 38.5, 24, 36, 1.5); box(gFit, mat.ply, 7, 60, Z0 + 12, 17, 29, 0.75);
-  box(gFit, mat.stoolw, 8, 62, Z0, 14, 18, 18); box(gFit, mat.stoolw, 8, 71, Z0, 14, 9, 9);
-  box(gFit, mat.peg, 3.5, 56.5, Z0 + 42, 0.25, 36, 48); box(gFit, mat.peg, 3.5, D - 3.75, Z0 + 40, 33.5, 0.25, 50); box(gFit, mat.peg, 107, D - 3.75, Z0 + 40, 33.5, 0.25, 50);
+  [[3.5, YB], [36, YB], [3.5, YB + 16.5], [36, YB + 16.5]].forEach(([x, y]) => box(gFit, mat.spf, x, y, Z0, 3.5, 3.5, 38.5));
+  box(gFit, mat.ply, 3.5, YB, Z0 + 38.5, 36, 20, 1.5);
+  box(gFit, mat.stoolw, 9, YB + 2, Z0, 16, 14, 18); box(gFit, mat.stoolw, 25, YB + 2, Z0, 9, 14, 9);
+  box(gFit, mat.peg, 3.5, YS, Z0 + 42, 0.25, 36, 48); box(gFit, mat.peg, 3.5, D - 3.75, Z0 + 40, 33.5, 0.25, 50); box(gFit, mat.peg, 107, D - 3.75, Z0 + 40, 33.5, 0.25, 50);
   const base = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, 1, 28), mat.steel); base.rotation.x = Math.PI / 2; base.position.set(122, D - 22, Z0 + 0.5); base.castShadow = true; gFit.add(base);
   cyl(gFit, mat.steel, [122, D - 22, Z0 + 1], [122, D - 22, Z0 + 52], 1.0);
   box(gFit, mat.steel, 121, D - 22, Z0 + 50, 2, 14, 2); box(gFit, mat.rack, 120.5, D - 10, Z0 + 49, 3, 3, 4);
-  const person = new THREE.Group(); person.position.set(40, 70, Z0); person.rotation.z = Math.PI; gFit.add(person);
+  const person = new THREE.Group(); person.position.set(50, D - 12, Z0); person.rotation.z = Math.PI; gFit.add(person);
   const head = new THREE.Mesh(new THREE.SphereGeometry(4.5, 16, 12), mat.skin); head.position.set(0, 0, 69.5); head.castShadow = true; person.add(head);
   box(person, mat.shirt, -8, -4.5, 40, 16, 9, 25); box(person, mat.shirt, -11, -3.5, 40, 3, 7, 24); box(person, mat.shirt, 8, -3.5, 40, 3, 7, 24);
   box(person, mat.pants, -7.5, -4, 0, 6.5, 8, 40); box(person, mat.pants, 1, -4, 0, 6.5, 8, 40); cyl(person, mat.skin, [0, 0, 65], [0, 0, 67], 2);
@@ -462,13 +462,13 @@
 
   // ---------- presets and toggles (site frame: x toward the old shed, y toward the yard) ----------
   const presets = {
-    hero: { az: 0.83, el: 0.48, r: 431, t: [72, 48, 60], fov: 45 },                // from over the west fence
+    hero: { az: 0.83, el: 0.48, r: 431, t: [72, 36, 60], fov: 45 },                // from over the west fence
     balcony: { az: 2.17, el: 0.995, r: 358, t: [120, 0, 0], fov: 85 },             // where the deck photos were taken, 25 ft up, wide lens
     corner: { az: 0.339, el: 0.03, r: 181, t: [-20, 130, 62], fov: 65 },           // on the lawn by the old shed, looking at the gap to the house
-    eye: { az: 1.527, el: 0.0, r: 182, t: [72, 48, 70], fov: 72 },                 // back against the house wall
-    inside: { az: 1.496, el: -0.02, r: 80, t: [60, 8, 68], fov: 80, doors: true },
+    eye: { az: 1.527, el: 0.0, r: 182, t: [72, 36, 70], fov: 72 },                 // back against the house wall
+    inside: { az: 1.496, el: 0.03, r: 104, t: [60, 8, 68], fov: 80, doors: true },
     behind: { az: 3.1416, el: 0.06, r: 175, t: [165, -18, 62], fov: 68 },
-    framing: { az: 0.83, el: 0.48, r: 431, t: [72, 48, 60], fov: 45, skin: false, roof: false },
+    framing: { az: 0.83, el: 0.48, r: 431, t: [72, 36, 60], fov: 45, skin: false, roof: false },
     plan: { az: 1.571, el: 1.5, r: 760, t: [60, 70, 0], fov: 40 },
   };
   const tSkin = document.getElementById('tSkin'), tRoof = document.getElementById('tRoof'), tBikes = document.getElementById('tBikes'),
