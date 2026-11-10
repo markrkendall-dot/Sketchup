@@ -41,7 +41,7 @@
   <header>
     <div class="eyebrow">2926 Wesley Ave, Charlotte &middot; 12' x 6' bike shop, no permit</div>
     <h1>Wesley Ave bike shop in 3D</h1>
-    <p class="lede">The shop as it would stand along the retaining wall behind the house: tall door wall facing the yard with a transom, the roof pitched 2.8:12 toward the wall and carried 26" past the back wall to cover the strip behind it, six XL 29ers on Steadyracks, the bench by the door, the parts tower and the parked stand inside, wheels and long tools hung under the overhang outside. The site was corrected on 10 November from two photos taken on the third-floor deck: the wall is inside the lot with a planted bank and the sidewalk fence behind it, the old shed's back corner nearly touches the wall, and the lawn between the house and the old shed is about 17.5 ft deep, so the shop was cut from 8 ft to 6 ft deep, which puts its nearest corner about 8.3 ft from the house. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
+    <p class="lede">The shop as it would stand along the retaining wall behind the house: tall door wall facing the yard with a transom, the roof pitched 2.8:12 toward the wall and carried 26" past the back wall to cover the strip behind it, six XL 29ers on Steadyracks, the bench by the door, the parts tower and the parked stand inside, wheels and long tools hung under the overhang outside. The site was corrected on 10 November from two photos taken on the third-floor deck: the wall is inside the lot with a planted bank and the sidewalk fence behind it, the old shed's back corner nearly touches the wall, and the lawn between the house and the old shed is about 17.5 ft deep, so the shop was cut from 8 ft to 6 ft deep, which puts its nearest corner about 8.3 ft from the house. The house itself is not drawn, so you can orbit freely: the black shape on the ground is its footprint. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
   </header>
 
   <div class="bar" role="group" aria-label="What is shown">
@@ -337,8 +337,9 @@
   box(site, mat.gravel, -12, -36, -1.5, L + 24, D + 48, 2.0);
   const roadC = toF([57, -24]), roadA = angF([1, 0]);
   const road = new THREE.Mesh(new THREE.BoxGeometry(170 * 12, 44 * 12, 2), mat.road); road.position.set(roadC[0], roadC[1], -1.4); road.rotation.z = roadA; road.receiveShadow = true; site.add(road);
-  extrude(site, mat.house, HOUSE.map(toF), null, 336, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-  extrude(site, mat.houseRoof, HOUSE.map(toF), null, 6, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 336, 0, 0, 0, 1]);
+  // the house is left out so the model can be orbited freely; its footprint is a flat black slab on the ground
+  const houseMark = extrude(site, new THREE.MeshBasicMaterial({ color: 0x111111 }), HOUSE.map(toF), null, 1.5, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  houseMark.castShadow = false; houseMark.receiveShadow = false;
   function seg(a, b, thick, z0, h, m, off) {      // a box along the lot-frame segment a to b; off shifts it sideways, inches
     const A = toF(a), B = toF(b), dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy);
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, thick, h), m);
