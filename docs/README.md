@@ -15,7 +15,7 @@
   (framing schedule, cut list, budget, permits): first a 10' x 7' bike room, then the chosen
   12' x 8' bike shop, the biggest box the state allows without a permit; `bike-shed-site.html`
   draws the lot from the plat with both sheds, the shop layout and six bikes to scale;
-  `bike-shop-3d.html` is the interactive 3D model of the shop on its site (three.js), with three
+  `bike-shop-3d.html` is the interactive 3D model of the shop on its site (three.js), with four
   rendered stills beside it; `photos/` holds the yard, the shed, the aerial, the parcel map and
   the 2012 plat.
 - **[history/](history/)**: planning and review records, kept for the reasoning behind decisions.

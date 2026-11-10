@@ -4,6 +4,51 @@
 SketchUp model he can build from. This is MK's Charlotte house, not 146 Mick Road, so nothing
 here touches the HomePlan app or its plans; the photos and plat are in [photos/](photos/).
 
+## Update, 9 November, later: roof flipped toward the wall, covering the strip behind
+
+MK asked to pitch the roof toward the retaining wall rather than the yard, with no need for a
+steep roof (Charlotte sees little snow), and to carry it over the 3' gap behind the shed so that
+strip becomes covered storage for wheelsets and long tools. He also noted he has only four to six
+wheels, so the big wheel shelf is not needed. Worked through and agreed:
+
+- **Heights.** Flipping makes the door wall the tall one (122") and the rack wall the low one.
+  The racks need about 102" clear (high cradle plus bracket), so the back wall stops at 106",
+  which caps the pitch at 2:12 under the 12' height rule. The 3.35:12 could not flip without
+  losing the high rack row.
+- **Roofing at 2:12.** Exposed-fastener panels are rated 3:12 without sealant; the IBC and the
+  Texas evaluation reports for Classic Rib allow down to 1/2:12 with butyl tape at every side and
+  end lap and stitch screws at 12" o.c., over a synthetic underlayment. Charlotte's issue is 43"
+  of rain, not snow, so the lap sealing is the whole job.
+- **The cantilever.** The 2x6 rafters run 26" past the back wall, leaving the roof edge 10" short
+  of the retaining wall face: a permit-exempt shed may sit near the line but its projections may
+  not cross it, and the wall is on the right-of-way line. A 26" cantilever on the 92.5" back span
+  is well within a 2x6 at 24" o.c. and puts no uplift on the front wall. Rafters become 2x6 x 12'.
+  The roof underside is 9'2" above the pad at the edge, so long tools stand upright.
+- **Permit.** The NC exemption is written on floor area ("does not exceed 12 feet in any
+  dimension"), so eaves do not count; the floor stays 12' x 8'. Roof top about 141" above the
+  pad at the front lip of the metal, 3" under the 12' line.
+
+| Item | Flipped value |
+|---|---|
+| Front (door) wall | 122" to top of plates, studs 117.5"; door RO 62" x 83" under a double 2x6 header at 83 to 88.5"; a 2x4 flat sill at 88.5 to 90", a transom RO 62" x 23.5" (90 to 113.5") with a fixed 60" x 20" glazing unit, and a double 2x6 transom header at 113.5 to 119" directly under the plates |
+| Back (rack) wall | 106" to top of plates, studs 101.5"; 2x8 ledgers at 70" and 82"; low cradles at 82", high at 94" (brackets to about 100", 3" under the plate underside); rear tyres 3" and 15" off the floor; low-bay bars at 65", still face height, bikes park swung |
+| Roof | underside through the front plate's outer top corner (122") and the back plate's inner top corner (106"): 16" rise over 92.5", 2.08:12; 2x6 x 12' rafters at 24" o.c., 12" eave in front, 26" cantilever behind (edge 10" off the wall), 12" rakes; screw-down panels with sealed laps |
+| Covered strip behind | 36" wide, 26" under the roof; 2x6 hook rail at 72" on the outside of the back wall with four wheel hooks, a 2x4 at 46" with two more between them (at 48" a lower wheel would clip its neighbours by 3/4"; at 46" it clears them by an inch), a tool rail with clips at 60"; a 29" wheel hangs from 72" down to 43", flat to the wall, leaving a 30" walkway; gravel pad extended to the wall |
+| Gutter | 5" gutter on the back roof edge, downspout at the house end down to grade and along the end wall's base to the turf |
+| Inside | shelf 30" x 36" at 100" over the bench for boxes (15" clear under the rafters there); parts tower 20.5" x 24" x 96" (the back plates are lower); bench, stool, pegboard, stand unchanged |
+
+Cut list changes against the 12' x 8' list below: front studs 117.5" and end studs 102 to 117"
+from 10' stock, back studs 101.5" from 9' or 10' stock; door header plus a transom sill, two 25"
+transom jacks and a transom header (one more 2x6 8'); rafters nine 2x6 x 12' instead of 10';
+roof deck 168" x 139" is six sheets of OSB; metal five 12' panels; 1x8 band and 1x4 head trim at
+the transom; a 60" x 20" fixed glazing unit (polycarbonate or glass, about $150 to $250); 5"
+gutter, two elbows and about 12' of downspout (about $80); butyl tape and stitch screws for the
+laps (about $60); three 2x6 8' rails and eight hooks outside. Budget moves from about $3,700 to
+about **$4,100** including the six racks.
+
+The drawings page, the 3D page and the SketchUp model (`wesley-bike-shop-12x8-flipped.skp`,
+link in "The SketchUp model") show this version.
+
 ## Update, 9 November: a 12' x 8' bike shop instead
 
 After the 10' x 7' design below was modelled, MK asked for as much space as the footprint can
@@ -281,17 +326,34 @@ These only move the shed on the site; the shed itself does not change.
 ## The 3D view
 
 [bike-shop-3d.html](bike-shop-3d.html) is an interactive three.js model of the 12' x 8' shop on
-its site, built from the same numbers as the drawings: orbit, zoom and pan; toggles for the
-siding and doors, roof, bikes, fit-out and site; doors open; bikes swung on their pivots; and
-camera presets (from the yard, from the upstairs window, door corner, eye level at 6'2", inside
-at the door, framing, from above, along the wall). The site is placed from the plat: the
+its site, in the flipped-roof version, built from the same numbers as the drawings: orbit, zoom
+and pan; toggles for the siding and doors, roof, bikes, fit-out and site; doors open; bikes swung
+on their pivots; and camera presets (from the yard, from the third-floor balcony where MK's yard
+photos were taken, door corner, eye level at 6'2", inside at the door with the doors open, behind
+the shed in the covered strip, framing, from above). The site is placed from the plat: the
 existing shed at its true angle, the retaining wall and fence along the Matheson right of way,
-the house footprint three storeys tall, Wesley Ave. Stills: [from the yard](bike-shop-3d-hero.png),
-[from the upstairs window](bike-shop-3d-from-upstairs.png), [framing](bike-shop-3d-framing.png).
+the house footprint three storeys tall, Wesley Ave; the light is an afternoon sun from the
+west-south-west, so the house's shadow stays off the sheds. Stills: [from the yard](bike-shop-3d-hero.png),
+[from the balcony](bike-shop-3d-from-balcony.png), [behind the shed](bike-shop-3d-behind.png),
+[framing](bike-shop-3d-framing.png).
 
 ## The SketchUp model
 
-**12' x 8' shop version:** `wesley-bike-shop-12x8.skp`, saved 9 November 2026 through the
+**Flipped-roof version (current):** `wesley-bike-shop-12x8-flipped.skp`, saved 9 November 2026
+through the Trimble SketchUp connector, 177 solid parts plus the label group: floor, the 122" door
+wall with the door and transom framing, the 106" rack wall, raked end walls, nine 2x6 x 12'
+rafters with the 26" cantilever over the strip, blocking, deck, metal, the gutter and downspout,
+siding with the door and transom openings, the doors, glazing and trim, six Steadyracks on 2x8
+ledgers at 70 and 82", six bikes (780 mm bars), the shelf over the bench, the 96" parts tower,
+the 40" bench with the two-step stool, pegboard, the parked stand, the hook rails outside with six
+hung wheels and four long tools, the site blocks with the gravel carried to the wall, and sixteen
+dimension labels, in four scenes (Complete, Framing, Bike shop inside, Covered strip). The roof
+top measures 141.0" above the pad at the metal's front lip (one label still says 140.7", the
+figure before the lip was counted). Download link (tokenised, may expire; the save also sits in
+the connector's session):
+https://api.sketchup.com/mcp/v1/sketchup/dl/aed1b383-8fb7-4ede-9a85-1002db7f2db9/005-save/wesley-bike-shop-12x8-flipped.skp?t=KKbM10AlmLwhc7w1jeXH0A
+
+**12' x 8' shop version, roof toward the yard:** `wesley-bike-shop-12x8.skp`, saved 9 November 2026 through the
 Trimble SketchUp connector, 143 solid parts: floor, four framed walls with the door opening and
 cripples, seven 2x6 rafters with bird's mouths plus fly rafters, blocking, deck, metal, siding,
 doors, six Steadyracks and six bikes (780 mm bars), the wheel shelf with 24 wheels stacked flat,

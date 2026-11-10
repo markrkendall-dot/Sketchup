@@ -22,7 +22,6 @@
   .bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 0.88rem; }
   .bar label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
   .bar input[type=checkbox] { accent-color: var(--new); width: 15px; height: 15px; }
-  .bar .sep { flex: 1 0 8px; }
   button { font: inherit; font-size: 0.85rem; padding: 5px 11px; border: 1px solid var(--rule); border-radius: 4px; background: var(--btn); color: var(--fg); cursor: pointer; }
   button:hover { border-color: var(--new); }
   button.on { border-color: var(--new); color: var(--new); }
@@ -42,7 +41,7 @@
   <header>
     <div class="eyebrow">2926 Wesley Ave, Charlotte &middot; 12' x 8' bike shop, no permit</div>
     <h1>Wesley Ave bike shop in 3D</h1>
-    <p class="lede">The shop as it would stand in the wedge below the Matheson Ave retaining wall: framing, skin, six XL 29ers on Steadyracks, the wheel shelf, parts tower, bench and stand, with the existing shed at its true angle from the 2012 plat. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
+    <p class="lede">The shop as it would stand in the wedge below the Matheson Ave retaining wall: tall door wall facing the yard with a transom, the roof pitched 2:12 toward the wall and carried 26" past the back wall to cover the strip behind it, six XL 29ers on Steadyracks, the bench, parts tower and stand inside, wheels and long tools hung under the overhang outside. The existing shed sits at its true angle from the 2012 plat. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
   </header>
 
   <div class="bar" role="group" aria-label="What is shown">
@@ -63,22 +62,22 @@
   <div class="bar" role="group" aria-label="Camera presets">
     <span class="eyebrow">Views</span>
     <button type="button" data-view="hero" class="on">From the yard</button>
-    <button type="button" data-view="window">From the upstairs window</button>
+    <button type="button" data-view="balcony">From the balcony</button>
     <button type="button" data-view="corner">Door corner</button>
     <button type="button" data-view="eye">Eye level, 6'2"</button>
     <button type="button" data-view="inside">Inside at the door</button>
+    <button type="button" data-view="behind">Behind the shed</button>
     <button type="button" data-view="framing">Framing</button>
     <button type="button" data-view="plan">From above</button>
-    <button type="button" data-view="wall">Along the wall</button>
   </div>
 
   <div class="facts">
-    <div><b>144" x 96"</b><span>outside the studs; interior 137" x 89"; 96 sq ft</span></div>
-    <div><b>122" / 96"</b><span>back and front walls to the top of plates; 3.35:12 roof, eave 142.8" above the pad</span></div>
-    <div><b>6 bays at 16"</b><span>Steadyracks, cradle tops 84" low and 96" high; bay 3 is the e-bike</span></div>
-    <div><b>2,000 mm / 780 mm</b><span>each bike's length and bar width; bars project 1,120 mm when straight out</span></div>
-    <div><b>3' off the wall</b><span>back wall on the string line from the old shed's corner, parallel to the retaining wall</span></div>
-    <div><b>9' along the line</b><span>from the old shed's back corner to the near end; 2.2' walkway between the sheds</span></div>
+    <div><b>144" x 96"</b><span>outside the studs; interior 137" x 89"; 96 sq ft of floor, which is what the 12' rule counts</span></div>
+    <div><b>122" / 106"</b><span>door wall and rack wall to the top of plates; 2:12 toward the retaining wall, sealed-lap screw-down metal</span></div>
+    <div><b>26" cantilever</b><span>roof carried past the back wall, edge 10" off the wall face; gutter there, downspout to the yard</span></div>
+    <div><b>6 bays at 16"</b><span>Steadyracks, cradle tops 82" low and 94" high; bay 3 is the e-bike</span></div>
+    <div><b>60" x 20" transom</b><span>fixed glazing above the door, facing the yard</span></div>
+    <div><b>141" roof top</b><span>highest point above the pad, at the front lip of the metal; 3" under the 12' line</span></div>
   </div>
   <p class="lede">Drawings, dimensions and the write-up: <a href="bike-shed-site.html">bike-shed-site.html</a> and <a href="BIKE-SHED.md">BIKE-SHED.md</a> in the same folder.</p>
 </main>
@@ -96,12 +95,14 @@
   }
   THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 
-  // ---------- constants (inches; X along the retaining wall, Y toward the yard, Z up from the pad) ----------
-  const L = 144, D = 96, Z0 = 9.75, HB = 122, HF = 96;
-  const S = (HB - HF) / (D - 3.5), SL = Math.sqrt(1 + S * S), RAF_V = 5.5 * SL;
-  const vU = u => HB - S * u, vT = u => vU(u) + RAF_V;
+  // ---------- constants (inches; design frame: X along the wall toward the house, Y toward the yard, Z up from the pad) ----------
+  const L = 144, D = 96, Z0 = 9.75, HB = 106, HF = 122;        // back (rack) wall low, front (door) wall tall
+  const S = (HF - HB) / (D - 3.5), SL = Math.sqrt(1 + S * S), RAF_V = 5.5 * SL;
+  const vU = u => HB + S * (u - 3.5), vT = u => vU(u) + RAF_V;   // rafter underside and top, relative to Z0
+  const BACK_OH = 26, FRONT_OH = 12;                              // roof past the back wall, past the front wall
   const DOOR0 = 41, DOOR1 = 103;
   const BAYS = [23.5, 39.5, 55.5, 71.5, 87.5, 103.5], LOW = [true, false, true, false, true, false];
+  const CR = i => (LOW[i] ? 82 : 94);
   const BIKE = { wb: 49.2, r: 14.77, bar: 30.7, barH: 44.1 };
 
   // ---------- materials ----------
@@ -112,21 +113,20 @@
     rack: M(0x1e1e20), tyre: M(0x151515, { roughness: 0.95 }), rim: M(0x8a8f94, { transparent: true, opacity: 0.35, metalness: 0.4, roughness: 0.4 }),
     black: M(0x1a1a1a, { roughness: 0.4, metalness: 0.2 }), yellow: M(0xe6be1e, { roughness: 0.4 }), blue: M(0x2d5fa6, { roughness: 0.4 }),
     gravel: M(0xaaa59b), concrete: M(0xaea9a0), fence: M(0x967858), soil: M(0x6e5f46), turf: M(0x5f7a4a, { roughness: 1 }),
-    road: M(0x8c8c8c), house: M(0xd9d3c8), houseRoof: M(0x5a5651), glass: M(0xbcd6e6, { transparent: true, opacity: 0.55 }),
+    road: M(0x8c8c8c), house: M(0xd9d3c8), houseRoof: M(0x5a5651), glass: M(0xbcd6e6, { transparent: true, opacity: 0.45 }),
     peg: M(0xc8aa78), steel: M(0x787d82, { metalness: 0.5, roughness: 0.4 }), skin: M(0xc9a58c), shirt: M(0x4a6b8a), pants: M(0x3a3f45),
-    white: M(0xf1f1ee), stoolw: M(0xb0864f),
+    white: M(0xf1f1ee), stoolw: M(0xb0864f), gutter: M(0xb9b5ad, { metalness: 0.4, roughness: 0.5 }), handle: M(0x9a7b4f),
   };
 
   // ---------- helpers ----------
   const scene = new THREE.Scene();
-  const groups = {};
-  function grp(name, parent) { const g = new THREE.Group(); g.name = name; (parent || scene).add(g); groups[name] = g; return g; }
+  function grp(name, parent) { const g = new THREE.Group(); g.name = name; (parent || scene).add(g); return g; }
   function box(parent, m, x, y, z, w, d, h) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), m);
     mesh.position.set(x + w / 2, y + d / 2, z + h / 2);
     mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
-  // box of size (w along its local x, len along its local y, t along local z) centred at c, tilted about X by ang (so +y rises when ang > 0)
+  // box (w across x, len along local y, t thick) centred at c, tilted about X by ang (+y rises when ang > 0)
   function slabX(parent, m, cx, cy, cz, w, len, t, ang) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, len, t), m);
     mesh.position.set(cx, cy, cz); mesh.rotation.x = ang;
@@ -140,25 +140,22 @@
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
     mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
-  // extrude a 2D outline (array of [a,b]) with optional holes, depth along local z, then map local (x,y,z) -> world by matrix rows
   function extrude(parent, m, pts, holes, depth, rows) {
     const sh = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1])));
     (holes || []).forEach(h => sh.holes.push(new THREE.Path(h.map(p => new THREE.Vector2(p[0], p[1])))));
-    const geo = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false });
-    const mesh = new THREE.Mesh(geo, m);
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }), m);
     if (rows) { mesh.matrixAutoUpdate = false; mesh.matrix.set.apply(mesh.matrix, rows); }
     mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
-  // local (x,y,z) -> world (y,z,x): a profile drawn in (Y,Z) extruded along X, starting at tx
-  const P1 = (tx, ty, tz) => [0, 0, 1, tx, 1, 0, 0, ty, 0, 1, 0, tz, 0, 0, 0, 1];
-  // local (x,y,z) -> world (x,-z,y): a panel drawn in (X,Z) extruded toward -Y, starting at ty
-  const PF = (tx, ty, tz) => [1, 0, 0, tx, 0, 0, -1, ty, 0, 1, 0, tz, 0, 0, 0, 1];
+  const P1 = (tx, ty, tz) => [0, 0, 1, tx, 1, 0, 0, ty, 0, 1, 0, tz, 0, 0, 0, 1];   // profile in (Y,Z) extruded along X
+  const PF = (tx, ty, tz) => [1, 0, 0, tx, 0, 0, -1, ty, 0, 1, 0, tz, 0, 0, 0, 1];  // panel in (X,Z) extruded toward -Y
+  const torusFlatOnWall = (parent, m, x, y, z, R, r) => { const t = new THREE.Mesh(new THREE.TorusGeometry(R, r, 10, 28), m); t.rotation.x = Math.PI / 2; t.position.set(x, y, z); t.castShadow = true; parent.add(t); return t; };
 
-  // ---------- the shed ----------
+  // ---------- the shed (design frame, mirrored into the site frame below) ----------
   const shed = grp('shed');
-  shed.scale.x = -1; shed.position.x = L; // design x runs toward the house; the site frame's x runs toward the old shed
+  shed.scale.x = -1; shed.position.x = L;
   const gFloor = grp('floor', shed), gWalls = grp('walls', shed), gRoofF = grp('roofFraming', shed), gRoof = grp('roof', shed);
-  const gSkin = grp('skin', shed), gDoors = grp('doors', shed), gRacks = grp('racks', shed), gBikes = grp('bikes', shed), gFit = grp('fit', shed);
+  const gSkin = grp('skin', shed), gDoors = grp('doors', shed), gRacks = grp('racks', shed), gBikes = grp('bikes', shed), gFit = grp('fit', shed), gOut = grp('outside', shed);
 
   // floor
   [0, (D - 3.5) / 2, D - 3.5].forEach(y => box(gFloor, mat.pt, 0, y, 0, L, 3.5, 3.5));
@@ -167,76 +164,87 @@
   studXs.forEach(x => box(gFloor, mat.pt, x, 1.5, 3.5, 1.5, D - 3, 5.5));
   box(gFloor, mat.ply, 0, 0, 9, L, D, 0.75);
 
-  // back wall
+  // back wall (racks), 106" to top of plates
   box(gWalls, mat.spf, 0, 0, Z0, L, 3.5, 1.5);
   studXs.forEach(x => box(gWalls, mat.spf, x, 0, Z0 + 1.5, 1.5, 3.5, HB - 4.5));
   box(gWalls, mat.spf, 0, 0, Z0 + HB - 3, L, 3.5, 3);
-  // front wall with the door opening
+  // front wall (door and transom), 122" to top of plates
   box(gWalls, mat.spf, 0, D - 3.5, Z0, DOOR0, 3.5, 1.5); box(gWalls, mat.spf, DOOR1, D - 3.5, Z0, L - DOOR1, 3.5, 1.5);
   [0, 15.25, 31.25, 111.25, 127.25, L - 1.5, DOOR0 - 3, DOOR1 + 1.5].forEach(x => box(gWalls, mat.spf, x, D - 3.5, Z0 + 1.5, 1.5, 3.5, HF - 4.5));
-  [DOOR0 - 1.5, DOOR1].forEach(x => box(gWalls, mat.spf, x, D - 3.5, Z0 + 1.5, 1.5, 3.5, 81.5));
-  box(gWalls, mat.spf, DOOR0 - 1.5, D - 3.5, Z0 + 83, DOOR1 - DOOR0 + 3, 3.5, 5.5);
-  [47.25, 63.25, 79.25, 95.25].forEach(x => box(gWalls, mat.spf, x, D - 3.5, Z0 + 88.5, 1.5, 3.5, HF - 3 - 88.5));
+  [DOOR0 - 1.5, DOOR1].forEach(x => box(gWalls, mat.spf, x, D - 3.5, Z0 + 1.5, 1.5, 3.5, 81.5));          // door jacks
+  box(gWalls, mat.spf, DOOR0 - 1.5, D - 3.5, Z0 + 83, DOOR1 - DOOR0 + 3, 3.5, 5.5);                       // door header
+  box(gWalls, mat.spf, DOOR0, D - 3.5, Z0 + 88.5, DOOR1 - DOOR0, 3.5, 1.5);                               // transom sill
+  [DOOR0 - 1.5, DOOR1].forEach(x => box(gWalls, mat.spf, x, D - 3.5, Z0 + 88.5, 1.5, 3.5, 25));          // transom jacks
+  box(gWalls, mat.spf, DOOR0 - 1.5, D - 3.5, Z0 + 113.5, DOOR1 - DOOR0 + 3, 3.5, 5.5);                    // transom header
   box(gWalls, mat.spf, 0, D - 3.5, Z0 + HF - 3, L, 3.5, 3);
-  // end walls, raked
+  // end walls, raked, tallest at the front
   const endYs = [3.5].concat([0, 1, 2, 3, 4].map(k => 15.25 + 16 * k), [D - 5]);
-  const tilt = -Math.atan(S);
+  const tilt = Math.atan(S);
   [0, L - 3.5].forEach(x0 => {
     box(gWalls, mat.spf, x0, 3.5, Z0, 3.5, D - 7, 1.5);
     endYs.forEach(y => box(gWalls, mat.spf, x0, y, Z0 + 1.5, 3.5, 1.5, vU(y + 0.75) - 3 * SL - 1.5));
     slabX(gWalls, mat.spf, x0 + 1.75, 48, Z0 + vU(48) - 1.5 * SL, 3.5, 89 * SL, 3, tilt);
   });
-  // rafters, blocking, fascias
+  // rafters: 2x6 x 12', 26" past the back wall, 12" past the front
   const rafXs = [0, 24, 48, 72, 96, 120, L - 1.5];
-  rafXs.concat([-12, L + 10.5]).forEach(x => slabX(gRoofF, mat.spf, x + 0.75, 48, Z0 + vU(48) + RAF_V / 2, 1.5, 120 * SL, 5.5, tilt));
+  const uMid = (D + FRONT_OH - BACK_OH) / 2, run = D + FRONT_OH + BACK_OH;
+  rafXs.concat([-12, L + 10.5]).forEach(x => slabX(gRoofF, mat.spf, x + 0.75, uMid, Z0 + vU(uMid) + RAF_V / 2, 1.5, run * SL, 5.5, tilt));
   for (let i = 0; i < rafXs.length - 1; i++) {
     const xa = rafXs[i] + 1.5, xb = rafXs[i + 1];
     box(gRoofF, mat.spf, xa, 0, Z0 + HB, xb - xa, 1.5, vT(1.5) - HB);
     box(gRoofF, mat.spf, xa, D - 1.5, Z0 + HF, xb - xa, 1.5, vT(D) - HF);
   }
-  box(gRoofF, mat.trim, -12, D + 12, Z0 + vU(D + 12), L + 24, 1.5, vT(D + 13.5) - vU(D + 12));
-  box(gRoofF, mat.trim, -12, -13.5, Z0 + vU(-12), L + 24, 1.5, vT(-12) - vU(-12));
+  box(gRoofF, mat.trim, -12, D + FRONT_OH, Z0 + vU(D + FRONT_OH), L + 24, 1.5, vT(D + FRONT_OH) - vU(D + FRONT_OH));
+  box(gRoofF, mat.trim, -12, -BACK_OH - 1.5, Z0 + vU(-BACK_OH), L + 24, 1.5, vT(-BACK_OH - 1.5) - vU(-BACK_OH));
   // deck and metal
-  slabX(gRoof, mat.osb, L / 2, 48, Z0 + vT(48) + 0.22 * SL, L + 24, 123 * SL, 0.4375, tilt);
-  slabX(gRoof, mat.metal, L / 2, 48, Z0 + vT(48) + (0.4375 + 0.4) * SL, L + 26, 125 * SL, 0.75, tilt);
-  for (let k = 0; k < 14; k++) slabX(gRoof, mat.metal, -12 + 5.5 + k * 12, 48, Z0 + vT(48) + (0.4375 + 1.0) * SL, 1.4, 125 * SL, 0.6, tilt);
+  slabX(gRoof, mat.osb, L / 2, uMid, Z0 + vT(uMid) + 0.22 * SL, L + 24, (run + 3) * SL, 0.4375, tilt);
+  slabX(gRoof, mat.metal, L / 2, uMid, Z0 + vT(uMid) + (0.4375 + 0.4) * SL, L + 26, (run + 5) * SL, 0.75, tilt);
+  for (let k = 0; k < 14; k++) slabX(gRoof, mat.metal, -12 + 5.5 + k * 12, uMid, Z0 + vT(uMid) + (0.4375 + 1.0) * SL, 1.4, (run + 5) * SL, 0.6, tilt);
+  // gutter on the back edge and downspout at the house end, out to the yard
+  box(gRoof, mat.gutter, -12, -BACK_OH - 6.5, Z0 + vU(-BACK_OH) - 1.5, L + 24, 5, 4.5);
+  box(gRoof, mat.gutter, L + 1.5, -BACK_OH - 5, 4, 3, 3, Z0 + vU(-BACK_OH) - 5.5);
+  box(gRoof, mat.gutter, L + 1.5, -BACK_OH - 5, 1.5, 3, D + BACK_OH + 5 + 14, 3);
 
-  // skin: back, raked ends, front with the door hole, trim, doors
+  // skin: back, raked ends, front with door and transom holes, trim, glazing, doors
   const T = 0.625;
   box(gSkin, mat.siding, 0, -T, 3.5, L, T, Z0 + HB - 3.5);
   const endPts = [[-T, 3.5], [D + T, 3.5], [D + T, Z0 + vT(D + T)], [-T, Z0 + vT(-T)]];
   extrude(gSkin, mat.siding, endPts, null, T, P1(-T, 0, 0));
   extrude(gSkin, mat.siding, endPts, null, T, P1(L, 0, 0));
-  extrude(gSkin, mat.siding, [[0, 3.5], [L, 3.5], [L, Z0 + HF], [0, Z0 + HF]], [[[DOOR0, Z0], [DOOR1, Z0], [DOOR1, Z0 + 83], [DOOR0, Z0 + 83]]], T, PF(0, D + T, 0));
-  box(gSkin, mat.trim, DOOR0 - 3.75, D + T, 91.25, DOOR1 - DOOR0 + 7.5, 0.75, 5.0);
-  box(gSkin, mat.trim, DOOR0 - 3.75, D + T, 3.5, 3.5, 0.75, 89.25); box(gSkin, mat.trim, DOOR1 + 0.25, D + T, 3.5, 3.5, 0.75, 89.25);
-  [[-T - 0.75, true], [L + T, false]].forEach(([x]) => {
-    box(gSkin, mat.trim, x, -T, 3.5, 0.75, 3.5, Z0 + vT(3.5) - 3.5 - 3.5);
+  extrude(gSkin, mat.siding, [[0, 3.5], [L, 3.5], [L, Z0 + HF], [0, Z0 + HF]],
+    [[[DOOR0, Z0], [DOOR1, Z0], [DOOR1, Z0 + 83], [DOOR0, Z0 + 83]], [[DOOR0, Z0 + 90], [DOOR1, Z0 + 90], [DOOR1, Z0 + 113.5], [DOOR0, Z0 + 113.5]]], T, PF(0, D + T, 0));
+  box(gSkin, mat.trim, DOOR0 - 3.75, D + T, 3.5, 3.5, 0.75, Z0 + 117 - 3.5); box(gSkin, mat.trim, DOOR1 + 0.25, D + T, 3.5, 3.5, 0.75, Z0 + 117 - 3.5);
+  box(gSkin, mat.trim, DOOR0 - 3.75, D + T, Z0 + 82.75, DOOR1 - DOOR0 + 7.5, 0.75, 7.5);                   // band between door and transom, lapping the leaves' top edge
+  box(gSkin, mat.trim, DOOR0 - 3.75, D + T, Z0 + 113.5, DOOR1 - DOOR0 + 7.5, 0.75, 3.5);                   // transom head
+  box(gSkin, mat.white, DOOR0, D - 2.5, Z0 + 90, 1.5, 2, 23.5); box(gSkin, mat.white, DOOR1 - 1.5, D - 2.5, Z0 + 90, 1.5, 2, 23.5);
+  box(gSkin, mat.white, DOOR0, D - 2.5, Z0 + 90, DOOR1 - DOOR0, 2, 1.5); box(gSkin, mat.white, DOOR0, D - 2.5, Z0 + 112, DOOR1 - DOOR0, 2, 1.5);
+  box(gSkin, mat.glass, DOOR0 + 1.5, D - 1.75, Z0 + 91.5, DOOR1 - DOOR0 - 3, 0.5, 20.5);
+  for (const x of [-T - 0.75, L + T]) {
+    box(gSkin, mat.trim, x, -T, 3.5, 0.75, 3.5, Z0 + vT(3.5 - T) - 3.5 - 3.5);
     box(gSkin, mat.trim, x, D + T - 3.5, 3.5, 0.75, 3.5, Z0 + vT(D) - 3.5 - 3.5);
-  });
+  }
   box(gSkin, mat.trim, -T, -T - 0.75, 3.5, 3.5, 0.75, Z0 + HB - 3.5); box(gSkin, mat.trim, L + T - 3.5, -T - 0.75, 3.5, 3.5, 0.75, Z0 + HB - 3.5);
   box(gSkin, mat.trim, -T, D + T, 3.5, 3.5, 0.75, Z0 + HF - 3.5); box(gSkin, mat.trim, L + T - 3.5, D + T, 3.5, 3.5, 0.75, Z0 + HF - 3.5);
-  // doors: each leaf hinged at its casing side; the leaf group pivots about its hinge line
   const leaves = [];
   [[DOOR0 - 0.25, 1], [DOOR1 + 0.25, -1]].forEach(([hx, dirn]) => {
     const piv = new THREE.Group(); piv.position.set(hx, D + T, 0); gDoors.add(piv);
     const w = 30.75;
-    box(piv, mat.siding, dirn > 0 ? 0 : -w, 0, 9.5, w, 1.5, 82.5);
+    box(piv, mat.siding, dirn > 0 ? 0 : -w, 0, 9.5, w, 1.5, 83);
     box(piv, mat.trim, dirn > 0 ? 2 : -w + 2, 1.5, 12, w - 4, 0.75, 20); box(piv, mat.trim, dirn > 0 ? 2 : -w + 2, 1.5, 36, w - 4, 0.75, 52);
     box(piv, mat.steel, dirn > 0 ? w - 4 : -w + 2.5, 1.5, 48, 1.5, 1.5, 6);
     leaves.push({ piv, dirn });
   });
 
   // racks and ledgers
-  box(gRacks, mat.spf, 3.5, 3.5, Z0 + 72, 113, 1.5, 7.25); box(gRacks, mat.spf, 3.5, 3.5, Z0 + 84, 113, 1.5, 7.25);
+  box(gRacks, mat.spf, 3.5, 3.5, Z0 + 70, 113, 1.5, 7.25); box(gRacks, mat.spf, 3.5, 3.5, Z0 + 82, 113, 1.5, 7.25);
   BAYS.forEach((bx, i) => {
-    const zc = Z0 + (LOW[i] ? 84 : 96);
+    const zc = Z0 + CR(i);
     box(gRacks, mat.rack, bx - 1.75, 5.0, zc - 14, 3.5, 0.25, 16);
     box(gRacks, mat.rack, bx - 2.6, 5.25, zc - 9.5, 1.0, 12, 1.0); box(gRacks, mat.rack, bx + 1.6, 5.25, zc - 9.5, 1.0, 12, 1.0);
     box(gRacks, mat.rack, bx - 2.6, 16.25, zc - 9.5, 5.2, 1.0, 1.0);
   });
 
-  // bikes: built standing in a local frame (u along the bike from the rear axle, v up from the tyre bottoms, w across)
+  // bikes, built standing (u along the bike from the rear axle, v up, w across), then hung
   function bike(frameMat, ebike) {
     const g = new THREE.Group();
     const r = BIKE.r, A = [0, r], B = [16.9, 13.4], ST = [12, 31.7], HTt = [37.2, 39.8], HTb = [39.2, 35.8], F = [BIKE.wb, r];
@@ -265,26 +273,23 @@
   const bikePivots = [];
   BAYS.forEach((bx, i) => {
     const b = bike(i === 2 ? mat.blue : (i === 5 ? mat.yellow : mat.black), i === 2);
-    const tz = Z0 + 19.65 + (LOW[i] ? 0 : 12);
+    const tz = Z0 + CR(i) - (BIKE.wb + BIKE.r);
     b.matrixAutoUpdate = false;
     b.matrix.set(0, 0, -1, 0, 0, 1, 0, 5.25, 1, 0, 0, tz, 0, 0, 0, 1);
     const piv = new THREE.Group(); piv.position.set(bx, 5.0, 0); piv.add(b); gBikes.add(piv);
     bikePivots.push(piv);
   });
 
-  // fit-out: wheel shelf with wheels, parts tower, bench with stool, pegboard, stand, figure
-  const SH = Z0 + 104;
-  box(gFit, mat.spf, 3.5, 3.5, SH - 3.5, 137, 1.5, 3.5); box(gFit, mat.spf, 3.5, 30, SH - 3.5, 137, 3.5, 3.5);
-  [15.25, 47.25, 79.25, 111.25, 127.25].forEach(x => box(gFit, mat.spf, x, 5, SH - 3.5, 1.5, 25, 3.5));
-  box(gFit, mat.ply, 3.5, 3.5, SH, 137, 30, 0.75);
-  for (let s = 0; s < 4; s++) for (let w = 0; w < 6; w++) {
-    const t = new THREE.Mesh(new THREE.TorusGeometry(13.5, 1.2, 8, 28), mat.tyre);
-    t.position.set(3.5 + 2 + 14.77 + 33.5 * s, 3.5 + 15.5, SH + 0.75 + 1.25 + 2.5 * w); t.castShadow = true; gFit.add(t);
-  }
+  // fit-out: shelf over the bench, parts tower, bench with stool, pegboard, stand, figure
+  const SH = Z0 + 100;
+  box(gFit, mat.spf, 3.5, 56.5, SH - 3.5, 1.5, 36, 3.5); box(gFit, mat.spf, 32, 56.5, SH - 3.5, 1.5, 36, 3.5);
+  box(gFit, mat.spf, 5, 58, SH - 3.5, 27, 1.5, 3.5); box(gFit, mat.spf, 5, 89.5, SH - 3.5, 27, 1.5, 3.5);
+  box(gFit, mat.ply, 3.5, 56.5, SH, 30, 36, 0.75);
+  box(gFit, mat.white, 6, 60, SH + 0.75, 12, 14, 9); box(gFit, mat.white, 20, 62, SH + 0.75, 10, 24, 8);
   const TX = 120;
-  box(gFit, mat.ply, TX, 5, Z0, 0.75, 24, 102); box(gFit, mat.ply, TX + 19.75, 5, Z0, 0.75, 24, 102);
-  [0, 20, 40, 60, 80, 100].forEach(z => box(gFit, mat.ply, TX + 0.75, 5, Z0 + z, 19, 24, 0.75));
-  [[TX + 2, 20.75], [TX + 10, 40.75], [TX + 1.5, 60.75], [TX + 9, 0.75], [TX + 3, 80.75]].forEach(([x, z]) => box(gFit, mat.white, x, 7, Z0 + z, 8, 13, 10));
+  box(gFit, mat.ply, TX, 5, Z0, 0.75, 24, 96); box(gFit, mat.ply, TX + 19.75, 5, Z0, 0.75, 24, 96);
+  [0, 19, 38, 57, 76, 95.25].forEach(z => box(gFit, mat.ply, TX + 0.75, 5, Z0 + z, 19, 24, 0.75));
+  [[TX + 2, 19.75], [TX + 10, 38.75], [TX + 1.5, 57.75], [TX + 9, 0.75], [TX + 3, 76.75]].forEach(([x, z]) => box(gFit, mat.white, x, 7, Z0 + z, 8, 13, 10));
   [[3.5, 56.5], [24, 56.5], [3.5, 89], [24, 89]].forEach(([x, y]) => box(gFit, mat.spf, x, y, Z0, 3.5, 3.5, 38.5));
   box(gFit, mat.ply, 3.5, 56.5, Z0 + 38.5, 24, 36, 1.5); box(gFit, mat.ply, 7, 60, Z0 + 12, 17, 29, 0.75);
   box(gFit, mat.stoolw, 8, 62, Z0, 14, 18, 18); box(gFit, mat.stoolw, 8, 71, Z0, 14, 9, 9);
@@ -292,11 +297,18 @@
   const base = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, 1, 28), mat.steel); base.rotation.x = Math.PI / 2; base.position.set(122, D - 22, Z0 + 0.5); base.castShadow = true; gFit.add(base);
   cyl(gFit, mat.steel, [122, D - 22, Z0 + 1], [122, D - 22, Z0 + 52], 1.0);
   box(gFit, mat.steel, 121, D - 22, Z0 + 50, 2, 14, 2); box(gFit, mat.rack, 120.5, D - 10, Z0 + 49, 3, 3, 4);
-  // the owner, 6'2", standing in the aisle looking at the bikes
   const person = new THREE.Group(); person.position.set(40, 70, Z0); person.rotation.z = Math.PI; gFit.add(person);
   const head = new THREE.Mesh(new THREE.SphereGeometry(4.5, 16, 12), mat.skin); head.position.set(0, 0, 69.5); head.castShadow = true; person.add(head);
   box(person, mat.shirt, -8, -4.5, 40, 16, 9, 25); box(person, mat.shirt, -11, -3.5, 40, 3, 7, 24); box(person, mat.shirt, 8, -3.5, 40, 3, 7, 24);
   box(person, mat.pants, -7.5, -4, 0, 6.5, 8, 40); box(person, mat.pants, 1, -4, 0, 6.5, 8, 40); cyl(person, mat.skin, [0, 0, 65], [0, 0, 67], 2);
+
+  // the covered strip behind: hook rail with wheels, a tool rail with long tools
+  box(gOut, mat.spf, 6, -T - 1.5, Z0 + 69.25, L - 12, 1.5, 5.5);
+  [20, 52, 84, 116].forEach(x => { box(gOut, mat.steel, x - 0.5, -T - 4, Z0 + 71, 1, 2.5, 1); torusFlatOnWall(gOut, mat.tyre, x, -T - 4.2, Z0 + 72 - 14.77, 13.5, 1.25); });
+  box(gOut, mat.spf, 20, -T - 1.5, Z0 + 44, 70, 1.5, 3.5);     // lower rail at 46": a wheel here clears its neighbours from the 72" rail by an inch
+  [36, 68].forEach(x => { box(gOut, mat.steel, x - 0.5, -T - 4, Z0 + 45, 1, 2.5, 1); torusFlatOnWall(gOut, mat.tyre, x, -T - 4.2, Z0 + 46 - 14.77, 13.5, 1.25); });
+  box(gOut, mat.spf, 100, -T - 1.5, Z0 + 58, 38, 1.5, 3.5);
+  [[106, 62], [112, 58], [118, 66], [124, 54]].forEach(([x, hgt]) => { cyl(gOut, mat.handle, [x, -T - 3, 1], [x, -T - 3, hgt], 0.7); box(gOut, mat.steel, x - 3.5, -T - 4, 1, 7, 1.5, 8); });
 
   // ---------- site, from the plat (page frame: u along Wesley in feet, v toward Matheson) ----------
   const LOT = [[0, 0], [114.36, 0], [114.29, 32.04], [83.45, 53.29], [75.73, 53.28], [40.57, 80.12], [40.55, 85.57], [13.07, 107.34], [-0.13, 107.34]];
@@ -306,24 +318,20 @@
   const e = [-dd[0] / dl, -dd[1] / dl], nin = [-dd[1] / dl, dd[0] / dl];
   const WALL_T = 0.83, GAP = 3.0, SLIDE = 7.5 + L / 12;
   const O = [P7[0] + nin[0] * (WALL_T + GAP) + e[0] * SLIDE, P7[1] + nin[1] * (WALL_T + GAP) + e[1] * SLIDE];
-  // right-handed site frame: x3 runs along the wall toward the old shed, y3 toward the yard, z up
+  // right-handed site frame: x3 along the wall toward the old shed, y3 toward the yard, z up
   const toF = p => [-((p[0] - O[0]) * e[0] + (p[1] - O[1]) * e[1]) * 12, ((p[0] - O[0]) * nin[0] + (p[1] - O[1]) * nin[1]) * 12];
   const angF = v => Math.atan2(v[0] * nin[0] + v[1] * nin[1], -(v[0] * e[0] + v[1] * e[1]));
 
   const site = grp('site');
-  const lotF = LOT.map(toF);
-  extrude(site, mat.turf, lotF, null, 2, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -2.2, 0, 0, 0, 1]);
-  box(site, mat.gravel, -12, -12, -1.5, L + 24, D + 24, 2.0);
-  // Wesley Ave as a slab south of the lot
+  extrude(site, mat.turf, LOT.map(toF), null, 2, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -2.2, 0, 0, 0, 1]);
+  box(site, mat.gravel, -12, -36, -1.5, L + 24, D + 48, 2.0);
   const roadC = toF([57, -24]), roadA = angF([1, 0]);
   const road = new THREE.Mesh(new THREE.BoxGeometry(170 * 12, 44 * 12, 2), mat.road); road.position.set(roadC[0], roadC[1], -1.4); road.rotation.z = roadA; road.receiveShadow = true; site.add(road);
-  // the house, simplified footprint, three storeys
   extrude(site, mat.house, HOUSE.map(toF), null, 336, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   extrude(site, mat.houseRoof, HOUSE.map(toF), null, 6, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 336, 0, 0, 0, 1]);
-  // retaining wall, soil and fence along the Matheson edges; board fences on the flat segment and the west line
   function wallSeg(a, b, kind) {
     const A = toF(a), B = toF(b), dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
-    const nx = -dy / len, ny = dx / len; // inward (lot) normal for the counter-clockwise lot polygon
+    const nx = -dy / len, ny = dx / len;
     const put = (off, thick, z0, h, m) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, thick, h), m);
       mesh.position.set((A[0] + B[0]) / 2 + nx * off, (A[1] + B[1]) / 2 + ny * off, z0 + h / 2); mesh.rotation.z = ang;
@@ -334,13 +342,11 @@
   }
   for (let i = 2; i < 7; i++) wallSeg(LOT[i], LOT[i + 1], 'wall');
   wallSeg(LOT[7], LOT[8], 'fence'); wallSeg(LOT[8], LOT[0], 'fence');
-  // the existing shed: 8.2' x 10.1', tall side on the fence, low window side facing the wedge, door toward the house
   (function existingShed() {
     const g = new THREE.Group(); site.add(g);
     const nw = toF([1.2, 107.34 - 2.0]);
     g.position.set(nw[0], nw[1], 0); g.rotation.z = angF([0, -1]);
     const Lx = 121.2, Wy = 98.4;
-    // profile in (Y,Z): tall wall 116" on the fence side (y=0), low wall 84" on the window side facing the wedge (y=Wy)
     extrude(g, mat.siding, [[0, 0], [Wy, 0], [Wy, 84], [0, 116]], null, Lx, P1(0, 0, 0));
     const ang = Math.atan2(32, Wy), rl = Math.hypot(Wy, 32) + 24;
     const roof = new THREE.Mesh(new THREE.BoxGeometry(Lx + 16, rl, 2), mat.metal); roof.position.set(Lx / 2, Wy / 2, 100 + 1.2); roof.rotation.x = -ang; roof.castShadow = true; g.add(roof);
@@ -359,8 +365,9 @@
   const camera = new THREE.PerspectiveCamera(40, 16 / 10, 2, 20000);
   camera.up.set(0, 0, 1);
   const hemi = new THREE.HemisphereLight(0xdfe8f3, 0x5a5445, 1.5); scene.add(hemi);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));   // lifts the inside and the covered strip, which the sun never reaches
   const sun = new THREE.DirectionalLight(0xfff2dc, 2.9);
-  sun.position.set(72 - 500, 48 + 620, 940); sun.target.position.set(72, 48, 60); scene.add(sun); scene.add(sun.target);
+  sun.position.set(72 + 369, 48 + 930, 60 + 840); sun.target.position.set(72, 48, 60); scene.add(sun); scene.add(sun.target);   // afternoon sun from the west-south-west, so the house's shadow misses the sheds
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
   const sc = sun.shadow.camera; sc.left = -700; sc.right = 700; sc.top = 700; sc.bottom = -700; sc.near = 100; sc.far = 2600; sun.shadow.bias = -0.0006;
 
@@ -397,8 +404,7 @@
   function pan(dx, dy) {
     const scale = ctl.r * 0.0016;
     const right = new THREE.Vector3().subVectors(camera.position, ctl.target).cross(camera.up).normalize();
-    const upv = new THREE.Vector3(0, 0, 1);
-    ctl.target.addScaledVector(right, dx * scale).addScaledVector(upv, dy * scale);
+    ctl.target.addScaledVector(right, dx * scale).addScaledVector(new THREE.Vector3(0, 0, 1), dy * scale);
   }
   canvas.addEventListener('pointermove', ev => {
     if (!ptrs.has(ev.pointerId)) return;
@@ -422,39 +428,40 @@
   });
   canvas.addEventListener('wheel', ev => { ev.preventDefault(); ctl.r = Math.min(6000, Math.max(60, ctl.r * Math.exp(ev.deltaY * 0.0012))); render(); }, { passive: false });
 
-  // ---------- presets and toggles ----------
+  // ---------- presets and toggles (site frame: x toward the old shed, y toward the yard) ----------
   const presets = {
     hero: { az: 1.0, el: 0.4, r: 440, t: [72, 48, 60], fov: 42 },
-    window: { az: 2.196, el: 0.368, r: 333, t: [72, 48, 60], fov: 52 },
+    balcony: { az: 2.175, el: 0.62, r: 433, t: [160, 70, 60], fov: 50 },
     corner: { az: 2.10, el: 0.43, r: 217, t: [60, 60, 60], fov: 48 },
     eye: { az: 1.507, el: 0.0, r: 283, t: [72, 48, 74], fov: 55 },
-    inside: { az: 1.496, el: -0.02, r: 80, t: [60, 8, 68], fov: 80 },
+    inside: { az: 1.496, el: -0.02, r: 80, t: [60, 8, 68], fov: 80, doors: true },
+    behind: { az: 3.1416, el: 0.06, r: 175, t: [165, -18, 62], fov: 68 },
     framing: { az: 1.0, el: 0.4, r: 440, t: [72, 48, 60], fov: 42, skin: false, roof: false },
     plan: { az: 1.571, el: 1.5, r: 900, t: [72, 48, 0], fov: 40 },
-    wall: { az: -3.11, el: 0.265, r: 305, t: [144, 40, 70], fov: 48 },
   };
+  const tSkin = document.getElementById('tSkin'), tRoof = document.getElementById('tRoof'), tBikes = document.getElementById('tBikes'),
+    tFit = document.getElementById('tFit'), tSite = document.getElementById('tSite'), tDoors = document.getElementById('tDoors'), tSwing = document.getElementById('tSwing');
+  function applyToggles() {
+    gSkin.visible = tSkin.checked; gDoors.visible = tSkin.checked; gRoof.visible = tRoof.checked;
+    gBikes.visible = tBikes.checked; gFit.visible = tFit.checked; gOut.visible = tFit.checked; site.visible = tSite.checked;
+    leaves.forEach(l => { l.piv.rotation.z = tDoors.checked ? l.dirn * 1.75 : 0; });
+    bikePivots.forEach((p, i) => { p.rotation.z = tSwing.checked ? (i === 0 ? 0.35 : 0.96) : 0; });
+    render();
+  }
   function setPreset(name) {
     const p = presets[name]; if (!p) return;
     ctl.az = p.az; ctl.el = p.el; ctl.r = p.r; ctl.target.set(p.t[0], p.t[1], p.t[2]);
     camera.fov = p.fov; camera.updateProjectionMatrix();
     if (p.skin === false) { tSkin.checked = false; tRoof.checked = false; } else if (name !== 'inside') { tSkin.checked = true; tRoof.checked = true; }
+    tDoors.checked = !!p.doors;
     applyToggles();
     document.querySelectorAll('button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name));
     render();
   }
   document.querySelectorAll('button[data-view]').forEach(b => b.addEventListener('click', () => setPreset(b.dataset.view)));
-  const tSkin = document.getElementById('tSkin'), tRoof = document.getElementById('tRoof'), tBikes = document.getElementById('tBikes'),
-    tFit = document.getElementById('tFit'), tSite = document.getElementById('tSite'), tDoors = document.getElementById('tDoors'), tSwing = document.getElementById('tSwing');
-  function applyToggles() {
-    gSkin.visible = tSkin.checked; gDoors.visible = tSkin.checked; gRoof.visible = tRoof.checked;
-    gBikes.visible = tBikes.checked; gFit.visible = tFit.checked; site.visible = tSite.checked;
-    leaves.forEach(l => { l.piv.rotation.z = tDoors.checked ? l.dirn * 1.75 : 0; });
-    bikePivots.forEach((p, i) => { p.rotation.z = tSwing.checked ? (i === 0 ? 0.35 : 0.96) : 0; });
-    render();
-  }
   [tSkin, tRoof, tBikes, tFit, tSite, tDoors, tSwing].forEach(el => el.addEventListener('change', applyToggles));
   applyToggles();
-  setPreset(location.hash === '#framing' || location.hash === '#inside' || location.hash === '#plan' ? location.hash.slice(1) : 'hero');
+  setPreset(['framing', 'inside', 'plan', 'behind', 'balcony'].indexOf(location.hash.slice(1)) >= 0 ? location.hash.slice(1) : 'hero');
   window.__ready = true;
 })();
 </script>
