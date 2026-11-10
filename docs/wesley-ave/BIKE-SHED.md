@@ -7,8 +7,8 @@ here touches the HomePlan app or its plans; the photos and plat are in [photos/]
 ## Update, 10 November, later: the shop cut to 6' deep
 
 With the yard half as deep as first drawn, MK asked for the shop to go from 8' to 6' deep to get
-lawn back. The drawings page and the 3D page now show 12' x 6'. The SketchUp model is still the
-8' version and has not been rebuilt.
+lawn back. The drawings page and the 3D page now show 12' x 6'. The SketchUp model was rebuilt and
+saved at 6' deep as well (link under "The SketchUp model").
 
 | Item | 12' x 8' | 12' x 6' |
 |---|---|---|
@@ -452,7 +452,15 @@ west-south-west. Stills: [from over the west fence](bike-shop-3d-hero.png),
 
 ## The SketchUp model
 
-**Flipped-roof version, still 8' deep (the 6' depth above is not modelled yet):** `wesley-bike-shop-12x8-flipped.skp`, saved 10 November 2026
+**Current, 12' x 6' with the flipped roof:** `wesley-bike-shop-12x6-flipped.skp`, saved 10 November
+2026 through the Trimble SketchUp connector, 175 solid parts plus the label group, eighteen labels,
+four scenes (Complete, Framing, Bike shop inside, Covered strip). It is the 8' model below with the
+depth cut to 72": skids at 0, 34.25" and 68.5", 69" joists, six studs in each end wall, 2x6 x 10'
+rafters at 2.8:12, the bench on the yard wall left of the door, the shelf on the left end wall.
+The roof top measures 142.0" above the pad. Download link (tokenised, may expire):
+https://api.sketchup.com/mcp/v1/sketchup/dl/44e7cec7-d0b8-48ee-8b32-63e6103c69ab/003-save/wesley-bike-shop-12x6-flipped.skp?t=6AwQVCZnVkEZeiJPV7ddZw
+
+**Flipped-roof version, 8' deep (superseded):** `wesley-bike-shop-12x8-flipped.skp`, saved 10 November 2026
 through the Trimble SketchUp connector, 178 solid parts plus the label group: floor, the 122" door
 wall with the door and transom framing, the 106" rack wall, raked end walls, nine 2x6 x 12'
 rafters with the 26" cantilever over the strip, blocking, deck, metal, the gutter and downspout,
