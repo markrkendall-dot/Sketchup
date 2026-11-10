@@ -1639,3 +1639,57 @@ button.primary:hover:not(:disabled) {
   color: inherit;
   opacity: 0.85;
 }
+
+/* The Houses list: plans kept in this browser, found by address (ui/HousesDialog.tsx). */
+.houses-dialog {
+  width: 560px;
+  max-width: 100%;
+}
+
+.houses-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.houses-field input {
+  padding: 6px 8px;
+  font-size: 15px;
+}
+
+.houses-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.houses-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.houses-list li.current {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.houses-list .house-open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.houses-list .house-open span {
+  font-size: 12px;
+  opacity: 0.7;
+}

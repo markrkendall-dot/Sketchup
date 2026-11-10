@@ -593,6 +593,7 @@ export interface Plan {
   schemaVersion: 8;
   id: Id;
   name: string;
+  address?: string; // the house's street address; the Houses list finds a plan by it (io/library.ts)
   levelOrder: Id[]; // bottom to top
   levels: Record<Id, Level>;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement

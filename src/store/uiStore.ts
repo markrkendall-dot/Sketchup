@@ -387,6 +387,8 @@ export interface UiState {
   walkLocked: boolean;
   /** The keyboard help overlay is open. */
   helpOpen: boolean;
+  /** The Houses list (plans kept in this browser, found by address) is open. */
+  housesOpen: boolean;
   notice: Notice | null;
   /** The walk start the user picked in 2D (not part of the plan, so not saved or undone). */
   walkFrom: WalkFrom | null;
@@ -455,6 +457,7 @@ export interface UiState {
   setWalkLevel: (id: Id | null) => void;
   setWalkLocked: (locked: boolean) => void;
   setHelpOpen: (open: boolean) => void;
+  setHousesOpen: (open: boolean) => void;
   /** Show (or clear) a notice; an info notice clears itself after NOTICE_MS. */
   setNotice: (notice: Notice | null) => void;
   setWalkFrom: (walkFrom: WalkFrom | null) => void;
@@ -568,6 +571,7 @@ export const useUiStore = create<UiState>()((set) => ({
   walkLevelId: null,
   walkLocked: false,
   helpOpen: false,
+  housesOpen: false,
   notice: null,
   walkFrom: null,
   contextMenu: null,
@@ -703,6 +707,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setWalkLevel: (walkLevelId) => set({ walkLevelId }),
   setWalkLocked: (walkLocked) => set((s) => (s.walkLocked === walkLocked ? s : { walkLocked })),
   setHelpOpen: (helpOpen) => set({ helpOpen }),
+  setHousesOpen: (housesOpen) => set({ housesOpen }),
   setNotice: (notice) => {
     if (noticeTimer) clearTimeout(noticeTimer);
     noticeTimer = null;

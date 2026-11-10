@@ -612,7 +612,7 @@ const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', '
 const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
 const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'underlay'] as const;
-const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'address', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
 
@@ -1355,6 +1355,7 @@ export function migrate(json: unknown): Plan {
   plan.schemaVersion = SCHEMA_VERSION;
   plan.id = typeof doc.id === 'string' && doc.id ? doc.id : newId();
   plan.name = typeof doc.name === 'string' && doc.name.trim() ? doc.name : 'Untitled plan';
+  put(plan, 'address', typeof doc.address === 'string' && doc.address.trim() ? doc.address.trim() : undefined);
   plan.levelOrder = [...(doc.levelOrder as string[])];
   plan.levels = levels;
   plan.baseFloorElevation = isNum(doc.baseFloorElevation) ? doc.baseFloorElevation : 0;

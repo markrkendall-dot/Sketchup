@@ -444,6 +444,16 @@ somewhere safe; **Open** (Ctrl+O) loads one back, replacing the current plan (an
 history). **Open example** loads the 146 Mick Road starter plan the same way. **New** and **Open
 example** ask before discarding a plan that has walls, roofs or site elements.
 
+**Houses** (toolbar) lists every plan this browser has kept, so several houses can be worked on
+side by side. A plan joins the list once something is drawn in it, and each save updates its entry.
+Give the plan on screen its street address at the top of the list, then find a house by typing
+part of its address or name ("2926", "wesley rd"; Road and Rd, Drive and Dr match each other) and
+press Enter or click it. Switching puts the plan on screen in the list first, so nothing is lost
+and nothing is asked. **Remove** deletes a house's copy from the browser. The two 146 Mick Road
+plans are in the list from the start. Like the autosave, the list lives only in this browser
+profile: **Save** a file for anything you want to keep or move to another computer, and **Open**
+it there to add it to that browser's list.
+
 The file is plain JSON with a `schemaVersion`; lengths are inches. Older files are upgraded on
 open, and unknown fields are dropped. Underlay images are stored inside the file (downscaled),
 so a plan with photos can be a few megabytes.

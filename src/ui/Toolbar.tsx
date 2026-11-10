@@ -303,6 +303,9 @@ export function Toolbar() {
           </button>
         </div>
         <div className="group" role="group" aria-label="File">
+          <button onClick={() => useUiStore.getState().setHousesOpen(true)} title="Houses: every plan kept in this browser; find one by its address">
+            Houses
+          </button>
           <button onClick={() => afterAction(newPlan)} title="Start a new, empty plan">
             New
           </button>

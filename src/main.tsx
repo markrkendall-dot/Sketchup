@@ -8,12 +8,14 @@ import { getFaces } from './derive/rooms';
 import { pruneDerivedCaches } from './derive/openings';
 import { fallbackElevation, groundAt, planTerrain, terrainHeightAt } from './derive/site';
 import { pruneSelection } from './editor2d/tools';
+import { set } from 'idb-keyval';
 import { loadAutosave, startAutosave } from './io/file';
+import { saveHouse } from './io/library';
 import { defaultLevelId } from './model/plan';
 import { clearHistory, usePlanStore } from './store/planStore';
 import { clearNoticeOnEdit, useUiStore } from './store/uiStore';
 import { startChecks } from './ui/checks';
-import { showNotice } from './ui/fileActions';
+import { planHasContent, showNotice } from './ui/fileActions';
 import './index.css';
 import { PLAN_STYLES } from './editor2d/planStyles';
 
@@ -76,7 +78,14 @@ async function boot(): Promise<void> {
     if (s.showFurniture !== prev.showFurniture) pruneSelection();
   });
   startChecks();
+  // The autosaved plan belongs in the Houses list too (one saved before the list existed is not there yet).
+  if (saved && planHasContent(saved)) void saveHouse(saved).catch(() => undefined);
   startAutosave(usePlanStore, {
+    // Every save also keeps the plan in the Houses list, under its id, once it has anything in it.
+    save: async (key, plan) => {
+      await set(key, plan);
+      if (planHasContent(plan)) await saveHouse(plan);
+    },
     // A failure stays in the status bar until a later save works.
     onStatus: (error) => {
       if (error) showNotice(error, true);

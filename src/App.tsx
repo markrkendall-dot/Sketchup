@@ -7,6 +7,7 @@ import { RoomNameEditor } from './editor2d/RoomNameEditor';
 import { dispatchKey, dispatchShift } from './editor2d/tools';
 import { useUiStore } from './store/uiStore';
 import { HelpOverlay } from './ui/HelpOverlay';
+import { HousesDialog } from './ui/HousesDialog';
 import { bindingFor } from './ui/keymap';
 import { LevelBar } from './ui/LevelBar';
 import { PropertiesPanel } from './ui/PropertiesPanel';
@@ -60,6 +61,12 @@ function onKeyDown(e: KeyboardEvent): void {
     return;
   }
   if (e.key === 'Shift') dispatchShift(true);
+  if (ui.housesOpen) {
+    // The Houses list owns the keyboard while it is open (its fields handle their own keys).
+    if (e.key === 'Escape') ui.setHousesOpen(false);
+    if (!mod) e.preventDefault();
+    return;
+  }
   if (dispatchKey(e)) {
     e.preventDefault();
     return;
@@ -191,6 +198,7 @@ export function App() {
       <StatusBar />
       <UnderlayFileInput />
       <HelpOverlay />
+      <HousesDialog />
     </div>
   );
 }

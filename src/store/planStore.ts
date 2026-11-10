@@ -147,6 +147,8 @@ export interface PlanState {
   plan: Plan;
   setPlan: (plan: Plan) => void;
   renamePlan: (name: string) => void;
+  /** Set the house's street address ('' clears it); the Houses list finds the plan by it. */
+  setPlanAddress: (address: string) => void;
   /**
    * Add a wall between two points or nodes and normalize the level. Null when it is degenerate or
    * would lie on top of a wall already there (then the draft message says so).
@@ -666,6 +668,14 @@ export const usePlanStore = create<PlanState>()(
         renamePlan: (name) =>
           set((s) => {
             s.plan.name = name;
+            touch(s.plan);
+          }),
+
+        setPlanAddress: (address) =>
+          set((s) => {
+            const v = address.trim();
+            if (v) s.plan.address = v;
+            else delete s.plan.address;
             touch(s.plan);
           }),
 
