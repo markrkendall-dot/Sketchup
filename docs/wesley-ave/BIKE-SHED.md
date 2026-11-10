@@ -348,10 +348,9 @@ ledgers at 70 and 82", six bikes (780 mm bars), the shelf over the bench, the 96
 the 40" bench with the two-step stool, pegboard, the parked stand, the hook rails outside with six
 hung wheels and four long tools, the site blocks with the gravel carried to the wall, and sixteen
 dimension labels, in four scenes (Complete, Framing, Bike shop inside, Covered strip). The roof
-top measures 141.0" above the pad at the metal's front lip (one label still says 140.7", the
-figure before the lip was counted). Download link (tokenised, may expire; the save also sits in
-the connector's session):
-https://api.sketchup.com/mcp/v1/sketchup/dl/aed1b383-8fb7-4ede-9a85-1002db7f2db9/005-save/wesley-bike-shop-12x8-flipped.skp?t=KKbM10AlmLwhc7w1jeXH0A
+top measures 141.0" above the pad at the metal's front lip. Download link (tokenised, may
+expire; the save also sits in the connector's session):
+https://api.sketchup.com/mcp/v1/sketchup/dl/279683f3-e49b-4b14-b239-11bf8de2ff1b/004-save/wesley-bike-shop-12x8-flipped.skp?t=wSwl8zhz96Rn2mfAX9_0FA
 
 **12' x 8' shop version, roof toward the yard:** `wesley-bike-shop-12x8.skp`, saved 9 November 2026 through the
 Trimble SketchUp connector, 143 solid parts: floor, four framed walls with the door opening and
