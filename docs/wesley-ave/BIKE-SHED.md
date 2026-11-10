@@ -72,7 +72,10 @@ gutter can be cleaned from the bank instead of from a ladder in the strip.
 
 The drawings page now leads with an enlarged back-yard plan that carries these distances, and the
 3D page's site is rebuilt the same way, with a view from the deck and a view of the gap to the
-house. The saved SketchUp model's shed is unchanged; its site blocks still show the old layout.
+house. The SketchUp model was saved again on 10 November with the shed unchanged and its site blocks
+redrawn to match: the planted bank behind the wall, the fence at the sidewalk and the jasmine on the
+wall. The model's site is schematic (a straight run of wall and a square pad), so the distances to
+the old shed and to the house are on the drawings page, not in the model.
 
 ## Update, 9 November, later: roof flipped toward the wall, covering the strip behind
 
@@ -418,18 +421,22 @@ west-south-west. Stills: [from over the west fence](bike-shop-3d-hero.png),
 
 ## The SketchUp model
 
-**Flipped-roof version (current):** `wesley-bike-shop-12x8-flipped.skp`, saved 9 November 2026
-through the Trimble SketchUp connector, 177 solid parts plus the label group: floor, the 122" door
+**Flipped-roof version (current):** `wesley-bike-shop-12x8-flipped.skp`, saved 10 November 2026
+through the Trimble SketchUp connector, 178 solid parts plus the label group: floor, the 122" door
 wall with the door and transom framing, the 106" rack wall, raked end walls, nine 2x6 x 12'
 rafters with the 26" cantilever over the strip, blocking, deck, metal, the gutter and downspout,
 siding with the door and transom openings, the doors, glazing and trim, six Steadyracks on 2x8
 ledgers at 70 and 82", six bikes (780 mm bars), the shelf over the bench, the 96" parts tower,
 the 40" bench with the two-step stool, pegboard, the parked stand, the hook rails outside with six
-hung wheels and four long tools, the site blocks with the gravel carried to the wall, and sixteen
-dimension labels, in four scenes (Complete, Framing, Bike shop inside, Covered strip). The roof
-top measures 141.0" above the pad at the metal's front lip. Download link (tokenised, may
-expire; the save also sits in the connector's session):
-https://api.sketchup.com/mcp/v1/sketchup/dl/279683f3-e49b-4b14-b239-11bf8de2ff1b/004-save/wesley-bike-shop-12x8-flipped.skp?t=wSwl8zhz96Rn2mfAX9_0FA
+hung wheels and four long tools, and eighteen dimension labels, in four scenes (Complete, Framing,
+Bike shop inside, Covered strip). The site blocks follow the 10 November correction: the gravel
+carried to the retaining wall 36" behind the shop, the planted bank rising from the wall top to the
+fence at the Matheson sidewalk about 11' further back, and the jasmine over the wall. They are
+schematic (the wall is drawn straight and the old shed and the house are left out), and a label
+says where the shop sits on the lot. The shed itself is as saved on 9 November. The roof top
+measures 141.0" above the pad at the metal's front lip. Download link (tokenised, may expire; the
+save also sits in the connector's session):
+https://api.sketchup.com/mcp/v1/sketchup/dl/ad6d4b20-4fe3-4961-9404-5dbe8c7c9a82/005-save/wesley-bike-shop-12x8-flipped.skp?t=6TwZOz607rhUBoda9eUhxg
 
 **12' x 8' shop version, roof toward the yard:** `wesley-bike-shop-12x8.skp`, saved 9 November 2026 through the
 Trimble SketchUp connector, 143 solid parts: floor, four framed walls with the door opening and
