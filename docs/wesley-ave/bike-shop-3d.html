@@ -41,7 +41,7 @@
   <header>
     <div class="eyebrow">2926 Wesley Ave, Charlotte &middot; 12' x 8' bike shop, no permit</div>
     <h1>Wesley Ave bike shop in 3D</h1>
-    <p class="lede">The shop as it would stand in the wedge below the Matheson Ave retaining wall: tall door wall facing the yard with a transom, the roof pitched 2:12 toward the wall and carried 26" past the back wall to cover the strip behind it, six XL 29ers on Steadyracks, the bench, parts tower and stand inside, wheels and long tools hung under the overhang outside. The existing shed sits at its true angle from the 2012 plat. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
+    <p class="lede">The shop as it would stand along the retaining wall behind the house: tall door wall facing the yard with a transom, the roof pitched 2:12 toward the wall and carried 26" past the back wall to cover the strip behind it, six XL 29ers on Steadyracks, the bench, parts tower and stand inside, wheels and long tools hung under the overhang outside. The site was corrected on 10 November from two photos taken on the third-floor deck: the wall is inside the lot with a planted bank and the sidewalk fence behind it, the old shed's back corner nearly touches the wall, and the lawn between the house and the old shed is about 17.5 ft deep, so the shop's nearest corner is about 6.7 ft from the house. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the skin to see the framing.</p>
   </header>
 
   <div class="bar" role="group" aria-label="What is shown">
@@ -63,7 +63,7 @@
     <span class="eyebrow">Views</span>
     <button type="button" data-view="hero" class="on">From the yard</button>
     <button type="button" data-view="balcony">From the balcony</button>
-    <button type="button" data-view="corner">Door corner</button>
+    <button type="button" data-view="corner">Gap to the house</button>
     <button type="button" data-view="eye">Eye level, 6'2"</button>
     <button type="button" data-view="inside">Inside at the door</button>
     <button type="button" data-view="behind">Behind the shed</button>
@@ -78,6 +78,7 @@
     <div><b>6 bays at 16"</b><span>Steadyracks, cradle tops 82" low and 94" high; bay 3 is the e-bike</span></div>
     <div><b>60" x 20" transom</b><span>fixed glazing above the door, facing the yard</span></div>
     <div><b>141" roof top</b><span>highest point above the pad, at the front lip of the metal; 3" under the 12' line</span></div>
+    <div><b>6.7 ft to the house</b><span>from the shop's nearest corner, with the lawn 17.5 ft deep and the shop 3 ft off the wall; tape both before building</span></div>
   </div>
   <p class="lede">Drawings, dimensions and the write-up: <a href="bike-shed-site.html">bike-shed-site.html</a> and <a href="BIKE-SHED.md">BIKE-SHED.md</a> in the same folder.</p>
 </main>
@@ -310,17 +311,26 @@
   box(gOut, mat.spf, 100, -T - 1.5, Z0 + 58, 38, 1.5, 3.5);
   [[106, 62], [112, 58], [118, 66], [124, 54]].forEach(([x, hgt]) => { cyl(gOut, mat.handle, [x, -T - 3, 1], [x, -T - 3, hgt], 0.7); box(gOut, mat.steel, x - 3.5, -T - 4, 1, 7, 1.5, 8); });
 
-  // ---------- site, from the plat (page frame: u along Wesley in feet, v toward Matheson) ----------
+  // ---------- site (lot frame: u east along Wesley in feet, v north toward Matheson) ----------
+  // Lot lines are the 2012 plat's. The retaining wall is inside the lot, parallel to the Matheson line, with a planted
+  // bank and the sidewalk fence behind it. The wall, the old shed and the lawn depth are placed from the plat as
+  // corrected by two photos taken from the third-floor deck (docs/wesley-ave/photos/11 and 12).
   const LOT = [[0, 0], [114.36, 0], [114.29, 32.04], [83.45, 53.29], [75.73, 53.28], [40.57, 80.12], [40.55, 85.57], [13.07, 107.34], [-0.13, 107.34]];
   const HOUSE = [[7.3, 65.4], [35.7, 65.4], [35.7, 7.0], [20.9, 7.0], [20.9, 19.3], [12.3, 19.3], [12.3, 32.9], [7.3, 32.9]];
   const P6 = LOT[6], P7 = LOT[7];
   const dd = [P7[0] - P6[0], P7[1] - P6[1]], dl = Math.hypot(dd[0], dd[1]);
-  const e = [-dd[0] / dl, -dd[1] / dl], nin = [-dd[1] / dl, dd[0] / dl];
-  const WALL_T = 0.83, GAP = 3.0, SLIDE = 7.5 + L / 12;
-  const O = [P7[0] + nin[0] * (WALL_T + GAP) + e[0] * SLIDE, P7[1] + nin[1] * (WALL_T + GAP) + e[1] * SLIDE];
+  const e = [-dd[0] / dl, -dd[1] / dl], nin = [-dd[1] / dl, dd[0] / dl];       // along the wall toward the house; into the yard
+  const HOUSE_N = 65.4, LAWN = 17.5, CORNER_GAP = 1.0, GAP = 3.0, ALONG = 9.0;  // feet: the drawings page's slider defaults
+  const WALL_IN = 10, WALL_H = 84, BANK_RISE = 24;                               // inches
+  const SHED_BOT = HOUSE_N + LAWN, SHED_TOP = SHED_BOT + 10.1;
+  const F0 = [9.4 - nin[0] * CORNER_GAP, SHED_TOP - nin[1] * CORNER_GAP];       // wall face, nearest the old shed's back corner
+  const O = [F0[0] + nin[0] * GAP + e[0] * (ALONG + L / 12), F0[1] + nin[1] * GAP + e[1] * (ALONG + L / 12)];
   // right-handed site frame: x3 along the wall toward the old shed, y3 toward the yard, z up
   const toF = p => [-((p[0] - O[0]) * e[0] + (p[1] - O[1]) * e[1]) * 12, ((p[0] - O[0]) * nin[0] + (p[1] - O[1]) * nin[1]) * 12];
   const angF = v => Math.atan2(v[0] * nin[0] + v[1] * nin[1], -(v[0] * e[0] + v[1] * e[1]));
+  const sOf = p => (p[0] - F0[0]) * e[0] + (p[1] - F0[1]) * e[1];               // feet along the wall from F0, toward the house
+  const xOf = s => (ALONG + L / 12 - s) * 12;                                    // the same as a site x
+  mat.vine = M(0x33503a, { roughness: 1 }); mat.bark = M(0xb9a58c); mat.leaf = M(0xc8793a, { transparent: true, opacity: 0.38, roughness: 1, depthWrite: false });
 
   const site = grp('site');
   extrude(site, mat.turf, LOT.map(toF), null, 2, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -2.2, 0, 0, 0, 1]);
@@ -329,28 +339,50 @@
   const road = new THREE.Mesh(new THREE.BoxGeometry(170 * 12, 44 * 12, 2), mat.road); road.position.set(roadC[0], roadC[1], -1.4); road.rotation.z = roadA; road.receiveShadow = true; site.add(road);
   extrude(site, mat.house, HOUSE.map(toF), null, 336, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   extrude(site, mat.houseRoof, HOUSE.map(toF), null, 6, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 336, 0, 0, 0, 1]);
-  function wallSeg(a, b, kind) {
-    const A = toF(a), B = toF(b), dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
-    const nx = -dy / len, ny = dx / len;
-    const put = (off, thick, z0, h, m) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, thick, h), m);
-      mesh.position.set((A[0] + B[0]) / 2 + nx * off, (A[1] + B[1]) / 2 + ny * off, z0 + h / 2); mesh.rotation.z = ang;
-      mesh.castShadow = true; mesh.receiveShadow = true; site.add(mesh);
-    };
-    if (kind === 'wall') { put(5, 10, -2, 86, mat.concrete); put(-40, 80, -2, 86, mat.soil); put(-82, 4, 84, 1, mat.gravel); put(0.75, 1.5, 84, 72, mat.fence); }
-    else if (kind === 'fence') { put(0.75, 1.5, 0, 72, mat.fence); }
+  function seg(a, b, thick, z0, h, m, off) {      // a box along the lot-frame segment a to b; off shifts it sideways, inches
+    const A = toF(a), B = toF(b), dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, thick, h), m);
+    mesh.position.set((A[0] + B[0]) / 2 - dy / len * (off || 0), (A[1] + B[1]) / 2 + dx / len * (off || 0), z0 + h / 2); mesh.rotation.z = Math.atan2(dy, dx);
+    mesh.castShadow = true; mesh.receiveShadow = true; site.add(mesh); return mesh;
   }
-  for (let i = 2; i < 7; i++) wallSeg(LOT[i], LOT[i + 1], 'wall');
-  wallSeg(LOT[7], LOT[8], 'fence'); wallSeg(LOT[8], LOT[0], 'fence');
+  // retaining wall and its return, the bank behind it, the sidewalk fence, Matheson Ave
+  const yFace = -GAP * 12, yBack = yFace - WALL_IN, TOP = WALL_H + BANK_RISE;
+  const yLot = ((P7[0] - O[0]) * nin[0] + (P7[1] - O[1]) * nin[1]) * 12, yLot2 = ((LOT[5][0] - O[0]) * nin[0] + (LOT[5][1] - O[1]) * nin[1]) * 12;
+  const sW = (LOT[8][0] - F0[0]) / e[0], W0 = [F0[0] + e[0] * sW, F0[1] + e[1] * sW];
+  const xW = xOf(sW), xE = xOf(sOf([64.26, 51.46])), xJog = xOf(sOf(LOT[6])), xP7 = xOf(sOf(P7));
+  box(site, mat.concrete, xE, yBack, -2, xW - xE, WALL_IN, WALL_H + 2);
+  seg([0.42, W0[1]], [0.42, W0[1] - 8.6], WALL_IN, -2, WALL_H + 2, mat.concrete);
+  extrude(site, mat.soil, [[yLot, -2], [yBack, -2], [yBack, WALL_H], [yLot, TOP]], null, xW - xJog, P1(xJog, 0, 0));
+  extrude(site, mat.soil, [[yLot2, -2], [yBack, -2], [yBack, WALL_H], [yLot2, TOP]], null, xJog - xE, P1(xE, 0, 0));
+  box(site, mat.vine, xE, yBack - 6, WALL_H - 18, xOf(7) - xE, WALL_IN + 8, 30);                 // jasmine over the wall, from 7 ft past the old shed
+  box(site, mat.fence, xJog, yLot - 1.5, TOP, xP7 - xJog, 1.5, 72);
+  box(site, mat.fence, xE, yLot2 - 1.5, TOP, xJog - xE, 1.5, 72);
+  box(site, mat.fence, xJog - 0.75, yLot, TOP, 1.5, yLot2 - yLot, 72);
+  seg(LOT[7], LOT[8], 1.5, TOP, 72, mat.fence);
+  box(site, mat.concrete, xJog, yLot - 60, TOP - 4, xW - xJog + 120, 60, 4);
+  box(site, mat.concrete, xE, yLot - 60, TOP - 4, xJog - xE, yLot2 - yLot + 60, 4);
+  box(site, mat.road, xE - 60, yLot - 560, TOP - 7, xW - xE + 240, 500, 4);
+  // crepe myrtles on the bank: three leaning trunks and a light canopy each
+  [[5, 55, 250], [15, 70, 290], [27, 50, 270], [40, 75, 300], [52, 45, 260]].forEach(([s, back, h], i) => {
+    const x = xOf(s), y = yBack - back, z = WALL_H + BANK_RISE * back / (yBack - yLot);
+    [[-16, 22], [10, 34], [20, 6]].forEach(([dx, dy]) => cyl(site, mat.bark, [x, y, z], [x + dx, y + dy, z + h - 60], 2.2));
+    [[0, 26, 0, 46], [-30, 10, -22, 34], [26, 40, -14, 38]].forEach(([dx, dy, dz, r]) => { const c = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat.leaf); c.position.set(x + dx, y + dy, z + h + dz - 40); site.add(c); });
+  });
+  // fences at ground level: the west line, the wood fence south of the wall's end, the east side of the back yard
+  seg(LOT[8], LOT[0], 1.5, 0, 72, mat.fence, 0.75);
+  seg([64.26, 51.46], [65.0, 8.5], 1.5, 0, 72, mat.fence);
+  seg([53.6, 59.4], [53.6, 47.7], 1.5, 0, 72, mat.fence); seg([53.6, 47.7], [35.7, 47.7], 1.5, 0, 72, mat.fence);
+  seg([32.3, 67.6], [34.9, 67.6], 30, 0, 34, mat.steel);                                          // AC unit by the house wall
   (function existingShed() {
     const g = new THREE.Group(); site.add(g);
-    const nw = toF([1.2, 107.34 - 2.0]);
+    const nw = toF([1.2, SHED_TOP]);
     g.position.set(nw[0], nw[1], 0); g.rotation.z = angF([0, -1]);
     const Lx = 121.2, Wy = 98.4;
     extrude(g, mat.siding, [[0, 0], [Wy, 0], [Wy, 84], [0, 116]], null, Lx, P1(0, 0, 0));
     const ang = Math.atan2(32, Wy), rl = Math.hypot(Wy, 32) + 24;
     const roof = new THREE.Mesh(new THREE.BoxGeometry(Lx + 16, rl, 2), mat.metal); roof.position.set(Lx / 2, Wy / 2, 100 + 1.2); roof.rotation.x = -ang; roof.castShadow = true; g.add(roof);
-    box(g, mat.trim, Lx + 0.1, 8, 8, 1, 60, 80); box(g, mat.trim, Lx + 0.1, 12, 92, 1, 76, 1.5);
+    box(g, mat.trim, Lx + 0.1, 28, 8, 1, 60, 76); box(g, mat.trim, Lx + 0.1, 24, 86, 1, 68, 1.5);
+    box(g, mat.stoolw, Lx + 1, 36, 0, 35, 44, 4);                                                // the pallet ramp at the door
     box(g, mat.white, 40, Wy - 0.1, 50, 26, 0.7, 22); box(g, mat.white, 72, Wy - 0.1, 50, 26, 0.7, 22);
     box(g, mat.glass, 41, Wy, 51, 24, 0.5, 20); box(g, mat.glass, 73, Wy, 51, 24, 0.5, 20);
   })();
@@ -430,14 +462,14 @@
 
   // ---------- presets and toggles (site frame: x toward the old shed, y toward the yard) ----------
   const presets = {
-    hero: { az: 1.0, el: 0.4, r: 440, t: [72, 48, 60], fov: 42 },
-    balcony: { az: 2.175, el: 0.62, r: 433, t: [160, 70, 60], fov: 50 },
-    corner: { az: 2.10, el: 0.43, r: 217, t: [60, 60, 60], fov: 48 },
-    eye: { az: 1.507, el: 0.0, r: 283, t: [72, 48, 74], fov: 55 },
+    hero: { az: 0.83, el: 0.48, r: 431, t: [72, 48, 60], fov: 45 },                // from over the west fence
+    balcony: { az: 2.17, el: 0.995, r: 358, t: [120, 0, 0], fov: 85 },             // where the deck photos were taken, 25 ft up, wide lens
+    corner: { az: 0.339, el: 0.03, r: 181, t: [-20, 130, 62], fov: 65 },           // on the lawn by the old shed, looking at the gap to the house
+    eye: { az: 1.527, el: 0.0, r: 182, t: [72, 48, 70], fov: 72 },                 // back against the house wall
     inside: { az: 1.496, el: -0.02, r: 80, t: [60, 8, 68], fov: 80, doors: true },
     behind: { az: 3.1416, el: 0.06, r: 175, t: [165, -18, 62], fov: 68 },
-    framing: { az: 1.0, el: 0.4, r: 440, t: [72, 48, 60], fov: 42, skin: false, roof: false },
-    plan: { az: 1.571, el: 1.5, r: 900, t: [72, 48, 0], fov: 40 },
+    framing: { az: 0.83, el: 0.48, r: 431, t: [72, 48, 60], fov: 45, skin: false, roof: false },
+    plan: { az: 1.571, el: 1.5, r: 760, t: [60, 70, 0], fov: 40 },
   };
   const tSkin = document.getElementById('tSkin'), tRoof = document.getElementById('tRoof'), tBikes = document.getElementById('tBikes'),
     tFit = document.getElementById('tFit'), tSite = document.getElementById('tSite'), tDoors = document.getElementById('tDoors'), tSwing = document.getElementById('tSwing');

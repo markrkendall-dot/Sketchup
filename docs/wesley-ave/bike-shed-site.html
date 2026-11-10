@@ -6,7 +6,7 @@
   :root {
     --bg: #f4f3ee; --paper: #fbfaf6; --fg: #22291f; --muted: #6b7366; --rule: #c9cbc2;
     --shed: #5c6b52; --new: #b85c2a; --new-soft: #e8c7b1; --house: #9a948a; --wall: #8f8a80; --turf: #dfe6cf;
-    --bike: #2b2f2c; --bike-high: #7d8c7a; --ebike: #2d5fa6; --grid: #e2e4da;
+    --bike: #2b2f2c; --bike-high: #7d8c7a; --ebike: #2d5fa6; --grid: #e2e4da; --bank: #c9d3ad;
     --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   }
@@ -14,13 +14,13 @@
     :root:not([data-theme="light"]) {
       --bg: #1c1f1b; --paper: #242823; --fg: #e8eae2; --muted: #a0a89c; --rule: #4a4f46;
       --shed: #8fa183; --new: #e4915a; --new-soft: #5a3a27; --house: #6f6c66; --wall: #8a857c; --turf: #2d3a2a;
-      --bike: #e2e5dd; --bike-high: #8f9a8c; --ebike: #7fa6e6; --grid: #2e332d; color-scheme: dark;
+      --bike: #e2e5dd; --bike-high: #8f9a8c; --ebike: #7fa6e6; --grid: #2e332d; --bank: #37452f; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --bg: #1c1f1b; --paper: #242823; --fg: #e8eae2; --muted: #a0a89c; --rule: #4a4f46;
     --shed: #8fa183; --new: #e4915a; --new-soft: #5a3a27; --house: #6f6c66; --wall: #8a857c; --turf: #2d3a2a;
-    --bike: #e2e5dd; --bike-high: #8f9a8c; --ebike: #7fa6e6; --grid: #2e332d; color-scheme: dark;
+    --bike: #e2e5dd; --bike-high: #8f9a8c; --ebike: #7fa6e6; --grid: #2e332d; --bank: #37452f; color-scheme: dark;
   }
   body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); line-height: 1.5;
     padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -62,6 +62,10 @@
   .newshed { fill: var(--new-soft); stroke: var(--new); stroke-width: 2; }
   .overhang { fill: none; stroke: var(--new); stroke-width: 0.8; stroke-dasharray: 4 3; }
   .wallband { fill: var(--wall); stroke: none; }
+  .wallface { fill: var(--wall); stroke: var(--fg); stroke-width: 0.8; }
+  .bank { fill: var(--bank); stroke: none; }
+  .vine { fill: var(--shed); stroke: none; opacity: 0.9; }
+  .fenceline { fill: none; stroke: var(--fg); stroke-width: 1.3; stroke-dasharray: 1 4; stroke-linecap: round; }
   .sewer { fill: none; stroke: var(--fg); stroke-width: 1; stroke-dasharray: 10 4 2 4; }
   .dim { stroke: var(--fg); stroke-width: 0.8; fill: none; }
   .dim-new { stroke: var(--new); stroke-width: 0.9; fill: none; }
@@ -69,6 +73,7 @@
   .t-s { fill: var(--muted); font-size: 9.5px; }
   .t-new { fill: var(--new); font-size: 11px; font-weight: 500; }
   .t-b { fill: var(--fg); font-size: 12px; font-weight: 500; }
+  .t-on { fill: var(--paper); font-size: 10.5px; }
   .fr { fill: var(--paper); stroke: var(--fg); stroke-width: 1; }
   .lumber { fill: none; stroke: var(--fg); stroke-width: 0.9; }
   .lumber-f { fill: var(--grid); stroke: var(--fg); stroke-width: 0.9; }
@@ -94,23 +99,30 @@
   </header>
 
   <figure>
-    <h2>Site plan</h2>
+    <h2>Back yard plan</h2>
     <div class="controls" role="group" aria-label="Siting controls">
-      <label>Gap behind the existing shed (to the Matheson line)
-        <input type="range" id="gapBehind" min="0" max="12" step="0.5" value="2"> <output id="gapBehindOut">2.0 ft</output></label>
-      <label>New shed's gap to the retaining wall face
+      <label>Lawn depth: house wall to the old shed's front
+        <input type="range" id="lawn" min="14" max="22" step="0.5" value="17.5"> <output id="lawnOut">17.5 ft</output></label>
+      <label>Retaining wall to the old shed's back-right corner
+        <input type="range" id="cornerGap" min="0" max="4" step="0.25" value="1"> <output id="cornerGapOut">1.0 ft</output></label>
+      <label>New shop's gap to the retaining wall face
         <input type="range" id="newGap" min="1" max="6" step="0.5" value="3"> <output id="newGapOut">3.0 ft</output></label>
-      <label>New shed slid along the wall (from the end of the 13.19' flat segment)
-        <input type="range" id="slide" min="0" max="30" step="0.5" value="7.5"> <output id="slideOut">7.5 ft</output></label>
+      <label>New shop's near end, along the wall from the old shed's back corner
+        <input type="range" id="along" min="4" max="30" step="0.5" value="9"> <output id="alongOut">9.0 ft</output></label>
       <label>Length along the wall
         <input type="range" id="lenFt" min="10" max="12" step="1" value="12"> <output id="lenFtOut">12 ft</output></label>
       <label>Depth toward the yard
         <input type="range" id="depFt" min="7" max="12" step="1" value="8"> <output id="depFtOut">8 ft</output></label>
-      <label class="check"><input type="checkbox" id="snapCorner" checked> Back wall on the line from the existing shed's back corner, parallel to the wall</label>
     </div>
-    <div class="sheet"><svg id="site" role="img" aria-label="Site plan of the lot with the house, the existing shed and the proposed bike shed along the Matheson Avenue retaining wall"></svg></div>
+    <div class="sheet"><svg id="yard" role="img" aria-label="Enlarged plan of the back yard: the house wall, the existing shed, the retaining wall with the planted bank behind it, and the proposed bike shop along the wall, with the distances between them"></svg></div>
     <div class="readouts" id="readouts"></div>
-    <figcaption>To set the new shed out on site: run a string line from the existing shed's back-right corner parallel to the retaining wall (by the plat it sits about 3' off the wall face); that is the new shed's back wall. Measure along it from the corner to the near end (the second readout), then the length, and square the depth off toward the yard. Lot lines, bearings and distances are the plat's; arcs along Matheson are drawn as their chords. The house footprint is simplified from the plat. The existing shed is 8.2' x 10.1' on the plat, 1.2' off the west line; its gap to the Matheson line is the first slider. The retaining wall is drawn 10" thick on the right-of-way line. Page up is N6°05'W; true north is the arrow. The dashed outline around the new shed is its roof: 12" eaves at the front and ends, and a 26" cantilever at the back that stops 10" short of the wall face.</figcaption>
+    <figcaption>This plan was corrected on 10 November from two photos taken on the third-floor deck. The lot lines and the house are the 2012 plat's. The retaining wall is not on the Matheson lot line, as earlier versions of this page drew it: the plat shows it 11 ft inside the lot, parallel to the line, with a planted bank and the sidewalk fence behind it. The wall is drawn where the photos put it against the old shed: about 1 ft from its back-right corner and 8.9 ft from its front-right corner, square to the wall. The plat draws it about 2 ft further off. The lawn is drawn 17.5 ft deep from the photos; the plat scales to 16.4 ft. Earlier versions drew 30 ft, which was wrong. Both are sliders: set them to your tape and the readouts follow. Dashed around the new shop is its roof: 12" eaves at the front and ends, 26" toward the wall. Page up is N6°05'W; true north is the arrow.</figcaption>
+  </figure>
+
+  <figure>
+    <h2>The whole lot</h2>
+    <div class="sheet"><svg id="site" role="img" aria-label="Plan of the whole lot from the plat: Wesley Avenue at the bottom, Matheson Avenue along the diagonal, the house, the retaining wall inside the lot, the existing shed and the proposed bike shop"></svg></div>
+    <figcaption>Lot lines, bearings and distances are the plat's; arcs along Matheson are drawn as their chords. The house footprint is simplified. The retaining wall runs from the west line to the wood fence east of the back yard, with a short return down the west line behind the old shed. Dotted lines are fences.</figcaption>
   </figure>
 
   <figure>
@@ -161,10 +173,11 @@
   <section>
     <h2>Still to confirm on site</h2>
     <ul>
-      <li>Tape from the existing shed's front-right corner straight across to the retaining wall, and the gap behind the shed; set the first slider to the gap and compare the wedge readout with the tape.</li>
-      <li>Tape the clear wall length from the sawhorse corner toward the house; the shop needs about 12' of it starting about 9' along the string line.</li>
-      <li>Ask Charlotte Planning which setback applies at the Matheson right of way before fixing the 36" gap. The 12' rule is the state building code; zoning is separate.</li>
-      <li>While asking, confirm that a roof edge 10" off the wall face is an acceptable projection; the floor stays 12' x 8' either way, and the gutter keeps the roof's water out of the gap.</li>
+      <li>Tape the lawn from the house wall to the old shed's front (drawn 17.5 ft; the plat scales to 16.4 ft) and set the first slider.</li>
+      <li>Tape from the old shed's front-right corner square across to the retaining wall (drawn 8.9 ft) and from its back-right corner (drawn 1 ft); set the second slider until the wedge readout matches.</li>
+      <li>Stake the shop's four corners: back wall 3 ft off the wall face, near end 9 ft along the wall from the old shed's back corner. Walk it before buying lumber: the house-end front corner lands about 6.7 ft from the house wall.</li>
+      <li>The Matheson lot line is 11 to 13 ft behind the wall, so the shop sits about 15 ft inside it. Ask Charlotte Planning to confirm that no street-side rule reaches that far. The 12' rule is the state building code; zoning is separate.</li>
+      <li>The roof's back edge sits under the jasmine and the crepe myrtles on the bank: plan on a gutter guard, trim the vine back along the shop, and expect to prune branches over the roof. The gutter can be cleaned from the bank.</li>
     </ul>
   </section>
 </main>
@@ -197,45 +210,52 @@
     return g;
   }
 
-  /* ---------------- Site plan (feet, page frame: u along Wesley, v toward Matheson) ---------------- */
+  /* ---------------- Site plans (feet, lot frame: u east along Wesley, v north toward Matheson) ---------------- */
+  // Lot lines: the 2012 plat's bearings and distances. House: the plat's dimensions. Retaining wall, old shed and
+  // lawn depth: the plat's drawing corrected by two photos taken from the third-floor deck (see the caption).
   const LOT = [[0, 0], [114.36, 0], [114.29, 32.04], [83.45, 53.29], [75.73, 53.28], [40.57, 80.12], [40.55, 85.57], [13.07, 107.34], [-0.13, 107.34]];
   const HOUSE = [[7.3, 65.4], [35.7, 65.4], [35.7, 7.0], [20.9, 7.0], [20.9, 19.3], [12.3, 19.3], [12.3, 32.9], [7.3, 32.9]];
-  const S = 10, U0 = -24, U1 = 134, V0 = -18, V1 = 126;
-  const W = (U1 - U0) * S, H = (V1 - V0) * S;
-  const X = u => (u - U0) * S, Y = v => (V1 - v) * S;
-  const P = a => a.map(q => X(q[0]) + ',' + Y(q[1])).join(' ');
   const add = (a, b, k) => [a[0] + b[0] * (k == null ? 1 : k), a[1] + b[1] * (k == null ? 1 : k)];
-  const WALL_T = 0.83;
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+  const WALL_T = 0.83, HOUSE_N = 65.4, SHED_U0 = 1.2, SHED_U1 = 9.4, SHED_D = 10.1, WALL_END = [64.26, 51.46], RETURN = 8.6;
   function edgeFrame(a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); const d = [dx / L, dy / L]; return { d, nin: [-d[1], d[0]], L }; }
   const P7 = LOT[7], P6 = LOT[6];
   const seg = edgeFrame(P6, P7);
-  const e = [-seg.d[0], -seg.d[1]];
-  const nin = seg.nin;
+  const e = [-seg.d[0], -seg.d[1]];   // along the retaining wall, toward the house
+  const nin = seg.nin;                 // square to the wall, into the yard
+  const WALL_ANG = Math.atan2(-e[1], e[0]) * 180 / Math.PI;   // screen angle of the wall, for labels
 
-  function drawSite() {
-    const gapBehind = +document.getElementById('gapBehind').value;
-    const slide = +document.getElementById('slide').value;
-    const LEN = +document.getElementById('lenFt').value;
-    const DEP = +document.getElementById('depFt').value;
-    const top = 107.34 - gapBehind, bot = top - 10.1;
-    const cornerNE = [9.4, top];
-    const cornerDist = (cornerNE[0] - P7[0]) * nin[0] + (cornerNE[1] - P7[1]) * nin[1] - WALL_T;
-    const snap = document.getElementById('snapCorner').checked;
-    const gapSlider = document.getElementById('newGap');
-    gapSlider.disabled = snap;
-    const newGap = snap ? Math.max(0.5, cornerDist) : +gapSlider.value;
-    if (snap) gapSlider.value = String(Math.round(newGap * 2) / 2);
-    document.getElementById('gapBehindOut').value = f1(gapBehind) + ' ft';
-    document.getElementById('newGapOut').value = f1(newGap) + ' ft';
-    document.getElementById('slideOut').value = f1(slide) + ' ft';
-    document.getElementById('lenFtOut').value = LEN + ' ft';
-    document.getElementById('depFtOut').value = DEP + ' ft';
-    const svg = document.getElementById('site');
+  function siteModel() {
+    const val = id => +document.getElementById(id).value;
+    const lawn = val('lawn'), cornerGap = val('cornerGap'), newGap = val('newGap'), along = val('along'), LEN = val('lenFt'), DEP = val('depFt');
+    const bot = HOUSE_N + lawn, top = bot + SHED_D;
+    const NE = [SHED_U1, top], SE = [SHED_U1, bot];
+    const F0 = add(NE, nin, -cornerGap);                       // the wall face's nearest point to the old shed's back corner
+    const sWest = (LOT[8][0] - F0[0]) / e[0], sEnd = dot(sub(WALL_END, F0), e);
+    const W0 = add(F0, e, sWest), W1 = add(F0, e, sEnd);
+    const pSE = dot(sub(SE, F0), nin), sSE = dot(sub(SE, F0), e);
+    const A = add(add(F0, e, along), nin, newGap), B = add(A, e, LEN), C = add(B, nin, DEP), D = add(A, nin, DEP);
+    let houseClear = Infinity, hc = null;
+    [A, B, C, D].forEach(q => { const hu = Math.min(35.7, Math.max(7.3, q[0])); const d = Math.hypot(q[0] - hu, q[1] - HOUSE_N); if (d < houseClear) { houseClear = d; hc = [q, [hu, HOUSE_N]]; } });
+    const lotGap = -dot(sub(P7, A), nin);
+    return { lawn, cornerGap, newGap, along, LEN, DEP, bot, top, NE, SE, F0, W0, W1, pSE, sSE, A, B, C, D, houseClear, hc, lotGap, walk: along - sSE, cross: pSE / Math.abs(nin[0]) };
+  }
+
+  function drawPlanView(svgId, vw, m) {
+    const svg = document.getElementById(svgId);
     clear(svg);
+    const S = vw.S, X = u => (u - vw.U0) * S, Y = v => (vw.V1 - v) * S;
+    const W = (vw.U1 - vw.U0) * S, H = (vw.V1 - vw.V0) * S, big = !!vw.detail;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const P = a => a.map(q => X(q[0]) + ',' + Y(q[1])).join(' ');
+    const line = (a, b, cls, style) => el(svg, 'line', Object.assign({ x1: X(a[0]), y1: Y(a[1]), x2: X(b[0]), y2: Y(b[1]), 'class': cls }, style ? { style } : {}));
+    const label = (q, s, cls, rot, anchor) => textAt(svg, X(q[0]), Y(q[1]), s, cls || 't-s', anchor || 'middle', rot || 0);
+    const dim = (a, b, s, off, cls, tcls) => dimLine(svg, X(a[0]), Y(a[1]), X(b[0]), Y(b[1]), s, cls || 'dim-new', tcls || 't-new', off);
 
-    el(svg, 'rect', { x: X(U0), y: Y(-4), width: W, height: 12 * S, 'class': 'ground' });
-    textAt(svg, X(57), Y(-10.5), 'WESLEY AVENUE', 't-b');
+    // streets
+    el(svg, 'rect', { x: X(vw.U0), y: Y(-4), width: W, height: 12 * S, 'class': 'ground' });
+    if (!big) label([57, -10.5], 'WESLEY AVENUE', 't-b');
     const bandPts = [];
     for (let i = 2; i <= 7; i++) {
       const prev = LOT[i - 1], cur = LOT[i], next = LOT[i + 1];
@@ -246,108 +266,128 @@
       const L = Math.hypot(nx, ny) || 1;
       bandPts.push([cur[0] + nx / L * 10, cur[1] + ny / L * 10]);
     }
+    bandPts.push(add(bandPts[bandPts.length - 1], e, -30));
     el(svg, 'polyline', { points: P(bandPts), style: `fill:none;stroke:var(--grid);stroke-width:${12 * S}px;stroke-linejoin:round;stroke-linecap:butt` });
-    textAt(svg, X(74), Y(86.5), 'MATHESON AVENUE', 't-b', 'middle', -37);
-    textAt(svg, X(77), Y(83.5), 'sidewalk 6 to 7 ft above the yard', 't-s', 'middle', -37);
+    if (big) { label([33, 101.5], 'MATHESON AVENUE', 't-b', WALL_ANG); label([30.2, 98.6], 'sidewalk, then the wood fence on the lot line', 't-s', WALL_ANG); }
+    else { label([78, 76], 'MATHESON AVENUE', 't-b', WALL_ANG); }
 
+    // the lot, the bank behind the wall, the wall with its return
     el(svg, 'polygon', { points: P(LOT), 'class': 'lot' });
-    for (let i = 2; i < 7; i++) {
-      const a = LOT[i], b = LOT[i + 1], fr = edgeFrame(a, b);
-      el(svg, 'polygon', { points: P([a, b, add(b, fr.nin, WALL_T), add(a, fr.nin, WALL_T)]), 'class': 'wallband' });
-    }
-    textAt(svg, X(53), Y(60.5), 'concrete retaining wall on the right-of-way line', 't-s', 'middle', -37);
-    textAt(svg, X(57), Y(-2.6), "N83°55'E  114.36'", 't-s');
-    textAt(svg, X(117.5), Y(16), "N6°13'W 32.04'", 't-s', 'middle', -90);
-    textAt(svg, X(-2.6), Y(54), "S6°10'E  107.35'  (board fence)", 't-s', 'middle', -90);
-    textAt(svg, X(6.5), Y(109.2), "13.19'", 't-s');
-    const chord = (i, s) => { const a = LOT[i], b = LOT[i + 1], fr = edgeFrame(a, b); textAt(svg, X((a[0] + b[0]) / 2 - fr.nin[0] * 2.2), Y((a[1] + b[1]) / 2 - fr.nin[1] * 2.2), s, 't-s', 'middle', -Math.atan2(fr.d[1], fr.d[0]) * 180 / Math.PI + 180); };
-    chord(2, "arc 37.45'  R 1470.39'");
-    chord(4, "arc 44.24'  R 1529.08'");
-    chord(6, "arc 35.07'  new R/W");
-    textAt(svg, X(79.5), Y(55.6), "7.73'", 't-s');
-    textAt(svg, X(43.3), Y(82.8), "5.44'", 't-s');
+    const f54 = edgeFrame(LOT[5], LOT[4]);
+    const Qr = add(LOT[5], f54.d, dot(sub(m.W1, LOT[5]), f54.d));
+    el(svg, 'polygon', { points: P([m.W0, LOT[8], LOT[7], LOT[6], LOT[5], Qr, m.W1]), 'class': 'bank' });
+    el(svg, 'polygon', { points: P([m.W0, m.W1, add(m.W1, nin, -WALL_T), add(m.W0, nin, -WALL_T)]), 'class': 'wallface' });
+    el(svg, 'polygon', { points: P([[0, m.W0[1]], [WALL_T, m.W0[1] - 0.6], [WALL_T, m.W0[1] - RETURN], [0, m.W0[1] - RETURN]]), 'class': 'wallface' });
+    // fences: Matheson side, west side, the wood fence south of the wall's end, the east side of the back yard
+    el(svg, 'polyline', { points: P([LOT[8], LOT[7], LOT[6], LOT[5], LOT[4], LOT[3], LOT[2]]), 'class': 'fenceline' });
+    line(LOT[8], LOT[0], 'fenceline');
+    line(m.W1, [65.0, 8.5], 'fenceline');
+    const sE = (53.6 - m.F0[0]) / e[0], E0 = add(m.F0, e, sE);
+    el(svg, 'polyline', { points: P([E0, [53.6, 47.7], [35.7, 47.7]]), 'class': 'fenceline' });
 
+    // house, AC unit, sewer
     el(svg, 'polygon', { points: P(HOUSE), 'class': 'house' });
-    textAt(svg, X(24), Y(47), 'house #2926', 't-b');
-    textAt(svg, X(24), Y(43.5), 'three storeys, footprint simplified', 't-s');
-    textAt(svg, X(21.5), Y(67.2), "28.4'", 't-s');
-    textAt(svg, X(37.4), Y(36), "58.4'", 't-s', 'middle', -90);
-    textAt(svg, X(28.3), Y(4), "7.0' to the right of way", 't-s');
-    el(svg, 'line', { x1: X(51), y1: Y(-4), x2: X(51), y2: Y(72.2), 'class': 'sewer' });
-    textAt(svg, X(52.8), Y(30), 'sewer line (plat)', 't-s', 'middle', -90);
+    el(svg, 'rect', { x: X(32.3), y: Y(68.9), width: 2.6 * S, height: 2.6 * S, 'class': 'fr' });
+    line([49.5, -4], [49.5, 60.5], 'sewer');
 
-    el(svg, 'rect', { x: X(1.2), y: Y(top), width: 8.2 * S, height: 10.1 * S, 'class': 'shed' });
-    const lineEnd = add(cornerNE, e, 40);
-    el(svg, 'line', { x1: X(cornerNE[0]), y1: Y(cornerNE[1]), x2: X(lineEnd[0]), y2: Y(lineEnd[1]), 'class': 'swing', style: 'stroke:var(--new)' });
-    const lt = add(add(cornerNE, e, 33), nin, -1.6);
-    textAt(svg, X(lt[0]), Y(lt[1]), 'string line from the shed corner, parallel to the wall', 't-s', 'middle', -Math.atan2(e[1], e[0]) * 180 / Math.PI);
-    el(svg, 'line', { x1: X(3.0), y1: Y(bot), x2: X(7.6), y2: Y(bot), 'class': 'fr', 'stroke-width': 3 });
-    textAt(svg, X(5.3), Y(bot - 2.6), 'existing shed', 't-s');
-    textAt(svg, X(5.3), Y(bot - 4.8), "8.2' x 10.1'", 't-s');
+    // the existing shed, its door and ramp
+    el(svg, 'rect', { x: X(SHED_U0), y: Y(m.top), width: (SHED_U1 - SHED_U0) * S, height: SHED_D * S, 'class': 'shed' });
+    line([3.5, m.bot], [7.5, m.bot], 'fr', 'stroke-width:3px');
+    el(svg, 'rect', { x: X(3.6), y: Y(m.bot), width: 3.7 * S, height: 2.9 * S, 'class': 'swing' });
 
-    const Q = add(add(P7, nin, WALL_T + newGap), e, slide);
-    const A = Q, B = add(Q, e, LEN), C = add(B, nin, DEP), D = add(Q, nin, DEP);
+    // the new shop: roof outline, footprint, door, six hung bikes
+    const A = m.A, B = m.B, C = m.C, D = m.D;
     el(svg, 'polygon', { points: P([add(add(A, e, -1), nin, -2.167), add(add(B, e, 1), nin, -2.167), add(add(C, e, 1), nin, 1), add(add(D, e, -1), nin, 1)]), 'class': 'overhang' });
     el(svg, 'polygon', { points: P([A, B, C, D]), 'class': 'newshed' });
-    const j1 = add(D, e, 1.0), j2 = add(D, e, 6.17);
-    el(svg, 'line', { x1: X(j1[0]), y1: Y(j1[1]), x2: X(j2[0]), y2: Y(j2[1]), 'class': 'fr', 'stroke-width': 3 });
-    [j1, j2].forEach(j => { const k = add(j, nin, 2.5); el(svg, 'line', { x1: X(j[0]), y1: Y(j[1]), x2: X(k[0]), y2: Y(k[1]), 'class': 'dim-new' }); });
+    const dl = m.LEN / 2 - 2.583, j1 = add(D, e, dl), j2 = add(D, e, dl + 5.167);
+    line(j1, j2, 'fr', 'stroke-width:3px');
+    [j1, j2].forEach(j => line(j, add(j, nin, 2.5), 'dim-new'));
     [20, 36, 52, 68, 84, 100].forEach((c, i) => {
       const cf = (3.5 + c) / 12, bar = 4.11, low = i % 2 === 0;
-      const s0 = add(add(A, e, cf), nin, 0.35), s1 = add(add(A, e, cf), nin, bar);
-      const b0 = add(add(A, e, cf - 1.28), nin, bar), b1 = add(add(A, e, cf + 1.28), nin, bar);
+      if (cf + 1.3 > m.LEN) return;
       const cls = i === 2 ? 'ebike-o' : (low ? 'bike-o' : 'bike-high-o');
-      el(svg, 'line', { x1: X(s0[0]), y1: Y(s0[1]), x2: X(s1[0]), y2: Y(s1[1]), 'class': cls });
-      el(svg, 'line', { x1: X(b0[0]), y1: Y(b0[1]), x2: X(b1[0]), y2: Y(b1[1]), 'class': cls });
+      line(add(add(A, e, cf), nin, 0.35), add(add(A, e, cf), nin, Math.min(bar, m.DEP - 0.4)), cls);
+      line(add(add(A, e, cf - 1.28), nin, Math.min(bar, m.DEP - 0.4)), add(add(A, e, cf + 1.28), nin, Math.min(bar, m.DEP - 0.4)), cls);
     });
-    if (DEP >= 10) {
-      const st = add(add(A, e, LEN - 2.8), nin, DEP - 4.0);
-      el(svg, 'circle', { cx: X(st[0]), cy: Y(st[1]), r: 1.25 * S, 'class': 'swing' });
-      const bk0 = add(st, nin, -3.3), bk1 = add(st, nin, 3.3);
-      el(svg, 'line', { x1: X(bk0[0]), y1: Y(bk0[1]), x2: X(bk1[0]), y2: Y(bk1[1]), 'class': 'swing' });
-    }
-    const lab = [Math.max(10.5, D[0] - 2), Math.min(C[1], D[1]) - 3.2];
-    textAt(svg, X(lab[0]), Y(lab[1]), `new bike shop ${LEN}' x ${DEP}'`, 't-new', 'start');
-    textAt(svg, X(lab[0]), Y(lab[1] - 2.4), 'door and transom to the yard; roof pitched to the wall, covering the strip behind', 't-s', 'start');
 
-    const corner = [9.4, bot];
-    const L0 = add(P7, nin, WALL_T);
-    const wv = [corner[0] - L0[0], corner[1] - L0[1]];
-    const wedge = wv[0] * nin[0] + wv[1] * nin[1];
-    const along = wv[0] * e[0] + wv[1] * e[1];
-    const foot = add(L0, e, along);
-    el(svg, 'line', { x1: X(corner[0]), y1: Y(corner[1]), x2: X(foot[0]), y2: Y(foot[1]), 'class': 'swing', style: 'stroke:var(--new)' });
-    const lf = add(foot, nin, -2.6);
-    textAt(svg, X(lf[0]), Y(lf[1]), f1(wedge) + ' ft', 't-new');
-    let gapSheds = Infinity, gapPt = null;
-    [A, D].forEach(q => { const g = q[0] - 9.4; if (g < gapSheds) { gapSheds = g; gapPt = q; } });
-    if (gapPt) dimLine(svg, X(9.4), Y(gapPt[1]), X(gapPt[0]), Y(gapPt[1]), f1(gapSheds) + ' ft', 'dim-new', 't-new', gapPt === D ? -9 : 9);
-    dimLine(svg, X(34.5), Y(bot), X(34.5), Y(65.4), f1(bot - 65.4) + ' ft of yard, shed to house', 'dim', 't', -9);
-    const frontToHouse = Math.min(C[1], D[1]) - 65.4;
-    const alongLine = (A[0] - cornerNE[0]) * e[0] + (A[1] - cornerNE[1]) * e[1];
-    const offLine = (A[0] - cornerNE[0]) * nin[0] + (A[1] - cornerNE[1]) * nin[1];
+    if (big) {
+      // labels
+      label([5.3, m.bot + 6.2], 'existing shed', 't-on'); label([5.3, m.bot + 5.0], "8.2' x 10.1'", 't-on'); label([5.3, m.bot + 0.7], 'door', 't-on');
+      label([21.5, 61.2], 'house, north wall (three storeys; 3rd-floor deck above)', 't-b');
+      label([36.6, 67.4], 'AC', 't-s', 0, 'start');
+      label(add(add(m.F0, e, 30), nin, -5.6), 'planted bank rising to the fence: crepe myrtles, jasmine over the wall', 't-s', WALL_ANG);
+      label(add(add(m.F0, e, 34), nin, 1.5), 'concrete retaining wall, about 7 ft high', 't-s', WALL_ANG);
+      label(add(add(A, e, m.LEN / 2), nin, m.DEP * 0.66), `bike shop ${m.LEN}' x ${m.DEP}'`, 't-new', WALL_ANG);
+      label(add(add(A, e, m.LEN / 2), nin, m.DEP * 0.66 + 1.25), 'door and transom to the yard', 't-s', WALL_ANG);
+      // where the deck photos were taken
+      const cam = [m.SE[0] + 6.2, m.bot - 14.5];
+      el(svg, 'circle', { cx: X(cam[0]), cy: Y(cam[1]), r: 5, 'class': 'rack' });
+      label([cam[0] - 0.6, cam[1] + 0.25], 'photos taken from', 't-s', 0, 'end'); label([cam[0] - 0.6, cam[1] - 0.75], 'the deck above here', 't-s', 0, 'end');
+      // dimensions MK can tape
+      const foot = add(m.SE, nin, -m.pSE);
+      line(m.SE, foot, 'swing', 'stroke:var(--new)');
+      label(add(add(m.SE, nin, -m.pSE / 2), e, 1.0), f1(m.pSE) + ' ft', 't-new', WALL_ANG - 90);
+      const wEnd = add(m.SE, e, m.walk);
+      if (m.walk > 0.6) dim(m.SE, wEnd, f1(m.walk) + ' ft', -9);
+      dim(m.hc[0], m.hc[1], f1(m.houseClear) + ' ft', 12);
+      dim([8.4, m.bot], [8.4, HOUSE_N], f1(m.lawn) + ' ft lawn', 9, 'dim', 't');
+      const mid = add(A, e, m.LEN * 0.72);
+      dim(mid, add(mid, nin, -m.lotGap), f1(m.lotGap) + ' ft to the lot line', 9, 'dim', 't');
+      dim(add(B, e, 0.8), add(add(B, e, 0.8), nin, -m.newGap), f1(m.newGap) + ' ft', -9);
+      dim(add(m.F0, nin, -2.0), add(add(m.F0, nin, -2.0), e, m.along), f1(m.along) + ' ft along the wall', 9, 'dim', 't');
+      el(svg, 'line', { x1: X(-4.5), y1: Y(58), x2: X(5.5), y2: Y(58), 'class': 'dim', 'stroke-width': 2 });
+      label([0.5, 56.6], '10 ft', 't');
+    } else {
+      label(add(add(m.F0, e, 44), nin, 2.4), 'retaining wall, inside the lot', 't-s', WALL_ANG);
+      label([57, -2.6], "N83°55'E  114.36'", 't-s');
+      label([117.5, 16], "N6°13'W 32.04'", 't-s', -90);
+      label([-2.6, 54], "S6°10'E  107.35'  (board fence)", 't-s', -90);
+      label([6.5, 109.2], "13.19'", 't-s');
+      const chord = (i, s) => { const a = LOT[i], b = LOT[i + 1], fr = edgeFrame(a, b); label([(a[0] + b[0]) / 2 - fr.nin[0] * 2.2, (a[1] + b[1]) / 2 - fr.nin[1] * 2.2], s, 't-s', -Math.atan2(fr.d[1], fr.d[0]) * 180 / Math.PI + 180); };
+      chord(2, "arc 37.45'  R 1470.39'");
+      chord(4, "arc 44.24'  R 1529.08'");
+      chord(6, "arc 35.07'  new R/W");
+      label([79.5, 55.6], "7.73'", 't-s');
+      label([43.3, 82.8], "5.44'", 't-s');
+      label([24, 47], 'house #2926', 't-b');
+      label([24, 43.5], 'three storeys, footprint simplified', 't-s');
+      label([21.5, 62.6], "28.4'", 't-s');
+      label([37.4, 36], "58.4'", 't-s', -90);
+      label([28.3, 4], "7.0' to the right of way", 't-s');
+      label([51.3, 26], 'sewer line (plat)', 't-s', -90);
+      label([66.8, 30], 'wood fence (plat)', 't-s', -90);
+      label([5.3, m.bot - 2.0], 'existing shed', 't-s');
+      label([Math.max(C[0], B[0]) + 1.5, Math.min(C[1], D[1]) + 1.5], `new bike shop ${m.LEN}' x ${m.DEP}'`, 't-new', 0, 'start');
+      el(svg, 'line', { x1: X(-20), y1: Y(-13), x2: X(0), y2: Y(-13), 'class': 'dim', 'stroke-width': 2 });
+      label([-10, -15.6], '20 ft', 't-s');
+    }
+    // north arrow
+    const nx = X(big ? 42.5 : 122), ny = Y(big ? 62 : 104), k = big ? 0.8 : 1;
+    const g = el(svg, 'g', { transform: `rotate(6.1 ${nx} ${ny})` });
+    el(g, 'line', { x1: nx, y1: ny + 60 * k, x2: nx, y2: ny - 50 * k, 'class': 'dim' });
+    el(g, 'polygon', { points: `${nx},${ny - 60 * k} ${nx - 7},${ny - 40 * k} ${nx + 7},${ny - 40 * k}`, fill: 'currentColor' });
+    textAt(g, nx, ny - 66 * k, 'N', 't-b');
+  }
+
+  function drawSite() {
+    const m = siteModel();
+    [['lawn', f1(m.lawn)], ['cornerGap', f1(m.cornerGap)], ['newGap', f1(m.newGap)], ['along', f1(m.along)], ['lenFt', String(m.LEN)], ['depFt', String(m.DEP)]].forEach(q => { document.getElementById(q[0] + 'Out').value = q[1] + ' ft'; });
+    drawPlanView('yard', { U0: -6, U1: 46, V0: 55, V1: 111, S: 22, detail: true }, m);
+    drawPlanView('site', { U0: -24, U1: 134, V0: -18, V1: 126, S: 10, detail: false }, m);
     const ro = document.getElementById('readouts');
     ro.innerHTML = '';
-    [[f1(cornerDist) + ' ft', 'string line to the wall face: the line from the existing shed’s back corner, parallel to the wall'],
-     [f1(alongLine) + ' ft', 'along that line from the shed corner to the new shed’s near back corner' + (Math.abs(offLine) > 0.05 ? ' (new shed is ' + f1(Math.abs(offLine)) + ' ft ' + (offLine > 0 ? 'inside' : 'outside') + ' the line)' : '')],
-     [f1(wedge) + ' ft', 'wedge width: existing shed front corner to the wall face, square to the wall'],
-     [f1(gapSheds) + ' ft', 'gap between the existing shed and the new shed, at its nearest corner'],
-     [f1(bot - 65.4) + ' ft', 'yard depth: existing shed front to the house'],
-     [f1(frontToHouse) + ' ft', 'new shed’s nearest front corner to the house'],
-     [(LEN * DEP) + ' sq ft', 'footprint outside the studs; the permit exemption allows 12 ft in any direction']].forEach(r => {
+    [[f1(m.pSE) + ' ft', 'wedge: the old shed’s front-right corner square across to the retaining wall'],
+     [f1(m.cross) + ' ft', 'the same corner to the wall, measured along the old shed’s front line'],
+     [f1(m.walk) + ' ft', 'walkway between the old shed’s front corner and the new shop’s end wall'],
+     [f1(m.houseClear) + ' ft', 'the new shop’s nearest corner to the house wall'],
+     [f1(m.lawn) + ' ft', 'lawn depth: the house wall to the old shed’s front'],
+     [f1(m.lotGap) + ' ft', 'the new shop’s back wall to the Matheson lot line'],
+     [(m.LEN * m.DEP) + ' sq ft', 'footprint outside the studs; the permit exemption allows 12 ft in any direction']].forEach(r => {
       const d = document.createElement('div'); const b = document.createElement('b'); b.textContent = r[0];
       const s = document.createElement('span'); s.textContent = r[1]; d.appendChild(b); d.appendChild(s); ro.appendChild(d);
     });
-
-    const nx = X(122), ny = Y(104);
-    const g = el(svg, 'g', { transform: `rotate(6.1 ${nx} ${ny})` });
-    el(g, 'line', { x1: nx, y1: ny + 60, x2: nx, y2: ny - 50, 'class': 'dim' });
-    el(g, 'polygon', { points: `${nx},${ny - 60} ${nx - 7},${ny - 40} ${nx + 7},${ny - 40}`, fill: 'currentColor' });
-    textAt(g, nx, ny - 66, 'N', 't-b');
-    el(svg, 'line', { x1: X(-20), y1: Y(-13), x2: X(0), y2: Y(-13), 'class': 'dim', 'stroke-width': 2 });
-    textAt(svg, X(-10), Y(-15.6), '20 ft', 't-s');
   }
-  ['gapBehind', 'newGap', 'slide', 'lenFt', 'depFt', 'snapCorner'].forEach(id => document.getElementById(id).addEventListener('input', drawSite));
+  ['lawn', 'cornerGap', 'newGap', 'along', 'lenFt', 'depFt'].forEach(id => document.getElementById(id).addEventListener('input', drawSite));
   drawSite();
 
   /* ---------------- Shop geometry (inches) ---------------- */
@@ -368,7 +408,7 @@
     const DOOR0 = 41, DOOR1 = 103;
     // behind the back wall: the retaining wall, the roof edge with its gutter, the hook rails of the covered strip
     r(-24, -WALL_GAP - 10, OUT + 48, 10, 'concrete');
-    textAt(svg, x(72), y(-WALL_GAP - 13), 'concrete retaining wall, 84 in high, on the right-of-way line; the 36 in gap is a placeholder', 't-s');
+    textAt(svg, x(72), y(-WALL_GAP - 13), 'retaining wall, about 84 in high, jasmine over it; planted bank behind, lot line 11 ft back', 't-s');
     r(-12, -BACK_OH - 6.5, OUT + 24, 5, 'swing');
     r(-12, -BACK_OH - 1.5, OUT + 24, 1.5, 'lumber');
     r(-12, OUTD + FRONT_OH, OUT + 24, 1.5, 'lumber');
@@ -423,7 +463,7 @@
     dimLine(svg, x(OUT + 16), y(3.5), x(OUT + 16), y(OUTD - 3.5), '89 in interior', 'dim', 't', 8);
     dimLine(svg, x(OUT + 6), y(5.25), x(OUT + 6), y(5.25 + BIKE.barH), '44.1 in (1,120 mm)', 'dim-new', 't-new', 8);
     dimLine(svg, x(OUT + 6), y(5.25 + BIKE.barH), x(OUT + 6), y(OUTD - 3.5), '43 in clear', 'dim', 't', 8);
-    dimLine(svg, x(103.5 - BIKE.bar / 2), y(5.25 + BIKE.barH + 4), x(103.5 + BIKE.bar / 2), y(5.25 + BIKE.barH + 4), '780 mm bar', 'dim', 't-s', -11);
+    dimLine(svg, x(87.5 - BIKE.bar / 2), y(5.25 + BIKE.barH + 4), x(87.5 + BIKE.bar / 2), y(5.25 + BIKE.barH + 4), '780 mm bar', 'dim', 't-s', -11);
     dimLine(svg, x(DOOR0), y(OUTD + 36), x(DOOR1), y(OUTD + 36), 'door RO 62 in, two 30.75 in leaves; transom 60 x 20 in above', 'dim', 't', -7);
     dimLine(svg, x(3.5), y(OUTD + 46), x(OUT - 3.5), y(OUTD + 46), '137 in interior', 'dim', 't', 6);
     dimLine(svg, x(-18), y(-WALL_GAP), x(-18), y(-T), '36 in gap', 'dim-new', 't-new', -8);
@@ -484,8 +524,10 @@
     const F0 = 9.75, Sl = (HF - HB) / (OUTD - 3.5), DV = 5.5 * Math.sqrt(1 + Sl * Sl);
     const vu = u => HB + Sl * (u - 3.5), vt = u => vu(u) + DV;
     r(-66, -12, 66 + OUTD + 26, 8, 'ground'); r(-WALL_GAP, -4, OUTD + WALL_GAP + 12, 4, 'ground');
-    r(-66, -4, 20, 88, 'ground'); r(-46, -4, 10, 88, 'concrete'); r(-46, 84, 1.5, 72, 'lumber-f');
-    textAt(svg, y(-64), z(90), 'Matheson sidewalk', 't-s', 'start'); textAt(svg, y(-64), z(86), 'and fence above', 't-s', 'start');
+    el(svg, 'polygon', { points: [[-66, -4], [-46, -4], [-46, 84], [-66, 90]].map(p => y(p[0]) + ',' + z(p[1])).join(' '), 'class': 'ground' });
+    r(-46, -4, 10, 88, 'concrete');
+    el(svg, 'path', { d: `M ${y(-52)} ${z(88)} Q ${y(-44)} ${z(97)} ${y(-35)} ${z(88)} L ${y(-33.5)} ${z(60)} Q ${y(-35.5)} ${z(52)} ${y(-36)} ${z(60)} L ${y(-36)} ${z(84)} L ${y(-46)} ${z(84)} Z`, 'class': 'vine' });
+    textAt(svg, y(-64), z(104), 'planted bank rising to', 't-s', 'start'); textAt(svg, y(-64), z(99.5), 'the sidewalk fence,', 't-s', 'start'); textAt(svg, y(-64), z(95), '11 ft back', 't-s', 'start');
     textAt(svg, y(-41), z(40), 'retaining wall 84 in', 't-s', 'middle', -90);
     [0, 46.25, OUTD - 3.5].forEach(s => r(s, 0, 3.5, 3.5, 'lumber-f'));
     r(0, 3.5, OUTD, 5.5, 'lumber-f'); r(0, 9, OUTD, 0.75, 'lumber');

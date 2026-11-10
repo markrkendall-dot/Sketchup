@@ -4,6 +4,76 @@
 SketchUp model he can build from. This is MK's Charlotte house, not 146 Mick Road, so nothing
 here touches the HomePlan app or its plans; the photos and plat are in [photos/](photos/).
 
+## Update, 10 November: the deck photos correct the site
+
+MK sent two photos taken from the third-floor deck
+([photo 11](photos/11-yard-from-third-floor-deck-shed-wedge-wall.jpg),
+[photo 12](photos/12-yard-from-third-floor-deck-wide-terrace-and-fence.jpg)). Measuring them, and
+re-reading the plat because of them, showed that the site in every earlier drawing here was wrong
+in three ways. The shop's design does not change. Where it sits, and how much yard it leaves, does.
+
+- **The retaining wall is inside the lot, not on the Matheson line.** The plat draws it as its
+  own hatched line ("conc. retaining wall"): it starts on the west line about 5' south of the
+  north-west corner, has an 8.6' return down the west line behind the old shed, and runs parallel
+  to the right-of-way line, 11.4' inside it, to a wood fence east of the back yard. Between the
+  wall and the sidewalk fence is a planted bank with crepe myrtles, and jasmine hangs over the
+  wall face ([photo 05](photos/05-retaining-wall-and-sawhorse-corner.jpg) shows the fence up the
+  bank). Earlier drawings put the wall on the lot line with the fence standing on it.
+- **The old shed and the house are much closer together.** Fitted to the lot corners (nine
+  control points, 0.4' rms), the plat puts the old shed 81.6' to 91.6' north of the Wesley line
+  and the house's north wall at 65.3': a lawn 16.4' deep. Earlier drawings had the shed hard
+  against the north line and a lawn 29.8' deep.
+- **The wall all but touches the old shed's back corner.** In both photos it passes about 1'
+  from the back-right corner and about 9' from the front-right corner.
+
+How the photos were measured: the fence boards and the old shed's battens are true verticals, so
+130 of their edges give the point straight below the camera; with the phone's lens (24 mm for
+photo 11, 13 mm for photo 12) that turns each photo into a plan view of the ground. The old
+shed's 8.2' front sets the scale. The two photos agree with each other: both put the camera 25'
+above the lawn, which is right for a third-floor deck.
+
+| Quantity | Earlier drawings | Plat, scaled | Deck photos | Drawn now |
+|---|---|---|---|---|
+| Lawn depth, house wall to the old shed's front | 29.8' | 16.4' | 17 to 18' | 17.5' |
+| Wall to the old shed's back-right corner, square to the wall | 3.0' | 3.2' | 0.8 to 1.4' | 1.0' |
+| Wall to the old shed's front-right corner, square to the wall | 10.9' | 10.9' | 8.8 to 9.0' | 8.9' |
+| Wall's angle to the old shed's front line | 38.4° | 38.9° | 37.5 to 41° | 38.4° |
+| Wall to the Matheson lot line | 0 | 11.4' | not measured | 12.5' |
+| New shop's nearest corner to the house | 20.5' | | | 6.7' |
+
+The photo figures are good to about a foot. Lawn depth and the wall's distance from the old shed
+are sliders on the drawings page, so a tape settles them.
+
+**What it means for the shop.** The wedge beside the old shed is 8.9' wide at its front corner,
+and the shop needs 11' from the wall (a 3' strip plus 8' of depth). So the shop cannot tuck in
+beside the old shed. It starts a 2.7' walkway past the old shed's front corner and runs 12' along
+the wall toward the house, and its house-end front corner lands **about 6.7' from the house
+wall** (5.6' to 8.2' across the lawn-depth uncertainty). The open yard between the house and the
+wall is about 690 sq ft today; the shop and its strip take about 130 of it and leave the lawn in
+front of the old shed joined to the east side by that 6.7' gap. If that is too tight:
+
+| Change | Nearest corner to the house |
+|---|---|
+| 12' x 8', 3' strip (as designed) | 6.7' |
+| 12' x 8', 2' strip | 7.5' |
+| 10' x 7', 3' strip (the original option C) | 8.7' |
+| 10' x 7', 2' strip | 9.5' |
+| Slide 1' toward the old shed (walkway 1.7') | 7.3' |
+
+**Zoning.** The shop's back wall is about 15.5' inside the Matheson lot line, not 3.8'. The
+street-side setback question in the notes below mostly goes away, though a call to Charlotte
+Planning is still worth it. The reason given below for stopping the roof 10" short of the wall
+(a projection may not cross the lot line) no longer applies: the wall is MK's own, well inside the
+lot. Ten inches is still right for the gutter and to keep the roof clear of the jasmine.
+
+**Leaves and vine.** The roof's back edge sits under the jasmine and the crepe myrtles. Plan on a
+gutter guard, trim the vine back along the shop, and expect to prune branches over the roof. The
+gutter can be cleaned from the bank instead of from a ladder in the strip.
+
+The drawings page now leads with an enlarged back-yard plan that carries these distances, and the
+3D page's site is rebuilt the same way, with a view from the deck and a view of the gap to the
+house. The saved SketchUp model's shed is unchanged; its site blocks still show the old layout.
+
 ## Update, 9 November, later: roof flipped toward the wall, covering the strip behind
 
 MK asked to pitch the roof toward the retaining wall rather than the yard, with no need for a
@@ -21,7 +91,8 @@ wheels, so the big wheel shelf is not needed. Worked through and agreed:
   of rain, not snow, so the lap sealing is the whole job.
 - **The cantilever.** The 2x6 rafters run 26" past the back wall, leaving the roof edge 10" short
   of the retaining wall face: a permit-exempt shed may sit near the line but its projections may
-  not cross it, and the wall is on the right-of-way line. A 26" cantilever on the 92.5" back span
+  not cross it, and the wall is on the right-of-way line (wrong: the wall is 11' inside the lot,
+  see the 10 November update; the 10" stays for the gutter). A 26" cantilever on the 92.5" back span
   is well within a 2x6 at 24" o.c. and puts no uplift on the front wall. Rafters become 2x6 x 12'.
   The roof underside is 9'2" above the pad at the edge, so long tools stand upright.
 - **Permit.** The NC exemption is written on floor area ("does not exceed 12 feet in any
@@ -76,7 +147,7 @@ the racks, the lot and the permits; the differences are these.
 | Bench | 24" x 36" at 40" high (elbow height for 6'2") on the left end wall, in front of the bikes' bar line, with a 1/4" pegboard panel above it and pegboard either side of the door |
 | Repair stand | parks in a 30" circle in the right front corner; works in the aisle with the doors open, an 80" bike clamped parallel to the wall |
 | Aisle | 43" from the hung bikes' bars to the yard wall, 67" with the bikes swung |
-| Siting | same string line from the old shed's corner, parallel to the wall, about 3' off the wall face; near end about 9' along it, far end 12' further, 8' square off toward the yard; nearest front corner about 20.5' from the house, 2.2' walkway to the old shed |
+| Siting | (superseded by the 10 November update) back wall 3' off the wall face; near end 9' along the wall from the old shed's back corner, far end 12' further, 8' square off toward the yard; nearest front corner about 6.7' from the house, 2.7' walkway past the old shed's front corner |
 
 Cut list changes against the 10' x 7' list: 2x4 10' pieces become 12' (back studs 117.5", end
 studs up to 116.6", plates 12'); front studs and kings 91.5" (8' stock); add four 4.5"
@@ -111,7 +182,9 @@ From the 2012 Lineberger plat ([photo 10](photos/10-plat-2012-lineberger.jpg)), 
 - The house fronts Wesley on the west half, about 7.3' off the west line. The "storage bldg"
   on the plat (8.2 x 10.1) is the existing shed, in the north-west corner under the flat
   segment, long axis north-south, door facing the house.
-- The concrete retaining wall runs along the Matheson right of way, which sits 6 to 7' above
+- (Corrected 10 November: the wall is 11' inside the lot, parallel to the right of way, with a
+  planted bank behind it; the lawn is about 17.5' deep, not 30'. The rest of this bullet is the
+  earlier reading.) The concrete retaining wall runs along the Matheson right of way, which sits 6 to 7' above
   the yard. The fence and trees above it in the photos are the sidewalk edge, not a neighbour.
   The wall leaves the shed's north-east corner heading south-east, so the strip on the shed's
   window side is a wedge: the sawhorse sits at the narrow end
@@ -310,7 +383,8 @@ found put installed lean-to sheds at $2,000 to $9,000 and were too generic to tr
   The catch here is that the Matheson side is a street right of way, not a neighbour's rear
   line, so the UDO may treat it as a street side. The existing shed already sits within a few
   feet of it. Confirm with Charlotte Planning which setback applies at the retaining wall
-  before fixing the gap; the model carries 36".
+  before fixing the gap; the model carries 36". (Corrected 10 November: the lot line is 11' to
+  13' behind the wall, so the shop sits about 15' inside it and the old shed about 13'.)
 - Lot coverage is not a concern: the two sheds together are about 150 sq ft on a 7,840 sq ft
   lot.
 
@@ -318,10 +392,13 @@ found put installed lean-to sheds at $2,000 to $9,000 and were too generic to tr
 
 These only move the shed on the site; the shed itself does not change.
 
-- Width of the wedge straight across from the existing shed's front-right corner to the
-  retaining wall, and the same at the back corner.
-- Clear wall length from the sawhorse corner along the base of the wall toward the house.
-- The gap behind the existing shed, and its tall and low wall heights, for the site model.
+- Lawn depth from the house wall to the existing shed's front (drawn 17.5').
+- Width of the wedge square across from the existing shed's front-right corner to the retaining
+  wall (drawn 8.9'), and the same at the back corner (drawn 1').
+- With stakes and string, the shop's four corners: 3' off the wall, starting 9' along the wall
+  from the old shed's back corner. The house-end front corner should land about 6.7' from the
+  house wall.
+- The existing shed's tall and low wall heights, for the site model.
 
 ## The 3D view
 
@@ -329,12 +406,14 @@ These only move the shed on the site; the shed itself does not change.
 its site, in the flipped-roof version, built from the same numbers as the drawings: orbit, zoom
 and pan; toggles for the siding and doors, roof, bikes, fit-out and site; doors open; bikes swung
 on their pivots; and camera presets (from the yard, from the third-floor balcony where MK's yard
-photos were taken, door corner, eye level at 6'2", inside at the door with the doors open, behind
-the shed in the covered strip, framing, from above). The site is placed from the plat: the
-existing shed at its true angle, the retaining wall and fence along the Matheson right of way,
-the house footprint three storeys tall, Wesley Ave; the light is an afternoon sun from the
-west-south-west, so the house's shadow stays off the sheds. Stills: [from the yard](bike-shop-3d-hero.png),
-[from the balcony](bike-shop-3d-from-balcony.png), [behind the shed](bike-shop-3d-behind.png),
+photos were taken, the gap to the house, eye level at 6'2", inside at the door with the doors
+open, behind the shed in the covered strip, framing, from above). The site is the corrected one
+of the 10 November update: the retaining wall inside the lot with the bank, the crepe myrtles and
+the sidewalk fence behind it, the existing shed with its back corner at the wall, the house
+17.5' from the old shed's front, Wesley Ave; the light is an afternoon sun from the
+west-south-west. Stills: [from over the west fence](bike-shop-3d-hero.png),
+[from the deck](bike-shop-3d-from-balcony.png), [from above](bike-shop-3d-from-above.png),
+[the gap to the house](bike-shop-3d-gap-to-house.png), [behind the shed](bike-shop-3d-behind.png),
 [framing](bike-shop-3d-framing.png).
 
 ## The SketchUp model
