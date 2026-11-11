@@ -1,0 +1,401 @@
+<title>Wesley Ave Bike Shelter</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a 3D view with a thin toolbar above it and camera presets below; the site built from the plat. */
+  :root {
+    --bg: #f4f3ee; --paper: #e9ecf2; --fg: #22291f; --muted: #6b7366; --rule: #c9cbc2; --new: #b85c2a; --btn: #fbfaf6;
+    --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1c1f1b; --paper: #2a2f33; --fg: #e8eae2; --muted: #a0a89c; --rule: #4a4f46; --new: #e4915a; --btn: #242823; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #1c1f1b; --paper: #2a2f33; --fg: #e8eae2; --muted: #a0a89c; --rule: #4a4f46; --new: #e4915a; --btn: #242823; color-scheme: dark; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+  main { max-width: 1200px; margin: 0 auto; display: grid; gap: 14px; }
+  h1 { font-size: 1.5rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  p { margin: 0; max-width: 78ch; }
+  .lede { color: var(--muted); }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 0.88rem; }
+  .bar label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .bar input[type=checkbox] { accent-color: var(--new); width: 15px; height: 15px; }
+  button { font: inherit; font-size: 0.85rem; padding: 5px 11px; border: 1px solid var(--rule); border-radius: 4px; background: var(--btn); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--new); }
+  button.on { border-color: var(--new); color: var(--new); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--new); outline-offset: 2px; }
+  .view { position: relative; width: 100%; aspect-ratio: 16 / 10; min-height: 320px; max-width: 100%; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; background: var(--paper); }
+  .view canvas { display: block; width: 100%; height: 100%; }
+  .hint { position: absolute; left: 10px; bottom: 8px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); background: color-mix(in srgb, var(--paper) 75%, transparent); padding: 2px 6px; border-radius: 3px; pointer-events: none; }
+  .fail { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--muted); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 20px; font-size: 0.88rem; }
+  .facts div { border-top: 1px solid var(--rule); padding-top: 6px; display: grid; gap: 2px; }
+  .facts b { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .facts span { color: var(--muted); }
+  a { color: var(--new); }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">2926 Wesley Ave, Charlotte &middot; ShelterLogic 6' x 12' x 8' on a wood deck</div>
+    <h1>Fabric bike shelter on a deck, in 3D</h1>
+    <p class="lede">The ShelterLogic Shed-in-a-Box 6' x 12' x 8' (model 70413) as it would sit where the pickets were laid out: long side along the retaining wall, 2 ft off it, door on the end facing the house, on a timber deck pinned to the ground. Six XL 29ers are inside, standing, packed 8" apart and staggered. The house is not drawn: the black shape on the ground is its footprint. Drag to orbit, scroll to zoom, right-drag or shift-drag to pan. Untick the cover to see the frame and the bikes.</p>
+  </header>
+
+  <div class="bar" role="group" aria-label="What is shown">
+    <label><input type="checkbox" id="tCover" checked> Fabric cover</label>
+    <label><input type="checkbox" id="tBikes" checked> Bikes</label>
+    <label><input type="checkbox" id="tFit" checked> Figure</label>
+    <label><input type="checkbox" id="tSite" checked> Site context</label>
+  </div>
+
+  <div class="view" id="view">
+    <canvas id="c" aria-label="Interactive 3D view of the 6 by 12 foot fabric bike shelter on a wood deck on its site"></canvas>
+    <div class="hint">drag: orbit &middot; wheel: zoom &middot; right-drag / shift-drag: pan</div>
+  </div>
+
+  <div class="bar" role="group" aria-label="Camera presets">
+    <span class="eyebrow">Views</span>
+    <button type="button" data-view="hero" class="on">From the yard</button>
+    <button type="button" data-view="door">Door end</button>
+    <button type="button" data-view="balcony">From the balcony</button>
+    <button type="button" data-view="eye">Eye level, 6'2"</button>
+    <button type="button" data-view="inside">Looking in</button>
+    <button type="button" data-view="frame">Frame and bikes</button>
+    <button type="button" data-view="plan">From above</button>
+  </div>
+
+  <div class="facts">
+    <div><b>6' x 12' x 8'</b><span>72" wide, 144" long, 96" at the ridge. Side walls are drawn 66" high, which is an assumption: no listing gives that height</span></div>
+    <div><b>Deck 144" x 72"</b><span>4x4 PT perimeter, eight 2x4 PT joists on edge at 16", 3/4" PT plywood; top 4.25" above the turf, ramp at the door; pinned at the corners</span></div>
+    <div><b>2 ft off the wall</b><span>front edge 8 ft out, where the pickets were; the jasmine still wants trimming along the back</span></div>
+    <div><b id="houseFact">about 9 ft</b><span>from the shelter's nearest corner to the house, with the lawn 17.5 ft deep; tape it before buying</span></div>
+    <div><b>Six bikes, jammed</b><span>standing 8" apart with four stagger positions, filling 115" of the 144". They come out in order, and there is no room to work inside</span></div>
+    <div><b>Not confirmed</b><span>door opening size, side wall height and the exact base size. The door is drawn 48" x 72", rolled up</span></div>
+  </div>
+  <p class="lede">The framed 12' x 6' shop this would stand in for: <a href="bike-shop-3d.html">bike-shop-3d.html</a>. The write-up: <a href="BIKE-SHED.md">BIKE-SHED.md</a>.</p>
+</main>
+
+<script type="module">
+(async function () {
+  let THREE;
+  try {
+    THREE = await import(window.__THREE_URL || 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.min.js');
+  } catch (err) {
+    const v = document.getElementById('view');
+    const d = document.createElement('div'); d.className = 'fail';
+    d.textContent = 'The 3D library did not load. Open the page again with a network connection.';
+    v.appendChild(d); return;
+  }
+  THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
+
+  // ---------- constants (inches; design frame: X along the wall toward the house, Y toward the yard, Z up from the pad) ----------
+  const L = 144, D = 72, Z0 = 4.25, HW = 66, HR = 96;           // deck top, side wall height (assumed), ridge height above the deck
+  const BIKE = { wb: 49.2, r: 14.77, bar: 30.7, barH: 44.1 };
+
+  // ---------- materials ----------
+  const M = (hex, o) => new THREE.MeshStandardMaterial(Object.assign({ color: hex, roughness: 0.85, metalness: 0, side: THREE.DoubleSide }, o || {}));
+  const mat = {
+    spf: M(0xdcbe8c), pt: M(0xb4a56e), osb: M(0xcdb478), ply: M(0xd2b98a),
+    siding: M(0x636d58), trim: M(0x707a66), metal: M(0x4f463e, { roughness: 0.45, metalness: 0.35 }),
+    rack: M(0x1e1e20), tyre: M(0x151515, { roughness: 0.95 }), rim: M(0x8a8f94, { transparent: true, opacity: 0.35, metalness: 0.4, roughness: 0.4 }),
+    black: M(0x1a1a1a, { roughness: 0.4, metalness: 0.2 }), yellow: M(0xe6be1e, { roughness: 0.4 }), blue: M(0x2d5fa6, { roughness: 0.4 }), red: M(0xb5352c, { roughness: 0.4 }), green: M(0x3f7d4f, { roughness: 0.4 }),
+    cover: M(0xb9bcc0, { roughness: 0.9 }), tube: M(0x9aa0a6, { metalness: 0.6, roughness: 0.35 }),
+    gravel: M(0xaaa59b), concrete: M(0xaea9a0), fence: M(0x967858), soil: M(0x6e5f46), turf: M(0x5f7a4a, { roughness: 1 }),
+    road: M(0x8c8c8c), house: M(0xd9d3c8), houseRoof: M(0x5a5651), glass: M(0xbcd6e6, { transparent: true, opacity: 0.45 }),
+    peg: M(0xc8aa78), steel: M(0x787d82, { metalness: 0.5, roughness: 0.4 }), skin: M(0xc9a58c), shirt: M(0x4a6b8a), pants: M(0x3a3f45),
+    white: M(0xf1f1ee), stoolw: M(0xb0864f), gutter: M(0xb9b5ad, { metalness: 0.4, roughness: 0.5 }), handle: M(0x9a7b4f),
+  };
+
+  // ---------- helpers ----------
+  const scene = new THREE.Scene();
+  function grp(name, parent) { const g = new THREE.Group(); g.name = name; (parent || scene).add(g); return g; }
+  function box(parent, m, x, y, z, w, d, h) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), m);
+    mesh.position.set(x + w / 2, y + d / 2, z + h / 2);
+    mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
+  }
+  // box (w across x, len along local y, t thick) centred at c, tilted about X by ang (+y rises when ang > 0)
+  function slabX(parent, m, cx, cy, cz, w, len, t, ang) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, len, t), m);
+    mesh.position.set(cx, cy, cz); mesh.rotation.x = ang;
+    mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
+  }
+  function cyl(parent, m, a, b, r) {
+    const av = new THREE.Vector3(a[0], a[1], a[2]), bv = new THREE.Vector3(b[0], b[1], b[2]);
+    const dir = new THREE.Vector3().subVectors(bv, av), len = dir.length();
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10), m);
+    mesh.position.copy(av).add(bv).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
+  }
+  function extrude(parent, m, pts, holes, depth, rows) {
+    const sh = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], p[1])));
+    (holes || []).forEach(h => sh.holes.push(new THREE.Path(h.map(p => new THREE.Vector2(p[0], p[1])))));
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }), m);
+    if (rows) { mesh.matrixAutoUpdate = false; mesh.matrix.set.apply(mesh.matrix, rows); }
+    mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
+  }
+  const P1 = (tx, ty, tz) => [0, 0, 1, tx, 1, 0, 0, ty, 0, 1, 0, tz, 0, 0, 0, 1];   // profile in (Y,Z) extruded along X
+  const PF = (tx, ty, tz) => [1, 0, 0, tx, 0, 0, -1, ty, 0, 1, 0, tz, 0, 0, 0, 1];  // panel in (X,Z) extruded toward -Y
+  const torusFlatOnWall = (parent, m, x, y, z, R, r) => { const t = new THREE.Mesh(new THREE.TorusGeometry(R, r, 10, 28), m); t.rotation.x = Math.PI / 2; t.position.set(x, y, z); t.castShadow = true; parent.add(t); return t; };
+
+  // ---------- the shelter on its deck (design frame: x from the far end toward the house, y from the wall side toward the yard) ----------
+  const shed = grp('shed');
+  shed.scale.x = -1; shed.position.x = L;
+  const gDeck = grp('deck', shed), gFrame = grp('frame', shed), gCover = grp('cover', shed), gBikes = grp('bikes', shed), gFit = grp('fit', shed);
+
+  // deck: 4x4 PT perimeter, 2x4 PT joists on edge between the long sides, 3/4" PT plywood, a ramp at the door end
+  box(gDeck, mat.pt, 0, 0, 0, L, 3.5, 3.5); box(gDeck, mat.pt, 0, D - 3.5, 0, L, 3.5, 3.5);
+  box(gDeck, mat.pt, 0, 3.5, 0, 3.5, D - 7, 3.5); box(gDeck, mat.pt, L - 3.5, 3.5, 0, 3.5, D - 7, 3.5);
+  for (let k = 1; k <= 8; k++) box(gDeck, mat.pt, k * 16 - 0.75, 3.5, 0, 1.5, D - 7, 3.5);
+  box(gDeck, mat.ply, 0, 0, 3.5, L, D, 0.75);
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(20, Z0), 56, 0.75), mat.ply);
+  ramp.position.set(L + 10, D / 2, Z0 / 2 - 0.3); ramp.rotation.y = Math.atan2(Z0, 20); ramp.castShadow = true; ramp.receiveShadow = true; gDeck.add(ramp);
+
+  // frame: 1-3/8" steel tube ribs every 3 ft, ridge, eave rails and a mid rail on each side
+  const TR = 0.7, ribs = [1, 36.5, 72, 107.5, L - 1];
+  ribs.forEach(x => {
+    cyl(gFrame, mat.tube, [x, 1, Z0], [x, 1, Z0 + HW], TR); cyl(gFrame, mat.tube, [x, D - 1, Z0], [x, D - 1, Z0 + HW], TR);
+    cyl(gFrame, mat.tube, [x, 1, Z0 + HW], [x, D / 2, Z0 + HR - 1], TR); cyl(gFrame, mat.tube, [x, D - 1, Z0 + HW], [x, D / 2, Z0 + HR - 1], TR);
+    box(gFrame, mat.tube, x - 2, 0, Z0, 4, 3, 0.4); box(gFrame, mat.tube, x - 2, D - 3, Z0, 4, 3, 0.4);
+  });
+  [[1, HW], [D - 1, HW], [D / 2, HR - 1], [1, 33], [D - 1, 33]].forEach(([y, z]) => cyl(gFrame, mat.tube, [1, y, Z0 + z], [L - 1, y, Z0 + z], TR));
+  cyl(gFrame, mat.tube, [1, 1, Z0 + HW], [1, D - 1, Z0 + HW], TR);
+
+  // cover: side walls, two roof slopes, a closed far end, the door end with its opening and the door rolled up
+  const CT = 0.35, slope = Math.atan2(HR - HW, D / 2), rl = Math.hypot(D / 2, HR - HW) + 1.5;
+  box(gCover, mat.cover, -0.5, -CT, Z0, L + 1, CT, HW); box(gCover, mat.cover, -0.5, D, Z0, L + 1, CT, HW);
+  slabX(gCover, mat.cover, L / 2, D / 4, Z0 + (HW + HR) / 2 + 0.4, L + 1, rl, CT, slope);
+  slabX(gCover, mat.cover, L / 2, 3 * D / 4, Z0 + (HW + HR) / 2 + 0.4, L + 1, rl, CT, -slope);
+  const gable = [[0, 0], [D, 0], [D, HW], [D / 2, HR], [0, HW]];
+  extrude(gCover, mat.cover, gable, null, CT, P1(-0.5, 0, Z0));
+  const DW = 48, DH = 72;   // assumed; the opening has to stay under the roof line at its top corners
+  const d0 = (D - DW) / 2, d1 = (D + DW) / 2;   // the door opening is a notch in the outline: a hole touching the bottom edge does not triangulate
+  extrude(gCover, mat.cover, [[0, 0], [d0, 0], [d0, DH], [d1, DH], [d1, 0], [D, 0], [D, HW], [D / 2, HR], [0, HW]], null, CT, P1(L + 0.15, 0, Z0));
+  cyl(gCover, mat.cover, [L + 1.5, (D - DW) / 2, Z0 + DH + 2], [L + 1.5, (D + DW) / 2, Z0 + DH + 2], 2.6);
+
+  // bikes, built standing (u along the bike from the rear axle, v up, w across), then hung
+  function bike(frameMat, ebike) {
+    const g = new THREE.Group();
+    const r = BIKE.r, A = [0, r], B = [16.9, 13.4], ST = [12, 31.7], HTt = [37.2, 39.8], HTb = [39.2, 35.8], F = [BIKE.wb, r];
+    [A, F].forEach(c => {
+      const t = new THREE.Mesh(new THREE.TorusGeometry(r - 1.25, 1.25, 10, 28), mat.tyre); t.position.set(c[0], c[1], 0); t.castShadow = true; g.add(t);
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(r - 2.4, r - 2.4, 0.3, 28), mat.rim); disc.rotation.x = Math.PI / 2; disc.position.set(c[0], c[1], 0); g.add(disc);
+    });
+    const tube = (p, q, rad, w) => cyl(g, frameMat, [p[0], p[1], w || 0], [q[0], q[1], w || 0], rad || 0.8);
+    tube(A, B, 0.7, 1.6); tube(A, B, 0.7, -1.6); tube(A, ST, 0.6, 1.4); tube(A, ST, 0.6, -1.4);
+    tube(B, ST, 0.9); tube(B, HTb, 1.1); tube(ST, HTt, 0.8); tube(HTb, HTt, 1.2);
+    tube(HTb, F, 0.75, 1.9); tube(HTb, F, 0.75, -1.9); tube(ST, [10.5, 37.4], 0.65);
+    cyl(g, mat.black, [8.5, 38.4, 0], [16, 37.6, 0], 1.2);
+    tube(HTt, [38.2, BIKE.barH], 0.7);
+    cyl(g, mat.black, [38.2, BIKE.barH, -BIKE.bar / 2], [38.2, BIKE.barH, BIKE.bar / 2], 0.6);
+    cyl(g, mat.black, [16.9, 13.4, -2.5], [16.9, 13.4, 2.5], 1.6);
+    cyl(g, mat.black, [16.9, 13.4, 2.5], [21.5, 9.8, 5.2], 0.6); cyl(g, mat.black, [16.9, 13.4, -2.5], [12.3, 17.0, -5.2], 0.6);
+    box(g, mat.black, 19.5, 8.3, 5.2, 4, 3, 2); box(g, mat.black, 10.3, 15.5, -7.2, 4, 3, 2);
+    if (ebike) {
+      const du = HTb[0] - B[0], dv = HTb[1] - B[1], ln = Math.hypot(du, dv), nu = -dv / ln, nv = du / ln;
+      const p0 = [B[0] + du / ln * 4 + nu * 2.6, B[1] + dv / ln * 4 + nv * 2.6], p1 = [p0[0] + du / ln * 16, p0[1] + dv / ln * 16];
+      cyl(g, mat.black, [p0[0], p0[1], 0], [p1[0], p1[1], 0], 1.9);
+      box(g, mat.black, 13.5, 10.2, -2.8, 6.5, 5.5, 5.6);
+    }
+    return g;
+  }
+  // six XL bikes standing, front wheels toward the door, 8" apart with four stagger positions so no two bars meet
+  const bikeMats = [mat.black, mat.red, mat.blue, mat.black, mat.green, mat.yellow];
+  for (let i = 0; i < 6; i++) {
+    const b = bike(bikeMats[i], i === 2);
+    const x0 = 3 + 12 * (i % 4), yc = 16 + 8 * i;
+    b.matrixAutoUpdate = false;
+    b.matrix.set(1, 0, 0, x0 + BIKE.r, 0, 0, 1, yc, 0, 1, 0, Z0 + 0.75, 0, 0, 0, 1);
+    gBikes.add(b);
+  }
+  // the 6 ft 2 in figure on the turf beside the door
+  const person = new THREE.Group(); person.position.set(L + 30, D - 8, 0); person.rotation.z = Math.PI / 2; gFit.add(person);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(4.5, 16, 12), mat.skin); head.position.set(0, 0, 69.5); head.castShadow = true; person.add(head);
+  box(person, mat.shirt, -8, -4.5, 40, 16, 9, 25); box(person, mat.shirt, -11, -3.5, 40, 3, 7, 24); box(person, mat.shirt, 8, -3.5, 40, 3, 7, 24);
+  box(person, mat.pants, -7.5, -4, 0, 6.5, 8, 40); box(person, mat.pants, 1, -4, 0, 6.5, 8, 40); cyl(person, mat.skin, [0, 0, 65], [0, 0, 67], 2);
+
+  // ---------- site (lot frame: u east along Wesley in feet, v north toward Matheson) ----------
+  // Lot lines are the 2012 plat's. The retaining wall is inside the lot, parallel to the Matheson line, with a planted
+  // bank and the sidewalk fence behind it. The wall, the old shed and the lawn depth are placed from the plat as
+  // corrected by two photos taken from the third-floor deck (docs/wesley-ave/photos/11 and 12).
+  const LOT = [[0, 0], [114.36, 0], [114.29, 32.04], [83.45, 53.29], [75.73, 53.28], [40.57, 80.12], [40.55, 85.57], [13.07, 107.34], [-0.13, 107.34]];
+  const HOUSE = [[7.3, 65.4], [35.7, 65.4], [35.7, 7.0], [20.9, 7.0], [20.9, 19.3], [12.3, 19.3], [12.3, 32.9], [7.3, 32.9]];
+  const P6 = LOT[6], P7 = LOT[7];
+  const dd = [P7[0] - P6[0], P7[1] - P6[1]], dl = Math.hypot(dd[0], dd[1]);
+  const e = [-dd[0] / dl, -dd[1] / dl], nin = [-dd[1] / dl, dd[0] / dl];       // along the wall toward the house; into the yard
+  const HOUSE_N = 65.4, LAWN = 17.5, CORNER_GAP = 1.0, GAP = 2.0, ALONG = 9.0;  // feet: the drawings page's slider defaults
+  const WALL_IN = 10, WALL_H = 84, BANK_RISE = 24;                               // inches
+  const SHED_BOT = HOUSE_N + LAWN, SHED_TOP = SHED_BOT + 10.1;
+  const F0 = [9.4 - nin[0] * CORNER_GAP, SHED_TOP - nin[1] * CORNER_GAP];       // wall face, nearest the old shed's back corner
+  const O = [F0[0] + nin[0] * GAP + e[0] * (ALONG + L / 12), F0[1] + nin[1] * GAP + e[1] * (ALONG + L / 12)];
+  // right-handed site frame: x3 along the wall toward the old shed, y3 toward the yard, z up
+  const toF = p => [-((p[0] - O[0]) * e[0] + (p[1] - O[1]) * e[1]) * 12, ((p[0] - O[0]) * nin[0] + (p[1] - O[1]) * nin[1]) * 12];
+  const angF = v => Math.atan2(v[0] * nin[0] + v[1] * nin[1], -(v[0] * e[0] + v[1] * e[1]));
+  const sOf = p => (p[0] - F0[0]) * e[0] + (p[1] - F0[1]) * e[1];               // feet along the wall from F0, toward the house
+  const xOf = s => (ALONG + L / 12 - s) * 12;                                    // the same as a site x
+  mat.vine = M(0x33503a, { roughness: 1 }); mat.bark = M(0xb9a58c); mat.leaf = M(0xc8793a, { transparent: true, opacity: 0.38, roughness: 1, depthWrite: false });
+
+  const site = grp('site');
+  extrude(site, mat.turf, LOT.map(toF), null, 2, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -2.2, 0, 0, 0, 1]);
+  { const c1 = [O[0] + nin[0] * D / 12, O[1] + nin[1] * D / 12]; const el = document.getElementById('houseFact'); if (el) el.textContent = (Math.min(O[1], c1[1]) - HOUSE_N).toFixed(1) + ' ft to the house'; }
+  const roadC = toF([57, -24]), roadA = angF([1, 0]);
+  const road = new THREE.Mesh(new THREE.BoxGeometry(170 * 12, 44 * 12, 2), mat.road); road.position.set(roadC[0], roadC[1], -1.4); road.rotation.z = roadA; road.receiveShadow = true; site.add(road);
+  // the house is left out so the model can be orbited freely; its footprint is a flat black slab on the ground
+  const houseMark = extrude(site, new THREE.MeshBasicMaterial({ color: 0x111111 }), HOUSE.map(toF), null, 1.5, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  houseMark.castShadow = false; houseMark.receiveShadow = false;
+  function seg(a, b, thick, z0, h, m, off) {      // a box along the lot-frame segment a to b; off shifts it sideways, inches
+    const A = toF(a), B = toF(b), dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, thick, h), m);
+    mesh.position.set((A[0] + B[0]) / 2 - dy / len * (off || 0), (A[1] + B[1]) / 2 + dx / len * (off || 0), z0 + h / 2); mesh.rotation.z = Math.atan2(dy, dx);
+    mesh.castShadow = true; mesh.receiveShadow = true; site.add(mesh); return mesh;
+  }
+  // retaining wall and its return, the bank behind it, the sidewalk fence, Matheson Ave
+  const yFace = -GAP * 12, yBack = yFace - WALL_IN, TOP = WALL_H + BANK_RISE;
+  const yLot = ((P7[0] - O[0]) * nin[0] + (P7[1] - O[1]) * nin[1]) * 12, yLot2 = ((LOT[5][0] - O[0]) * nin[0] + (LOT[5][1] - O[1]) * nin[1]) * 12;
+  const sW = (LOT[8][0] - F0[0]) / e[0], W0 = [F0[0] + e[0] * sW, F0[1] + e[1] * sW];
+  const xW = xOf(sW), xE = xOf(sOf([64.26, 51.46])), xJog = xOf(sOf(LOT[6])), xP7 = xOf(sOf(P7));
+  box(site, mat.concrete, xE, yBack, -2, xW - xE, WALL_IN, WALL_H + 2);
+  seg([0.42, W0[1]], [0.42, W0[1] - 8.6], WALL_IN, -2, WALL_H + 2, mat.concrete);
+  extrude(site, mat.soil, [[yLot, -2], [yBack, -2], [yBack, WALL_H], [yLot, TOP]], null, xW - xJog, P1(xJog, 0, 0));
+  extrude(site, mat.soil, [[yLot2, -2], [yBack, -2], [yBack, WALL_H], [yLot2, TOP]], null, xJog - xE, P1(xE, 0, 0));
+  box(site, mat.vine, xE, yBack - 6, WALL_H - 18, xOf(7) - xE, WALL_IN + 8, 30);                 // jasmine over the wall, from 7 ft past the old shed
+  box(site, mat.fence, xJog, yLot - 1.5, TOP, xP7 - xJog, 1.5, 72);
+  box(site, mat.fence, xE, yLot2 - 1.5, TOP, xJog - xE, 1.5, 72);
+  box(site, mat.fence, xJog - 0.75, yLot, TOP, 1.5, yLot2 - yLot, 72);
+  seg(LOT[7], LOT[8], 1.5, TOP, 72, mat.fence);
+  box(site, mat.concrete, xJog, yLot - 60, TOP - 4, xW - xJog + 120, 60, 4);
+  box(site, mat.concrete, xE, yLot - 60, TOP - 4, xJog - xE, yLot2 - yLot + 60, 4);
+  box(site, mat.road, xE - 60, yLot - 560, TOP - 7, xW - xE + 240, 500, 4);
+  // crepe myrtles on the bank: three leaning trunks and a light canopy each
+  [[5, 55, 250], [15, 70, 290], [27, 50, 270], [40, 75, 300], [52, 45, 260]].forEach(([s, back, h], i) => {
+    const x = xOf(s), y = yBack - back, z = WALL_H + BANK_RISE * back / (yBack - yLot);
+    [[-16, 22], [10, 34], [20, 6]].forEach(([dx, dy]) => cyl(site, mat.bark, [x, y, z], [x + dx, y + dy, z + h - 60], 2.2));
+    [[0, 26, 0, 46], [-30, 10, -22, 34], [26, 40, -14, 38]].forEach(([dx, dy, dz, r]) => { const c = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat.leaf); c.position.set(x + dx, y + dy, z + h + dz - 40); site.add(c); });
+  });
+  // fences at ground level: the west line, the wood fence south of the wall's end, the east side of the back yard
+  seg(LOT[8], LOT[0], 1.5, 0, 72, mat.fence, 0.75);
+  seg([64.26, 51.46], [65.0, 8.5], 1.5, 0, 72, mat.fence);
+  seg([53.6, 59.4], [53.6, 47.7], 1.5, 0, 72, mat.fence); seg([53.6, 47.7], [35.7, 47.7], 1.5, 0, 72, mat.fence);
+  seg([32.3, 67.6], [34.9, 67.6], 30, 0, 34, mat.steel);                                          // AC unit by the house wall
+  (function existingShed() {
+    const g = new THREE.Group(); site.add(g);
+    const nw = toF([1.2, SHED_TOP]);
+    g.position.set(nw[0], nw[1], 0); g.rotation.z = angF([0, -1]);
+    const Lx = 121.2, Wy = 98.4;
+    extrude(g, mat.siding, [[0, 0], [Wy, 0], [Wy, 84], [0, 116]], null, Lx, P1(0, 0, 0));
+    const ang = Math.atan2(32, Wy), rl = Math.hypot(Wy, 32) + 24;
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(Lx + 16, rl, 2), mat.metal); roof.position.set(Lx / 2, Wy / 2, 100 + 1.2); roof.rotation.x = -ang; roof.castShadow = true; g.add(roof);
+    box(g, mat.trim, Lx + 0.1, 28, 8, 1, 60, 76); box(g, mat.trim, Lx + 0.1, 24, 86, 1, 68, 1.5);
+    box(g, mat.stoolw, Lx + 1, 36, 0, 35, 44, 4);                                                // the pallet ramp at the door
+    box(g, mat.white, 40, Wy - 0.1, 50, 26, 0.7, 22); box(g, mat.white, 72, Wy - 0.1, 50, 26, 0.7, 22);
+    box(g, mat.glass, 41, Wy, 51, 24, 0.5, 20); box(g, mat.glass, 73, Wy, 51, 24, 0.5, 20);
+  })();
+
+  // ---------- renderer, camera, lights ----------
+  const canvas = document.getElementById('c'), view = document.getElementById('view');
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); }
+  catch (err) { const d = document.createElement('div'); d.className = 'fail'; d.textContent = 'This browser could not start WebGL, so the 3D view cannot draw.'; view.appendChild(d); return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const camera = new THREE.PerspectiveCamera(40, 16 / 10, 2, 20000);
+  camera.up.set(0, 0, 1);
+  const hemi = new THREE.HemisphereLight(0xdfe8f3, 0x5a5445, 1.5); scene.add(hemi);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));   // lifts the inside and the covered strip, which the sun never reaches
+  const sun = new THREE.DirectionalLight(0xfff2dc, 2.9);
+  sun.position.set(72 + 369, 48 + 930, 60 + 840); sun.target.position.set(72, 48, 60); scene.add(sun); scene.add(sun.target);   // afternoon sun from the west-south-west, so the house's shadow misses the sheds
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  const sc = sun.shadow.camera; sc.left = -700; sc.right = 700; sc.top = 700; sc.bottom = -700; sc.near = 100; sc.far = 2600; sun.shadow.bias = -0.0006;
+
+  function applyBackground() {
+    const col = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#e9ecf2';
+    renderer.setClearColor(new THREE.Color(col), 1);
+  }
+  applyBackground();
+  if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyBackground(); render(); }); } catch (err) { /* older browsers */ } }
+
+  // ---------- orbit controls (spherical about a target, Z up) ----------
+  const ctl = { az: 0.9, el: 0.55, r: 620, target: new THREE.Vector3(72, 48, 60) };
+  function updateCamera() {
+    const ce = Math.cos(ctl.el);
+    camera.position.set(ctl.target.x + ctl.r * ce * Math.cos(ctl.az), ctl.target.y + ctl.r * ce * Math.sin(ctl.az), ctl.target.z + ctl.r * Math.sin(ctl.el));
+    camera.lookAt(ctl.target);
+  }
+  let needsRender = true;
+  function render() { needsRender = true; }
+  function frame() { if (needsRender) { needsRender = false; updateCamera(); renderer.render(scene, camera); } requestAnimationFrame(frame); }
+  function resize() {
+    const w = view.clientWidth, h = view.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); render();
+  }
+  window.addEventListener('resize', resize); resize();
+  requestAnimationFrame(frame);
+
+  let drag = null;
+  const ptrs = new Map();
+  canvas.addEventListener('contextmenu', ev => ev.preventDefault());
+  canvas.addEventListener('pointerdown', ev => { canvas.setPointerCapture(ev.pointerId); ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); drag = { mode: (ev.button === 2 || ev.shiftKey) ? 'pan' : 'orbit' }; });
+  canvas.addEventListener('pointerup', ev => { ptrs.delete(ev.pointerId); if (ptrs.size === 0) drag = null; });
+  canvas.addEventListener('pointercancel', ev => { ptrs.delete(ev.pointerId); if (ptrs.size === 0) drag = null; });
+  function pan(dx, dy) {
+    const scale = ctl.r * 0.0016;
+    const right = new THREE.Vector3().subVectors(camera.position, ctl.target).cross(camera.up).normalize();
+    ctl.target.addScaledVector(right, dx * scale).addScaledVector(new THREE.Vector3(0, 0, 1), dy * scale);
+  }
+  canvas.addEventListener('pointermove', ev => {
+    if (!ptrs.has(ev.pointerId)) return;
+    const prev = ptrs.get(ev.pointerId);
+    if (ptrs.size === 2) {
+      const ids = Array.from(ptrs.keys()), a = ptrs.get(ids[0]), b = ptrs.get(ids[1]);
+      const before = Math.hypot(a.x - b.x, a.y - b.y);
+      ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      const a2 = ptrs.get(ids[0]), b2 = ptrs.get(ids[1]);
+      const after = Math.hypot(a2.x - b2.x, a2.y - b2.y);
+      if (before > 0 && after > 0) ctl.r = Math.min(6000, Math.max(60, ctl.r * before / after));
+      pan(-((a2.x + b2.x) - (a.x + b.x)) / 2, ((a2.y + b2.y) - (a.y + b.y)) / 2);
+      render(); return;
+    }
+    const dx = ev.clientX - prev.x, dy = ev.clientY - prev.y;
+    ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (!drag) return;
+    if (drag.mode === 'pan') pan(-dx, dy);
+    else { ctl.az -= dx * 0.006; ctl.el = Math.min(1.52, Math.max(-0.05, ctl.el + dy * 0.006)); }
+    render();
+  });
+  canvas.addEventListener('wheel', ev => { ev.preventDefault(); ctl.r = Math.min(6000, Math.max(60, ctl.r * Math.exp(ev.deltaY * 0.0012))); render(); }, { passive: false });
+
+  // ---------- presets and toggles (site frame: x toward the old shed, y toward the yard) ----------
+  const presets = {
+    hero: { az: 0.9, el: 0.42, r: 400, t: [72, 36, 45], fov: 45 },
+    door: { az: 2.35, el: 0.22, r: 330, t: [50, 36, 45], fov: 50 },
+    balcony: { az: 2.17, el: 0.995, r: 358, t: [120, 0, 0], fov: 85 },
+    eye: { az: 1.527, el: 0.0, r: 200, t: [72, 36, 70], fov: 72 },
+    inside: { az: 3.1416, el: 0.1, r: 135, t: [70, 36, 44], fov: 62 },
+    frame: { az: 2.1, el: 0.5, r: 330, t: [72, 36, 40], fov: 45, cover: false },
+    plan: { az: 1.571, el: 1.5, r: 700, t: [60, 60, 0], fov: 40 },
+  };
+  const tCover = document.getElementById('tCover'), tBikes = document.getElementById('tBikes'), tFit = document.getElementById('tFit'), tSite = document.getElementById('tSite');
+  function applyToggles() {
+    gCover.visible = tCover.checked; gBikes.visible = tBikes.checked; gFit.visible = tFit.checked; site.visible = tSite.checked;
+    render();
+  }
+  function setPreset(name) {
+    const p = presets[name]; if (!p) return;
+    ctl.az = p.az; ctl.el = p.el; ctl.r = p.r; ctl.target.set(p.t[0], p.t[1], p.t[2]);
+    camera.fov = p.fov; camera.updateProjectionMatrix();
+    tCover.checked = p.cover !== false;
+    applyToggles();
+    document.querySelectorAll('button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name));
+    render();
+  }
+  document.querySelectorAll('button[data-view]').forEach(b => b.addEventListener('click', () => setPreset(b.dataset.view)));
+  [tCover, tBikes, tFit, tSite].forEach(el => el.addEventListener('change', applyToggles));
+  applyToggles();
+  setPreset(['frame', 'inside', 'plan', 'door', 'balcony'].indexOf(location.hash.slice(1)) >= 0 ? location.hash.slice(1) : 'hero');
+  window.__ready = true;
+})();
+</script>

@@ -4,6 +4,31 @@
 SketchUp model he can build from. This is MK's Charlotte house, not 146 Mick Road, so nothing
 here touches the HomePlan app or its plans; the photos and plat are in [photos/](photos/).
 
+## Update, 11 November: a fabric shelter on a deck, as the cheap first try
+
+MK's idea: skip the framed shop for now and put up a ShelterLogic Shed-in-a-Box 6' x 12' x 8'
+(model 70413: 1-3/8" steel tube frame, polyethylene cover, zip door on a 6' end; about $400 to
+$500 on 11 November) on a timber deck. He laid 6' pickets on the turf to mark it: long side along
+the retaining wall, 2' off it, front edge 8' out, door on the end facing the house. A bike has
+sat under a plain cover in that spot for two years, so security and damp are not the worry.
+[shelter-6x12-3d.html](shelter-6x12-3d.html) shows it on the site, with stills
+[from the yard](shelter-6x12-hero.png), [at the door end](shelter-6x12-door.png) and
+[with the cover off](shelter-6x12-frame.png).
+
+- **Deck, 144" x 72":** 4x4 PT perimeter (two 12' sides, two ends cut to about 65"), eight 2x4
+  PT joists on edge at 16" (the same 3.5" height as the 4x4s, so they bear on the ground), three
+  sheets of 3/4" PT plywood, all ground-contact rated. Rebar pins or earth anchors through the
+  4x4s at the corners, a ramp at the door, a drainage gap under the wall-side timber. The kit's
+  augers are for soil and do not suit the artificial turf.
+- **What fits:** six XL bikes only stand in it jammed, 8" apart with four stagger positions so
+  the 780 mm bars miss each other, filling about 115" of the 144". They come out in order. There
+  is no room to work inside, so the old shed, emptied of bikes, becomes the build shop.
+- **Not confirmed:** the door opening size, the side wall height (drawn 66") and the exact base
+  size. Take the base size from the manual before cutting the 4x4s.
+- **Jasmine:** the 2' gap clears most of it; trim the back right, and keep the cover off the vine.
+
+The framed 12' x 6' design below stays as the fallback, and the deck can go under it.
+
 ## Update, 10 November, later: the shop cut to 6' deep
 
 With the yard half as deep as first drawn, MK asked for the shop to go from 8' to 6' deep to get

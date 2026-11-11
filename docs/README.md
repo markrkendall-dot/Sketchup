@@ -16,7 +16,8 @@
   12' x 8' bike shop, the biggest box the state allows without a permit; `bike-shed-site.html`
   draws the lot from the plat with both sheds, the shop layout and six bikes to scale;
   `bike-shop-3d.html` is the interactive 3D model of the shop on its site (three.js), with six
-  rendered stills beside it; `photos/` holds the yard, the shed, the aerial, the parcel map, the
+  rendered stills beside it; `shelter-6x12-3d.html` shows the cheaper first try, a 6' x 12' fabric
+  shelter on a timber deck in the same spot; `photos/` holds the yard, the shed, the aerial, the parcel map, the
   2012 plat and two views from the third-floor deck (11, 12) that corrected the site drawing.
 - **[history/](history/)**: planning and review records, kept for the reasoning behind decisions.
   - `PLAN-v2.md`: the plan for roofs, terrain, finishes and the starter house.
