@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Cpath d=%22M2 14V7l6-5 6 5v7z%22 fill=%22%235b6170%22/%3E%3C/svg%3E" />
-    <title>146 Mick Road</title>
+    <title>House plans</title>
     <style>
       :root {
         --bg: #f6f6f4;
@@ -49,6 +49,7 @@
       .plan strong { display: block; font-size: 20px; color: var(--link); margin-bottom: 2px; }
       .plan span { color: var(--muted); }
       h2 { font-size: 18px; margin: 32px 0 8px; }
+      h2.house { margin: 24px 0 10px; }
       dl { margin: 0; }
       dt { font-weight: 600; margin-top: 10px; }
       dd { margin: 0; color: var(--muted); }
@@ -58,10 +59,13 @@
   </head>
   <body>
     <main>
-      <h1>146 Mick Road</h1>
-      <p class="lead">Two plans of the house, each in 3D and as floor plans. They open in the browser,
-        on a phone, an iPad or a computer, with nothing to install.</p>
+      <h1>House plans</h1>
+      <p class="lead">Each plan in 3D and as floor plans. They open in the browser, on a phone, an
+        iPad or a computer, with nothing to install. Inside a plan, its name at the top left
+        switches to another plan or comes back here.</p>
 
+      <!-- projects:start (written by npm run build:index from scripts/projects.json) -->
+      <h2 class="house">146 Mick Road</h2>
       <a class="plan" href="viewer/146-mick-road-viewer.html">
         <strong>The house and its renovation</strong>
         <span>The house as it stands, and the planned renovation.</span>
@@ -70,6 +74,7 @@
         <strong>The rebuild</strong>
         <span>A design study: the house taken down and rebuilt on its foundation.</span>
       </a>
+      <!-- projects:end -->
 
       <h2>Looking around</h2>
       <dl>

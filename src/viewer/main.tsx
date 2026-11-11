@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { defaultLevelId, migrate } from '../model/plan';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
+import { parseProjectList, type ProjectList } from './projects';
 import { ViewerApp } from './ViewerApp';
 import '../index.css';
 import './viewer.css';
@@ -16,6 +17,15 @@ async function bakedPlan(): Promise<unknown> {
   if (text) return JSON.parse(text);
   if (import.meta.env.DEV) return (await import('../../docs/examples/146-mick-road.json')).default;
   throw new Error('No plan is baked into this page.');
+}
+
+/**
+ * The list of projects baked in beside the plan, for the switcher. Not when the page is opened as
+ * a file (sent by AirDrop or mail): the other viewers are not beside it there.
+ */
+function bakedProjects(): ProjectList | null {
+  if (!/^https?:$/.test(location.protocol)) return null;
+  return parseProjectList(document.getElementById('homeplan-projects')?.textContent);
 }
 
 async function boot(): Promise<void> {
@@ -34,7 +44,7 @@ async function boot(): Promise<void> {
     createRoot(root).render(
       <StrictMode>
         <Suspense fallback={<section className="view3d-host" aria-busy="true" />}>
-          <ViewerApp />
+          <ViewerApp projects={bakedProjects()} />
         </Suspense>
       </StrictMode>,
     );

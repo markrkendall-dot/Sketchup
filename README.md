@@ -370,7 +370,7 @@ it from the editor and run `node scripts/build-viewer.mjs that-plan.json` after 
 
 A built copy of the starter's viewer is kept at `docs/viewer/146-mick-road-viewer.html` so it can
 be downloaded from GitHub (the download button on the file's page) and passed on by AirDrop or
-mail; rebuild and copy it over after changing the starter. The rebuild plan's viewer is beside it,
+mail; rebuild and copy it over (`npm run publish:viewer`) after changing the starter. The rebuild plan's viewer is beside it,
 `docs/viewer/146-mick-road-rebuild-viewer.html` (`npm run build:viewer` makes both).
 
 The same two files are also a web site, so a link is enough: https://markrkendall-dot.github.io/Sketchup/
@@ -383,6 +383,31 @@ the viewers on every push to `main` that changes them; with **Deploy from a bran
 `/docs`), GitHub publishes the whole `docs` folder itself (`docs/.nojekyll` makes it serve the
 folder as it is, without Jekyll). Either way the site shows a change a minute or two after the
 viewer is rebuilt, copied over and pushed.
+
+The same pages open through githack, straight from the repository with nothing to switch on:
+https://raw.githack.com/markrkendall-dot/Sketchup/main/docs/index.html (put a branch's name in
+place of `main` to look at a branch before it is merged).
+
+### Projects: the front page and the switcher
+
+`scripts/projects.json` is the list of projects: one entry per plan that has a viewer, with its
+`slug` (the viewer is `<slug>-viewer.html`), its `group` (the house), a `title`, a `blurb` and the
+`plan` JSON. `npm run build:viewer` builds a viewer for every entry and writes the front page's
+cards from the list (`npm run build:index` does the cards alone), a heading per house.
+`npm run publish:viewer` then copies the built viewers to `docs/viewer/`. Each viewer has the list
+baked in: on a host, the name at the top left of its bar is a menu of the projects by house, with
+**All projects** for the front page, and the arrows beside it step to the previous and next
+project. Opened as a file (AirDrop, mail), where the other viewers are not beside it, a viewer
+shows its plain name as before.
+
+To add a project:
+
+1. Write its plan script on `scripts/planLib.ts` (as `scripts/rebuild-plan.ts`) and add it to the
+   list in `scripts/build-example.ts`, with a test like `src/__tests__/rebuild.test.ts`. Or save a
+   plan from the editor into `docs/examples/`.
+2. Add its entry to `scripts/projects.json`.
+3. `npm run build:example`, `npm run build:viewer`, `npm run publish:viewer`, then `npm test`
+   (which fails if the front page or a published viewer does not match the list).
 
 ## Export the plan
 

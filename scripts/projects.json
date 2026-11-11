@@ -1,0 +1,16 @@
+[
+  {
+    "slug": "146-mick-road",
+    "group": "146 Mick Road",
+    "title": "The house and its renovation",
+    "blurb": "The house as it stands, and the planned renovation.",
+    "plan": "docs/examples/146-mick-road.json"
+  },
+  {
+    "slug": "146-mick-road-rebuild",
+    "group": "146 Mick Road",
+    "title": "The rebuild",
+    "blurb": "A design study: the house taken down and rebuilt on its foundation.",
+    "plan": "docs/examples/146-mick-road-rebuild.json"
+  }
+]

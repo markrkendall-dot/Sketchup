@@ -45,7 +45,7 @@ jobs:
             *) echo "::warning::GitHub Pages is not switched on. Open https://github.com/$GITHUB_REPOSITORY/settings/pages and choose a source." ;;
           esac
 
-      - name: Gather the site (the front page and the two viewers)
+      - name: Gather the site (the front page and the viewers)
         if: steps.pages.outputs.build_type == 'workflow'
         run: |
           mkdir -p _site/viewer

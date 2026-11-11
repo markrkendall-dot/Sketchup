@@ -5,16 +5,19 @@ import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import Scene3D from '../view3d/Scene3D';
 import { PanZoom } from './PanZoom';
+import { ProjectSwitcher } from './ProjectSwitcher';
+import type { ProjectList } from './projects';
 
 type Tab = '3d' | 'plan';
 
 /**
- * The viewer's shell: a bar with the plan's name, the 3D / Plan tabs and the Existing / Proposed /
+ * The viewer's shell: a bar with the plan's name (the project switcher when the page was built with
+ * the list of projects and is on a host, where the other viewers are beside it), the 3D / Plan tabs and the Existing / Proposed /
  * All control, then the 3D view (Scene3D, with its own level checkboxes, elevations and Fit) or
  * the chosen level's plan drawing (io/exportPlan.ts planSvg, as an image so its own styles stay
  * inside it) under a pan and pinch-zoom wrapper.
  */
-export function ViewerApp() {
+export function ViewerApp({ projects = null }: { projects?: ProjectList | null }) {
   const [tab, setTab] = useState<Tab>('3d');
   const name = usePlanStore((s) => s.plan.name);
   const viewMode = useUiStore((s) => s.viewMode);
@@ -28,9 +31,13 @@ export function ViewerApp() {
   return (
     <div className="viewer">
       <header className="viewer-bar">
-        <span className="viewer-title" title={name}>
-          {name}
-        </span>
+        {projects ? (
+          <ProjectSwitcher list={projects} />
+        ) : (
+          <span className="viewer-title" title={name}>
+            {name}
+          </span>
+        )}
         <div className="viewer-tabs" role="tablist">
           {(['3d', 'plan'] as const).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
