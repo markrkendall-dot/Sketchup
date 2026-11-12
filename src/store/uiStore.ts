@@ -401,8 +401,8 @@ export interface UiState {
   walkCollision: boolean;
   /** The keyboard help overlay is open. */
   helpOpen: boolean;
-  /** The Properties dialog (the property library, ui/PropertiesDialog.tsx) is open. */
-  libraryOpen: boolean;
+  /** The Properties dialog (the property library, ui/PropertiesDialog.tsx) is open; 'new': open on its New form. */
+  libraryOpen: boolean | 'new';
   notice: Notice | null;
   /** The walk start the user picked in 2D (not part of the plan, so not saved or undone). */
   walkFrom: WalkFrom | null;
@@ -472,7 +472,7 @@ export interface UiState {
   setWalkLevel: (id: Id | null) => void;
   setWalkLocked: (locked: boolean) => void;
   setHelpOpen: (open: boolean) => void;
-  setLibraryOpen: (open: boolean) => void;
+  setLibraryOpen: (open: boolean | 'new') => void;
   /** Show (or clear) a notice; an info notice clears itself after NOTICE_MS. */
   setNotice: (notice: Notice | null) => void;
   setWalkFrom: (walkFrom: WalkFrom | null) => void;

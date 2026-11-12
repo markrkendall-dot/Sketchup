@@ -200,8 +200,17 @@ export const sashesOf = (o: Pick<Opening, 'sashes'>): number => o.sashes ?? DEFA
 /** A door's leaves: one, or two for a double door (any sash count above one). */
 export const leavesOf = (o: Pick<Opening, 'sashes'>): number => Math.min(MAX_LEAVES, sashesOf(o));
 export const glazingOf = (o: Pick<Opening, 'glazing'>): Glazing => o.glazing ?? 'glass';
-/** A sliding door: a door with `sliding` set (the flag means nothing on a window or a passage). */
-export const isSlidingDoor = (o: Pick<Opening, 'type' | 'sliding'>): boolean => o.type === 'door' && !!o.sliding;
+/** A sliding door: a door with `sliding` set (the flag means nothing on a window or a passage); an overhead door is not one. */
+export const isSlidingDoor = (o: Pick<Opening, 'type' | 'sliding'> & Partial<Pick<Opening, 'overhead'>>): boolean => o.type === 'door' && !!o.sliding && !o.overhead;
+/** An overhead (sectional garage) door: a door with `overhead` set. */
+export const isOverheadDoor = (o: Pick<Opening, 'type'> & Partial<Pick<Opening, 'overhead'>>): boolean => o.type === 'door' && !!o.overhead;
+/** A door that swings on hinges (and so has a swing arc on the plan): not sliding, not overhead. */
+export const isSwingDoor = (o: Pick<Opening, 'type' | 'sliding'> & Partial<Pick<Opening, 'overhead'>>): boolean => o.type === 'door' && !o.sliding && !o.overhead;
+/** An overhead door's sections: white, and the usual sizes (a single and a double car door, 7' high). */
+export const OVERHEAD_DOOR_COLOR = '#ecebe6';
+export const OVERHEAD_DOOR_SIZES = { single: { width: 108, height: 84 }, double: { width: 192, height: 84 } } as const;
+/** The height of one section of an overhead door, about (sections are whole, 21" in a 7' door). */
+export const OVERHEAD_SECTION = 21;
 /** How far a sliding door's two panels overlap at the middle (where they meet in their tracks). */
 export const SLIDING_LAP = 2;
 
@@ -211,7 +220,8 @@ export const RAILING_COLOR = '#8a5a34';
 /** A deck's boards, framing and railing: weathered wood. */
 export const DECK_COLOR = '#9c7650';
 export const deckColorOf = (d: Pick<Deck, 'color'>): string => d.color ?? DECK_COLOR;
-export const leafColorOf = (o: Pick<Opening, 'leafColor'>): string => o.leafColor ?? DEFAULT_LEAF_COLOR;
+export const leafColorOf = (o: Pick<Opening, 'leafColor'> & Partial<Pick<Opening, 'type' | 'overhead'>>): string =>
+  o.leafColor ?? (o.type === 'door' && o.overhead ? OVERHEAD_DOOR_COLOR : DEFAULT_LEAF_COLOR);
 
 /** Column colours by kind: brick red for a chimney, trim tan for a post, stainless for a flue, grey-brown fieldstone for a pier. */
 export const COLUMN_COLOR: Record<Column['kind'], string> = { chimney: '#7a4a3e', post: '#c9b58c', flue: '#b9bdc1', pier: '#8a8378' };

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useViewPlanStore } from '../store/viewStore';
 import { getLevelElevations } from '../derive/levels';
 import { cancelActiveTool, enterSiteMode, switchLevel } from '../editor2d/tools';
 import { levelContentCount, type LevelEdit, type LevelPosition } from '../model/levelOps';
@@ -225,6 +226,9 @@ function StructureBar() {
   const activeId = useActiveStructureId();
   const activeName = usePlanStore((s) => (activeId ? s.plan.structures[activeId]?.name : '') ?? '');
   const siteMode = useUiStore((s) => s.siteMode);
+  // A building only other options build: listed, marked, still selectable (switch option to edit it).
+  const gone = useViewPlanStore((s) => s.hiddenStructures);
+  const optionName = useViewPlanStore((s) => s.plan.options.find((o) => o.id === s.optionId)?.name ?? '');
   const [adding, setAdding] = useState<{ kind: StructureKind; name: string } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const commitRename = () => {
@@ -239,7 +243,7 @@ function StructureBar() {
     setAdding(null);
     openStructure(id);
     const s = getPlan().structures[id];
-    if (s) useUiStore.getState().setNotice({ text: `Added ${s.name} beside the others: move or turn it in the properties panel (Building).`, error: false });
+    if (s) useUiStore.getState().setNotice({ text: `Added ${s.name} beside the others: drag it in site mode, or move or turn it in the properties panel (Building).`, error: false });
   };
   return (
     <div className="structure-bar" role="group" aria-label="Buildings">
@@ -270,10 +274,15 @@ function StructureBar() {
           {siteMode && <option value="">Site</option>}
           {ids.map((id, i) => (
             <option key={id} value={id}>
-              {names[i]}
+              {gone.has(id) ? `${names[i]} (not in this option)` : names[i]}
             </option>
           ))}
         </select>
+      )}
+      {!siteMode && activeId && gone.has(activeId) && (
+        <p className="panel-note structure-absent">
+          {activeName} is new work of other options only: it is not in {optionName || 'this option'}. Pick its option in the toolbar to see and edit it.
+        </p>
       )}
       {adding ? (
         <div className="structure-add">

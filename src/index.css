@@ -1691,7 +1691,14 @@ button.primary:hover:not(:disabled) {
 
 .library-head-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+}
+
+.library-message {
+  margin: 0 0 8px;
+  color: var(--text);
 }
 
 .library-note {
@@ -1718,6 +1725,22 @@ button.primary:hover:not(:disabled) {
   gap: 6px 12px;
   padding: 8px 6px;
   border-bottom: 1px solid var(--border);
+}
+
+.library-thumb {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.library-thumb-none {
+  display: block;
+  background:
+    linear-gradient(135deg, transparent 47%, var(--border) 47%, var(--border) 53%, transparent 53%),
+    var(--bg);
 }
 
 .library-row.current {
@@ -1859,4 +1882,18 @@ button.primary:hover:not(:disabled) {
 
 .view3d-toolbar .view3d-structure {
   font-weight: 600;
+}
+
+/* A small text button inside a field hint (the proposed look's "As today in <option>"). */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent, #2563eb);
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.link-button:hover:not(:disabled) {
+  background: none;
 }

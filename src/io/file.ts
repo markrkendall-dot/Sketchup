@@ -32,16 +32,25 @@ export function downloadPlan(plan: Plan): void {
   downloadBlob(new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' }), planFileName(plan, 'json'));
 }
 
-/** Read and validate a plan file chosen by the user. Throws a readable Error. */
-export async function readPlanFile(file: File): Promise<Plan> {
+/** Read a JSON file chosen by the user. Throws a readable Error. */
+export async function readJsonFile(file: Pick<File, 'name' | 'text'>): Promise<unknown> {
   const text = await file.text();
-  let json: unknown;
   try {
-    json = JSON.parse(text);
+    return JSON.parse(text) as unknown;
   } catch {
     throw new Error(`${file.name} is not valid JSON.`);
   }
-  return migrate(json);
+}
+
+/** Read and validate a plan file chosen by the user. Throws a readable Error. */
+export async function readPlanFile(file: Pick<File, 'name' | 'text'>): Promise<Plan> {
+  return migrate(await readJsonFile(file));
+}
+
+/** Download name of a library backup: homeplan-backup-YYYY-MM-DD.json. */
+export function backupFileName(date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `homeplan-backup-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.json`;
 }
 
 /** Why an autosave failed, in words for the status bar. */

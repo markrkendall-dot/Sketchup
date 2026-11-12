@@ -11,7 +11,7 @@ import { viewPlanStore } from '../store/viewStore';
 import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore, type UiState, type View3dPreset } from '../store/uiStore';
 import { focusCanvas } from '../ui/focus';
-import { planBox, sunShadowFit } from './bounds';
+import { planBox, shadowMapSizeFor, sunShadowFit } from './bounds';
 import { registerCapture, SKY_NAME, SUN_LIGHT_NAME } from './capture';
 import { Controls } from './Controls';
 import { viewSun } from './elevation';
@@ -36,8 +36,6 @@ const HEMISPHERE_GROUND = '#a39f7c';
 const HEMISPHERE_INTENSITY = 2.4;
 /** Tone mapping exposure (ACES): a little above 1 lifts the shaded faces without clipping the sunlit ones. */
 const EXPOSURE = 1.1;
-/** Shadow map size (2048: a texel is about half an inch on the starter house). */
-const SHADOW_MAP_SIZE = 2048;
 /** Depth bias (normalized depth) and normal offset (inches) against shadow acne. */
 const SHADOW_BIAS = -0.0002;
 const SHADOW_NORMAL_BIAS = 1.5;
@@ -106,13 +104,14 @@ function DebugHandle() {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls);
   const invalidate = useThree((s) => s.invalidate);
+  const gl = useThree((s) => s.gl);
   useEffect(() => {
     if (!import.meta.env.DEV || !window.__homeplan) return;
-    window.__homeplan.scene3d = { scene, camera, controls, invalidate };
+    window.__homeplan.scene3d = { scene, camera, controls, invalidate, gl };
     return () => {
       if (window.__homeplan?.scene3d?.scene === scene) delete window.__homeplan.scene3d;
     };
-  }, [scene, camera, controls, invalidate]);
+  }, [scene, camera, controls, invalidate, gl]);
   return null;
 }
 
@@ -165,18 +164,22 @@ function SunLight() {
   const plan = useViewPlanStore((s) => s.plan);
   const sun = useViewSun();
   const invalidate = useThree((s) => s.invalidate);
+  const maxTexture = useThree((s) => s.gl.capabilities.maxTextureSize);
+  const fit = useMemo(() => sunShadowFit(planBox(plan), sun), [plan, sun]);
+  // The map grows with the ground it covers (bounds.ts shadowMapSizeFor): a new light per size, as
+  // three makes the map's render target once.
+  const mapSize = shadowMapSizeFor(fit, maxTexture);
   const light = useMemo(() => {
     const l = new DirectionalLight('#ffffff', SUN_INTENSITY);
     l.name = SUN_LIGHT_NAME;
     l.castShadow = true;
-    l.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    l.shadow.mapSize.set(mapSize, mapSize);
     l.shadow.bias = SHADOW_BIAS;
     l.shadow.normalBias = SHADOW_NORMAL_BIAS;
     l.shadow.autoUpdate = false;
     l.shadow.needsUpdate = true;
     return l;
-  }, []);
-  const fit = useMemo(() => sunShadowFit(planBox(plan), sun), [plan, sun]);
+  }, [mapSize]);
   const { half, near, far } = fit;
   const [px, py, pz] = fit.position;
   useEffect(() => {
@@ -310,9 +313,10 @@ function Levels() {
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const active = useUiStore((s) => s.activeLevelId);
   const siteMode = useUiStore((s) => s.siteMode);
+  const gone = useViewPlanStore((s) => s.hiddenStructures);
   const shown = useMemo(
-    () => new Set(visible3dLevels(plan, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode })),
-    [plan, hidden, only, active, siteMode],
+    () => new Set(visible3dLevels(plan, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode, hiddenStructures: gone })),
+    [plan, hidden, only, active, siteMode, gone],
   );
   return (
     <>
@@ -340,11 +344,13 @@ const PRESET_BUTTONS: { preset: View3dPreset; label: string; title: string }[] =
 
 /** Small overlay toolbar: level and roof visibility, the view presets, Fit 3D, and the walk mode toggle. */
 function View3dToolbar() {
-  // Each structure's levels, bottom to top; with more than one structure, each run of levels after its structure's name.
+  // Each structure's levels, bottom to top; with more than one structure, each run of levels after
+  // its structure's name. A building the active option does not build has no checkboxes.
+  const gone = useViewPlanStore((s) => s.hiddenStructures);
   const rows = usePlanStore(
     useShallow((s) => {
       const many = s.plan.structureOrder.length > 1;
-      return structuresOf(s.plan).flatMap((st) => [...(many ? [`s|${st.id}|${st.name}`] : []), ...st.levelOrder.map((id) => `l|${id}|${s.plan.levels[id]?.name ?? ''}`)]);
+      return structuresOf(s.plan).filter((st) => !gone.has(st.id)).flatMap((st) => [...(many ? [`s|${st.id}|${st.name}`] : []), ...st.levelOrder.map((id) => `l|${id}|${s.plan.levels[id]?.name ?? ''}`)]);
     }),
   );
   const hidden = useUiStore((s) => s.hidden3dLevels);

@@ -12,6 +12,8 @@ import type { Tool, ToolContext, ToolPointerEvent } from './index';
 import { applyBufferKey } from './lengthBuffer';
 import { makeOutlineTool } from './outlineTool';
 import { isIdentity, structuresOf, toLocal, toSite } from '../../model/structures';
+import { snapStructureOrigin, structureAt } from './structureDrag';
+import { getHiddenStructures } from '../../store/viewStore';
 
 // The site tools (DESIGN.md "Site and terrain"): grade point (E), column (C), ground surface (A),
 // fence (Q), and the select tool as it works in site mode. All of them work on plan.site, over the
@@ -331,17 +333,23 @@ type SiteDrag =
       fences: Record<Id, Vec2[]>;
       started: boolean;
     }
-  | { kind: 'box'; a: Vec2; additive: boolean };
+  | { kind: 'box'; a: Vec2; additive: boolean }
+  /** A building moved by its ground floor (structureDrag.ts); one undo step. */
+  | { kind: 'structure'; id: Id; startScreen: Vec2; grab: Vec2; origin: Vec2; started: boolean };
 
 let drag: SiteDrag | null = null;
 
 const toggle = (list: Id[], id: Id) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
 function finishDrag(): void {
-  if (drag?.kind === 'move' && drag.started) resumeHistory();
+  if ((drag?.kind === 'move' || drag?.kind === 'structure') && drag.started) resumeHistory();
 }
 
-/** Select, move and delete grade points, columns, fences and surfaces. The wall, opening, room, stairs and roof picking is off. */
+
+/**
+ * Select, move and delete grade points, columns, fences and surfaces, and drag a building by its
+ * ground floor. The wall, opening, room, stairs and roof picking is off.
+ */
 export const siteSelectTool: Tool = {
   onPointerDown(e: ToolPointerEvent, ctx) {
     if (e.button !== 0) return;
@@ -349,6 +357,14 @@ export const siteSelectTool: Tool = {
     const site = ctx.plan().site;
     const sel = ui.selection;
     const hit = hitSite(site, e.world, ui.viewport.k, ui.viewMode);
+    // Pressed on a building with nothing of the site under the pointer: drag the building (one the
+    // active option does not build is not there to press on).
+    const building = !hit && !e.shiftKey ? structureAt(ctx.plan(), e.world, ui.viewMode, getHiddenStructures()) : null;
+    if (building) {
+      ui.clearSelection();
+      drag = { kind: 'structure', id: building.id, startScreen: e.screen, grab: e.world, origin: { ...building.origin }, started: false };
+      return;
+    }
     if (!hit) {
       if (!e.shiftKey) ui.clearSelection();
       drag = { kind: 'box', a: e.world, additive: e.shiftKey };
@@ -384,6 +400,21 @@ export const siteSelectTool: Tool = {
       return;
     }
     if (!drag.started && dist(e.screen, drag.startScreen) < DRAG_THRESHOLD_PX) return;
+    if (drag.kind === 'structure') {
+      const plan = ctx.plan();
+      const wanted = add(drag.origin, sub(e.world, drag.grab));
+      const { origin, snap } = snapStructureOrigin(plan, drag.id, wanted, ui.viewport.k, ui.viewMode, getHiddenStructures());
+      const name = plan.structures[drag.id]?.name ?? 'the building';
+      const prec = plan.settings.precisionDenominator;
+      ui.patchDraft({ cursor: e.world, snap, error: false, message: `Moving ${name} to x ${formatLengthCompact(origin.x, prec)}, y ${formatLengthCompact(origin.y, prec)}${snap ? ', snapped to a wall corner' : ''}. Esc puts it back.` });
+      const before = ctx.plan();
+      ctx.actions.updateStructure(drag.id, { origin });
+      if (!drag.started && ctx.plan() !== before) {
+        drag.started = true;
+        pauseHistory();
+      }
+      return;
+    }
     const grid = ctx.plan().settings.snapGrid;
     const round = (v: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
     const d = sub(e.world, drag.grab);
@@ -402,6 +433,7 @@ export const siteSelectTool: Tool = {
 
   onPointerUp(e, ctx) {
     const ui = ctx.ui();
+    if (drag?.kind === 'structure') ui.patchDraft({ snap: null, message: drag.started ? `Moved ${ctx.plan().structures[drag.id]?.name ?? 'the building'}.` : null });
     if (drag?.kind === 'box') {
       const { a } = drag;
       const b = e.world;
@@ -455,6 +487,8 @@ export const siteSelectTool: Tool = {
   },
 
   cancel(ctx) {
+    // Esc in a building drag puts it back where it was (folded into the drag's undo step).
+    if (drag?.kind === 'structure' && drag.started) ctx.actions.updateStructure(drag.id, { origin: drag.origin });
     finishDrag();
     drag = null;
     ctx.ui().patchDraft({ box: null, snap: null });

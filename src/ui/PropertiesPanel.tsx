@@ -70,12 +70,13 @@ import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type 
 import { columnProblem, fenceProblem, groundLevelId, MAX_DECK_ELEVATION, MAX_FENCE_RAILS, MAX_ROOF_PITCH, MIN_FENCE_SPACING, wallLength } from '../model/plan';
 import { firstStructure, isLowestLevel, levelAboveId, STRUCTURE_KIND_LABEL, STRUCTURE_KINDS, structureOf } from '../model/structures';
 import { boundsOf } from '../model/geometry';
-import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
+import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isOverheadDoor, isSlidingDoor, leafColorOf, OVERHEAD_DOOR_COLOR, OVERHEAD_DOOR_SIZES, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
 import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
-import type { ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { RoomOptionFinishes, OptionLook, ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import { AS_TODAY } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type EntitySelection, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { getViewPlan, useViewPlanStore } from '../store/viewStore';
@@ -819,7 +820,22 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   const wording = wall ? swingWording(level, wall, getFaces(level, viewMode)) : null;
   const door = opening.type === 'door';
   const sliding = isSlidingDoor(opening);
-  const screened = glazingOf(opening) === 'screen';
+  const overhead = isOverheadDoor(opening);
+  const screened = !overhead && glazingOf(opening) === 'screen';
+  /** A door's style: hinged (the default), sliding or overhead; each clears the others' flag. */
+  const setDoorStyle = (style: 'hinged' | 'sliding' | 'overhead') => {
+    const patch: Partial<Opening> = { sliding: style === 'sliding' ? true : undefined, overhead: style === 'overhead' ? true : undefined };
+    // A door made overhead that is narrower than a car takes the single size (9' x 7') where it fits.
+    if (style === 'overhead' && opening.width < OVERHEAD_DOOR_SIZES.single.width && OVERHEAD_DOOR_SIZES.single.width <= clear + EPS) {
+      patch.width = OVERHEAD_DOOR_SIZES.single.width;
+      if (openingFitsHeight({ sill: 0, height: OVERHEAD_DOOR_SIZES.single.height }, wallH)) patch.height = OVERHEAD_DOOR_SIZES.single.height;
+    }
+    updateOpening(levelId, opening.id, patch);
+  };
+  const setOverheadSize = (size: 'single' | 'double') => {
+    const { width, height } = OVERHEAD_DOOR_SIZES[size];
+    updateOpening(levelId, opening.id, { width: Math.min(width, clear), height: Math.min(height, wallH - opening.sill) });
+  };
   const changeType = (type: OpeningType) => {
     if (type === opening.type) return;
     const def = OPENING_DEFAULTS[type];
@@ -889,20 +905,31 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
       />
       <PhaseSelect sel={{ openings: [opening.id] }} value={opening.phase} items={[opening]} />
       {door && (
-        <label className="check-row">
-          <input
-            type="checkbox"
-            aria-label="Sliding"
-            checked={sliding}
-            onChange={(e) => {
-              updateOpening(levelId, opening.id, { sliding: e.target.checked ? true : undefined });
-              releaseFocus(e.currentTarget);
-            }}
-          />
-          Sliding (two glazed panels in tracks, no swing)
-        </label>
+        <SelectField
+          label="Style"
+          value={overhead ? 'overhead' : sliding ? 'sliding' : 'hinged'}
+          options={[
+            { value: 'hinged', label: 'Hinged (swings)' },
+            { value: 'sliding', label: 'Sliding (two glazed panels in tracks)' },
+            { value: 'overhead', label: 'Overhead (sectional garage door)' },
+          ]}
+          onChange={setDoorStyle}
+        />
       )}
-      {door && !sliding && (
+      {overhead && (
+        <div className="field">
+          <span className="label">Size</span>
+          <div className="group" role="group" aria-label="Garage door size">
+            <button onClick={() => setOverheadSize('single')} title="A single car door, 9' wide and 7' high">
+              9' x 7'
+            </button>
+            <button onClick={() => setOverheadSize('double')} title="A double car door, 16' wide and 7' high">
+              16' x 7'
+            </button>
+          </div>
+        </div>
+      )}
+      {door && !sliding && !overhead && (
         <>
           <SelectField
             label="Hinge"
@@ -926,7 +953,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
       )}
       {opening.type !== 'passage' && (
         <>
-          {!sliding && (
+          {!sliding && !overhead && (
             <NumberField
               label={door ? 'Leaves' : 'Sashes'}
               value={door ? leavesOf(opening) : sashesOf(opening)}
@@ -949,13 +976,15 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
               Fixed centre pane (side sashes at most 24" wide)
             </label>
           )}
-          <SelectField
-            label="Glazing"
-            value={glazingOf(opening)}
-            options={glazingOptions}
-            onChange={(g) => updateOpening(levelId, opening.id, { glazing: g === 'glass' ? undefined : g })}
-          />
-          {!screened && (
+          {!overhead && (
+            <SelectField
+              label="Glazing"
+              value={glazingOf(opening)}
+              options={glazingOptions}
+              onChange={(g) => updateOpening(levelId, opening.id, { glazing: g === 'glass' ? undefined : g })}
+            />
+          )}
+          {!screened && !overhead && (
             <>
               <NumberField
                 label={sliding ? 'Lites across per panel' : door ? 'Glazed columns per leaf' : 'Lites across per sash'}
@@ -980,7 +1009,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
               />
             </>
           )}
-          {door && !sliding && !screened && (
+          {door && !sliding && !overhead && !screened && (
             <label className="check-row">
               <input
                 type="checkbox"
@@ -1007,7 +1036,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
               value={leafColorOf(opening)}
               onCommit={(leafColor) => updateOpening(levelId, opening.id, { leafColor })}
               onReset={opening.leafColor ? () => updateOpening(levelId, opening.id, { leafColor: undefined }) : undefined}
-              hint={screened ? 'The screen door frame.' : `Default ${DEFAULT_LEAF_COLOR}.`}
+              hint={screened ? 'The screen door frame.' : overhead ? `The sections; default ${OVERHEAD_DOOR_COLOR}.` : `Default ${DEFAULT_LEAF_COLOR}.`}
             />
           )}
         </>
@@ -1089,14 +1118,26 @@ function RoomProposedFinishes({ levelId, room }: { levelId: Id; room: Room }) {
     scope.mine && scope.optionId ? updateOwn(levelId, room.id, scope.optionId, patch) : updateRoom(levelId, room.id, patch);
   const floor = shown.proposedFloor;
   const wall = shown.proposedWall;
+  // In one option's scope "Keep today's" is stored as 'today' (as today whatever the shared choice);
+  // "Shared" goes back to the shared one.
+  const mine = scope.mine && scope.optionId ? scope.optionId : null;
+  const ownChoice = (v: RoomOptionFinishes['proposedFloor'] | RoomOptionFinishes['proposedWall'], fallback: string): string => (v === AS_TODAY ? 'keep' : v ? v.finish : fallback);
+  const sharedLabel = (v: { finish: string } | undefined, labels: Record<string, string>, today: string) => `Shared: ${v ? labels[v.finish] : today}`;
+  const choose = (key: 'proposedFloor' | 'proposedWall', v: string, current: { finish: string; color?: string } | undefined) => {
+    if (mine && (v === 'shared' || v === 'keep')) {
+      updateOwn(levelId, room.id, mine, { [key]: v === 'keep' ? AS_TODAY : undefined });
+      return;
+    }
+    set({ [key]: v === 'keep' ? undefined : { finish: v, ...(current?.color ? { color: current.color } : {}) } } as Pick<RoomPatch, 'proposedFloor' | 'proposedWall'>);
+  };
   return (
     <>
       <FinishScopeField scope={scope} />
       <SelectField
         label="Proposed floor"
-        value={floor?.finish ?? 'keep'}
-        options={proposedFloorOptions}
-        onChange={(v) => set({ proposedFloor: v === 'keep' ? undefined : { finish: v, ...(floor?.color ? { color: floor.color } : {}) } })}
+        value={mine ? ownChoice(own?.proposedFloor, 'shared') : (floor?.finish ?? 'keep')}
+        options={mine ? [{ value: 'shared', label: sharedLabel(stored?.proposedFloor, FLOOR_FINISH_LABEL, "today's floor") }, ...proposedFloorOptions] : proposedFloorOptions}
+        onChange={(v) => choose('proposedFloor', v, floor)}
       />
       {floor && (
         <ColorField
@@ -1108,9 +1149,9 @@ function RoomProposedFinishes({ levelId, room }: { levelId: Id; room: Room }) {
       )}
       <SelectField
         label="Proposed walls"
-        value={wall?.finish ?? 'keep'}
-        options={proposedWallOptions}
-        onChange={(v) => set({ proposedWall: v === 'keep' ? undefined : { finish: v, ...(wall?.color ? { color: wall.color } : {}) } })}
+        value={mine ? ownChoice(own?.proposedWall, 'shared') : (wall?.finish ?? 'keep')}
+        options={mine ? [{ value: 'shared', label: sharedLabel(stored?.proposedWall, ROOM_WALL_FINISH_LABEL, "today's walls") }, ...proposedWallOptions] : proposedWallOptions}
+        onChange={(v) => choose('proposedWall', v, wall)}
       />
       {wall && (
         <ColorField
@@ -1125,7 +1166,7 @@ function RoomProposedFinishes({ levelId, room }: { levelId: Id; room: Room }) {
           <button onClick={() => updateOwn(levelId, room.id, scope.optionId!, { proposedFloor: undefined, proposedWall: undefined })}>Use the shared floor and walls</button>
         </div>
       )}
-      {scope.mine && <p className="panel-note">"Keep today's" in {scope.optionName} goes back to the shared choice; set Every option to change that.</p>}
+      {scope.mine && <p className="panel-note">"Keep today's" keeps today's in {scope.optionName} whatever the shared choice; "Shared" follows Every option.</p>}
     </>
   );
 }
@@ -3616,24 +3657,71 @@ function ProposedExterior() {
   // In one option's scope it shows the look that option gets and sets that option's own fields
   // (a reset goes back to the shared field); in every option's, the shared look.
   const look = scope.mine ? shown : shared;
-  const update = (patch: Partial<ProposedLook>) => (scope.mine && scope.optionId ? updateOption(scope.optionId, patch) : updateShared(patch));
-  const resettable = (key: keyof ProposedLook) => (scope.mine ? own?.[key] !== undefined : look?.[key] !== undefined);
-  const color = (label: string, key: 'wallColor' | 'roofColor' | 'boardColor' | 'trimColor' | 'sashColor', fallback: string, hint?: string) => (
-    <ColorField label={label} value={look?.[key] ?? fallback} onCommit={(c) => update({ [key]: c })} onReset={resettable(key) ? () => update({ [key]: undefined }) : undefined} hint={hint} />
-  );
+  // In one option's scope "As today" is stored as 'today' (whatever the shared look says) and
+  // "Shared" (or a reset) goes back to the shared field.
+  const mine = scope.mine && scope.optionId ? scope.optionId : null;
+  const update = (patch: Partial<OptionLook>) => (mine ? updateOption(mine, patch) : updateShared(patch as Partial<ProposedLook>));
+  const resettable = (key: keyof ProposedLook) => (mine ? own?.[key] !== undefined : look?.[key] !== undefined);
+  const color = (label: string, key: 'wallColor' | 'roofColor' | 'boardColor' | 'trimColor' | 'sashColor', fallback: string, hint?: string) => {
+    const today = own?.[key] === AS_TODAY;
+    const asToday =
+      mine && shared?.[key] !== undefined && !today ? (
+        <button className="link-button" onClick={() => update({ [key]: AS_TODAY })}>
+          As today in {scope.optionName}
+        </button>
+      ) : null;
+    return (
+      <ColorField
+        label={label}
+        value={look?.[key] ?? fallback}
+        onCommit={(c) => update({ [key]: c })}
+        onReset={resettable(key) ? () => update({ [key]: undefined }) : undefined}
+        hint={
+          today || hint || asToday ? (
+            <>
+              {today ? `As today in ${scope.optionName}, not the shared colour. ` : ''}
+              {hint}
+              {asToday && (hint ? ' ' : '')}
+              {asToday}
+            </>
+          ) : undefined
+        }
+      />
+    );
+  };
+  const sharedName = (v: string | undefined, labels: Record<string, string>) => `Shared: ${v ? labels[v] : 'as today'}`;
+  const finishValue = (key: 'wallFinish' | 'roofFinish'): string => (mine ? (own?.[key] === AS_TODAY ? 'default' : (own?.[key] ?? 'shared')) : (look?.[key] ?? 'default'));
+  const chooseFinish = (key: 'wallFinish' | 'roofFinish', v: string) =>
+    update({ [key]: v === 'shared' ? undefined : v === 'default' ? (mine ? AS_TODAY : undefined) : v } as Partial<OptionLook>);
+  const shutterValue = mine ? (own?.shutters === AS_TODAY || own?.shutters === true ? 'keep' : own?.shutters === false ? 'remove' : 'shared') : look?.shutters === false ? 'remove' : 'keep';
   return (
     <>
       <FinishScopeField scope={scope} />
-      <SelectField label="Proposed siding" value={look?.wallFinish ?? 'default'} options={sidingOptions} onChange={(v) => update({ wallFinish: v === 'default' ? undefined : v })} />
+      <SelectField
+        label="Proposed siding"
+        value={finishValue('wallFinish')}
+        options={mine ? [{ value: 'shared', label: sharedName(shared?.wallFinish, WALL_FINISH_LABEL) }, ...sidingOptions] : sidingOptions}
+        onChange={(v) => chooseFinish('wallFinish', v)}
+      />
       {color('Proposed siding colour', 'wallColor', defaultWallColor('exterior'))}
-      <SelectField label="Proposed roof" value={look?.roofFinish ?? 'default'} options={proposedRoofOptions} onChange={(v) => update({ roofFinish: v === 'default' ? undefined : v })} />
+      <SelectField
+        label="Proposed roof"
+        value={finishValue('roofFinish')}
+        options={mine ? [{ value: 'shared', label: sharedName(shared?.roofFinish, Object.fromEntries(roofFinishOptions.map((o) => [o.value, o.label]))) }, ...proposedRoofOptions] : proposedRoofOptions}
+        onChange={(v) => chooseFinish('roofFinish', v)}
+      />
       {color('Proposed roof colour', 'roofColor', ROOF_COLOR[look?.roofFinish ?? 'metal'])}
       {color('Proposed roof boards', 'boardColor', TRIM_COLOR, 'Fascia, rake boards and rafter tails.')}
       {color('Proposed window trim', 'trimColor', TRIM_COLOR)}
       {color('Proposed window sashes', 'sashColor', DEFAULT_SASH_COLOR, 'Window sashes and door frames.')}
-      <SelectField label="Proposed shutters" value={look?.shutters === false ? 'remove' : 'keep'} options={shutterOptions} onChange={(v) => update({ shutters: v === 'remove' ? false : undefined })} />
+      <SelectField
+        label="Proposed shutters"
+        value={shutterValue}
+        options={mine ? [{ value: 'shared', label: `Shared: ${shared?.shutters === false ? 'remove' : 'keep'}` }, ...shutterOptions] : shutterOptions}
+        onChange={(v) => update({ shutters: v === 'remove' ? false : v === 'keep' && mine ? AS_TODAY : undefined })}
+      />
       <p className="panel-note">The whole house after the work, in the Proposed view only; Existing and All keep today's look.</p>
-      {scope.mine && <p className="panel-note">What {scope.optionName} sets here replaces the shared look in that option; a field it leaves (or resets) is the shared one.</p>}
+      {scope.mine && <p className="panel-note">What {scope.optionName} sets here replaces the shared look in that option ("As today" too, whatever the shared look says); "Shared" (or a reset) follows Every option.</p>}
     </>
   );
 }

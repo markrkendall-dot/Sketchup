@@ -3,8 +3,13 @@ import { siteGhostLevelId } from '../derive/site';
 import { allLevelIds, firstStructure, structureOf, structuresOf } from '../model/structures';
 import type { Id, Plan } from '../model/types';
 import type { UiState } from '../store/uiStore';
+import { getHiddenStructures } from '../store/viewStore';
 
-type LevelUi = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode'>>;
+type LevelUi = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> &
+  Partial<Pick<UiState, 'siteMode'>> & {
+    /** Buildings the view leaves out (a building only other options build); default: the view store's. */
+    hiddenStructures?: ReadonlySet<Id>;
+  };
 
 /**
  * The level the 3D view treats as the active one: the active level, except in site mode, which
@@ -21,9 +26,11 @@ export function active3dLevel(plan: Pick<Plan, 'structures' | 'structureOrder'>,
  * Levels the 3D view shows, each structure's bottom to top, in structure order: the checked ones,
  * optionally ("Only active level and below") only up to the active level (active3dLevel) in its
  * structure, and in the other structures only those whose floor is not above the active level's.
+ * A building the active option does not build (`hiddenStructures`) shows none.
  */
 export function visible3dLevels(plan: Plan, ui: LevelUi): Id[] {
-  const ids = allLevelIds(plan).filter((id) => !ui.hidden3dLevels.includes(id));
+  const gone = ui.hiddenStructures ?? getHiddenStructures();
+  const ids = allLevelIds(plan).filter((id) => !ui.hidden3dLevels.includes(id) && !(gone.size && gone.has(structureOf(plan, id)?.id ?? '')));
   if (!ui.only3dActiveAndBelow) return ids;
   const activeId = active3dLevel(plan, ui);
   const own = structureOf(plan, activeId);

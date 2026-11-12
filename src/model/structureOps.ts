@@ -3,7 +3,8 @@
 import { boundsOf, type Bounds } from './geometry';
 import { createStructure, newId, templateLevels } from './plan';
 import { normalizeDegrees, STRUCTURE_KIND_LABEL, structuresOf, toSite } from './structures';
-import type { Id, Level, Phase, Plan, Roof, Structure, StructureKind, Vec2 } from './types';
+import { OVERHEAD_DOOR_SIZES } from './finish';
+import type { Id, Level, Opening, Phase, Plan, Roof, Structure, StructureKind, Vec2 } from './types';
 
 /** What a new structure starts with: its levels' template and, for a garage or shed, a starter box. */
 export interface StructurePreset {
@@ -11,19 +12,21 @@ export interface StructurePreset {
   template: 'single' | 'twoStorey' | 'basementTwoStorey' | 'outbuilding';
   /** Name of its (single) level, when not the template's. */
   levelName?: string;
+  /** Wall height of its (single) level when it gets the starter box, when not the template's. */
+  wallHeight?: number;
   /** A rectangle of exterior walls (width along x, depth along y) with a door in its front (+y) wall and a gable roof. */
-  box?: { width: number; depth: number; door: { type: 'door' | 'passage'; width: number; height: number } };
+  box?: { width: number; depth: number; door: { type: 'door' | 'passage'; width: number; height: number; overhead?: boolean } };
 }
 
 /**
- * The presets: a garage is one 84" storey on a 4" slab (the outbuilding template) with a 24' x 24'
- * box, a 16' x 6'8" opening for the car door (a passage: there is no overhead door type) and a gable
- * roof; a shed is the same storey with a 10' x 12' box and a 36" door; a house is one storey on a
- * slab (the single template), and other is the outbuilding storey with nothing on it.
+ * The presets: a garage is one storey on a 4" slab (the outbuilding template; with its starter box
+ * the walls are 96", so the 7' door has a header) with a 24' x 24' box, a 16' x 7' overhead (sectional) door and a
+ * gable roof; a shed is the outbuilding's 84" storey with a 10' x 12' box and a 36" door; a house is
+ * one storey on a slab (the single template), and other is the outbuilding storey with nothing on it.
  */
 export const STRUCTURE_PRESETS: Record<StructureKind, StructurePreset> = {
   house: { template: 'single' },
-  garage: { template: 'outbuilding', levelName: 'Garage', box: { width: 288, depth: 288, door: { type: 'passage', width: 192, height: 80 } } },
+  garage: { template: 'outbuilding', levelName: 'Garage', wallHeight: 96, box: { width: 288, depth: 288, door: { type: 'door', overhead: true, ...OVERHEAD_DOOR_SIZES.double } } },
   shed: { template: 'outbuilding', levelName: 'Shed', box: { width: 144, depth: 120, door: { type: 'door', width: 36, height: 80 } } },
   other: { template: 'outbuilding' },
 };
@@ -70,7 +73,8 @@ function addBox(level: Level, box: NonNullable<StructurePreset['box']>, thicknes
   for (const wall of walls) level.walls[wall.id] = wall;
   // The front wall runs (w, d) -> (0, d); its middle is half its length from a.
   const front = walls[2];
-  const door = { id: newId(), wallId: front.id, type: box.door.type, offset: w / 2, width: box.door.width, height: Math.min(box.door.height, level.wallHeight), sill: 0, phase };
+  const door: Opening = { id: newId(), wallId: front.id, type: box.door.type, offset: w / 2, width: box.door.width, height: Math.min(box.door.height, level.wallHeight), sill: 0, phase };
+  if (box.door.overhead) door.overhead = true;
   level.openings[door.id] = door;
   const h = thickness / 2;
   const roof: Roof = {
@@ -105,6 +109,21 @@ export interface NewStructure {
   starter?: boolean;
   /** The starter box's phase (default existing). */
   phase?: Phase;
+  /**
+   * Floor top of its lowest level. Default: the template's (0 on a slab); the store's addStructure
+   * sets it from the terrain when the site has grade points (groundFloorFor).
+   */
+  baseFloorElevation?: number;
+}
+
+/**
+ * Where on the site a new structure of this kind stands at `origin`: the middle of its starter box
+ * (turned with it), or the origin itself when it has none. The store reads the ground there.
+ */
+export function newStructureCentre(input: Pick<NewStructure, 'kind' | 'rotation' | 'starter'>, origin: Vec2): Vec2 {
+  const box = STRUCTURE_PRESETS[input.kind].box;
+  if (!box || input.starter === false) return origin;
+  return toSite({ origin, rotation: normalizeDegrees(input.rotation ?? 0) }, { x: box.width / 2, y: box.depth / 2 });
 }
 
 /**
@@ -115,10 +134,14 @@ export function addStructureTo(plan: Plan, input: NewStructure): Structure {
   const preset = STRUCTURE_PRESETS[input.kind];
   const { levels, base } = templateLevels(preset.template);
   if (preset.levelName && levels.length === 1) levels[0].name = preset.levelName;
-  if (preset.box && input.starter !== false) addBox(levels[0], preset.box, plan.settings.defaultExteriorThickness, input.phase ?? 'existing');
+  if (preset.box && input.starter !== false) {
+    // The starter box's storey height (a garage's 8', so its 7' door has a header); without the box the template's.
+    if (preset.wallHeight && levels.length === 1) levels[0].wallHeight = preset.wallHeight;
+    addBox(levels[0], preset.box, plan.settings.defaultExteriorThickness, input.phase ?? 'existing');
+  }
   const name = input.name?.trim() || freshStructureName(plan, STRUCTURE_KIND_LABEL[input.kind]);
   const origin = input.origin ?? clearOrigin(plan);
-  const s = createStructure(name, input.kind, levels, base, { origin, rotation: normalizeDegrees(input.rotation ?? 0) });
+  const s = createStructure(name, input.kind, levels, input.baseFloorElevation ?? base, { origin, rotation: normalizeDegrees(input.rotation ?? 0) });
   for (const l of levels) plan.levels[l.id] = l;
   plan.structures[s.id] = s;
   plan.structureOrder.push(s.id);

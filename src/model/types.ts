@@ -113,6 +113,12 @@ export interface Opening {
    * `halfLite` do not apply, and the lite grid is per panel.
    */
   sliding?: boolean;
+  /**
+   * Doors: an overhead (sectional garage) door, horizontal sections that roll up inside on tracks.
+   * No swing (the swing is kept, not drawn); `sashes`, `halfLite`, `sliding`, glazing and the lite
+   * grid do not apply. Typical sizes OVERHEAD_DOOR_SIZES: 9' x 7' single, 16' x 7' double.
+   */
+  overhead?: boolean;
   /** Doors: hex colour `#rrggbb` of the leaf. Absent: the dark green of the house door. */
   leafColor?: string;
 }
@@ -779,11 +785,21 @@ export interface Structure {
   levelOrder: Id[]; // bottom to top
 }
 
-/** An option's own proposed floor and walls for a room (Room.optionFinishes). */
+/**
+ * In an option's own proposed finishes: "as today", explicitly, whatever the shared proposed value
+ * is (absent: the shared value, inherited). See "Design options".
+ */
+export const AS_TODAY = 'today';
+export type AsToday = typeof AS_TODAY;
+
+/** An option's own proposed floor and walls for a room (Room.optionFinishes); 'today' keeps today's whatever the shared choice. */
 export interface RoomOptionFinishes {
-  proposedFloor?: { finish: FloorFinish; color?: string };
-  proposedWall?: { finish: RoomWallFinish; color?: string };
+  proposedFloor?: { finish: FloorFinish; color?: string } | AsToday;
+  proposedWall?: { finish: RoomWallFinish; color?: string } | AsToday;
 }
+
+/** An option's own proposed look: each field its own value, 'today' (as today, whatever the shared look says), or absent (the shared one). */
+export type OptionLook = { [K in keyof ProposedLook]?: ProposedLook[K] | AsToday };
 
 /**
  * A design option (schema version 10, DESIGN.md "Design options"): one alternative proposal for the
@@ -792,8 +808,8 @@ export interface RoomOptionFinishes {
 export interface DesignOption {
   id: Id;
   name: string;
-  /** This option's proposed look, field by field over the plan's (Plan.proposedLook). */
-  proposedLook?: ProposedLook;
+  /** This option's proposed look, field by field over the plan's (Plan.proposedLook); 'today' clears a shared field. */
+  proposedLook?: OptionLook;
 }
 
 export interface Plan {

@@ -3,8 +3,8 @@ import { immer } from 'zustand/middleware/immer';
 import { current } from 'immer';
 import { temporal } from 'zundo';
 import { addLevelTo, deleteLevelFrom, moveLevelIn, type LevelEdit, type LevelPosition } from '../model/levelOps';
-import { addStructureTo, deleteStructureFrom, structurePatchProblem, type NewStructure, type StructurePatch } from '../model/structureOps';
-import { allLevelIds, isLowestLevel, normalizeDegrees as normalizeAngle } from '../model/structures';
+import { addStructureTo, clearOrigin, deleteStructureFrom, newStructureCentre, STRUCTURE_PRESETS, structurePatchProblem, type NewStructure, type StructurePatch } from '../model/structureOps';
+import { allLevelIds, firstStructure, isIdentity, isLowestLevel, normalizeDegrees as normalizeAngle, structureOf } from '../model/structures';
 import { dist } from '../model/geometry';
 import { coreInterval, draftFootprints } from '../derive/openings';
 import { clampOpeningHeight, clampOpeningOffset, openingFitsHeight, wallHeightOf } from '../model/openings';
@@ -34,16 +34,19 @@ import {
   nodeMeets,
   roomOptionFinishesOf,
   foundationProblem,
+  templateLevels,
+  mergeLeftoverJoints,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import { planRenovation } from '../model/renovate';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from '../model/structure';
-import type { Beam, Column, RoomOptionFinishes, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { OptionLook, Beam, Column, RoomOptionFinishes, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
 import { resolveOptionId } from '../derive/optionView';
 import { optionsMeet } from '../derive/phase';
+import { fallbackElevation, terrainHeightAt } from '../derive/site';
 import { addOptionTo, applyPhaseIn, deleteOptionFrom, duplicateOptionIn, renameOptionIn, setEntityOptionsIn } from '../model/optionOps';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
 import { isWoodId } from '../model/furniture';
@@ -87,6 +90,7 @@ const OPTIONAL_OPENING_KEYS: ReadonlySet<keyof Opening> = new Set<keyof Opening>
   'glazing',
   'halfLite',
   'sliding',
+  'overhead',
   'leafColor',
 ]);
 export type RoomPatch = Partial<Omit<Room, 'id'>>;
@@ -409,7 +413,8 @@ export interface PlanState {
   /** Put the selected new and demolished entities in these options (undefined: every option). */
   setEntityOption: (levelId: Id, sel: EntitySelection, optionIds: Id[] | undefined) => void;
   /** Set or clear fields of an option's own proposed look (over the plan's); undefined clears a field. */
-  updateOptionLook: (optionId: Id, patch: Partial<ProposedLook>) => void;
+  /** Set an option's own look fields; 'today' keeps today's whatever the shared look says, undefined goes back to the shared one. */
+  updateOptionLook: (optionId: Id, patch: Partial<OptionLook>) => void;
   /** Set or clear (undefined) a room's own proposed floor or walls in an option (Room.optionFinishes). */
   updateRoomOptionFinishes: (levelId: Id, roomId: Id, optionId: Id, patch: Partial<RoomOptionFinishes>) => void;
 }
@@ -951,7 +956,12 @@ export const usePlanStore = create<PlanState>()(
             // A staircase goes with its pieces.
             const staircases = new Set(sel.staircases ?? []);
             const stairs = [...(sel.stairs ?? []), ...Object.values(level.stairs).flatMap((st) => (st.staircaseId && staircases.has(st.staircaseId) ? [st.id] : []))];
+            // The corners the deleted walls ended at: a T left there may join its two walls again.
+            const gone = new Set(sel.walls);
+            const goneNodes = new Set(sel.nodes);
+            const ends = Object.values(level.walls).flatMap((w) => (gone.has(w.id) || goneNodes.has(w.a) || goneNodes.has(w.b) ? [w.a, w.b] : []));
             deleteInPlace(level, sel.nodes, sel.walls, sel.openings, sel.rooms, stairs, sel.roofs, sel.fixtures, sel.decks, sel.floorOpenings);
+            mergeLeftoverJoints(level, ends);
             for (const id of sel.members ?? []) delete level.members[id];
             for (const id of sel.joistZones ?? []) delete level.joistZones[id];
             for (const id of sel.gradePoints ?? []) delete plan.site.gradePoints[id];
@@ -1815,7 +1825,7 @@ export const usePlanStore = create<PlanState>()(
               if (v === undefined) delete look[k];
               else look[k] = typeof v === 'string' && k.endsWith('Color') ? v.toLowerCase() : v;
             }
-            if (Object.keys(look).length) opt.proposedLook = look as ProposedLook;
+            if (Object.keys(look).length) opt.proposedLook = look as OptionLook;
             else delete opt.proposedLook;
             touch(s.plan);
           }),
@@ -1962,12 +1972,27 @@ export const usePlanStore = create<PlanState>()(
 
         addStructure: (input) => {
           let id = '';
+          // With grade points, a new building's lowest floor sits on the ground where it goes (the
+          // middle of its starter box), the template's levels kept relative to it; without, the
+          // template's (0 on a slab). Read from the plan before the edit: a draft never keys a cache.
+          const before = get().plan;
+          let placed = input;
+          if (input.baseFloorElevation === undefined && Object.keys(before.site.gradePoints).length > 0) {
+            const origin = input.origin ?? clearOrigin(before);
+            const ground = terrainHeightAt(before.site, newStructureCentre(input, origin), fallbackElevation(before));
+            const template = templateLevels(STRUCTURE_PRESETS[input.kind].template).base;
+            if (Number.isFinite(ground)) placed = { ...input, origin, baseFloorElevation: Math.round(ground) + template };
+          }
           set((s) => {
-            const st = addStructureTo(s.plan, input);
+            const st = addStructureTo(s.plan, placed);
             id = st.id;
             for (const lid of st.levelOrder) {
               const level = s.plan.levels[lid];
-              if (level) tagWorkSince({ walls: {}, openings: {} }, level, s.plan);
+              if (!level) continue;
+              tagWorkSince({ walls: {}, openings: {} }, level, s.plan);
+              // The starter box's roof is its work too (it was left in every option before).
+              const work = workOptionOf(s.plan);
+              if (work) for (const r of Object.values(level.roofs)) if (r.phase !== 'existing' && r.optionIds === undefined) r.optionIds = [work];
             }
             touch(s.plan);
           });
@@ -2064,6 +2089,12 @@ export const usePlanStore = create<PlanState>()(
 
 const temporalStore = () => usePlanStore.temporal.getState();
 
+/** Fit the 2D view to the active level (registered by ui/fileActions.ts, which owns zoomToFit). */
+let refitView: () => void = () => {};
+export function setHistoryRefit(fn: () => void): void {
+  refitView = fn;
+}
+
 type HistoryListener = (kind: 'undo' | 'redo') => void;
 const historyListeners = new Set<HistoryListener>();
 
@@ -2087,7 +2118,14 @@ function stepHistory(kind: 'undo' | 'redo'): void {
     const changed = allLevelIds(after).filter((id) => before.levels[id] !== after.levels[id]);
     if (changed.length > 0 && !changed.includes(ui.activeLevelId)) {
       const id = changed[0];
+      // Landing in another building refits the 2D view to it, as switching building by hand does
+      // (editor2d/tools switchLevel): each building is drawn in its own coordinates.
+      const from = ui.siteMode ? undefined : structureOf(before, ui.activeLevelId);
+      const to = structureOf(after, id);
+      const main = firstStructure(after);
+      const refit = from?.id !== to?.id && !(!from && to && isIdentity(to) && to.id === main?.id);
       ui.setActiveLevel(id);
+      if (refit) refitView();
       const text = `${kind === 'undo' ? 'Undid' : 'Redid'} a change on ${after.levels[id].name}`;
       // Clears itself after NOTICE_MS (uiStore.setNotice).
       useUiStore.getState().setNotice({ text, error: false });

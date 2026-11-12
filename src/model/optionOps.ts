@@ -1,7 +1,7 @@
 // Design option edits (DESIGN.md "Design options"), on a plan or an immer draft of one, in place.
 // The store wraps each in one undo step.
 import { isOptionTagged, phaseIn, type Phased } from '../derive/phase';
-import { knownOptionIds, newId, normalizeLevel } from './plan';
+import { knownOptionIds, mergeLeftoverJoints, newId, normalizeLevel } from './plan';
 import type { DesignOption, Id, Level, Phase, Plan, Site } from './types';
 
 type Tagged = Phased & { id: Id; phase?: Phase; optionIds?: Id[] };
@@ -158,6 +158,8 @@ export function deleteOptionFrom(plan: Plan, id: Id): boolean {
   };
   for (const level of Object.values(plan.levels)) {
     let walls = false;
+    // The corners of the walls this option alone builds: a T left there may join its walls again.
+    const ends = Object.values(level.walls).flatMap((w) => (w.phase === 'new' && isOptionTagged(w) && w.optionIds!.length === 1 && w.optionIds![0] === id ? [w.a, w.b] : []));
     for (const [i, rec] of records(level).entries()) {
       const removed = strip(rec);
       if (i === 0 && removed) walls = true;
@@ -171,8 +173,10 @@ export function deleteOptionFrom(plan: Plan, id: Id): boolean {
     const used = new Set(Object.values(level.stairs).map((s) => s.staircaseId));
     for (const scId of Object.keys(level.staircases)) if (!used.has(scId)) delete level.staircases[scId];
     // Openings in removed walls and corners no wall uses go; walls that now stand together join.
-    if (walls) normalizeLevel(level);
-    else for (const o of Object.values(level.openings)) if (!level.walls[o.wallId]) delete level.openings[o.id];
+    if (walls) {
+      normalizeLevel(level);
+      mergeLeftoverJoints(level, ends);
+    } else for (const o of Object.values(level.openings)) if (!level.walls[o.wallId]) delete level.openings[o.id];
   }
   for (const rec of siteRecords(plan.site)) strip(rec);
   return true;

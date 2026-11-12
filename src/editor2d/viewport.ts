@@ -1,3 +1,4 @@
+import { isSwingDoor } from '../model/finish';
 import { boundsOf, type Bounds } from '../model/geometry';
 import { underlayCorners } from '../model/underlay';
 import type { Level, Vec2 } from '../model/types';
@@ -66,12 +67,12 @@ export function fitLevel(level: Level, size: Size, withUnderlay = true): Viewpor
   if (withUnderlay && level.underlay) points.push(...underlayCorners(level.underlay));
   for (const d of Object.values(level.decks ?? {})) points.push(...d.outline);
   // A door's swing can reach a door width beyond its wall (a front door opening outward); a
-  // sliding door stays in its wall.
+  // sliding or overhead door stays in its wall.
   for (const o of Object.values(level.openings)) {
     const w = level.walls[o.wallId];
     const a = w && level.nodes[w.a];
     const b = w && level.nodes[w.b];
-    if (o.type !== 'door' || o.sliding || !a || !b) continue;
+    if (!isSwingDoor(o) || !a || !b) continue;
     const len = Math.hypot(b.x - a.x, b.y - a.y);
     if (len < 1e-9) continue;
     const d = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };

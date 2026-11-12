@@ -62,8 +62,8 @@ subfolder): copy the folder up, or try it locally with `npm run preview`. `npm t
 unit tests. `npm run build:example` rebuilds `docs/examples/146-mick-road.json` (see
 [Modelling 146 Mick Road](#modelling-146-mick-road)).
 
-To see what the tool does before drawing anything, click **Open example** in the toolbar: it
-adds the starter plan of 146 Mick Road as a property and opens it, then press the **3D** button. **Open rebuild** loads the
+To see what the tool does before drawing anything, choose **File > Open example** in the toolbar: it
+adds the starter plan of 146 Mick Road as a property and opens it, then press the **3D** button. **File > Open rebuild** loads the
 second plan, the same house knocked down and rebuilt on its foundation (see
 [The rebuild](#the-rebuild-a-second-plan)).
 
@@ -75,8 +75,8 @@ the same way.
 
 Before you start, measure on paper. Then follow these steps in order.
 
-0. **Start a property with the levels the house has.** **All properties > New...** asks for a name and
-   a template: a basement and two floors (what the toolbar's **New** makes), two floors at grade,
+0. **Start a property with the levels the house has.** **File > New...** (or **All properties >
+   New...**) asks for a name and a template: a basement and two floors (the default), two floors at grade,
    one storey on a slab, or a garage or shed (one level, 84" walls). The buttons under the level
    tabs change it later, on the active level: **Add above** and **Add below** add an empty level
    (its wall height from the level beside it; one added under the lowest leaves the others at their
@@ -148,10 +148,12 @@ levels, floor elevation, wall heights, rooms and roofs.
 
 1. In the level bar, under **Buildings**, press **Add building**, pick the kind (house, garage,
    shed or outbuilding), give it a name if you like, and press **Add**. A garage starts as one 84"
-   storey on a 4" slab with a 24' x 24' box of walls, a 16' opening for the car door (a passage:
-   there is no overhead door type) and a 6:12 gable roof; a shed a 10' x 12' box with a 36" door;
-   an outbuilding an empty storey. It is put 10' to the right of the other buildings, in the
-   toolbar's **Draw as** phase.
+   storey on a 4" slab with 96" walls in a 24' x 24' box, a 16' x 7' overhead (sectional) garage
+   door in its front and a 6:12 gable roof; a shed an 84" storey with a 10' x 12' box and a 36"
+   door; an outbuilding an empty 84" storey. It is put 10' to the right of the other buildings, in
+   the toolbar's **Draw as** phase. When the site has grade points, its floor is set on the ground
+   in the middle of its box (its **Base floor elevation** is the terrain's height there, rounded to
+   the inch), so it neither floats nor sinks; without grade points it is at 0.
 2. The building selector above the levels picks the building you edit; the level tabs, **Add
    above**, **Add below**, the level keys `1` to `9` and the level options then work on its levels
    only. **Rename** and **Delete** act on the selected building (it asks first when there is
@@ -160,12 +162,19 @@ levels, floor elevation, wall heights, rooms and roofs.
    and **Position y** (where its own 0,0 stands on the site) and **Rotation** (degrees, clockwise),
    and the level fields under it, where **Base floor elevation** is this building's lowest floor
    top. Set that to the ground there: a garage slab on a lawn at -6 has its floor at -6.
+   In site mode you can also drag a building: press on its ground floor (where no grade point,
+   column, fence or surface is) and drag. Its wall-face corners snap to the other buildings' corners
+   and faces, else the move snaps to the grid; Esc puts it back, and the drag is one undo step.
+   There is no rotate handle: type the rotation. (A box selection in site mode starts off the buildings.)
 4. Each building is drawn in its own coordinates, square on the screen. The others show faintly
    where they stand on the site, with their roofs; they cannot be selected or snapped to from
    another building. In site mode every building shows at its place, and the site tools snap to all
    of them.
 
-Undo reverts each step. The 3D view, its Fit and elevations, the shadows, the ground (cut out under
+Undo reverts each step; an undo or redo that lands on a level of another building switches to it
+and fits the view to it, as picking that building does.
+
+The 3D view, its Fit and elevations, the shadows, the ground (cut out under
 each building at its own slab), walk mode and the glTF and OBJ exports show every building; in an
 export, a level of a building other than the first is named `<building>: <level>`.
 
@@ -259,8 +268,11 @@ Once the walls are in, these make the 3D model look like the house.
   between them; the lites, cols x rows, are per sash), "Fixed centre pane" (at 3 sashes: a picture
   window, one undivided pane between two casements at most 24" wide), "Glazing" (glass, or an
   insect screen in a light frame), the trim width (0 for none) and shutters (one sash wide). A
-  door's panel sets "Sliding" (a patio door: two glass panels in tracks, framed in the window
-  colour, no swing; its lites are per panel), its "Leaves" (2 for a double door), the glazed lites
+  door's panel sets its "Style": hinged, "Sliding" (a patio door: two glass panels in tracks,
+  framed in the window colour, no swing; its lites are per panel) or "Overhead" (a sectional
+  garage door: about 21" sections with a row of recessed panels, white unless you set the leaf
+  colour, drawn closed on the plan with no swing arc; the **9' x 7'** and **16' x 7'** buttons set
+  a single or double car door, and walk mode goes through it like any door), its "Leaves" (2 for a double door), the glazed lites
   per leaf (1 x 1 is a solid panel), "Half lite" (the lites in the upper part, two panels below),
   "Glazing" (a screen door: screen above and below a mid rail) and the "Leaf colour".
 - **Walls run through the floors.** An exterior wall on a level with a level above it is taller by
@@ -420,13 +432,18 @@ glass.
      gets a button per option.
    - The proposed look (siding, roof, windows) and an existing room's proposed floor and walls can
      be set per option: with several options their panels have **Proposed finishes for**: the option
-     shown, or every option (shared). An option's own value replaces the shared one; where the option
-     sets nothing, it gets the shared one, so "as today" in one option while the others re-side is
-     not possible (leave the shared look as today and set each option's own).
+     shown, or every option (shared). In the option's scope each choice has **Shared** (follow every
+     option's), **As today** / **Keep today's** (today's, whatever the shared choice is) or a value
+     of its own; a colour has an **As today in** link under it while a shared colour is set, and its
+     reset goes back to the shared one. So one option can keep today's siding while the others
+     re-side. Siding or roof "as today" keeps today's colour with it unless the option sets one.
    - A building is not tagged itself: a garage that only one option builds is a building whose
-     walls are all new work of that option; in the others it is listed but empty.
+     contents are all new work of that option. In the other options' Proposed and All views it is
+     left out: not drawn in 3D or on the site, no checkboxes in the 3D bar, and the building list
+     marks it "(not in this option)". It can still be picked there; pick its option to see and edit it.
    - Switching option is not an undo step; adding, duplicating, renaming and deleting options are.
-     A plan opens on its first option.
+     A property opens on the option it was left on (kept in this browser's list of properties), or
+     its first option when that one is gone.
 
 ## Editing walls
 
@@ -451,6 +468,11 @@ glass.
   type the two sizes, `12' x 10'` (or `12' by 10'`, or `12'` Tab `10'`) and Enter; or click the
   opposite corner. "Lengths to" applies: with inside face the room inside is exactly the typed
   size. A side that lies along a wall already there reuses that wall. One undo step.
+- **Deleting a partition joins the wall it met.** When a wall that teed into another is deleted
+  (directly, or with the option that built it), the two pieces of the wall it met are one wall again,
+  provided they are the same in every property (thickness, kind, height, finishes, phase, options)
+  and nothing else meets that corner; doors and windows on them keep their places. Pieces that
+  differ stay two walls. The same undo step as the delete.
 - **Measure (`M`).** Click two points (the corners of wall faces snap, so inside corners measure
   the room); the overlay shows the distance with its x and y parts, and the status bar keeps
   "Measured 12'-6" (dx 10'-0", dy 7'-6")" until Esc. Dragging a wall or a corner with the select
@@ -585,17 +607,29 @@ keyboard back to the plan.
 
 Your browser keeps a library of **properties**: each is a whole plan, saved automatically
 (IndexedDB) after every change. **All properties** (next to the plan name in the toolbar) lists
-them, most recently changed first, with the open one marked; there you can **Open** another,
-start a **New** one, **Duplicate** one (it is added as "name copy"), **Rename**, **Delete** (it
-asks first; deleting the open one opens the next most recent, or a new empty plan), **Import
-JSON** (adds a plan file as a new property) and **Export JSON** (downloads one). The page reopens
-on the property you had open last. Switching property clears Undo, so Undo never reaches into
-another property.
+them, most recently changed first, with the open one marked and a small outline of each (the
+ground-floor walls of every building, as the Proposed view shows them; a grey placeholder until
+the property has been open and switched away from, or the page hidden, or the dialog opened while
+it is open). There you can **Open** another, start a **New** one, **Duplicate** one (it is added
+as "name copy"), **Rename**, **Delete** (it asks first; deleting the open one opens the next most
+recent, or a new empty plan), **Import JSON** (adds a plan file as a new property; a backup file
+is restored instead, below) and **Export JSON** (downloads one). The page reopens on the property
+you had open last, on the design option it was left on. Switching property clears Undo, so Undo
+never reaches into another property.
 
-The toolbar's **New**, **Open** (Ctrl+O), **Open example** and **Open rebuild** add a property
-and switch to it; the plan you were working on stays in the list. Each Open example adds a
-fresh copy of the example, so a copy you have changed is never overwritten. **Save** (Ctrl+S)
-downloads the open plan as a `.json` file.
+**Backup all** downloads one file, `homeplan-backup-<date>.json`, holding every property.
+**Restore all** reads such a file and adds every property in it; nothing in the list is
+overwritten: one whose id is already there is added under a new id with "(restored)" after its
+name. Each plan is read as an Import is (older files upgraded); one that cannot be read is skipped,
+and the dialog says how many were added and how many skipped. The open property stays open.
+
+The toolbar's **File** menu has **New...** (the same name and template form), **Open...**
+(Ctrl+O; a plan file as a new property), **Open example**, **Open rebuild** and **Save** (Ctrl+S,
+downloads the open plan as a `.json` file). Open example and Open rebuild open the copy already
+in the list when it is unchanged since it was added (the list remembers which example a copy came
+from, a hash of that example's file, and the copy's modified time when it was added; any edit or
+rename moves that time on), and otherwise add a fresh copy, so a copy you have changed is never
+overwritten. A newer version of the example (a different file) also gets a fresh copy.
 
 The library lives only in that browser profile: clearing site data removes it, and if the
 browser's storage is full the status bar says "Autosave failed". Export the properties you care

@@ -12,7 +12,8 @@ import { isVariantOf } from './bath';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
 import { firstStructure, isStructureKind, normalizeDegrees, structureOf } from './structures';
-import type { CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
+import { AS_TODAY } from './types';
+import type { OptionLook, CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 10 as const;
@@ -397,6 +398,73 @@ function insertCrossingNode(level: Level, skip: Set<string>): boolean {
   return false;
 }
 
+/** A wall's own properties, everything but its id and ends, as one comparable string (keys sorted). */
+const wallPropsKey = (w: Wall): string =>
+  JSON.stringify(
+    Object.keys(w)
+      .filter((k) => k !== 'id' && k !== 'a' && k !== 'b')
+      .sort()
+      .map((k) => [k, (w as unknown as Record<string, unknown>)[k]]),
+  );
+
+/**
+ * Leftover joints (DESIGN.md "Walls are a graph"): after walls are deleted, a corner they ended at
+ * that now joins exactly two walls (of any phase or option), running straight on from each other,
+ * whose two walls are the same in every property (thickness, kind, phase, height, finishes, band,
+ * bearing, options), is taken out and the two walls become one: the pieces were only split for the
+ * T the deleted wall made. The first wall's id and direction are kept; the other's openings move
+ * onto it at the same places (offsets from its start, a reversed door's hinge and swing side turned
+ * with it). Anything else (a bend, a third wall, a difference in any property) leaves the corner.
+ * Returns the corners taken out.
+ */
+export function mergeLeftoverJoints(level: Level, nodeIds: Iterable<Id>): Id[] {
+  const merged: Id[] = [];
+  for (const n of new Set(nodeIds)) {
+    const node = level.nodes[n];
+    if (!node) continue;
+    const at = Object.values(level.walls).filter((w) => w.a === n || w.b === n);
+    if (at.length !== 2) continue;
+    const [w1, w2] = at;
+    if (w1.a === w1.b || w2.a === w2.b) continue;
+    const far1 = level.nodes[w1.a === n ? w1.b : w1.a];
+    const far2 = level.nodes[w2.a === n ? w2.b : w2.a];
+    if (!far1 || !far2 || far1.id === far2.id) continue;
+    if (wallPropsKey(w1) !== wallPropsKey(w2)) continue;
+    // Straight on: the corner lies on the segment between the far ends, within a hair.
+    const l1 = dist(node, far1);
+    const l2 = dist(node, far2);
+    if (l1 < MERGE_EPS || l2 < MERGE_EPS) continue;
+    const u1 = { x: (far1.x - node.x) / l1, y: (far1.y - node.y) / l1 };
+    const u2 = { x: (far2.x - node.x) / l2, y: (far2.y - node.y) / l2 };
+    if (Math.abs(cross(u1, u2)) > 1e-6 || u1.x * u2.x + u1.y * u2.y > -0.999999) continue;
+    // Already a wall between the far ends (another phase or option): leave it (one wall per pair of corners).
+    if (Object.values(level.walls).some((w) => (w.a === far1.id && w.b === far2.id) || (w.a === far2.id && w.b === far1.id))) continue;
+    // w1 keeps its direction. Its start s: the merged wall's start; offsets along it from there.
+    const w1Forward = w1.b === n; // runs far1 -> n
+    const w2Forward = w2.a === n; // runs n -> far2
+    // The merged wall runs far1 -> far2 when w1 ran toward the corner, else far2 -> far1.
+    const head = w1Forward ? 0 : l2; // how far w1's own start is from the merged start
+    for (const o of Object.values(level.openings)) {
+      if (o.wallId === w1.id) {
+        o.offset += head;
+      } else if (o.wallId === w2.id) {
+        // Distance of the opening's centre from the corner, along w2.
+        const fromN = w2Forward ? o.offset : l2 - o.offset;
+        const same = w1Forward === w2Forward; // w2 runs the merged wall's way
+        o.offset = w1Forward ? l1 + fromN : l2 - fromN;
+        o.wallId = w1.id;
+        if (!same && o.swing) o.swing = { hinge: o.swing.hinge === 'a' ? 'b' : 'a', side: o.swing.side === 'left' ? 'right' : 'left' };
+      }
+    }
+    if (w1Forward) w1.b = far2.id;
+    else w1.a = far2.id;
+    delete level.walls[w2.id];
+    delete level.nodes[n];
+    merged.push(n);
+  }
+  return merged;
+}
+
 /**
  * Restore the planar-graph invariant on a (draft) level, in place:
  * merge nodes within MERGE_EPS, drop zero-length and duplicate walls, split walls at nodes lying
@@ -760,7 +828,7 @@ const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 
 const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'optionIds', 'heightOverride', 'finish', 'color', 'bearing', 'band'] as const;
-const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'optionIds', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
+const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'optionIds', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'overhead', 'leafColor'] as const;
 const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'optionIds', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'optionFinishes', 'ceilingFinish', 'ceilingColor'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'optionIds', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'optionIds', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
@@ -860,21 +928,30 @@ function migrateOpenings(raw: Json, walls: Level['walls']): Level['openings'] {
     put(opening, 'glazing', typeof o.glazing === 'string' && GLAZINGS.includes(o.glazing as Glazing) ? o.glazing : undefined);
     put(opening, 'halfLite', typeof o.halfLite === 'boolean' ? o.halfLite : undefined);
     put(opening, 'sliding', typeof o.sliding === 'boolean' ? o.sliding : undefined);
+    // Only a door is overhead, and only `true` is stored (as for the other flags, false is absent).
+    put(opening, 'overhead', o.overhead === true && opening.type === 'door' ? true : undefined);
     put(opening, 'leafColor', isHexColor(o.leafColor) ? o.leafColor.toLowerCase() : undefined);
     out[oid] = opening as unknown as Opening;
   }
   return out;
 }
 
-/** The proposed look (types.ts ProposedLook): each valid field kept, the rest dropped; undefined when none is left. */
-function migrateProposedLook(raw: unknown): ProposedLook | undefined {
+/**
+ * The proposed look (types.ts ProposedLook): each valid field kept, the rest dropped; undefined
+ * when none is left. An option's look (`option`) may also say 'today' for any field (OptionLook);
+ * in the shared look 'today' is a bad value and dropped.
+ */
+function migrateProposedLook(raw: unknown): ProposedLook | undefined;
+function migrateProposedLook(raw: unknown, option: true): OptionLook | undefined;
+function migrateProposedLook(raw: unknown, option = false): OptionLook | undefined {
   if (!isObject(raw)) return undefined;
   const look = pick(raw, PROPOSED_LOOK_KEYS);
-  put(look, 'wallFinish', typeof raw.wallFinish === 'string' && WALL_FINISHES.includes(raw.wallFinish as WallFinish) ? raw.wallFinish : undefined);
-  put(look, 'roofFinish', typeof raw.roofFinish === 'string' && ROOF_FINISHES.includes(raw.roofFinish as RoofFinish) ? raw.roofFinish : undefined);
-  for (const k of ['wallColor', 'roofColor', 'boardColor', 'trimColor', 'sashColor'] as const) put(look, k, isHexColor(raw[k]) ? (raw[k] as string).toLowerCase() : undefined);
-  put(look, 'shutters', typeof raw.shutters === 'boolean' ? raw.shutters : undefined);
-  return Object.keys(look).length ? (look as ProposedLook) : undefined;
+  const today = (v: unknown) => option && v === AS_TODAY;
+  put(look, 'wallFinish', today(raw.wallFinish) || (typeof raw.wallFinish === 'string' && WALL_FINISHES.includes(raw.wallFinish as WallFinish)) ? raw.wallFinish : undefined);
+  put(look, 'roofFinish', today(raw.roofFinish) || (typeof raw.roofFinish === 'string' && ROOF_FINISHES.includes(raw.roofFinish as RoofFinish)) ? raw.roofFinish : undefined);
+  for (const k of ['wallColor', 'roofColor', 'boardColor', 'trimColor', 'sashColor'] as const) put(look, k, today(raw[k]) ? AS_TODAY : isHexColor(raw[k]) ? (raw[k] as string).toLowerCase() : undefined);
+  put(look, 'shutters', today(raw.shutters) || typeof raw.shutters === 'boolean' ? raw.shutters : undefined);
+  return Object.keys(look).length ? (look as OptionLook) : undefined;
 }
 
 function migrateRooms(raw: Json): Level['rooms'] {
@@ -1653,7 +1730,7 @@ function migrateOptions(raw: unknown): DesignOption[] {
     for (const o of raw) {
       if (!isObject(o) || typeof o.id !== 'string' || !o.id || out.some((x) => x.id === o.id)) continue;
       const opt: DesignOption = { id: o.id, name: typeof o.name === 'string' && o.name.trim() ? o.name : `Option ${out.length + 1}` };
-      const look = migrateProposedLook(o.proposedLook);
+      const look = migrateProposedLook(o.proposedLook, true);
       if (look) opt.proposedLook = look;
       out.push(opt);
     }
@@ -1710,6 +1787,9 @@ export function cleanOptionTags(plan: Plan): void {
 /** A room's per-option proposed floor and walls (types.ts RoomOptionFinishes), each kept when valid; undefined when neither is. */
 export function roomOptionFinishesOf(v: Record<string, unknown>): RoomOptionFinishes | undefined {
   const out: RoomOptionFinishes = {};
+  // 'today': as today in this option, whatever the shared choice (types.ts AS_TODAY).
+  if (v.proposedFloor === AS_TODAY) out.proposedFloor = AS_TODAY;
+  if (v.proposedWall === AS_TODAY) out.proposedWall = AS_TODAY;
   const pf = v.proposedFloor;
   if (isObject(pf) && typeof pf.finish === 'string' && FLOOR_FINISHES.includes(pf.finish as FloorFinish)) out.proposedFloor = { finish: pf.finish as FloorFinish, ...(isHexColor(pf.color) ? { color: pf.color.toLowerCase() } : {}) };
   const pw = v.proposedWall;

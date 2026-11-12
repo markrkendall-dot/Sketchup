@@ -1,5 +1,5 @@
 import { add, cross, dist, dot, scale, sub } from '../model/geometry';
-import { isSlidingDoor, SLIDING_LAP } from '../model/finish';
+import { isOverheadDoor, isSlidingDoor, SLIDING_LAP } from '../model/finish';
 import { clampOpeningOffset } from '../model/openings';
 import type { Id, Level, Opening, Phase, Plan, Vec2, ViewMode } from '../model/types';
 import { computeFootprints, forgetFootprintLevels, getFootprints, type Footprint, type Footprints } from './footprint';
@@ -53,7 +53,7 @@ export const displayCenter = (g: WallGeom, o: Pick<Opening, 'offset' | 'width'>)
 
 export function openingSymbol(
   g: WallGeom,
-  o: Pick<Opening, 'type' | 'offset' | 'width' | 'swing' | 'sliding' | 'sashes'>,
+  o: Pick<Opening, 'type' | 'offset' | 'width' | 'swing' | 'sliding' | 'sashes'> & Partial<Pick<Opening, 'overhead'>>,
 ): OpeningSymbol {
   const center = displayCenter(g, o);
   const w = Math.min(o.width, g.s1 - g.s0);
@@ -66,6 +66,11 @@ export function openingSymbol(
     for (const off of [h, 0, -h]) sym.lines.push([wallPoint(g, j0, off), wallPoint(g, j1, off)]);
   } else if (o.type === 'passage') {
     for (const off of [h, -h]) sym.dashed.push([wallPoint(g, j0, off), wallPoint(g, j1, off)]);
+  } else if (isOverheadDoor(o)) {
+    // An overhead door, closed: its sections as a thin panel across the hole at mid-wall (a 2"
+    // band, or a third of a thin wall), no leaf and no swing arc.
+    const t = Math.min(1, h / 3);
+    sym.lines.push([wallPoint(g, j0, t), wallPoint(g, j1, t)], [wallPoint(g, j0, -t), wallPoint(g, j1, -t)]);
   } else if (isSlidingDoor(o)) {
     // A sliding door: its two panels, one in each track a third of the way out from the
     // centerline, each from its jamb to SLIDING_LAP / 2 past the middle; no leaf and no swing.

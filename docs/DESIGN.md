@@ -59,7 +59,7 @@ export interface Opening {
   swing?: { hinge: 'a' | 'b'; side: 'left' | 'right' };
   lites?: { cols: number; rows: number }; shutters?: boolean; trim?: Inches; // see "Exterior appearance"
   sashes?: number;           // windows: 1..6 side by side; doors: 1 or 2 leaves
-  fixedCenter?: boolean; glazing?: 'glass' | 'screen'; halfLite?: boolean; sliding?: boolean; leafColor?: string;
+  fixedCenter?: boolean; glazing?: 'glass' | 'screen'; halfLite?: boolean; sliding?: boolean; overhead?: boolean; leafColor?: string;
 }
 
 export interface Room {
@@ -259,12 +259,18 @@ fences, north) is shared and stays in site coordinates. There is no plan-level `
   buildings. `floorTops(plan, structureId)` and `getLevelElevations` (all levels) follow the elevation
   rule per stack; `groundLevelId(structure)` is a structure's ground floor (the level above the lowest
   when that one's floor is below 0, else the lowest); `defaultLevelId` is the main structure's.
-- **Store.** `addStructure({kind, name?, origin?, rotation?, starter?, phase?})` takes its levels from
-  a `createEmptyPlan` template (`STRUCTURE_PRESETS`: house `single`; garage, shed and other the
-  `outbuilding` storey, 84" on a 4" slab) and, for a garage (24' x 24', a 192" x 80" passage for the
-  car door, a 6:12 gable) or a shed (12' x 10', a 36" door), a starter box of exterior walls on the
-  level, in the given phase; without an origin it goes `STRUCTURE_GAP` (10') right of the others'
-  site bounding box, level with its top (`clearOrigin`). `deleteStructure` takes its levels with it
+- **Store.** `addStructure({kind, name?, origin?, rotation?, starter?, phase?, baseFloorElevation?})`
+  takes its levels from a `createEmptyPlan` template (`STRUCTURE_PRESETS`: house `single`; garage,
+  shed and other the `outbuilding` storey, 84" on a 4" slab) and, for a garage (24' x 24', a 16' x 7'
+  overhead door, a 6:12 gable, its storey raised to 96" by the preset's `wallHeight` so the door has a
+  header; only with the box) or a shed (12' x 10', a 36" door), a starter box of exterior walls on the
+  level, in the given phase (with several options its walls, door and roof are tagged for the option
+  shown); without an origin it goes `STRUCTURE_GAP` (10') right of the others'
+  site bounding box, level with its top (`clearOrigin`). Without a `baseFloorElevation`, when the
+  site has grade points, the store reads the terrain (`terrainHeightAt`, on the plan before the edit,
+  since a draft never keys a cache) at `newStructureCentre` (the middle of the starter box, turned
+  with it, else the origin) and sets the base to that height rounded to the inch plus the template's
+  own base; without grade points the template's base (0) stays. `deleteStructure` takes its levels with it
   and refuses the last structure; `renameStructure` and `updateStructure` (name, kind, origin,
   rotation normalized to [0, 360), base floor elevation) refuse an empty name or a value that is not
   a finite number. `setBaseFloorElevation(elevation, structureId?)` and `addLevel(position, name?,
@@ -278,7 +284,15 @@ fences, north) is shared and stays in site coordinates. There is no plan-level `
   the others are drawn by `OtherStructures` with the level-below ghost style (their ground floor and
   roofs) under an SVG transform from their coordinates into the active one's (`svgTransform`), with
   no pointer events and no snap sources. Switching to a level of another structure fits the view to
-  it. Site mode draws every structure's ground floor and roofs at its site place; `siteSnap` snaps to
+  it, and so does an undo or redo that lands there (planStore `stepHistory`, with the same rule as
+  `switchLevel`, through `setHistoryRefit`, which ui/fileActions.ts sets to `zoomToFit`). In site
+  mode the select tool drags a building (`tools/structureDrag.ts`): a press with no site element under
+  it on a building's ground floor (`structureAt`: inside an outer face of its site ghost level; the
+  smallest wins) moves its origin with the pointer through `updateStructure`, the first change
+  tracked and the rest folded into it (one undo step), Esc putting it back. `snapStructureOrigin` moves
+  the wanted origin so that one of the building's face corners (`faceSnapSources` of its ghost level)
+  lands on another building's face corner within the node radius, else on another's face within the
+  wall radius (nearest pull wins), else rounds it to the snap grid. There is no rotate handle. Site mode draws every structure's ground floor and roofs at its site place; `siteSnap` snaps to
   each one's face corners and edges in its own coordinates. The properties panel shows the
   building's kind, position and rotation over the level fields. The 3D bar lists the levels under
   each structure's name.
@@ -372,6 +386,16 @@ house across it): `addWall` with `replacesDemolished` and phase `new` may lie al
 walls (never along one that stays). Its pieces never run between the same two nodes as the
 demolished wall, and in the All view `computeFaceGeometry` traces a demolished edge that a shown
 wall already covers between the same two points once, as the rebuilt wall's.
+
+Leftover joints (`mergeLeftoverJoints`): `deleteEntities` and `deleteOptionFrom` pass the corners
+of the walls they remove (for an option, its own new walls); a corner that now has exactly two walls
+(of any phase or option), straight on from each other within 1e-6 of a turn, equal in every property
+but id and ends (`wallPropsKey`, the sorted fields as JSON: thickness, kind, phase, height, finishes,
+band, bearing, optionIds) and not already joined by a wall between their far ends is taken out: the
+first wall keeps its id and direction and reaches the far end of the second, which goes; the
+second's openings move onto it at the same plan places (offsets from the merged start; a reversed
+piece's door has its hinge and swing side turned). Anything else leaves the corner. It runs in the
+same edit, so it is the delete's undo step.
 
 ## Corner joins (`derive/footprint.ts`)
 
@@ -1524,7 +1548,18 @@ one in the outside half of the leaf's 1.75" and the other in the inside half, wi
 bottom rail round a pane with the lite grid per panel (1 x 1 by default, one pane) or a screen; `sashes` and
 `halfLite` do not apply. On the plan (`openingSymbol`) it is two lines, one per panel, a third of the wall's
 thickness out from the centerline either side, with no leaf and no swing arc; its swing is kept but not drawn, and
-the dimension labels and Fit ignore it. Passages stay open. A swinging door is drawn on the plan with its leaf
+the dimension labels and Fit ignore it. An overhead (sectional garage) door (`overhead`, on a door only:
+`isOverheadDoor`; only `true` is stored, like the other flags, so no schema change) has the same trim and frame and,
+in place of a leaf, `overheadSections`: the leaf height in whole sections of about 21" (`OVERHEAD_SECTION`; four
+in a 7' door), each with 2.5" rails top and bottom and a row of 0.75"-recessed panels about 24" wide
+(`OVERHEAD_PANEL`, eight across 16') between 2.5" stiles, and a 0.5" groove at panel depth where two sections meet;
+all part `leaf`, in `leafColorOf` (white `#ecebe6` unless the leaf colour is set). Sliding, `sashes`, `halfLite`,
+glazing and the lites do not apply (`isSlidingDoor` is false for it). On the plan it is drawn closed: two lines
+across the hole 1" either side of the centerline (a third of a thin wall), no leaf and no swing arc
+(`isSwingDoor` is false, so the labels and Fit ignore it too). Walk mode opens every door's span, so it is
+passable. `OVERHEAD_DOOR_SIZES`: single 108" x 84", double 192" x 84"; the panel's Style select (hinged,
+sliding, overhead) clears the other style's flag, and its 9' x 7' / 16' x 7' buttons set the size.
+Passages stay open. A swinging door is drawn on the plan with its leaf
 and swing arc from the hinge jamb (`leaves`, `arcs`); a double door (`sashes` 2) with a half-width leaf and arc
 on each jamb, both to the swing's side, meeting in the middle.
 The outside is found by `outwardSide`: the side of the wall with no closed room beside it when the other has one
@@ -1704,6 +1739,9 @@ and focuses the canvas, so the next Ctrl+Z undoes the plan, not the text.
 
 ### Narrow windows
 
+The top row keeps its buttons on one line down to 1280 px: the file commands (New..., Open...,
+Open example, Open rebuild, Save) are one **File** menu (`Toolbar.tsx FileMenu`, in the Export
+menu's style); its New... opens the Properties dialog on its New form (`uiStore.libraryOpen = 'new'`).
 Below 1400 px the toolbar drops the hotkey suffixes (the tooltips keep them), and below 1100 px it
 also uses short tool names (Image, Opening, Tape) so it stays within two rows (CSS only; the long names stay in the DOM, hidden). Below 900 px (`NARROW_QUERY`
 in `uiStore.ts`, mirrored in `index.css`) the level bar and properties panel float over the plan
@@ -1715,7 +1753,9 @@ split layout keeps the plan, shows a one-line hint, and does not mount the 3D ca
 
 zundo `temporal` on planStore only, `partialize: s => ({plan: s.plan})`, limit 200. uiStore is not
 tracked. Drag grouping: the first set of a drag is tracked, then `temporal.getState().pause()`,
-moves are untracked, `resume()` on pointerup. One undo reverts the whole drag.
+moves are untracked, `resume()` on pointerup. One undo reverts the whole drag. `undo()` / `redo()`
+(`stepHistory`) switch to a level the step changed when the active one did not change, and refit the
+2D view when that level is in another building (see "Structures").
 
 ## Checks (`derive/checks.ts`, `model/codeLimits.ts`, `ui/checks.ts`, `ui/ChecksPanel.tsx`)
 
@@ -1994,7 +2034,31 @@ the exports. Edits go to the plan store by the same ids, so the drawing code tes
 and needs no option logic. The Existing view of the option plan is the same in every option.
 
 The active option is UI state (`uiStore.activeOptionId`, null = first, an id an undo removed falls
-back to the first), not undone, not saved: a plan opens on its first option. With more than one
+back to the first), not undone and not in the plan file. It is remembered per property in the
+library index entry (`LibraryEntry.activeOptionId`, written by main.tsx whenever it changes) and
+restored when the property opens (`switchTo`, and startup) by `optionToRestore`: the stored id while
+the plan has that option, else null (the first).
+
+An option's own proposed finishes may say "as today" explicitly (`AS_TODAY = 'today'`):
+`RoomOptionFinishes.proposedFloor` / `proposedWall` take `'today'` as well as a finish, and
+`DesignOption.proposedLook` is an `OptionLook`, each field its value or `'today'`. Absent still
+means "inherit the shared one". `roomFinishesIn` gives no proposed finish for `'today'`;
+`proposedLookIn` drops a `'today'` field from the merged look, and a siding or roof finish `'today'`
+drops that colour too unless the option sets its own. `migrate` keeps `'today'` there and drops it
+(a bad value) in the shared `Plan.proposedLook` and anywhere else; older files have none, so there is
+no migration and the schema stays 10 (an older HomePlan drops the value and shows the shared one).
+In the option's scope the panels offer "Shared: ..." (absent), "As today" / "Keep today's"
+(`'today'`) or a value; a colour has an "As today in <option>" link while a shared colour is set.
+
+A building whose every phased entity is new work tagged for other options only
+(`structureOnlyInOtherOptions`; an empty building or one with anything existing, untagged or this
+option's is not) is left out of the option's Proposed and All views: `hiddenStructureIds(plan,
+optionId, viewMode)` (memoized per plan, option and view; none in Existing or with one option) is
+computed from the stored plan in the view store (`ViewPlanState.hiddenStructures`, since the view
+plan has already dropped the building's contents); `visible3dLevels` leaves its levels out (so
+3D, Fit, the exports and the checkbox list), the 3D bar has no checkboxes for it, the site drag
+neither picks nor snaps to it, and the building list marks it "(not in this option)" with a note
+when it is the one being edited; it stays selectable, to be edited after switching option. With more than one
 option, new entities made by the store's add actions (and a renovation's or a starter box's new
 and demolished pieces) are tagged for it (`workOptionOf`, `tagWork`); with one they stay untagged.
 `setPhase` goes through `applyPhaseIn`: demolish tags the demolition for the option (adding it to
@@ -2075,7 +2139,13 @@ ground's corners are in view from anywhere inside the sky.
 `SkyEnvironment`). The sun (`SunLight`) is a directional light at intensity 5.2 from `sunPosition(northAngle)`
 (see "Site and terrain") that casts shadows:
 `<Canvas shadows="percentage">` (PCF; three 0.186 has dropped PCF soft, r3f's default, and falls back to PCF
-with a warning), map 2048 x 2048, bias -0.0002, normal bias 1.5". Its orthographic shadow camera is fitted
+with a warning), map 2048 x 2048 or 4096 x 4096 (`bounds.ts shadowMapSizeFor`: the smallest of
+`SHADOW_MAP_SIZES` whose texel, `2 half / size`, is at most `SHADOW_TEXEL` 0.52", else the largest the
+GPU's `maxTextureSize` allows; a new light is made when the size changes, since three makes the map's
+target once), bias -0.0002, normal bias 1.5". The starter alone is 0.507" a texel at 2048; with its
+garage the fit covers 0.866" a texel at 2048, so it takes 4096 (0.433"). The map is drawn only when
+the scene or sun changes, so the larger map costs memory (64 MB) and that one render: measured in the
+headless smoke test (software GL), a frame of the starter took about the same with either size. Its orthographic shadow camera is fitted
 to `planBox(plan)` (every level) on each plan change by `bounds.ts sunShadowFit`: target the box centre,
 the light twice the box's radius r toward the sun, a square frustum 1.1r either side of the axis, depth from
 r/2 to past the far side of the box plus twice r over the sine of the sun's elevation, so the house's
@@ -2245,11 +2315,33 @@ file's order so a current file round-trips byte for byte), with defaults for mis
 values and broken openings, rooms, stairs and underlays dropped (a broken roof, deck or floor opening is dropped
 with a console warning naming it; railings are fitted to the outline). Property library (`io/library.ts`, idb-keyval): each plan
 under `homeplan:plan:<id>`, plus an index under `homeplan:library` of `{id, name, modifiedAt,
-thumbnail?}` entries (no thumbnails are made yet); the index is rebuilt from the plan keys when it is
+thumbnail?, example?, activeOptionId?}` entries (`cleanEntry` drops a malformed optional field, not the
+entry; a save of the plan keeps them); the index is rebuilt from the plan keys when it is
 missing. Every library call runs after the one before it finishes, so the index's read-modify-write
 never interleaves. `load` runs the plan through `migrate`; the key's id wins over the file's. `add`
 (Import, Open, the examples) keeps the file's id unless the library has it, else gives a new one, so
-an import never overwrites. On first run, when the library is empty, the old single autosave slot
+an import never overwrites. `setMeta` changes an entry's kept fields only.
+Thumbnails (`io/thumbnail.ts`): `thumbnailLines` draws the walls of each building's ground floor
+(`groundLevelId`) at its site place, in the Proposed view of the active option (demolished walls and
+other options' new work left out), fitted into 96 x 64 px with a 5 px margin, line width the wall
+thickness at that scale (1 to 3 px); `makeThumbnail` strokes them on a detached canvas into a PNG data
+URL (about 1 to 2 KB), memoized per plan object and option, null without walls (the dialog then shows a
+grey placeholder). `fileActions.saveThumbnail` writes it to the entry (`setMeta`, skipped when the same
+as the last written) when a property is switched away from, when the Properties dialog opens or
+refreshes (for the open one), when the page is hidden, and for each restored plan; never on autosave.
+Backup all (`library.backup`): `{format: 'homeplan-backup', version: 1, createdAt, plans}` with every
+stored plan document as stored (its key's id). Restore all (`library.restore`; also Import JSON when
+`isBackup` says the file is one) refuses a value that is not a backup or a newer version, runs each
+plan through `migrate` (one that throws is skipped and counted), and stores it under its id, or, when
+the library has that id, a new id with " (restored)" on the name; entries get no example, option or
+thumbnail. The dialog and the status bar say "Restored n properties; skipped m that could not be read."
+Open example / Open rebuild (`openExample`): an entry added from an example carries `example: {which,
+hash, modifiedAt}` (`contentHash`, FNV-1a over the example file's JSON, and the plan's modifiedAt at
+the add). `unmodifiedExample` finds an entry of the same example and hash whose modifiedAt still
+equals the recorded one (every edit and rename moves modifiedAt on), and that copy is opened (or,
+when it is the open one, nothing happens); otherwise a fresh copy is added. A duplicate or a restore
+does not carry `example`, and a rebuilt example file (another hash) gets a fresh copy.
+On first run, when the library is empty, the old single autosave slot
 `homeplan:autosave` is moved in and deleted. The open plan's id is kept in localStorage
 (`homeplan:lastPlanId`); startup opens it, else the most recently modified, else a new plan (saved at
 once). Switching property (`ui/fileActions.ts` `switchTo`) awaits the autosave's flush of the outgoing

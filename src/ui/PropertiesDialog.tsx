@@ -3,7 +3,7 @@ import { library, type LibraryEntry } from '../io/library';
 import { PLAN_TEMPLATES, type PlanTemplate } from '../model/plan';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
-import { deleteProperty, duplicateProperty, exportProperty, flushAutosave, newPlan, openPlanFile, openProperty, renameProperty } from './fileActions';
+import { backupAll, deleteProperty, duplicateProperty, exportProperty, flushAutosave, newPlan, openPlanFile, openProperty, renameProperty, restoreFile, restoreSummary, saveThumbnail } from './fileActions';
 import { focusCanvas } from './focus';
 
 const close = () => {
@@ -28,16 +28,20 @@ export function PropertiesDialog() {
   const currentModified = usePlanStore((s) => s.plan.modifiedAt);
   const [entries, setEntries] = useState<LibraryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** What the last Backup all or Restore all did, shown under the head until the dialog closes. */
+  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   /** The New form: a name and a template (model/plan.ts PLAN_TEMPLATES), open while not null. */
   const [creating, setCreating] = useState<{ name: string; template: PlanTemplate } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const restoreRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     try {
       await flushAutosave();
+      await saveThumbnail();
       setEntries(await library.list());
       setError(null);
     } catch (err) {
@@ -49,23 +53,27 @@ export function PropertiesDialog() {
     if (!open) {
       setRenaming(null);
       setCreating(null);
+      setMessage(null);
       return;
     }
     ref.current?.focus();
+    // The toolbar's New opens the dialog on its New form.
+    if (open === 'new') setCreating((c) => c ?? { name: '', template: 'basementTwoStorey' });
     void refresh();
   }, [open, refresh]);
 
   if (!open) return null;
 
   /** Run an action with the buttons disabled, then list again; close when it opened a property. */
-  const run = async (fn: () => Promise<unknown>, closeAfter = false) => {
+  const run = async <T,>(fn: () => Promise<T>, closeAfter: boolean | ((result: T) => boolean) = false) => {
     setBusy(true);
+    let result: T;
     try {
-      await fn();
+      result = await fn();
     } finally {
       setBusy(false);
     }
-    if (closeAfter) close();
+    if (typeof closeAfter === 'function' ? closeAfter(result) : closeAfter) close();
     else await refresh();
   };
 
@@ -109,8 +117,23 @@ export function PropertiesDialog() {
             >
               New...
             </button>
-            <button disabled={busy} onClick={() => fileRef.current?.click()} title="Add a plan file (.json) to the list and open it">
+            <button disabled={busy} onClick={() => fileRef.current?.click()} title="Add a plan file (.json) to the list and open it; a backup file is restored">
               Import JSON
+            </button>
+            <button
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const n = await backupAll();
+                  setMessage(n > 0 ? `Backed up ${n} ${n === 1 ? 'property' : 'properties'} into one file.` : null);
+                })
+              }
+              title="Download one .json file holding every property in this browser"
+            >
+              Backup all
+            </button>
+            <button disabled={busy} onClick={() => restoreRef.current?.click()} title="Add every property in a backup file; nothing here is overwritten">
+              Restore all
             </button>
             <button onClick={close} aria-label="Close properties">
               Close <kbd>Esc</kbd>
@@ -162,6 +185,11 @@ export function PropertiesDialog() {
           </form>
         )}
         {error && <p className="library-error">{error}</p>}
+        {message && (
+          <p className="help-note library-message" role="status">
+            {message}
+          </p>
+        )}
         {entries === null && !error ? (
           <p className="help-note">Loading...</p>
         ) : (
@@ -170,6 +198,11 @@ export function PropertiesDialog() {
               const current = e.id === currentId;
               return (
                 <li key={e.id} className={current ? 'library-row current' : 'library-row'} aria-current={current || undefined}>
+                  {e.thumbnail ? (
+                    <img className="library-thumb" src={e.thumbnail} alt="" width={96} height={64} />
+                  ) : (
+                    <span className="library-thumb library-thumb-none" aria-hidden="true" title="No picture yet: it is made when you switch away from the property" />
+                  )}
                   <div className="library-name">
                     {renaming?.id === e.id ? (
                       <input
@@ -223,7 +256,31 @@ export function PropertiesDialog() {
           onChange={(ev) => {
             const file = ev.target.files?.[0];
             ev.target.value = '';
-            if (file) void run(() => openPlanFile(file), true);
+            if (!file) return;
+            void run(
+              async () => {
+                const r = await openPlanFile(file);
+                // A backup chosen here is restored, not opened (and a file that fails is said): the dialog stays to show it.
+                if (r !== 'opened') setMessage(useUiStore.getState().notice?.text ?? null);
+                return r;
+              },
+              (r) => r === 'opened',
+            );
+          }}
+        />
+        <input
+          ref={restoreRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(ev) => {
+            const file = ev.target.files?.[0];
+            ev.target.value = '';
+            if (!file) return;
+            void run(async () => {
+              const r = await restoreFile(file);
+              setMessage(r ? restoreSummary(r) : (useUiStore.getState().notice?.text ?? null));
+            });
           }}
         />
       </div>

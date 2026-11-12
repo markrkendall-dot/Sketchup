@@ -15,7 +15,7 @@ import { memberAxis, memberBoxes, type AxisPoint } from './members';
 import { isLog, isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
-import { ceilingLookOf, columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookIn, isSlidingDoor, leafColorOf, roomWallLookIn, wainscotIn, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { ceilingLookOf, columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookIn, isOverheadDoor, isSlidingDoor, leafColorOf, roomWallLookIn, wainscotIn, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
@@ -1029,6 +1029,7 @@ export function buildOpeningFill(fp: Footprint, o: Opening, wallHeight: number, 
     glazing: o.glazing,
     halfLite: o.halfLite,
     sliding: isSlidingDoor(o),
+    overhead: isOverheadDoor(o),
   });
   const byPart = new Map<FillPart, BufferGeometry[]>();
   for (const b of boxes) {

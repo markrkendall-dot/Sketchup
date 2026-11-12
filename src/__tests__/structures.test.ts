@@ -176,17 +176,17 @@ describe('structure actions in the store', () => {
     const g = plan().structures[id];
     expect(g).toMatchObject({ name: 'Garage', kind: 'garage', rotation: 0, baseFloorElevation: 0 });
     expect(plan().structureOrder).toEqual([before.structureOrder[0], id]);
-    // One level on a 4" slab with lower walls (the outbuilding template).
+    // One level on a 4" slab (the outbuilding template), its walls 8' with the starter box.
     expect(g.levelOrder).toHaveLength(1);
     const level = plan().levels[g.levelOrder[0]];
-    expect(level).toMatchObject({ name: 'Garage', wallHeight: 84, floorThickness: 4 });
-    // 24' x 24' of exterior walls, a 16' opening in the front, a gable roof on the outside faces.
+    expect(level).toMatchObject({ name: 'Garage', wallHeight: 96, floorThickness: 4 });
+    // 24' x 24' of exterior walls, a 16' x 7' overhead door in the front, a gable roof on the outside faces.
     expect(Object.keys(level.walls)).toHaveLength(4);
     const xs = Object.values(level.nodes).map((n) => n.x);
     expect(Math.max(...xs) - Math.min(...xs)).toBe(288);
     const openings = Object.values(level.openings);
     expect(openings).toHaveLength(1);
-    expect(openings[0]).toMatchObject({ type: 'passage', width: 192, height: 80, sill: 0 });
+    expect(openings[0]).toMatchObject({ type: 'door', overhead: true, width: 192, height: 84, sill: 0 });
     expect(Object.values(level.roofs)).toEqual([expect.objectContaining({ shape: 'gable' })]);
     // Clear of the house: STRUCTURE_GAP right of its walls' outside, level with its top.
     const house = structureSiteBounds(plan(), firstStructure(plan()))!;
@@ -272,7 +272,7 @@ describe('levels per structure', () => {
     store().setBaseFloorElevation(-6, id);
     expect(floorTops(plan(), id)).toEqual([-6]);
     expect(floorTops(plan())).toEqual(houseTops);
-    expect(getLevelElevations(plan())[g.levelOrder[0]]).toEqual({ floorTop: -6, ceiling: 78, slabBottom: -10 });
+    expect(getLevelElevations(plan())[g.levelOrder[0]]).toEqual({ floorTop: -6, ceiling: 90, slabBottom: -10 });
     // Each structure's ground floor: the house's first floor over its basement, the garage's only level.
     expect(siteGhostLevelIds(plan())).toEqual([firstStructure(plan()).levelOrder[1], g.levelOrder[0]]);
   });
@@ -298,8 +298,8 @@ describe('levels per structure', () => {
     const loft = store().addLevel('top', 'Loft', id)!;
     expect(plan().structures[id].levelOrder).toEqual([g, loft.id]);
     expect(firstStructure(plan()).levelOrder).toEqual(house);
-    // The loft sits on the garage's walls: 84" over its slab, then a framed floor.
-    expect(getLevelElevations(plan())[loft.id].floorTop).toBe(84 + 12);
+    // The loft sits on the garage's walls: 96" over its slab, then a framed floor.
+    expect(getLevelElevations(plan())[loft.id].floorTop).toBe(96 + 12);
     // A position naming a garage level adds to the garage, whatever structure is asked for.
     expect(store().addLevel({ below: g }, undefined, firstStructure(plan()).id)).toBeNull();
     const under = store().addLevel({ below: g })!;

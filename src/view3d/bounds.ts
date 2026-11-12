@@ -129,6 +129,27 @@ export interface ShadowFit {
   far: number;
 }
 
+/** Shadow map sizes the sun may use: the smallest that keeps SHADOW_TEXEL, up to the largest (and the GPU's limit). */
+export const SHADOW_MAP_SIZES = [2048, 4096] as const;
+/** The shadow texel the sun keeps where it can (inches): the starter house alone had about 0.52". */
+export const SHADOW_TEXEL = 0.52;
+
+/** The side of one shadow-map texel on the ground across the light (inches) for a fit and map size. */
+export const shadowTexel = (fit: Pick<ShadowFit, 'half'>, mapSize: number): number => (2 * fit.half) / mapSize;
+
+/**
+ * The shadow map size for a fit: the smallest of SHADOW_MAP_SIZES whose texel is at most
+ * SHADOW_TEXEL, else the largest the GPU takes (`maxTextureSize`). A plan with several buildings
+ * spreads the map over more ground; a bigger map keeps the house's shadows as sharp as they were
+ * with the house alone. The map is drawn only when the scene or the sun changes, so its size costs
+ * memory and that one render, not every frame.
+ */
+export function shadowMapSizeFor(fit: Pick<ShadowFit, 'half'>, maxTextureSize = 4096): number {
+  const sizes = SHADOW_MAP_SIZES.filter((s) => s <= maxTextureSize);
+  if (sizes.length === 0) return Math.min(SHADOW_MAP_SIZES[0], maxTextureSize);
+  return sizes.find((s) => shadowTexel(fit, s) <= SHADOW_TEXEL) ?? sizes[sizes.length - 1];
+}
+
 /**
  * Fit the sun's shadow camera round a box: target at the box centre, the light 2r out along the
  * sun direction (r the radius of the box's bounding sphere), a square frustum 1.1r either side of

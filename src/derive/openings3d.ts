@@ -1,4 +1,4 @@
-import { DEFAULT_LITES, DEFAULT_TRIM, MAX_SASHES, SLIDING_LAP } from '../model/finish';
+import { DEFAULT_LITES, DEFAULT_TRIM, MAX_SASHES, OVERHEAD_SECTION, SLIDING_LAP } from '../model/finish';
 import type { Opening } from '../model/types';
 
 // Window and door fills (DESIGN.md "Exterior appearance"). Pure: an opening becomes a list of axis
@@ -88,6 +88,21 @@ export interface FillInput {
   glazing?: Opening['glazing'];
   halfLite?: boolean;
   sliding?: boolean;
+  /** An overhead (sectional garage) door (overheadSections). */
+  overhead?: boolean;
+}
+
+/** An overhead door's raised panels: about this wide, a whole number across each section. */
+export const OVERHEAD_PANEL = 24;
+/** The stiles and rails round an overhead door's panels, and the groove between two sections. */
+export const OVERHEAD_RAIL = 2.5;
+export const OVERHEAD_JOINT = 0.5;
+
+/** An overhead door's sections, bottom to top, as [y0, y1] between ly0 and ly1: about OVERHEAD_SECTION high each. */
+export function overheadSections(ly0: number, ly1: number): [number, number][] {
+  const h = ly1 - ly0;
+  const n = Math.max(1, Math.round(h / OVERHEAD_SECTION));
+  return Array.from({ length: n }, (_, i): [number, number] => [ly0 + (h * i) / n, i === n - 1 ? ly1 : ly0 + (h * (i + 1)) / n]);
 }
 
 /** Number of (vertical, horizontal) muntins for a lite grid. */
@@ -278,6 +293,31 @@ export function openingFill(input: FillInput): FillBox[] {
   };
   const l0 = j0 + fr;
   const l1 = j1 - fr;
+  if (input.overhead) {
+    // An overhead door: horizontal sections the full width between the frame, each with a row of
+    // recessed panels framed by rails and stiles, and a shallow groove where two sections meet.
+    // Every board is the leaf's colour.
+    const sections = overheadSections(ly0, ly1);
+    const across = Math.max(1, Math.round((l1 - l0) / OVERHEAD_PANEL));
+    sections.forEach(([y0, y1], i) => {
+      const g = i < sections.length - 1 ? Math.min(OVERHEAD_JOINT, (y1 - y0) / 8) / 2 : 0;
+      const b0 = y0 + (i > 0 ? Math.min(OVERHEAD_JOINT, (y1 - y0) / 8) / 2 : 0);
+      const b1 = y1 - g;
+      // The groove: the section's edge set back to panel depth, so the joint reads as a line.
+      if (g > 0) add('leaf', 'panel', l0, l1, -pd, pd, b1, y1 + g);
+      const r = Math.min(OVERHEAD_RAIL, (b1 - b0) / 4);
+      const st = Math.min(OVERHEAD_RAIL, (l1 - l0) / (4 * across));
+      add('leaf', 'leaf', l0, l1, -ld, ld, b1 - r, b1);
+      add('leaf', 'leaf', l0, l1, -ld, ld, b0, b0 + r);
+      const pw = (l1 - l0 - (across + 1) * st) / across;
+      for (let k = 0; k <= across; k++) {
+        const s0 = l0 + k * (pw + st);
+        add('leaf', 'leaf', s0, s0 + st, -ld, ld, b0 + r, b1 - r);
+        if (k < across) add('leaf', 'panel', s0 + st, s0 + st + pw, -pd, pd, b0 + r, b1 - r);
+      }
+    });
+    return boxes;
+  }
   if (input.sliding) {
     // A sliding door: two panels framed like window sashes (part sash), each from its jamb to
     // SLIDING_LAP / 2 past the middle, the start one in the outside track and the end one in the

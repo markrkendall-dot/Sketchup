@@ -6,7 +6,7 @@ import type { MeasureTo } from '../model/types';
 import { redo, undo, usePlanStore, useTemporal } from '../store/planStore';
 import { isSiteModeTool, SITE_MODE_TOOL_HINT, useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
 import { visible3dLevels } from '../view3d/visibility';
-import { choosePlanFile, newPlan, openExample, savePlan, zoomToFit } from './fileActions';
+import { choosePlanFile, openExample, savePlan, zoomToFit } from './fileActions';
 import { focusCanvas, releaseFocus } from './focus';
 import { OptionPicker } from './OptionPicker';
 import { optionOf } from '../derive/optionView';
@@ -197,6 +197,73 @@ function ExportMenu() {
   );
 }
 
+/**
+ * File menu: New (the Properties dialog's New form: a name and a template), Open a plan file, the
+ * two bundled examples and Save; one button, so the top row fits at 1280 px.
+ */
+function FileMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [open]);
+  const pick = (fn: () => void) => {
+    setOpen(false);
+    afterAction(fn);
+  };
+  return (
+    <div
+      className="menu-host"
+      ref={ref}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          setOpen(false);
+        }
+      }}
+    >
+      <button aria-haspopup="menu" aria-expanded={open} className={open ? 'active' : ''} onClick={() => setOpen((o) => !o)} title="New, Open, the examples and Save">
+        File
+      </button>
+      {open && (
+        <div className="menu" role="menu" aria-label="File">
+          <button
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              useUiStore.getState().setLibraryOpen('new');
+            }}
+          >
+            New...
+            <small>A new, empty property from a template; this one stays under Properties</small>
+          </button>
+          <button role="menuitem" onClick={() => pick(choosePlanFile)}>
+            Open... <kbd>Ctrl+O</kbd>
+            <small>A plan file as a new property (a backup file is restored)</small>
+          </button>
+          <button role="menuitem" aria-label="Open example" onClick={() => pick(() => void openExample())}>
+            Open example
+            <small>The 146 Mick Road starter plan, estimates flagged</small>
+          </button>
+          <button role="menuitem" aria-label="Open rebuild" onClick={() => pick(() => void openExample('rebuild'))}>
+            Open rebuild
+            <small>146 Mick Road rebuilt on its foundation (a design study)</small>
+          </button>
+          <button role="menuitem" onClick={() => pick(savePlan)}>
+            Save <kbd>Ctrl+S</kbd>
+            <small>Download the plan as a JSON file</small>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlanName() {
   const name = usePlanStore((s) => s.plan.name);
   const renamePlan = usePlanStore((s) => s.renamePlan);
@@ -326,33 +393,7 @@ export function Toolbar() {
             Redo
           </button>
         </div>
-        <div className="group" role="group" aria-label="File">
-          <button onClick={() => afterAction(() => void newPlan())} title="Start a new, empty property (this one stays under Properties)">
-            New
-          </button>
-          <button onClick={() => afterAction(choosePlanFile)} title="Open a plan file (Ctrl+O) as a new property; this one stays under Properties">
-            Open
-          </button>
-          <button
-            aria-label="Open example"
-            onClick={() => afterAction(() => void openExample())}
-            title="Open a copy of the 146 Mick Road starter plan (estimates flagged) as a new property"
-          >
-            <span className="lbl-long">Open example</span>
-            <span className="lbl-short">Example</span>
-          </button>
-          <button
-            aria-label="Open rebuild"
-            onClick={() => afterAction(() => void openExample('rebuild'))}
-            title="Open a copy of the 146 Mick Road rebuild (the house rebuilt on its foundation; design study) as a new property"
-          >
-            <span className="lbl-long">Open rebuild</span>
-            <span className="lbl-short">Rebuild</span>
-          </button>
-          <button onClick={() => afterAction(savePlan)} title="Download the plan as a JSON file (Ctrl+S)">
-            Save
-          </button>
-        </div>
+        <FileMenu />
         <ExportMenu />
         <button
           className={`help-button${helpOpen ? ' active' : ''}`}

@@ -16,7 +16,7 @@ import type { Plan } from './model/types';
 import { clearHistory, usePlanStore } from './store/planStore';
 import { clearNoticeOnEdit, forgetGoneLevels, useUiStore } from './store/uiStore';
 import { startChecks } from './ui/checks';
-import { setAutosave, showNotice } from './ui/fileActions';
+import { optionToRestore, rememberActiveOption, saveThumbnail, setAutosave, showNotice, storedOptionOf } from './ui/fileActions';
 import './index.css';
 import { PLAN_STYLES } from './editor2d/planStyles';
 
@@ -47,7 +47,7 @@ declare global {
         planTerrain: typeof planTerrain;
       };
       /** The live 3D scene while the 3D view is mounted. */
-      scene3d?: { scene: Object3D; camera: Camera; controls: unknown; invalidate: () => void };
+      scene3d?: { scene: Object3D; camera: Camera; controls: unknown; invalidate: () => void; gl?: unknown };
     };
   }
 }
@@ -66,6 +66,12 @@ async function boot(): Promise<void> {
   writeLastPlanId(usePlanStore.getState().plan.id);
   clearHistory();
   useUiStore.getState().setActiveLevel(defaultLevelId(usePlanStore.getState().plan));
+  // The design option it was last open on (its library entry), else the first.
+  useUiStore.getState().setActiveOption(optionToRestore(usePlanStore.getState().plan, await storedOptionOf(usePlanStore.getState().plan.id)));
+  // Remember the option per property whenever it changes (a switch of property sets the incoming one's).
+  useUiStore.subscribe((s, prev) => {
+    if (s.activeOptionId !== prev.activeOptionId) void rememberActiveOption();
+  });
 
   // Keep the active level valid when the plan is replaced (Open, New, or undo across them).
   // Drop selected ids that undo removed or a phase change hid.
@@ -99,6 +105,13 @@ async function boot(): Promise<void> {
     },
   });
   setAutosave(autosave);
+  // The open property's thumbnail is brought up to date when the page is hidden (after the
+  // autosave's own flush on the same events), not on every autosave.
+  const thumbOnHide = () => void autosave.flush().then(() => saveThumbnail());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') thumbOnHide();
+  });
+  window.addEventListener('pagehide', thumbOnHide);
 
   if (import.meta.env.DEV) {
     const handle = {
