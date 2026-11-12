@@ -33,6 +33,11 @@ export interface WallBand {
 export type RoomWallFinish = 'paint' | 'boards' | 'pine' | 'check';
 /** How a room's floor is dressed: a flat colour, painted boards, square tiles, parquet, wide face-nailed pine or carpet. */
 export type FloorFinish = 'plain' | 'boards' | 'tile' | 'parquet' | 'pine' | 'carpet';
+/**
+ * How a room's ceiling is dressed (DESIGN.md "Ceilings"): paint, painted boards or knotty pine (the
+ * wall finishes' textures), or none: open to the floor framing or the roof above, as before.
+ */
+export type CeilingFinish = 'paint' | 'boards' | 'pine' | 'none';
 /** A lower band of a room's walls in another finish, up to `height` above the floor top. */
 export interface Wainscot {
   height: Inches;
@@ -130,6 +135,13 @@ export interface Room {
    * Ignored on a new or demolished room.
    */
   proposedWall?: { finish: RoomWallFinish; color?: string };
+  /**
+   * The ceiling (DESIGN.md "Ceilings"), flat at `ceilingOverride` (else the level's wall height)
+   * under the floor above or the roof. Absent: the level's default (LevelFinishes.ceilingFinish),
+   * else paint under the floor of a level above and none elsewhere. A colour without a finish is paint.
+   */
+  ceilingFinish?: CeilingFinish;
+  ceilingColor?: string;
 }
 
 export interface Stairs {
@@ -250,11 +262,39 @@ export interface Roof {
 }
 
 /**
- * Kitchen casework and fixtures (DESIGN.md "Casework"): cabinets, the island, appliances, the sink
- * and a labelled generic box. Each is a plan rectangle standing on the level's floor (or at an
- * `elevation` above it for wall cabinets, the hood and the microwave).
+ * Kitchen casework and fixtures (DESIGN.md "Casework"): cabinets, the island, appliances, the sink,
+ * the bath and laundry fixtures (DESIGN.md "Bath and laundry") and a labelled generic box. Each is
+ * a plan rectangle standing on the level's floor (or at an `elevation` above it for wall cabinets,
+ * the hood and the microwave).
  */
-export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink' | 'box' | 'furniture';
+export type FixtureKind =
+  | 'base'
+  | 'wall'
+  | 'tall'
+  | 'island'
+  | 'range'
+  | 'fridge'
+  | 'dishwasher'
+  | 'wallOven'
+  | 'hood'
+  | 'microwave'
+  | 'sink'
+  | 'bathtub'
+  | 'shower'
+  | 'showerGlass'
+  | 'toilet'
+  | 'vanity'
+  | 'basin'
+  | 'washer'
+  | 'dryer'
+  | 'waterHeater'
+  | 'box'
+  | 'furniture';
+/**
+ * The form of a bath fixture (model/bath.ts VARIANTS): a bathtub in an alcove or freestanding, a
+ * shower on a tray or curbless, a basin on a pedestal or hung on the wall.
+ */
+export type BathVariant = 'alcove' | 'freestanding' | 'tray' | 'curbless' | 'pedestal' | 'wallHung';
 /** Cabinet door and drawer fronts: flat slabs, or a frame round a recessed panel. */
 export type FrontStyle = 'slab' | 'panel';
 /** What a piece of furniture is (DESIGN.md "Furniture"; model/furniture.ts FURNITURE). */
@@ -324,6 +364,13 @@ export interface Fixture {
    * furniture layer is on or off. Absent: loose furniture.
    */
   builtIn?: boolean;
+  /** Bathtubs, showers and basins only: its form (model/bath.ts). Absent: the kind's first. */
+  variant?: BathVariant;
+  /**
+   * Showers only: the sides with a glass panel, the front (a fixed panel and a door) and the ends,
+   * left and right as you stand in the shower facing out. Absent: none.
+   */
+  glass?: { front?: boolean; left?: boolean; right?: boolean };
 }
 
 /** Per-level defaults for casework (DESIGN.md "Casework"); every field optional. */
@@ -333,6 +380,9 @@ export interface LevelFinishes {
   frontStyle?: FrontStyle;
   /** Cabinets in a catalogue wood rather than painted. */
   cabinetWood?: WoodId;
+  /** The ceiling of the level's rooms that set none (DESIGN.md "Ceilings"). */
+  ceilingFinish?: CeilingFinish;
+  ceilingColor?: string;
 }
 
 /** A post or chimney on the site (M9 implements their behaviour). */

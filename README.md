@@ -240,7 +240,12 @@ Once the walls are in, these make the 3D model look like the house.
   it in the proposed design, which the Proposed view shows in place of today's.
   The walls round the room show its finish on the room's side only (an exterior wall keeps its
   siding outside, a partition shows each room's finish on its own side), and the floor covers the
-  room inside the wall faces. "Default" clears each one. Ceilings are not drawn yet.
+  room inside the wall faces. "Default" clears each one. "Ceiling" (paint, painted boards, knotty
+  pine, or none) with "Ceiling colour" and "Ceiling height" sets the room's ceiling; by default a room
+  under a floor has a white painted ceiling and a room under a roof none (open to it). The Level
+  panel's "Ceilings" changes that default for every room on the level. Ceilings are flat, show in 3D
+  with the Roofs checkbox on and in walk mode, and are seen only from below, so a look-down view
+  still shows the room.
 - **Windows and doors.** A window's panel sets its "Sashes" (1 to 6 side by side with 2" mullions
   between them; the lites, cols x rows, are per sash), "Fixed centre pane" (at 3 sashes: a picture
   window, one undivided pane between two casements at most 24" wide), "Glazing" (glass, or an
@@ -258,7 +263,7 @@ Once the walls are in, these make the 3D model look like the house.
 ## Kitchens: cabinets, counters and appliances
 
 Press `C`. The properties panel shows the kind the next click places (base cabinet, wall cabinet,
-tall cabinet, island, sink, range, fridge, dishwasher, wall oven, hood, microwave, or a labelled
+tall cabinet, island, sink, range, fridge, dishwasher, wall oven, hood, microwave, the bath and laundry fixtures below, or a labelled
 box); pick one there. Then:
 
 - **Point along a wall.** The cabinet follows the cursor with its back on the nearest wall face and
@@ -284,6 +289,29 @@ box); pick one there. Then:
 
 Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the old cabinets
 *demolish*, and the Existing, Proposed and All views show each state.
+
+### Bathrooms and laundry
+
+The same tool places bath and laundry fixtures: pick "Bath: Bathtub", "Bath: Shower", "Bath: Glass
+panel", "Bath: Toilet", "Bath: Vanity", "Bath: Basin", "Laundry: Washer", "Laundry: Dryer" or
+"Laundry: Water heater" in the Kind list. They snap to the wall, abut, turn and follow the phases
+like cabinets (the furniture layer never hides them). Stock sizes: a 60" x 30" tub, a 36" square
+shower with a glass front, a toilet 20" x 28", a 36" vanity (a cabinet with a counter at 34" and an
+undermount basin; two basins from 60" wide), a pedestal basin, 27" front-load washer and dryer, a
+22" water heater. Select one to change its size and:
+
+- **Form**: a tub in an alcove or freestanding (oval); a shower on a 3" tray or curbless (a tiled
+  floor with a linear drain); a basin on a pedestal or wall-hung.
+- **Glass** (showers): the front (a fixed panel and a door) and either end. A separate "Glass panel"
+  is a fixed screen of any size.
+- **China colour** (or "Colour" for the laundry): white unless set. A vanity has cabinet fronts,
+  wood and front colour instead, and the level's counter colour.
+- To stack a dryer on a washer, set its "Bottom" to the washer's height.
+
+On the plan a tub shows its basin and drain, a shower a cross with its drain and its glass sides, a
+toilet its tank and bowl, a vanity or basin its bowls; the washer, dryer and water heater carry W, D
+and WH. In 3D they are white china and enamel with chrome taps, drains and a shower head, and clear
+glass.
 
 ## Planning the renovation
 
@@ -652,10 +680,11 @@ the Kitchen has blue check wallpaper (`#2e3f6b` on white) and beige vinyl tile (
 Living has cream-painted vertical boards (`#ddd6b4`) and the front room smooth cream paint, both over
 a dark red-brown painted board floor (`#5e2a22`); the Bath has green paint (`#2f7a68`) over a knotty
 pine wainscot 40" high and a parquet floor; the Utility has pine paneling and a wood board floor
-(`#a87a4c`). Not drawn yet: the ceilings (the Kitchen's knotty pine tongue-and-groove with boards
-running east-west, the Bath's pine, white-painted boards or flat in the Living and the front room,
-wood in the Utility), the Kitchen's pine crown and baseboard, and window reveals (they show the
-siding). The appliances are white (the app draws them as steel). In the Proposed view the Kitchen's
+(`#a87a4c`). The ceilings: knotty pine in the Kitchen, the Bath and the Utility, white-painted
+boards in the Living, flat white paint in the front room (the pine boards' east-west run is not
+drawn). Not drawn yet: the Kitchen's pine crown and baseboard, and window reveals (they show the
+siding). The Bath's tub, toilet, washer and dryer and the proposed baths' toilets, showers, glass
+panels, washer and dryer are bath and laundry fixtures at the measured or planned sizes. The appliances are white (the app draws them as steel). In the Proposed view the Kitchen's
 check and tile carry on into the old bath's alcove, which becomes part of the kitchen.
 
 The Second Floor's rooms (no photos) have **placeholder** finishes: off-white paint and wood board
@@ -1319,8 +1348,8 @@ bedrooms); change them in each room's panel.
   exterior steps other than a flight (an outside stair is a flight on the lowest level, open and,
   down a slope, starting below its floor, as the starter's are), fences,
   the lot outline, porch floors and steps, foundations under additions and porches, gutters,
-  ceilings, crown and baseboards, furniture outside (below a level's floor), and text or dimension notes
-  you place yourself. Bathroom fixtures and a wood stove are labelled boxes. A retaining wall is a
+  sloped ceilings (a ceiling is flat, at one height), crown and baseboards, furniture outside (below a level's floor), and text or dimension notes
+  you place yourself. A wood stove is a labelled box, and so are a shower's tiled bench and the vents. A retaining wall is a
   wall on the lowest level; its free end shows as an open wall end.
 - **Cabinets** are boxes with simple fronts: no door swings on the plan, no backsplash, open
   shelves or corner cabinets (an inside corner is two cabinets whose counter is mitred), and a

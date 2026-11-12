@@ -455,11 +455,11 @@ export function buildExistingHouse(name: string): ExistingIds {
   // end and the toilet south of it, a 36" vanity with its sink on the south wall beside the toilet, and
   // the dryer then the washer along the north wall from the west wall.
   const b = { north: 7, east: 311, south: 97 };
-  existingFixture({ kind: 'box', label: 'Tub', origin: { x: b.east, y: 37 }, direction: WESTWARD, width: 60, depth: 30, height: 16, elevation: 0, frontColor: WHITE });
-  existingFixture({ kind: 'box', label: 'WC', origin: { x: b.east, y: 82 }, direction: WESTWARD, width: 20, depth: 28, height: 30, elevation: 0, frontColor: WHITE });
+  existingFixture({ kind: 'bathtub', origin: { x: b.east, y: 37 }, direction: WESTWARD, width: 60, depth: 30, height: 16, elevation: 0, frontColor: WHITE });
+  existingFixture({ kind: 'toilet', origin: { x: b.east, y: 82 }, direction: WESTWARD, width: 20, depth: 28, height: 30, elevation: 0, frontColor: WHITE });
   existingFixture({ kind: 'sink', origin: { x: 263, y: b.south }, direction: 270, width: 36, depth: 24, height: 31.5, elevation: 0 });
-  existingFixture({ kind: 'box', label: 'Dryer', origin: { x: 210.5, y: b.north }, direction: SOUTHWARD, width: 27, depth: 28, height: 40, elevation: 0, frontColor: WHITE });
-  existingFixture({ kind: 'box', label: 'Washer', origin: { x: 237.5, y: b.north }, direction: SOUTHWARD, width: 27, depth: 28, height: 40, elevation: 0, frontColor: WHITE });
+  existingFixture({ kind: 'dryer', origin: { x: 210.5, y: b.north }, direction: SOUTHWARD, width: 27, depth: 28, height: 40, elevation: 0, frontColor: WHITE });
+  existingFixture({ kind: 'washer', origin: { x: 237.5, y: b.north }, direction: SOUTHWARD, width: 27, depth: 28, height: 40, elevation: 0, frontColor: WHITE });
   // The Bath's tub sits in an alcove: a pine-clad stub wall, floor to ceiling, at its south end
   // between it and the toilet (photo 21).
   existingFixture({ kind: 'box', label: 'Wall', origin: { x: b.east, y: 69 }, direction: WESTWARD, width: 4, depth: 30, height: 96, elevation: 0, frontColor: PINE });
@@ -499,10 +499,11 @@ export function buildExistingHouse(name: string): ExistingIds {
   // beige vinyl tile; the Living's cream-painted vertical boards and the front room's smooth cream
   // paint over the same dark red-brown painted board floor; the Bath's green paint over a knotty
   // pine wainscot about 40" high and its parquet; the Utility's pine paneling and wood floor. The
-  // ceilings (pine in the Kitchen and the Bath) are not drawn.
+  // ceilings: knotty pine in the Kitchen, the Bath and the Utility, white-painted boards in the
+  // Living, flat paint in the front room (the default under the Second Floor).
   // MK calls the old entry hall the front room (photos 19 and 20).
   label(fId, 'Front room', { x: 100, y: 52 }, PHASE, { wallFinish: 'paint', wallColor: CREAM, floorFinish: 'boards', floorColor: FLOOR_RED_BROWN, proposedWall: BOARDS_PROPOSED });
-  label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: 70 }, PHASE, { wallFinish: 'paint', wallColor: BATH_GREEN, wainscot: { height: 40, finish: 'pine' }, floorFinish: 'parquet' });
+  label(fId, 'Bath', { x: (PART.bathWest + 2.5 + (CL.x1 - HALF)) / 2, y: 70 }, PHASE, { wallFinish: 'paint', wallColor: BATH_GREEN, wainscot: { height: 40, finish: 'pine' }, floorFinish: 'parquet', ceilingFinish: 'pine' });
   // Its label sits between the proposed island and table (y 159..204), clear of both.
   label(fId, 'Kitchen (17\'2" adjusted: re-measure)', { x: (PART.kl + 2.5 + (CL.x1 - HALF)) / 2, y: 182 }, PHASE, {
     wallFinish: 'check',
@@ -511,6 +512,7 @@ export function buildExistingHouse(name: string): ExistingIds {
     floorColor: VINYL_BEIGE,
     proposedFloor: PINE_PROPOSED,
     proposedWall: BOARDS_PROPOSED,
+    ceilingFinish: 'pine',
   });
   label(fId, 'Living', { x: (CL.x0 + HALF + (PART.kl - 2.5)) / 2, y: (PART.stairSouth + 2.5 + (CL.y1 - HALF)) / 2 }, PHASE, {
     wallFinish: 'boards',
@@ -519,9 +521,10 @@ export function buildExistingHouse(name: string): ExistingIds {
     floorColor: FLOOR_RED_BROWN,
     proposedFloor: PINE_PROPOSED,
     proposedWall: BOARDS_PROPOSED,
+    ceilingFinish: 'boards',
   });
   // The stair strip is part of the Living (no wall on its south side), so it has no label of its own.
-  label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR });
+  label(fId, 'Utility', { x: (WING.x0 + WING.x1) / 2, y: (WING.y0 + WING.y1) / 2 }, PHASE, { wallFinish: 'pine', floorFinish: 'boards', floorColor: WOOD_FLOOR, ceilingFinish: 'pine' });
   // North of the proposed foyer's north wall (y 46.25..53.25), so the All view still finds its face.
   label(fId, 'Entry porch (est.)', { x: (PORCH.x0 + PORCH.x1) / 2, y: 26 });
   // Second Floor. The Office / hall is one face with the landing and the stair well.
@@ -1172,7 +1175,7 @@ function proposed(ids: ExistingIds): void {
   kitchen({ ...SHELVES, origin: { x: (PANTRY.west + KITCHEN_EAST) / 2, y: PANTRY.north }, direction: 90, width: KITCHEN_EAST - PANTRY.west });
   kitchen({ ...SHELVES, origin: { x: KITCHEN_EAST, y: endShelf }, direction: 180, width: PANTRY.south - (PANTRY.north + 12) });
   kitchen({ ...SHELVES, origin: { x: PANTRY.west, y: endShelf }, direction: 0, width: PANTRY.south - (PANTRY.north + 12) });
-  const WC = { kind: 'box' as const, label: 'WC', width: 20, depth: 28, height: 30, frontColor: WHITE };
+  const WC = { kind: 'toilet' as const, width: 20, depth: 28, height: 30, frontColor: WHITE };
   const POWDER_MID = (CL.y0 + HALF + POWDER.south - TI / 2) / 2;
   kitchen({ ...WC, origin: { x: POWDER.west + TI / 2, y: POWDER_MID }, direction: 0 });
   kitchen({ kind: 'sink', origin: { x: PART_KL - TI / 2, y: POWDER_MID }, direction: 180, width: 18, depth: 12, height: 31.5 });
@@ -1190,15 +1193,15 @@ function proposed(ids: ExistingIds): void {
   // The floor's tile is drawn east of the bench (the bench box stands on it).
   const TILE = WHITE;
   const SHOWER = { south: 55, mid: 31, depth: 48 };
-  kitchen({ kind: 'box', label: 'Walk-in shower', origin: { x: 369, y: 7 }, direction: 90, width: 66, depth: SHOWER.depth, height: 1, frontColor: TILE });
+  kitchen({ kind: 'shower', variant: 'curbless', origin: { x: 369, y: 7 }, direction: 90, width: 66, depth: SHOWER.depth, height: 78, frontColor: TILE });
   kitchen({ kind: 'box', label: 'Bench', origin: { x: 318, y: SHOWER.mid }, direction: 0, width: SHOWER.depth, depth: 18, height: 18, frontColor: TILE });
-  kitchen({ kind: 'box', label: 'Glass', origin: { x: 363.5, y: SHOWER.south + 0.5 }, direction: 270, width: 17, depth: 0.5, height: 78, frontColor: '#cfe2e6' });
+  kitchen({ kind: 'showerGlass', origin: { x: 363.5, y: SHOWER.south + 0.5 }, direction: 270, width: 17, depth: 0.5, height: 78 });
   kitchen({ kind: 'box', label: 'Wall', origin: { x: 402, y: SHOWER.mid }, direction: 0, width: SHOWER.depth, depth: 4, height: 96, frontColor: TILE });
   kitchen({ kind: 'sink', origin: { x: 430, y: 7 }, direction: 90, width: 48, depth: 21, height: 34.5 });
   kitchen({ ...WC, origin: { x: 456, y: 100 }, direction: 180 });
   const DRYER_Y = 77.5;
-  kitchen({ kind: 'box', label: 'Dryer', origin: { x: 322, y: DRYER_Y }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
-  kitchen({ kind: 'box', label: 'Washer', origin: { x: 322, y: DRYER_Y + 27 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  kitchen({ kind: 'dryer', origin: { x: 322, y: DRYER_Y }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  kitchen({ kind: 'washer', origin: { x: 322, y: DRYER_Y + 27 }, direction: 0, width: 27, depth: 28, height: 38, frontColor: WHITE });
   // ---- The master bedroom (MK, 15 Oct 2026: a king bed). Built-in wardrobes, 24" deep and 84"
   // high with pine doors, along the west wall at the bed's foot, x 318..342, y 138..244 (two of
   // 53", 8'10" of rod; the walk-in of the livability review had 5'): their backs on the
@@ -1347,7 +1350,7 @@ function proposed(ids: ExistingIds): void {
   // wall; the WC under the north window (x 230..250, 17" from the west wall to its centre, 21" clear
   // in front); a 24" vanity on the south wall east of the door's swing (x 255..279), a mirror over it.
   upstairs({ ...WC, origin: { x: 240, y: CL.y0 + HALF }, direction: 90 });
-  upstairs({ kind: 'box', label: 'Shower', origin: { x: KITCHEN_EAST, y: CL.y0 + HALF + 30 }, direction: 180, width: 60, depth: 32, height: 78, frontColor: WHITE });
+  upstairs({ kind: 'shower', glass: { front: true }, origin: { x: KITCHEN_EAST, y: CL.y0 + HALF + 30 }, direction: 180, width: 60, depth: 32, height: 78, frontColor: WHITE });
   upstairs({ kind: 'sink', origin: { x: 267, y: UP_BATH.south - 2.5 }, direction: 270, width: 24, depth: 18, height: 34.5 });
 
   // ---- Upstairs furniture (MK, 15 Oct 2026). The west room (the Master): two full log beds with

@@ -544,7 +544,7 @@ function rebuild(ids: ExistingIds): void {
   fix(fId, { ...SHELVES, origin: { x: IN.x1, y: (F.powderSouth + HP + F.hallSouth - HP) / 2 }, direction: 180, width: F.hallSouth - HP - (F.powderSouth + HP) });
   fix(fId, { ...SHELVES, origin: { x: (F.corridorEast + HP + 12 + IN.x1 - 12) / 2, y: F.hallSouth - HP }, direction: 270, width: IN.x1 - 12 - (F.corridorEast + HP + 12) });
   // The powder room: the WC under the transom, a 24" vanity on the east wall clear of the door.
-  const WC = { kind: 'box' as const, label: 'WC', width: 20, depth: 28, height: 30, frontColor: WHITE };
+  const WC = { kind: 'toilet' as const, width: 20, depth: 28, height: 30, frontColor: WHITE };
   fix(fId, { ...WC, origin: { x: 285, y: IN.y0 }, direction: 90 });
   fix(fId, { kind: 'sink', origin: { x: IN.x1, y: 50 }, direction: 180, width: 24, depth: 20, height: 31.5 });
   // The master bath: a 60" x 42" walk-in shower in the north-west corner (a glass panel on its
@@ -552,20 +552,20 @@ function rebuild(ids: ExistingIds): void {
   // window. The laundry: the washer and dryer on its north wall, the dryer's vent out the east wall.
   // The closet: rods and shelves 24" deep along its north wall and a 12" shelf unit on its south.
   const SX = CL.x1 + HN;
-  fix(fId, { kind: 'box', label: 'Walk-in shower', origin: { x: SX + 30, y: IN.y0 }, direction: 90, width: 60, depth: 42, height: 1, frontColor: WHITE });
-  fix(fId, { kind: 'box', label: 'Glass', origin: { x: SX + 60, y: IN.y0 + 21 }, direction: 180, width: 42, depth: 0.5, height: 78, frontColor: '#cfe2e6' });
+  fix(fId, { kind: 'shower', variant: 'curbless', origin: { x: SX + 30, y: IN.y0 }, direction: 90, width: 60, depth: 42, height: 78, frontColor: WHITE });
+  fix(fId, { kind: 'showerGlass', origin: { x: SX + 60, y: IN.y0 + 21 }, direction: 180, width: 42, depth: 0.5, height: 78 });
   fix(fId, { kind: 'sink', origin: { x: 425, y: F.suite.bathSouth - HP }, direction: 270, width: 72, depth: 21, height: COUNTER });
   fix(fId, { ...WC, origin: { x: SUITE_CL.x1 - HN, y: 48 }, direction: 180 });
   const LAUNDRY_X0 = F.suite.closetEast + HP;
-  fix(fId, { kind: 'box', label: 'Washer', origin: { x: LAUNDRY_X0 + 15, y: F.suite.bathSouth + HP }, direction: 90, width: 27, depth: 28, height: 38, frontColor: WHITE });
-  fix(fId, { kind: 'box', label: 'Dryer', origin: { x: LAUNDRY_X0 + 43, y: F.suite.bathSouth + HP }, direction: 90, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  fix(fId, { kind: 'washer', origin: { x: LAUNDRY_X0 + 15, y: F.suite.bathSouth + HP }, direction: 90, width: 27, depth: 28, height: 38, frontColor: WHITE });
+  fix(fId, { kind: 'dryer', origin: { x: LAUNDRY_X0 + 43, y: F.suite.bathSouth + HP }, direction: 90, width: 27, depth: 28, height: 38, frontColor: WHITE });
   fix(fId, { kind: 'box', label: 'Dryer vent', origin: { x: SUITE_CL.x1 + HN, y: F.suite.bathSouth + HP + 14 }, direction: 180, width: 4, depth: SUITE_CL.x1 + HN - (LAUNDRY_X0 + 56), elevation: 60, height: 4, frontColor: METAL });
   const CLOSET = { x0: F.suite.hallEast + HP, x1: F.suite.closetEast - HP };
   fix(fId, { kind: 'box', label: 'Rods and shelves', origin: { x: (CLOSET.x0 + CLOSET.x1) / 2, y: F.suite.bathSouth + HP }, direction: 90, width: CLOSET.x1 - CLOSET.x0, depth: 24, height: 84, frontColor: PINE_FLOOR });
   fix(fId, { kind: 'box', label: 'Shelves', origin: { x: (CLOSET.x0 + CLOSET.x1) / 2, y: F.suite.bedNorth - HP }, direction: 270, width: CLOSET.x1 - CLOSET.x0, depth: 12, height: 84, frontColor: PINE_FLOOR });
   // Upstairs: the bath's tub-shower across its north end, the WC on the west wall and a 24" vanity
   // on the south wall clear of the door; 18" shelves in the linen closet.
-  fix(sId, { kind: 'box', label: 'Tub / shower', origin: { x: (IN.x0 + S.bathEast - HP) / 2, y: IN.y0 }, direction: 90, width: 60, depth: 32, height: 20, frontColor: WHITE });
+  fix(sId, { kind: 'bathtub', origin: { x: (IN.x0 + S.bathEast - HP) / 2, y: IN.y0 }, direction: 90, width: 60, depth: 32, height: 20, frontColor: WHITE });
   fix(sId, { ...WC, origin: { x: IN.x0, y: 62 }, direction: 0 });
   fix(sId, { kind: 'sink', origin: { x: 30, y: S.hallSouth - HP }, direction: 270, width: 24, depth: 20, height: 31.5 });
   fix(sId, { kind: 'box', label: 'Shelves', origin: { x: IN.x1, y: (IN.y0 + S.hallSouth - HP) / 2 }, direction: 180, width: S.hallSouth - HP - IN.y0, depth: 18, height: 84, frontColor: PINE_FLOOR });

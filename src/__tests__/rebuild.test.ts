@@ -183,7 +183,7 @@ describe('docs/examples/146-mick-road-rebuild.json', () => {
       expect(windows.length, name).toBeGreaterThanOrEqual(2);
       expect(windows.some((o) => o.sill <= 44 && o.height >= 24), name).toBe(true);
     }
-    const bath = Object.values(s.fixtures).filter((x) => x.phase === 'new' && (x.label === 'Tub / shower' || x.label === 'WC' || x.kind === 'sink'));
+    const bath = Object.values(s.fixtures).filter((x) => x.phase === 'new' && (x.kind === 'bathtub' || x.kind === 'toilet' || x.kind === 'sink'));
     expect(bath.length).toBeGreaterThanOrEqual(3);
   });
 

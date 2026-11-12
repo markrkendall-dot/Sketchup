@@ -1830,6 +1830,7 @@
             "finish": "pine"
           },
           "floorFinish": "parquet",
+          "ceilingFinish": "pine",
           "id": "f-r2",
           "phase": "demo"
         },
@@ -1851,6 +1852,7 @@
             "finish": "boards",
             "color": "#ece6da"
           },
+          "ceilingFinish": "pine",
           "id": "f-r3"
         },
         "f-r4": {
@@ -1871,6 +1873,7 @@
             "finish": "boards",
             "color": "#ece6da"
           },
+          "ceilingFinish": "boards",
           "id": "f-r4"
         },
         "f-r5": {
@@ -1882,6 +1885,7 @@
           "wallFinish": "pine",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
+          "ceilingFinish": "pine",
           "id": "f-r5",
           "phase": "demo"
         },
@@ -2474,8 +2478,7 @@
           "id": "f-c17"
         },
         "f-c18": {
-          "kind": "box",
-          "label": "Tub",
+          "kind": "bathtub",
           "origin": {
             "x": 311,
             "y": 37
@@ -2490,8 +2493,7 @@
           "id": "f-c18"
         },
         "f-c19": {
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "origin": {
             "x": 311,
             "y": 82
@@ -2520,8 +2522,7 @@
           "id": "f-c20"
         },
         "f-c21": {
-          "kind": "box",
-          "label": "Dryer",
+          "kind": "dryer",
           "origin": {
             "x": 210.5,
             "y": 7
@@ -2536,8 +2537,7 @@
           "id": "f-c21"
         },
         "f-c22": {
-          "kind": "box",
-          "label": "Washer",
+          "kind": "washer",
           "origin": {
             "x": 237.5,
             "y": 7
@@ -3402,8 +3402,7 @@
         },
         "f-c78": {
           "elevation": 0,
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "width": 20,
           "depth": 28,
           "height": 30,
@@ -3433,8 +3432,8 @@
         },
         "f-c80": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Walk-in shower",
+          "kind": "shower",
+          "variant": "curbless",
           "origin": {
             "x": 369,
             "y": 7
@@ -3442,7 +3441,7 @@
           "direction": 90,
           "width": 66,
           "depth": 48,
-          "height": 1,
+          "height": 78,
           "frontColor": "#f1efe8",
           "phase": "new",
           "id": "f-c80"
@@ -3465,8 +3464,7 @@
         },
         "f-c82": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Glass",
+          "kind": "showerGlass",
           "origin": {
             "x": 363.5,
             "y": 55.5
@@ -3475,7 +3473,6 @@
           "width": 17,
           "depth": 0.5,
           "height": 78,
-          "frontColor": "#cfe2e6",
           "phase": "new",
           "id": "f-c82"
         },
@@ -3512,8 +3509,7 @@
         },
         "f-c85": {
           "elevation": 0,
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "width": 20,
           "depth": 28,
           "height": 30,
@@ -3528,8 +3524,7 @@
         },
         "f-c86": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Dryer",
+          "kind": "dryer",
           "origin": {
             "x": 322,
             "y": 77.5
@@ -3544,8 +3539,7 @@
         },
         "f-c87": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Washer",
+          "kind": "washer",
           "origin": {
             "x": 322,
             "y": 104.5
@@ -5559,8 +5553,7 @@
         },
         "s-c4": {
           "elevation": 0,
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "width": 20,
           "depth": 28,
           "height": 30,
@@ -5575,8 +5568,10 @@
         },
         "s-c5": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Shower",
+          "kind": "shower",
+          "glass": {
+            "front": true
+          },
           "origin": {
             "x": 311,
             "y": 37

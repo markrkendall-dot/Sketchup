@@ -1059,7 +1059,7 @@ describe('docs/examples/146-mick-road.json', () => {
       return face ? f.rooms[face.roomId!].name.replace(/ \(.*$/, '') : 'none';
     };
     const fixtures = allNew.filter((x) => roomOf(x) === 'Kitchen');
-    // The placeholder bath fixtures (MK): a WC and a narrow vanity in the powder room, a shower, a
+    // The placeholder bath fixtures (MK; bath and laundry fixtures, not boxes): a WC and a narrow vanity in the powder room, a shower, a
     // vanity and a WC in the master bath (the shower walk-in with its bench, glass and end wall), the
     // washer and dryer in its laundry closet; the master bedroom's wardrobes, king bed and
     // nightstands; the pantry's
@@ -1073,9 +1073,9 @@ describe('docs/examples/146-mick-road.json', () => {
     const nameOf = (x: (typeof allNew)[number]) => (x.kind === 'furniture' ? furnitureNameOf(x) : (x.label ?? x.kind));
     expect(allNew.filter((x) => roomOf(x) !== 'Kitchen').map((x) => `${roomOf(x)}: ${nameOf(x)}`).sort()).toEqual([
       'Foyer: Coat bench',
-      'Laundry: Dryer',
       'Laundry: Dryer vent',
-      'Laundry: Washer',
+      'Laundry: dryer',
+      'Laundry: washer',
       'Living: Armchair',
       'Living: Bookcase',
       'Living: Bookcase',
@@ -1093,11 +1093,11 @@ describe('docs/examples/146-mick-road.json', () => {
       'Living: Wood stove',
       'Master bath: Bench',
       'Master bath: Dryer vent',
-      'Master bath: Glass',
-      'Master bath: WC',
-      'Master bath: Walk-in shower',
       'Master bath: Wall',
+      'Master bath: shower',
+      'Master bath: showerGlass',
       'Master bath: sink',
+      'Master bath: toilet',
       'Master bedroom: King bed',
       'Master bedroom: Nightstand',
       'Master bedroom: Nightstand',
@@ -1109,8 +1109,8 @@ describe('docs/examples/146-mick-road.json', () => {
       'Pantry: Shelves',
       'Pantry: Shelves',
       'Pantry: Shelves',
-      'Powder room: WC',
       'Powder room: sink',
+      'Powder room: toilet',
       'Screen porch: Adirondack chair',
       'Screen porch: Adirondack chair',
       'Screen porch: Side table',
@@ -1378,7 +1378,7 @@ describe('docs/examples/146-mick-road.json', () => {
       return { x: o.reduce((t, p) => t + p.x, 0) / o.length, y: o.reduce((t, p) => t + p.y, 0) / o.length };
     };
     const inBath = Object.values(s.fixtures).filter((x) => x.phase === 'new' && s.rooms[faceAt(set, centre(x))?.roomId ?? '']?.name === 'Bath (proposed)');
-    expect(inBath.map((x) => x.label ?? x.kind).sort()).toEqual(['Shower', 'WC', 'sink']);
+    expect(inBath.map((x) => x.label ?? x.kind).sort()).toEqual(['shower', 'sink', 'toilet']);
     // The livability review's layout: a 32" x 60" shower along the east wall, the WC under the north
     // window and a 24" vanity on the south wall east of the door's swing. The WC's centre is 15"+
     // from the wall, the shower and the vanity, with 21" clear in front of the vanity (R307.1), and
@@ -1387,7 +1387,7 @@ describe('docs/examples/146-mick-road.json', () => {
       const o = fixtureOutline(inBath.find((x) => (x.label ?? x.kind) === label)!);
       return { x0: Math.min(...o.map((p) => p.x)), x1: Math.max(...o.map((p) => p.x)), y0: Math.min(...o.map((p) => p.y)), y1: Math.max(...o.map((p) => p.y)) };
     };
-    const [shower, wc, vanity] = [bx('Shower'), bx('WC'), bx('sink')];
+    const [shower, wc, vanity] = [bx('shower'), bx('toilet'), bx('sink')];
     expect(shower).toEqual({ x0: 279, x1: 311, y0: 7, y1: 67 });
     expect(wc).toEqual({ x0: 230, x1: 250, y0: 7, y1: 35 });
     expect(vanity).toEqual({ x0: 255, x1: 279, y0: 52, y1: 70 });
@@ -1419,7 +1419,7 @@ describe('docs/examples/146-mick-road.json', () => {
     // Downstairs, the washer and dryer side by side in the master bath's laundry closet.
     const fset = getFaces(f, 'proposed');
     const laundry = Object.values(f.fixtures).filter((x) => x.phase === 'new' && f.rooms[faceAt(fset, centre(x))?.roomId ?? '']?.name === 'Laundry (proposed)');
-    expect(laundry.map((x) => x.label).sort()).toEqual(['Dryer', 'Dryer vent', 'Washer']);
+    expect(laundry.map((x) => x.label ?? x.kind).sort()).toEqual(['Dryer vent', 'dryer', 'washer']);
   });
 
   it('builds every level without throwing, and the export has the parts of the house', () => {

@@ -14,6 +14,7 @@ import {
 } from '../model/casework';
 import { add, cross, dot, polygonSignedArea, scale, sub } from '../model/geometry';
 import { furniturePlanLabel } from '../model/furniture';
+import { isBath, VANITY_BASIN } from '../model/bath';
 import type { Fixture, FrontStyle, Id, LevelFinishes, Vec2 } from '../model/types';
 import { directionVector, normalizeDegrees } from './stairs';
 
@@ -83,6 +84,29 @@ export function basinOutline(f: Pick<Fixture, 'origin' | 'direction' | 'width' |
   const fr = fixtureFrame(f);
   const b = basinLocal(f);
   return [fixturePoint(fr, b.s0, b.d0), fixturePoint(fr, b.s0, b.d1), fixturePoint(fr, b.s1, b.d1), fixturePoint(fr, b.s1, b.d0)];
+}
+
+/**
+ * A vanity's undermount basins in its frame (DESIGN.md "Bath and laundry"): one in the middle, two
+ * (a quarter of the width in from each end) from VANITY_BASIN.double wide; each 17" x 13" or less,
+ * a little forward of the middle of the depth so the taps fit behind it.
+ */
+export function vanityBasinsLocal(f: Pick<Fixture, 'width' | 'depth'>): { s0: number; s1: number; d0: number; d1: number }[] {
+  const n = f.width >= VANITY_BASIN.double ? 2 : 1;
+  const w = Math.min(VANITY_BASIN.width, f.width / n - 4);
+  const dp = Math.min(VANITY_BASIN.depth, f.depth - 6);
+  if (w < 4 || dp < 4) return [];
+  const d0 = Math.min(f.depth - 1.5 - dp, Math.max(4.5, (f.depth - dp) / 2 + 1));
+  const centres = n === 1 ? [0] : [-f.width / 4, f.width / 4];
+  return centres.map((c) => ({ s0: c - w / 2, s1: c + w / 2, d0, d1: d0 + dp }));
+}
+
+/** The plan rectangles of the holes a fixture's basins cut in its counter: a sink's basin, a vanity's basins. */
+export function basinOutlines(f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth'>): Vec2[][] {
+  if (f.kind === 'sink') return [basinOutline(f)];
+  if (f.kind !== 'vanity') return [];
+  const fr = fixtureFrame(f);
+  return vanityBasinsLocal(f).map((b) => [fixturePoint(fr, b.s0, b.d0), fixturePoint(fr, b.s0, b.d1), fixturePoint(fr, b.s1, b.d1), fixturePoint(fr, b.s1, b.d0)]);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -183,6 +207,8 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
   switch (f.kind) {
     case 'base':
     case 'island':
+    case 'vanity':
+      // A vanity's basins and taps are bath solids (derive/bath.ts), under the counter's holes.
       cabinet(true);
       break;
     case 'wall':
@@ -266,7 +292,7 @@ export interface CounterRun {
   y1: number;
 }
 
-type Rect = { fixture: Fixture; poly: Vec2[]; basin: Vec2[] | null; minX: number; minY: number; maxX: number; maxY: number };
+type Rect = { fixture: Fixture; poly: Vec2[]; basins: Vec2[][]; minX: number; minY: number; maxX: number; maxY: number };
 
 const EPS = 1e-6;
 /** Rectangles closer than this touch (fixtures placed by the tool abut exactly). */
@@ -398,7 +424,7 @@ export function counterRuns(fixtures: readonly Fixture[]): CounterRun[] {
     .filter((f) => hasCounter(f.kind))
     .map((f) => {
       const poly = counterOutline(f);
-      return { fixture: f, poly, basin: f.kind === 'sink' ? basinOutline(f) : null, ...bbox(poly) };
+      return { fixture: f, poly, basins: basinOutlines(f), ...bbox(poly) };
     });
   // Union-find over touching rectangles.
   const parent = rects.map((_, i) => i);
@@ -433,7 +459,7 @@ export function counterRuns(fixtures: readonly Fixture[]): CounterRun[] {
     if (members.length > 1 && members.every((m) => isAxisAligned(m.fixture))) {
       const rings = rectilinearUnion(
         members.map((m) => m.poly),
-        members.flatMap((m) => (m.basin ? [m.basin] : [])),
+        members.flatMap((m) => m.basins),
       );
       if (rings.length) {
         // Connected members give one outer ring (the largest); the rest are holes.
@@ -442,7 +468,7 @@ export function counterRuns(fixtures: readonly Fixture[]): CounterRun[] {
         continue;
       }
     }
-    for (const m of members) slab([m], m.poly, m.basin ? [m.basin] : []);
+    for (const m of members) slab([m], m.poly, m.basins);
   }
   return runs.sort((p, q) => (p.fixtureIds[0] < q.fixtureIds[0] ? -1 : p.fixtureIds[0] > q.fixtureIds[0] ? 1 : 0));
 }
@@ -501,13 +527,16 @@ export function fixtureSymbol(f: Fixture): FixtureSymbol {
     }
   }
   const word = f.label?.trim() || (f.kind === 'box' ? FIXTURE_PLAN_LABEL.box! : FIXTURE_PLAN_LABEL[f.kind]) || null;
+  // A bath fixture's drawing says what it is (derive/bath.ts bathSymbol): a word only on the laundry
+  // and the water heater, or when labelled.
+  const own = f.kind === 'range' || f.kind === 'sink' || (isBath(f.kind) && !FIXTURE_PLAN_LABEL[f.kind]);
   return {
     outline,
     front: [outline[1], outline[2]],
     ticks,
     dashed: isOverhead(f.kind),
     // Furniture: a big piece's name ("Queen bed"), else its label or nothing (derive/furniture.ts draws its detail).
-    label: f.kind === 'furniture' ? furniturePlanLabel(f) : f.kind === 'range' || f.kind === 'sink' ? (f.label?.trim() || null) : word,
+    label: f.kind === 'furniture' ? furniturePlanLabel(f) : own ? (f.label?.trim() || null) : word,
     labelAt: fixturePoint(fr, 0, f.depth / 2),
     labelAngle,
     burners,

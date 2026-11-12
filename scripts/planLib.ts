@@ -375,7 +375,7 @@ export function fixture(levelId: Id, f: NewFixture): Id {
  * Name a room: a label anchored at `at`. A label of a new or demolished room shows only in the views
  * that show its phase. `finishes`: the room's interior finishes (DESIGN.md "Interior finishes").
  */
-export function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE, finishes: Pick<Room, 'wallFinish' | 'wallColor' | 'wainscot' | 'floorFinish' | 'floorColor' | 'proposedFloor' | 'proposedWall'> = {}): void {
+export function label(levelId: Id, name: string, at: Vec2, phase: Phase = PHASE, finishes: Pick<Room, 'wallFinish' | 'wallColor' | 'wainscot' | 'floorFinish' | 'floorColor' | 'proposedFloor' | 'proposedWall' | 'ceilingFinish' | 'ceilingColor'> = {}): void {
   if (!store().addRoom(levelId, { name, anchor: at, ...(phase === 'existing' ? {} : { phase }), ...finishes })) throw new Error(`room ${name} rejected`);
 }
 

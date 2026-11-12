@@ -4,6 +4,7 @@ import { isVisible } from '../../derive/phase';
 import { normalizeDegrees } from '../../derive/stairs';
 import { FIXTURE_DEFAULTS, FIXTURE_LABEL, type FixtureSize } from '../../model/casework';
 import { FURNITURE, furnitureDefaults, furnitureNameOf } from '../../model/furniture';
+import { BATH_STOCK_EXTRA } from '../../model/bath';
 import { add, dot, projectPointToSegment, scale, sub } from '../../model/geometry';
 import type { Fixture, FixtureKind, FurniturePiece, Id, Level, Vec2, ViewMode } from '../../model/types';
 import { formatLengthCompact, tryParseLength } from '../../model/units';
@@ -11,7 +12,8 @@ import { EMPTY_SELECTION, type FixturePreview, type UiState } from '../../store/
 import type { Tool, ToolContext, ToolPointerEvent } from './index';
 import { applyBufferKey } from './lengthBuffer';
 
-// The fixture tool (C; DESIGN.md "Casework"): the cabinet or appliance of the chosen kind follows
+// The fixture tool (C; DESIGN.md "Casework"): the cabinet, appliance or bath and laundry fixture
+// (DESIGN.md "Bath and laundry") of the chosen kind follows
 // the cursor with its back on the nearest wall face, its front facing into the room, and slides
 // to abut a fixture already on that wall; away from any wall it is free and Tab turns it. Typing a
 // width sets the next one's width; click (or Enter) places it in the toolbar's "Draw as" phase.
@@ -124,7 +126,7 @@ interface PlacementSpec {
 
 type SpecOf = (ui: UiState) => PlacementSpec;
 
-const caseworkSpec: SpecOf = (ui) => ({ kind: ui.draft.fixtureKind, size: FIXTURE_DEFAULTS[ui.draft.fixtureKind], placement: 'wall', extra: {}, name: () => FIXTURE_LABEL[ui.draft.fixtureKind] });
+const caseworkSpec: SpecOf = (ui) => ({ kind: ui.draft.fixtureKind, size: FIXTURE_DEFAULTS[ui.draft.fixtureKind], placement: 'wall', extra: { ...BATH_STOCK_EXTRA[ui.draft.fixtureKind] }, name: () => FIXTURE_LABEL[ui.draft.fixtureKind] });
 
 const furnitureSpec: SpecOf = (ui) => {
   const d = ui.draft;
@@ -151,7 +153,12 @@ function preview(ctx: ToolContext, e: ToolPointerEvent | null, specOf: SpecOf): 
   const level = ctx.level();
   // Shift swaps a wall piece to free and a free piece to the wall.
   const toWall = (spec.placement === 'wall') !== (e?.shiftKey ?? false);
-  const own = { ...(spec.piece ? { piece: spec.piece } : {}), ...(spec.extra.wood ? { wood: spec.extra.wood } : {}), ...(spec.extra.fabric ? { fabric: spec.extra.fabric } : {}) };
+  const own = {
+    ...(spec.piece ? { piece: spec.piece } : {}),
+    ...(spec.extra.wood ? { wood: spec.extra.wood } : {}),
+    ...(spec.extra.fabric ? { fabric: spec.extra.fabric } : {}),
+    ...(spec.extra.glass ? { glass: spec.extra.glass } : {}),
+  };
   let pv: FixturePreview;
   const face = toWall ? nearestFace(level, ui.viewMode, cursor, FACE_SNAP_PX / k) : null;
   if (face) {

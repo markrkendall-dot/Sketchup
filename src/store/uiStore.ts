@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Issue } from '../derive/checks';
 import type { WallGeom } from '../derive/openings';
 import { structureOf } from '../model/structures';
-import type { Column, FabricId, FixtureKind, FurniturePiece, Id, MeasureTo, Opening, Phase, Plan, SurfaceMaterial, Vec2, ViewMode, WallKind, WoodId } from '../model/types';
+import type { Column, FabricId, Fixture, FixtureKind, FurniturePiece, Id, MeasureTo, Opening, Phase, Plan, SurfaceMaterial, Vec2, ViewMode, WallKind, WoodId } from '../model/types';
 import type { BedSize } from '../model/furniture';
 
 export type OpeningToolName = Opening['type'];
@@ -107,6 +107,8 @@ export interface FixturePreview {
   /** The Furniture tool's wood and fabric for the piece (absent: the piece's own). */
   wood?: WoodId;
   fabric?: FabricId;
+  /** A shower's glass sides (the Cabinet tool places a shower with a glass front). */
+  glass?: Fixture['glass'];
   /** Middle of the back edge. */
   origin: Vec2;
   direction: number;

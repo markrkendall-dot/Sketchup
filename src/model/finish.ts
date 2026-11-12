@@ -1,4 +1,4 @@
-import type { Column, Deck, Fence, FloorFinish, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, SiteSurface, SurfaceMaterial, ViewMode, Wall, WallFinish, WallKind } from './types';
+import type { CeilingFinish, Column, Deck, Fence, FloorFinish, LevelFinishes, Glazing, Opening, Roof, RoofEave, RoofFinish, Room, RoomWallFinish, SiteSurface, SurfaceMaterial, ViewMode, Wall, WallFinish, WallKind } from './types';
 
 // Exterior appearance defaults (DESIGN.md "Exterior appearance"). Pure data, shared by the panel,
 // the 3D materials, the opening fills and the loader's validation.
@@ -90,6 +90,25 @@ export function floorLookOf(r: Pick<Room, 'floorFinish' | 'floorColor'>): Interi
   if (!r.floorFinish && !r.floorColor) return null;
   const finish = r.floorFinish ?? 'plain';
   return { finish, color: r.floorColor ?? FLOOR_COLOR[finish] };
+}
+
+// Ceilings (DESIGN.md "Ceilings"): per room, else the level's default, else paint where there is a
+// floor above and none under a roof.
+export const CEILING_FINISHES: readonly CeilingFinish[] = ['paint', 'boards', 'pine', 'none'];
+export const CEILING_FINISH_LABEL: Record<CeilingFinish, string> = { paint: 'Paint', boards: 'Painted boards', pine: 'Knotty pine', none: 'None (open above)' };
+/** Default ceiling colours: ceiling white, the wall finishes' pine. */
+export const CEILING_COLOR: Record<Exclude<CeilingFinish, 'none'>, string> = { paint: '#f2f0ea', boards: '#f2f0ea', pine: ROOM_WALL_COLOR.pine };
+
+/**
+ * The look of a room's ceiling, or null for none: the room's finish (a colour alone is paint), else
+ * the level's default, else paint when the room is under the floor of a level above (`underFloor`)
+ * and none otherwise (under a roof, open to it, as before ceilings existed).
+ */
+export function ceilingLookOf(r: Pick<Room, 'ceilingFinish' | 'ceilingColor'>, finishes: Pick<LevelFinishes, 'ceilingFinish' | 'ceilingColor'> | undefined, underFloor: boolean): InteriorLook<Exclude<CeilingFinish, 'none'>> | null {
+  const finish: CeilingFinish = r.ceilingFinish ?? (r.ceilingColor ? 'paint' : (finishes?.ceilingFinish ?? (finishes?.ceilingColor ? 'paint' : underFloor ? 'paint' : 'none')));
+  if (finish === 'none') return null;
+  const own = r.ceilingFinish !== undefined || r.ceilingColor !== undefined;
+  return { finish, color: (own ? r.ceilingColor : finishes?.ceilingColor) ?? CEILING_COLOR[finish] };
 }
 
 /** Whether a room shows its proposed walls (Room.proposedWall) in a view: an existing room's, in the Proposed view. */

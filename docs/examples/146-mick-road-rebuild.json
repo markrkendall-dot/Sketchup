@@ -2286,6 +2286,7 @@
             "finish": "pine"
           },
           "floorFinish": "parquet",
+          "ceilingFinish": "pine",
           "id": "f-r2",
           "phase": "demo"
         },
@@ -2307,6 +2308,7 @@
             "finish": "boards",
             "color": "#ece6da"
           },
+          "ceilingFinish": "pine",
           "id": "f-r3",
           "phase": "demo"
         },
@@ -2328,6 +2330,7 @@
             "finish": "boards",
             "color": "#ece6da"
           },
+          "ceilingFinish": "boards",
           "id": "f-r4",
           "phase": "demo"
         },
@@ -2340,6 +2343,7 @@
           "wallFinish": "pine",
           "floorFinish": "boards",
           "floorColor": "#a87a4c",
+          "ceilingFinish": "pine",
           "id": "f-r5",
           "phase": "demo"
         },
@@ -2975,8 +2979,7 @@
           "id": "f-c17"
         },
         "f-c18": {
-          "kind": "box",
-          "label": "Tub",
+          "kind": "bathtub",
           "origin": {
             "x": 311,
             "y": 37
@@ -2991,8 +2994,7 @@
           "id": "f-c18"
         },
         "f-c19": {
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "origin": {
             "x": 311,
             "y": 82
@@ -3021,8 +3023,7 @@
           "id": "f-c20"
         },
         "f-c21": {
-          "kind": "box",
-          "label": "Dryer",
+          "kind": "dryer",
           "origin": {
             "x": 210.5,
             "y": 7
@@ -3037,8 +3038,7 @@
           "id": "f-c21"
         },
         "f-c22": {
-          "kind": "box",
-          "label": "Washer",
+          "kind": "washer",
           "origin": {
             "x": 237.5,
             "y": 7
@@ -3473,8 +3473,7 @@
         },
         "f-c50": {
           "elevation": 0,
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "width": 20,
           "depth": 28,
           "height": 30,
@@ -3504,8 +3503,8 @@
         },
         "f-c52": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Walk-in shower",
+          "kind": "shower",
+          "variant": "curbless",
           "origin": {
             "x": 347.75,
             "y": 6.75
@@ -3513,15 +3512,14 @@
           "direction": 90,
           "width": 60,
           "depth": 42,
-          "height": 1,
+          "height": 78,
           "frontColor": "#f1efe8",
           "phase": "new",
           "id": "f-c52"
         },
         "f-c53": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Glass",
+          "kind": "showerGlass",
           "origin": {
             "x": 377.75,
             "y": 27.75
@@ -3530,7 +3528,6 @@
           "width": 42,
           "depth": 0.5,
           "height": 78,
-          "frontColor": "#cfe2e6",
           "phase": "new",
           "id": "f-c53"
         },
@@ -3551,8 +3548,7 @@
         },
         "f-c55": {
           "elevation": 0,
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "width": 20,
           "depth": 28,
           "height": 30,
@@ -3567,8 +3563,7 @@
         },
         "f-c56": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Washer",
+          "kind": "washer",
           "origin": {
             "x": 434.75,
             "y": 95.25
@@ -3583,8 +3578,7 @@
         },
         "f-c57": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Dryer",
+          "kind": "dryer",
           "origin": {
             "x": 462.75,
             "y": 95.25
@@ -5482,8 +5476,7 @@
       "fixtures": {
         "s-c1": {
           "elevation": 0,
-          "kind": "box",
-          "label": "Tub / shower",
+          "kind": "bathtub",
           "origin": {
             "x": 42.75,
             "y": 6.75
@@ -5498,8 +5491,7 @@
         },
         "s-c2": {
           "elevation": 0,
-          "kind": "box",
-          "label": "WC",
+          "kind": "toilet",
           "width": 20,
           "depth": 28,
           "height": 30,

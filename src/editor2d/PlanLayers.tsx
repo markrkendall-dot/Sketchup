@@ -2,6 +2,8 @@ import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
 import { furnitureSymbol, type FurnitureSymbol } from '../derive/furniture';
+import { bathSymbol } from '../derive/bath';
+import { isBath } from '../model/bath';
 import { FURNITURE, isLayerFurniture } from '../model/furniture';
 import { deckTopWords, getDeckLayout, scanSegments } from '../derive/decks';
 import { beamOutline, postOutline } from '../derive/members';
@@ -474,6 +476,9 @@ export function FixtureGlyph({ sym, k, className, id, detail }: { sym: FixtureSy
   );
 }
 
+/** The drawing inside a fixture's outline: a furniture piece's or a bath fixture's detail, else none. */
+export const fixtureDetail = (f: Fixture): FurnitureSymbol | null => (f.kind === 'furniture' ? furnitureSymbol(f) : isBath(f.kind) ? bathSymbol(f) : null);
+
 const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelId: Id; fixtureId: Id }) {
   const f = useLayerPlan((s) => s.plan.levels[levelId]?.fixtures?.[fixtureId]);
   const viewMode = useLayerUi((s) => s.viewMode);
@@ -481,7 +486,7 @@ const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelI
   const showFurniture = useLayerUi((s) => s.showFurniture);
   const k = useLayerUi(viewportScale);
   const sym = useMemo(() => (f ? fixtureSymbol(f) : null), [f]);
-  const detail = useMemo(() => (f?.kind === 'furniture' ? furnitureSymbol(f) : null), [f]);
+  const detail = useMemo(() => (f ? fixtureDetail(f) : null), [f]);
   if (!f || !sym || !isVisible(f.phase, viewMode)) return null;
   // The furniture layer (Shift+F) off hides every piece.
   if (isLayerFurniture(f) && !showFurniture) return null;

@@ -124,7 +124,9 @@ export interface Roof {
 }
 
 // Casework (schema version 3, see "Casework"): a cabinet, appliance or sink as a plan rectangle.
-export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink' | 'box';
+export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink'
+  | 'bathtub' | 'shower' | 'showerGlass' | 'toilet' | 'vanity' | 'basin' | 'washer' | 'dryer' | 'waterHeater' // see "Bath and laundry"
+  | 'box' | 'furniture';
 export interface Fixture {
   id: Id; kind: FixtureKind;
   origin: Vec2;              // middle of the BACK edge (against the wall)
@@ -134,8 +136,10 @@ export interface Fixture {
   phase: Phase; label?: string;
   frontStyle?: 'slab' | 'panel'; frontColor?: string;            // else the level's finishes
   counterOverhang?: { front: Inches; back: Inches; left: Inches; right: Inches }; // else 1" front (island: all round)
+  variant?: 'alcove' | 'freestanding' | 'tray' | 'curbless' | 'pedestal' | 'wallHung'; // a tub's, shower's or basin's form
+  glass?: { front?: boolean; left?: boolean; right?: boolean };                       // a shower's glass sides
 }
-export interface LevelFinishes { cabinetColor?: string; counterColor?: string; frontStyle?: 'slab' | 'panel' }
+export interface LevelFinishes { cabinetColor?: string; counterColor?: string; frontStyle?: 'slab' | 'panel'; ceilingFinish?: CeilingFinish; ceilingColor?: string }
 
 // Decks (schema version 4, see "Decks"): boards over framing on posts, a 36" railing per edge.
 export interface Deck {
@@ -1107,6 +1111,77 @@ rows, linen, woven cane, book spines, each under a fine weave. **Paint** (`paint
 stipple. `texturesFromPixels` caches each id and variant (the new-work variant blended toward green)
 with its normal map; materials (`furnitureMaterial`, `woodMaterial`, the tread and the pine floor)
 keep the flat colour for the export.
+
+## Bath and laundry (`model/bath.ts`, `derive/bath.ts`)
+
+Bathroom and laundry items are fixture kinds like the kitchen's appliances, not a furniture catalogue:
+`bathtub`, `shower`, `showerGlass` (a fixed glass panel), `toilet`, `vanity`, `basin`, `washer`, `dryer` and
+`waterHeater` (`BATH_KINDS`). That needed the least new machinery: the Cabinet tool places them (its Kind list
+names them "Bath: ..." and "Laundry: ..."), wall snapping, abutting, Tab and Shift work as for cabinets, the
+panel edits them with the casework fields, and they show as casework does: by phase (red demolished, green new,
+hidden in the view that does not show their phase), and never on the furniture layer (Shift+F hides only loose
+furniture; kitchens and baths stay).
+
+Two optional fields, no schema bump (as with `counterOverhang` and the furniture kind: `migrateFixtures` keeps
+valid values and drops each malformed one): `variant`, a tub's form (`alcove`, default, or `freestanding`), a
+shower's (`tray`, default, or `curbless`) or a basin's (`pedestal`, default, or `wallHung`); and `glass`, a
+shower's glass sides (`front`: a fixed panel and a door; `left`, `right`: the ends as you stand in it facing out).
+`fixtureProblem` refuses a form the kind does not have and glass on anything but a shower; `cleanFixture` drops
+them when the kind changes. The Cabinet tool places a shower with a glass front (`BATH_STOCK_EXTRA`). The body's
+colour is `frontColor` (absent: white china, `CERAMIC_WHITE`); a vanity's `frontColor` is its cabinet fronts' and
+its basins stay white (`bathBodyColorOf`).
+
+Stock sizes (`FIXTURE_DEFAULTS`): tub 60 x 30 x 20 (to the rim), shower 36 x 36 x 78 (the glass's height; the
+head is at 80" whatever it), glass panel 30 x 1/2 x 78, toilet 20 x 28 x 30 (to the tank's top), vanity 36 x 21
+x 32 1/2 (counter at 34), basin 22 x 18 x 34, washer and dryer 27 x 30 x 38, water heater 22 x 22 x 60. A
+stacked dryer is a dryer with its bottom at the washer's height.
+
+**Geometry** (`bathSolids`) is a recipe of solids per kind in the fixture's frame, like furniture's, with one more
+solid type, `prism` (a plan ring less holes, extruded): the alcove tub is an apron and rim round a rounded basin
+(wider at the back rest), a drain, and a spout and valve on the end wall at s < 0; the freestanding tub an oval
+rim on an oval floor and plinth with a floor-mounted filler; a shower a 3" tray with a rim and a round drain or
+a 1/2" tiled floor with a linear drain, a valve and a rain head on an arm (the back wall), and 3/8" glass on a
+chrome channel; a toilet a tank and lid with a lever, a supply line, an oval pedestal, an open oval bowl and a
+seat with hinges; a vanity the cabinet of a base cabinet (`fixtureBoxes`) under a counter with a hole per basin
+(`vanityBasinsLocal`: one, or two from 60" wide; `counterRuns` cuts them like a sink's) and an undermount basin
+and a tap behind each; a basin an oval bowl in a rounded top with a tap, on a pedestal or over a trap into the
+wall; a washer and a dryer a cabinet, a round door low on the front (a washer's chrome ring and dark window, a
+dryer's white door and small window), a control strip, a washer's drawer; the water heater a round tank on a pan
+with its flue and pipes. Every solid stays inside the footprint; taps and shower heads on the wall stand above
+a tub's or shower's height. `buildFixtureParts` merges them per part with the casework boxes.
+
+**Materials** (`bathMaterial`): `body` glossy (roughness 0.25, smooth shaded, the sky faintly reflected) in the
+body colour; `chrome` metal; `glass` the window glass made clear (`SHOWER_GLASS_COLOR` at
+`SHOWER_GLASS_OPACITY`), drawn after the opaque meshes and casting no shadow (`isGlassPart`); `dark` as a toe
+kick. Demolished: translucent red; new: pulled toward green. The export names them `bath_body` (plus `_<hex>`),
+`bath_chrome`, `bath_glass` and `kick`, in meshes named `Bath (<kind>)`.
+
+**Plan symbols** (`bathSymbol`, drawn thin inside the outline like furniture's detail): a tub's basin and drain
+(an oval tub's two ellipses), a shower's corner-to-corner cross with its drain (a curbless one's linear drain)
+and a double line along each glass side, a toilet's tank and bowl with the seat's opening, a vanity's basins
+(ellipses) and taps over its door ticks, a basin's bowl, a water heater's circle. The washer, dryer and water
+heater carry a word (`W`, `D`, `WH`); the others only a label set by hand.
+
+## Ceilings (`model/finish.ts ceilingLookOf`, `derive/meshes.ts buildCeilingGeometry`)
+
+A room may set `ceilingFinish` (`paint | boards | pine | none`) and `ceilingColor`, and a level a default for its
+rooms (`LevelFinishes.ceilingFinish`, `ceilingColor`): optional data, no schema bump. `ceilingLookOf` resolves the
+room's (a colour alone is paint), else the level's, else **paint** (`CEILING_COLOR`, ceiling white) when the room
+is under the floor of a level above (its label point inside the slab outline of the level above, `outerFaces`)
+and **none** under a roof, which is how plans looked before: a room open to the roof keeps its view of the
+rafters and log trusses unless a ceiling is set. The finishes reuse the wall finishes' textures (paint's stipple,
+painted boards, knotty pine).
+
+`getLevelMeshes` gives `ceilings`: per labelled room with one, its net polygon at its ceiling height
+(`ceilingOverride`, else the wall height; under a floor above never higher than the wall height) less
+`CEILING_DROP` (1/16"), one surface facing down, less the holes through the floor above (the level's stairs that
+cut it and the floor openings of the level above). It is flat: under a sloped roof it does not follow the roof.
+Being FrontSide and facing down, it is culled from above, so it never hides a room in a look-down view; it casts
+no shadow. The 3D view draws ceilings with the roofs on and in walk mode (the 3D bar's Roofs checkbox off lifts
+them off with the roofs), the per-level checkboxes as before. Its material (`ceilingMaterial`) adds a little of
+its own colour as glow (a downward face gets only the hemisphere's green-brown ground light). The export carries
+them as `Ceiling (<room>)` unless `show3dRoofs` is false. The room panel has Ceiling, Ceiling colour and Ceiling
+height; the Level panel Ceilings and Ceiling colour.
 
 ## Exterior appearance (`model/finish.ts`, `view3d/textures.ts`, `derive/openings3d.ts`)
 

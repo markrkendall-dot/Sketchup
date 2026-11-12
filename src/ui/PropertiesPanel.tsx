@@ -48,7 +48,9 @@ import { boundsOf } from '../model/geometry';
 import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
-import type { Beam, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
+import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
+import type { BathVariant, Beam, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -1184,6 +1186,30 @@ function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; 
           )}
         </>
       )}
+      <SelectField
+        label="Ceiling"
+        value={(room.ceilingFinish ?? 'default') as CeilingChoice}
+        options={roomCeilingOptions}
+        onChange={(v) => set(v === 'default' ? { ceilingFinish: undefined, ceilingColor: undefined } : v === 'none' ? { ceilingFinish: 'none', ceilingColor: undefined } : { ceilingFinish: v })}
+      />
+      {room.ceilingFinish !== 'none' && (
+        <ColorField
+          label="Ceiling colour"
+          value={room.ceilingColor ?? CEILING_COLOR[room.ceilingFinish ?? 'paint']}
+          onCommit={(color) => set({ ceilingColor: color })}
+          onReset={room.ceilingColor ? () => set({ ceilingColor: undefined }) : undefined}
+          hint={room.ceilingFinish === undefined && !room.ceilingColor ? 'Setting it paints the ceiling in it.' : undefined}
+        />
+      )}
+      <LengthField
+        label="Ceiling height"
+        value={room.ceilingOverride ?? wallHeight}
+        onCommit={(h) => {
+          if (h === null) return;
+          set({ ceilingOverride: h === wallHeight ? undefined : h });
+        }}
+        hint="Flat, over the floor; under a floor above it is at most the wall height."
+      />
       {(wall || w || floor) && <p className="panel-note">They dress the faces of the walls round the room, and its floor, in 3D; each wall keeps its own finish on its other side.</p>}
       {room.proposedFloor && (room.phase ?? 'existing') === 'existing' && <p className="panel-note">The proposed floor is a new floor laid in this room in the proposed design; the Proposed view shows it.</p>}
     </>
@@ -1556,7 +1582,9 @@ function StairsOpeningFields({ level, stairs, ftf }: { level: Level; stairs: Sta
   );
 }
 
-const fixtureKindOptions = CASEWORK_KINDS.map((k) => ({ value: k, label: FIXTURE_LABEL[k] }));
+/** The Cabinet tool's kinds: the kitchen's, then "Bath: ..." and "Laundry: ..." (DESIGN.md "Bath and laundry"). */
+const LAUNDRY_KINDS: readonly string[] = ['washer', 'dryer', 'waterHeater'];
+const fixtureKindOptions = CASEWORK_KINDS.map((k) => ({ value: k, label: isBath(k) ? `${LAUNDRY_KINDS.includes(k) ? 'Laundry' : 'Bath'}: ${FIXTURE_LABEL[k]}` : FIXTURE_LABEL[k] }));
 /** The catalogue by category ("Beds: Bed", "Seating: Sofa"...). */
 const furniturePieceOptions = FURNITURE_CATEGORIES.flatMap((c) => FURNITURE_PIECES.filter((p) => FURNITURE[p].category === c).map((p) => ({ value: p, label: `${c}: ${FURNITURE[p].label}` })));
 const bedSizeOptions = BED_SIZE_IDS.map((b) => ({ value: b, label: `${BED_SIZES[b].label} (${BED_SIZES[b].mattress[0]}" x ${BED_SIZES[b].mattress[1]}" mattress)` }));
@@ -1749,14 +1777,20 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
         label="Height"
         value={fixture.height}
         onCommit={(v) => void (v !== null && set({ height: v }))}
-        hint={heightChoices ? `Usual: ${heightChoices.map((h) => formatLength(h, denom)).join(', ')}.` : hasCounter(fixture.kind) ? `The counter top sits at ${formatLength(counterTopOf(fixture), denom)}.` : undefined}
+        hint={
+          heightChoices
+            ? `Usual: ${heightChoices.map((h) => formatLength(h, denom)).join(', ')}.`
+            : hasCounter(fixture.kind)
+              ? `The counter top sits at ${formatLength(counterTopOf(fixture), denom)}.`
+              : BATH_HEIGHT_HINT[fixture.kind]
+        }
       />
       <LengthField
         label="Bottom"
         value={fixture.elevation}
         bound="nonnegative"
         onCommit={(v) => void (v !== null && set({ elevation: v }))}
-        hint="Above the floor: 0 on the floor, 54 for a wall cabinet."
+        hint={fixture.kind === 'dryer' || fixture.kind === 'washer' ? 'Above the floor: set it to the other machine\'s height to stack it.' : 'Above the floor: 0 on the floor, 54 for a wall cabinet.'}
       />
       <SelectField label="Facing" value={dir} options={facing} onChange={(v) => set({ direction: Number(v) })} />
       <SelectField label="Phase" value={fixture.phase} options={phaseOptions} onChange={(p) => set({ phase: p })} />
@@ -1791,6 +1825,7 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
           />
         </>
       ) : null}
+      {isBath(fixture.kind) && <BathOptions level={level} fixture={fixture} />}
       {hasCounter(fixture.kind) && (
         <>
           <ReadOnly label="Counter top">{formatLength(counterTopOf(fixture), denom)}</ReadOnly>
@@ -1806,6 +1841,89 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
         </>
       )}
       <p className="panel-note">Drag with the select tool to move. Touching counter cabinets share one counter top.</p>
+    </>
+  );
+}
+
+/** What a bath fixture's height measures, where it is not plain. */
+const BATH_HEIGHT_HINT: Partial<Record<Fixture['kind'], string>> = {
+  bathtub: 'To the rim.',
+  shower: `The glass's height; the head is at ${SHOWER.head}" over the floor.`,
+  showerGlass: 'The panel\'s height.',
+  toilet: 'To the top of the tank.',
+  basin: 'To the rim.',
+};
+
+/** A bath or laundry fixture's own options: its form, a shower's glass sides, the body's colour (a vanity's fronts are cabinet fronts). */
+function BathOptions({ level, fixture }: { level: Level; fixture: Fixture }) {
+  const updateFixture = usePlanStore((s) => s.updateFixture);
+  const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
+  const variants = VARIANTS[fixture.kind];
+  const glass = glassOf(fixture);
+  return (
+    <>
+      {variants && (
+        <SelectField
+          label="Form"
+          value={variantOf(fixture) as BathVariant}
+          options={variants.map((v) => ({ value: v, label: VARIANT_LABEL[v] }))}
+          onChange={(v) => set({ variant: v === variants[0] ? undefined : v })}
+        />
+      )}
+      {fixture.kind === 'shower' &&
+        (['front', 'left', 'right'] as const).map((side) => (
+          <label className="check-row" key={side}>
+            <input
+              type="checkbox"
+              aria-label={`Glass ${side}`}
+              checked={glass[side]}
+              onChange={(e) => {
+                set({ glass: { ...glass, [side]: e.target.checked } });
+                releaseFocus(e.currentTarget);
+              }}
+            />
+            Glass {side === 'front' ? 'front (a fixed panel and a door)' : `${side} end`}
+          </label>
+        ))}
+      {fixture.kind === 'shower' && <p className="panel-note">Left and right as you stand in the shower facing out.</p>}
+      {fixture.kind !== 'vanity' && fixture.kind !== 'showerGlass' && (
+        <ColorField
+          label={fixture.kind === 'washer' || fixture.kind === 'dryer' || fixture.kind === 'waterHeater' ? 'Colour' : 'China colour'}
+          value={bathBodyColorOf(fixture)}
+          onCommit={(c) => set({ frontColor: c === CERAMIC_WHITE ? undefined : c })}
+          onReset={fixture.frontColor ? () => set({ frontColor: undefined }) : undefined}
+          hint={fixture.frontColor ? undefined : 'White.'}
+        />
+      )}
+    </>
+  );
+}
+
+type CeilingChoice = 'default' | CeilingFinish;
+const roomCeilingOptions: { value: CeilingChoice; label: string }[] = [{ value: 'default', label: 'Default (the level\'s)' }, ...CEILING_FINISHES.map((f) => ({ value: f, label: CEILING_FINISH_LABEL[f] }))];
+const levelCeilingOptions: { value: CeilingChoice; label: string }[] = [
+  { value: 'default', label: 'Default (paint under a floor, none under a roof)' },
+  ...CEILING_FINISHES.map((f) => ({ value: f, label: CEILING_FINISH_LABEL[f] })),
+];
+
+/** A level's ceiling default (DESIGN.md "Ceilings"): for its rooms that set none. */
+function CeilingDefaults({ level }: { level: Level }) {
+  const updateFinishes = usePlanStore((s) => s.updateFinishes);
+  const f = level.finishes;
+  const finish = f?.ceilingFinish;
+  const shown: Exclude<CeilingFinish, 'none'> | null = finish === 'none' ? null : (finish ?? (f?.ceilingColor ? 'paint' : null));
+  return (
+    <>
+      <SelectField label="Ceilings" value={(finish ?? 'default') as CeilingChoice} options={levelCeilingOptions} onChange={(v) => updateFinishes(level.id, { ceilingFinish: v === 'default' ? undefined : v, ...(v === 'none' ? { ceilingColor: undefined } : {}) })} />
+      {(shown || finish === undefined) && (
+        <ColorField
+          label="Ceiling colour"
+          value={f?.ceilingColor ?? CEILING_COLOR[shown ?? 'paint']}
+          onCommit={(c) => updateFinishes(level.id, { ceilingColor: c })}
+          onReset={f?.ceilingColor ? () => updateFinishes(level.id, { ceilingColor: undefined }) : undefined}
+          hint="For the rooms that set no ceiling of their own."
+        />
+      )}
     </>
   );
 }
@@ -3288,6 +3406,7 @@ function LevelProps({ level }: { level: Level }) {
       <ExteriorAppearance level={level} />
       <ProposedExterior />
       <CaseworkDefaults level={level} />
+      <CeilingDefaults level={level} />
       {floorTop !== undefined && ceiling !== undefined && (
         <>
           <ReadOnly label="Floor top">{formatLength(floorTop, denom)}</ReadOnly>

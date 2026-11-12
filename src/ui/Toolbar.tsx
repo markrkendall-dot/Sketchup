@@ -46,7 +46,7 @@ const TOOL_TITLE: Partial<Record<ToolName, string>> = {
   floorOpening: 'Floor opening (H): a hole in this floor, open to the level below; click its corners (they snap to the wall faces), close on the first corner or Enter; its guards are set in the properties panel',
   beam: 'Beam (I): click one end, then the other; a flush (2) 1 3/4" x 11 7/8" LVL in the floor framing over this level, a placeholder for the engineer to size',
   post: 'Post (L): click to place a 6x6 post up to the beam over it; on the lowest level it stands on a 24" x 12" footing',
-  fixture: 'Cabinet (C): a cabinet, appliance or sink follows the cursor along the nearest wall; click to place it, type a width first to change it; pick the kind in the properties panel',
+  fixture: 'Cabinet (C): a cabinet, appliance, sink, or bath or laundry fixture follows the cursor along the nearest wall; click to place it, type a width first to change it; pick the kind in the properties panel',
   furniture: 'Furniture (Shift+C): pick a bed, dresser, desk, sofa, chair, table or rug, its wood and fabric in the properties panel; it follows the cursor, click to place it',
   underlay: 'Underlay (U): load an image of a floor plan or sketch, scale it by two points, trace over it',
 };

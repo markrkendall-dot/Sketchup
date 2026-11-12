@@ -5,7 +5,7 @@ import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { counterColorOf } from '../model/casework';
-import { counterMaterial, fixturePartMaterial, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { ceilingMaterial, counterMaterial, fixturePartMaterial, isGlassPart, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -20,6 +20,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const viewMode = useUiStore((s) => s.viewMode);
   // The 3D bar's Roofs checkbox: off lifts every roof (with its fascia and rafter tails) off.
   const showRoofs = useUiStore((s) => s.show3dRoofs);
+  // Ceilings go with the roofs, and show in walk mode whatever the Roofs checkbox (you are inside).
+  const showCeilings = useUiStore((s) => s.show3dRoofs || s.cameraMode === 'walk');
   // The furniture layer (Shift+F, the 3D bar's Furniture checkbox): off hides every loose piece (built-ins stay).
   const showFurniture = useUiStore((s) => s.showFurniture);
   const meshes = usePlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
@@ -37,6 +39,11 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
       {meshes.floorFinishes.map((f) => (
         <mesh key={f.roomId} name={`floor-finish:${f.roomId}`} geometry={f.geometry} material={floorFinishMaterial(f.phase, f.finish, f.color)} receiveShadow dispose={null} />
       ))}
+      {/* Ceilings face down (culled from above) and go with the roofs (or walk mode): lifting the roofs off shows the rooms from above. They cast no shadow (the floor or roof over them does). */}
+      {showCeilings &&
+        meshes.ceilings.map((c) => (
+          <mesh key={c.roomId} name={`ceiling:${c.roomId}`} geometry={c.geometry} material={ceilingMaterial(c.phase, c.finish, c.color)} receiveShadow dispose={null} />
+        ))}
       {meshes.walls.map((w) => (
         <group key={w.id}>
           <mesh
@@ -220,8 +227,8 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
               name={`fixture:${f.id}:${p.part}`}
               geometry={p.geometry}
               material={fixturePartMaterial(f, p.part)}
-              renderOrder={f.phase === 'demo' ? 1 : 0}
-              castShadow={f.phase !== 'demo' && !f.furniture?.floorLayer}
+              renderOrder={f.phase === 'demo' || isGlassPart(p.part) ? 1 : 0}
+              castShadow={f.phase !== 'demo' && !f.furniture?.floorLayer && !isGlassPart(p.part)}
               receiveShadow
               dispose={null}
             />

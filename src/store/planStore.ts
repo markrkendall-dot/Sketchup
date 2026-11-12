@@ -17,6 +17,7 @@ import {
   stairsRailingsOf,
   floorOpeningProblem,
   fixtureProblem,
+  glassSidesOf,
   roofOptionProblem,
   roofProblem,
   surfaceProblem,
@@ -39,6 +40,7 @@ import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stair
 import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
 import { isWoodId } from '../model/furniture';
+import { isVariantOf } from '../model/bath';
 
 export interface AddWallOptions {
   kind: WallKind;
@@ -79,7 +81,7 @@ const OPTIONAL_OPENING_KEYS: ReadonlySet<keyof Opening> = new Set<keyof Opening>
 ]);
 export type RoomPatch = Partial<Omit<Room, 'id'>>;
 /** Room fields that a patch clears with undefined. */
-const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall'] as const;
+const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'ceilingFinish', 'ceilingColor'] as const;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 /** A flight's fields; its staircase is set by groupStairs and ungroupStaircase, not here. */
 export type StairsPatch = Partial<Omit<Stairs, 'id' | 'staircaseId'>>;
@@ -117,7 +119,7 @@ export type JoistZonePatch = Partial<Omit<JoistZone, 'id'>>;
 export type FixturePatch = Partial<Omit<Fixture, 'id'>>;
 export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
 /** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
-const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn']);
+const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn', 'variant', 'glass']);
 export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** A level's casework defaults; undefined clears a field. */
@@ -562,7 +564,11 @@ function cleanFixture(f: Fixture): Fixture {
     delete out.fabric;
     delete out.builtIn;
   }
-  for (const k of ['label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn'] as const) if (out[k] === undefined) delete out[k];
+  // A form only on a kind that has it, glass sides only on a shower (and only the true ones).
+  if (out.variant !== undefined && !isVariantOf(f.kind, out.variant)) delete out.variant;
+  if (f.kind !== 'shower' || !f.glass) delete out.glass;
+  else out.glass = glassSidesOf(f.glass);
+  for (const k of ['label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass'] as const) if (out[k] === undefined) delete out[k];
   return out;
 }
 
@@ -1000,7 +1006,7 @@ export const usePlanStore = create<PlanState>()(
               else r.phase = patch.phase;
             }
             // Interior finishes: undefined clears a field; colours lower-case, the wainscot copied.
-            for (const key of ['wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor'] as const) {
+            for (const key of ['wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'ceilingFinish', 'ceilingColor'] as const) {
               if (!(key in patch)) continue;
               const v = patch[key];
               if (v === undefined) delete r[key];
@@ -1336,6 +1342,8 @@ export const usePlanStore = create<PlanState>()(
           editLevel(levelId, (level) => {
             const f = level.fixtures[id];
             if (!f) return false;
+            // A form the (new) kind does not come in is refused; a kind change drops the old form (cleanFixture).
+            if (patch.variant !== undefined && !isVariantOf(patch.kind ?? f.kind, patch.variant)) return false;
             const next = cleanFixture({ ...f, ...patch, id });
             if (fixtureProblem(next)) return false;
             const keys = Object.keys(patch) as (keyof FixturePatch)[];
@@ -1349,7 +1357,7 @@ export const usePlanStore = create<PlanState>()(
               } else (f as unknown as Record<string, unknown>)[k] = next[k];
             }
             // Fields the cleaning dropped (a piece and a fabric when the kind is no longer furniture).
-            for (const k of ['piece', 'fabric', 'builtIn'] as const) if (next[k] === undefined) delete f[k];
+            for (const k of ['piece', 'fabric', 'builtIn', 'variant', 'glass'] as const) if (next[k] === undefined) delete f[k];
           }),
 
         deleteFixtures: (levelId, ids) =>
@@ -1391,7 +1399,7 @@ export const usePlanStore = create<PlanState>()(
             const cur: LevelFinishes = { ...(level.finishes ?? {}) };
             let changed = false;
             for (const [k, v] of Object.entries(patch) as [keyof LevelFinishes, LevelFinishes[keyof LevelFinishes] | undefined][]) {
-              const value = typeof v === 'string' && (k === 'cabinetColor' || k === 'counterColor') ? v.toLowerCase() : v;
+              const value = typeof v === 'string' && (k === 'cabinetColor' || k === 'counterColor' || k === 'ceilingColor') ? v.toLowerCase() : v;
               if (k === 'cabinetWood' && value !== undefined && !isWoodId(value)) continue;
               if (cur[k] === value) continue;
               if (value === undefined) delete cur[k];

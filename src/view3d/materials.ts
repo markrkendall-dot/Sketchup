@@ -6,6 +6,7 @@ import type { FabricId, WoodId } from '../model/types';
 import { fabricTextures, paintTextures, pineFloorTextures, woodTextures, type FabricTexture } from './proceduralTextures';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
+import { CERAMIC_WHITE, CHROME_COLOR, SHOWER_GLASS_COLOR } from '../model/bath';
 import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
 import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DECK_COLOR, DEFAULT_WEATHERING, defaultWallColor, FENCE_COLOR, RAILING_COLOR, SURFACE_COLOR, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, SurfaceMaterial, WallFinish, WallKind } from '../model/types';
@@ -450,19 +451,56 @@ export const GLASS_OPACITY = 0.75;
  * view, by Fresnel), no depth write (drawn after the opaque meshes, renderOrder 1). New glass is
  * pulled toward green; demolished glass is translucent red at 0.35 like every demolished part.
  */
-function glassMaterial(phase: Phase): MeshPhysicalMaterial {
+function glassMaterial(phase: Phase, color: string = GLASS_COLOR, opacity: number = GLASS_OPACITY): MeshPhysicalMaterial {
   const m = new MeshPhysicalMaterial({
-    color: new Color(phase === 'demo' ? PHASE_COLOR.demo : phase === 'new' ? pullGreen(GLASS_COLOR) : GLASS_COLOR),
+    color: new Color(phase === 'demo' ? PHASE_COLOR.demo : phase === 'new' ? pullGreen(color) : color),
     roughness: 0.05,
     metalness: 0,
     flatShading: true,
     side: FrontSide,
     transparent: true,
-    opacity: phase === 'demo' ? 0.35 : GLASS_OPACITY,
+    opacity: phase === 'demo' ? 0.35 : opacity,
     depthWrite: false,
   });
   return reflectSky(m, GLASS_ENV_INTENSITY);
 }
+
+/** Shower glass is the window glass made clear: pale and mostly see-through. */
+export const SHOWER_GLASS_OPACITY = 0.35;
+
+/**
+ * Bath and laundry fixtures (DESIGN.md "Bath and laundry"): the body (vitreous china, enamel, a
+ * tray) glossy in its colour, smooth shaded so the round parts read round; polished chrome that
+ * reflects the sky; clear shower glass (the window glass, pale and at SHOWER_GLASS_OPACITY, drawn
+ * after the opaque meshes); dark parts (a washer's window, a display) like a toe kick. Demolished:
+ * translucent red; new: pulled toward green, like everything else.
+ */
+export function bathMaterial(part: FixturePart, phase: Phase, color: string = CERAMIC_WHITE): MeshStandardMaterial {
+  if (part === 'dark') return trimLike('kick', KICK_COLOR, phase);
+  const key = part === 'body' ? `bath-body|${phase}|${color}` : `bath-${part}|${phase}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    if (part === 'glass') m = glassMaterial(phase, SHOWER_GLASS_COLOR, SHOWER_GLASS_OPACITY);
+    else if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else if (part === 'chrome') {
+      m = make(phase === 'new' ? pullGreen(CHROME_COLOR) : CHROME_COLOR);
+      m.metalness = 0.9;
+      m.roughness = 0.2;
+      m.flatShading = false;
+      reflectSky(m, 1);
+    } else {
+      m = make(phase === 'new' ? pullGreen(color) : color);
+      m.roughness = 0.25;
+      m.flatShading = false;
+      reflectSky(m, 0.35);
+    }
+    partMaterials.set(key, m);
+  }
+  return m;
+}
+
+/** Bath parts that are drawn like glass: see-through, after the opaque meshes, casting no shadow. */
+export const isGlassPart = (part: FixturePart): boolean => part === 'glass';
 
 /**
  * The ground: the lawn texture (groundTexture.ts; the terrain's UVs are in inches) under a white
@@ -613,6 +651,32 @@ export function fenceMaterial(part: 'body' | 'end', phase: Phase, color: string 
 }
 
 /** The material of one part of a fixture mesh: a furniture piece's (furnitureMaterial) or casework's (caseworkMaterial, in its wood when it has one). */
-export function fixturePartMaterial(f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture'>, part: FixturePart): MeshStandardMaterial {
-  return f.furniture ? furnitureMaterial(part, f.phase, f.furniture.wood, f.furniture.fabric) : caseworkMaterial(part, f.phase, f.frontColor, f.wood);
+export function fixturePartMaterial(f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor'>, part: FixturePart): MeshStandardMaterial {
+  if (f.furniture) return furnitureMaterial(part, f.phase, f.furniture.wood, f.furniture.fabric);
+  if (part === 'body' || part === 'chrome' || part === 'glass' || part === 'dark') return bathMaterial(part, f.phase, f.bodyColor);
+  return caseworkMaterial(part, f.phase, f.frontColor, f.wood);
+}
+
+const ceilingMaterials = new Map<string, MeshStandardMaterial>();
+
+/**
+ * A room's ceiling (DESIGN.md "Ceilings"): the wall finishes' material (paint, painted boards, knotty
+ * pine), with a little of its own colour as glow: facing down, it gets only the hemisphere light's
+ * green-brown ground colour, which made a pale ceiling read dark and greenish.
+ */
+export function ceilingMaterial(phase: Phase, finish: 'paint' | 'boards' | 'pine', color: string): MeshStandardMaterial {
+  const key = `${phase}|${finish}|${color}`;
+  let m = ceilingMaterials.get(key);
+  if (!m) {
+    const wall = roomWallMaterial(phase, finish, color);
+    m = make(interiorFlatColor(phase, finish, color));
+    m.emissive = new Color(interiorFlatColor(phase, finish, color));
+    m.emissiveIntensity = 0.3;
+    m.userData.flatColor = wall.userData.flatColor;
+    const kind = interiorTextureOf('wall', finish);
+    const variant = phase === 'new' ? 'new' : 'plain';
+    texture(m, () => (finish === 'paint' ? paintTextures(color, variant) : kind ? interiorTextures(kind, color, variant) : null));
+    ceilingMaterials.set(key, m);
+  }
+  return m;
 }

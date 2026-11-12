@@ -1,10 +1,11 @@
+import { BATH_KINDS } from './bath';
 import type { Fixture, FixtureKind, FrontStyle, Level, LevelFinishes } from './types';
 
 // Casework data (DESIGN.md "Casework"): the kinds of fixture, their stock sizes, the counter and
 // toe-kick dimensions and the colour defaults. Pure data shared by the tool, the panel, the 3D
 // materials, the 2D symbols and the loader's validation.
 
-export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'wall', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', 'box', 'furniture'];
+export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'wall', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', ...BATH_KINDS, 'box', 'furniture'];
 /** The kinds the Cabinet tool offers (furniture has its own tool and catalogue, model/furniture.ts). */
 export const CASEWORK_KINDS: readonly FixtureKind[] = FIXTURE_KINDS.filter((k) => k !== 'furniture');
 
@@ -20,6 +21,15 @@ export const FIXTURE_LABEL: Record<FixtureKind, string> = {
   wallOven: 'Wall oven',
   hood: 'Range hood',
   microwave: 'Microwave',
+  bathtub: 'Bathtub',
+  shower: 'Shower',
+  showerGlass: 'Glass panel',
+  toilet: 'Toilet',
+  vanity: 'Vanity',
+  basin: 'Basin',
+  washer: 'Washer',
+  dryer: 'Dryer',
+  waterHeater: 'Water heater',
   box: 'Box',
   furniture: 'Furniture',
 };
@@ -32,6 +42,9 @@ export const FIXTURE_PLAN_LABEL: Partial<Record<FixtureKind, string>> = {
   wallOven: 'OVEN',
   hood: 'HOOD',
   microwave: 'MW',
+  washer: 'W',
+  dryer: 'D',
+  waterHeater: 'WH',
   box: 'BOX',
 };
 
@@ -56,6 +69,18 @@ export const FIXTURE_DEFAULTS: Record<FixtureKind, FixtureSize> = {
   wallOven: { width: 30, depth: 24, height: 84, elevation: 0 },
   hood: { width: 30, depth: 18, height: 12, elevation: 66 },
   microwave: { width: 30, depth: 16, height: 17, elevation: 54 },
+  // Bath and laundry (model/bath.ts): a 60" x 30" tub, a 36" square shower (its height the glass's),
+  // a fixed 30" glass panel, a toilet (tank 20" wide), a 36" vanity (counter at 34"), a pedestal
+  // basin, front-load washer and dryer, a 50-gallon water heater.
+  bathtub: { width: 60, depth: 30, height: 20, elevation: 0 },
+  shower: { width: 36, depth: 36, height: 78, elevation: 0 },
+  showerGlass: { width: 30, depth: 0.5, height: 78, elevation: 0 },
+  toilet: { width: 20, depth: 28, height: 30, elevation: 0 },
+  vanity: { width: 36, depth: 21, height: 32.5, elevation: 0 },
+  basin: { width: 22, depth: 18, height: 34, elevation: 0 },
+  washer: { width: 27, depth: 30, height: 38, elevation: 0 },
+  dryer: { width: 27, depth: 30, height: 38, elevation: 0 },
+  waterHeater: { width: 22, depth: 22, height: 60, elevation: 0 },
   box: { width: 24, depth: 24, height: 24, elevation: 0 },
   // Nominal: the Furniture tool places each piece at its own size (model/furniture.ts).
   furniture: { width: 24, depth: 24, height: 30, elevation: 0 },
@@ -66,9 +91,9 @@ export const WALL_CABINET_HEIGHTS = [30, 36, 42] as const;
 export const TALL_CABINET_HEIGHTS = [84, 96] as const;
 
 /** Kinds a counter top runs over. */
-export const hasCounter = (kind: FixtureKind): boolean => kind === 'base' || kind === 'island' || kind === 'dishwasher' || kind === 'sink';
+export const hasCounter = (kind: FixtureKind): boolean => kind === 'base' || kind === 'island' || kind === 'dishwasher' || kind === 'sink' || kind === 'vanity';
 /** Kinds that are cabinets (carcass and fronts in the cabinet colour). */
-export const isCabinet = (kind: FixtureKind): boolean => kind === 'base' || kind === 'wall' || kind === 'tall' || kind === 'island' || kind === 'sink';
+export const isCabinet = (kind: FixtureKind): boolean => kind === 'base' || kind === 'wall' || kind === 'tall' || kind === 'island' || kind === 'sink' || kind === 'vanity';
 /** Kinds that hang above the counter: drawn dashed on the plan. */
 export const isOverhead = (kind: FixtureKind): boolean => kind === 'wall' || kind === 'hood' || kind === 'microwave';
 

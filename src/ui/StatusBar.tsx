@@ -175,7 +175,7 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   },
   underlay: { idle: '', busy: '' },
   fixture: {
-    idle: 'The cabinet or appliance follows the cursor with its back on the nearest wall face and slides to abut the last one; click to place it. Type a width (36, 2\'6) to change it; pick the kind in the properties panel; hold Shift for free placement, Tab turns it.',
+    idle: 'The cabinet, appliance or bath fixture follows the cursor with its back on the nearest wall face and slides to abut the last one; click to place it. Type a width (36, 2\'6) to change it; pick the kind in the properties panel; hold Shift for free placement, Tab turns it.',
     busy: 'Type the width in feet and inches, then click or press Enter to place it. Esc clears the width.',
   },
   furniture: {

@@ -47,13 +47,13 @@ describe('fixture frame and outline', () => {
     expect(island.map((p) => p.y).sort((a, b) => a - b)).toEqual([-1, -1, 37, 37]);
   });
 
-  it('has a stock size for every kind, and a counter on the base, island, dishwasher and sink only', () => {
+  it('has a stock size for every kind, and a counter on the base, island, dishwasher, sink and vanity only', () => {
     for (const k of FIXTURE_KINDS) {
       const d = FIXTURE_DEFAULTS[k];
       expect(d.width).toBeGreaterThan(0);
       expect(d.height).toBeGreaterThan(0);
     }
-    expect(FIXTURE_KINDS.filter(hasCounter)).toEqual(['base', 'island', 'sink', 'dishwasher']);
+    expect(FIXTURE_KINDS.filter(hasCounter)).toEqual(['base', 'island', 'sink', 'dishwasher', 'vanity']);
     expect(FIXTURE_DEFAULTS.wall.elevation).toBe(54);
     expect(FIXTURE_DEFAULTS.hood.elevation).toBe(66);
   });

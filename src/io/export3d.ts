@@ -7,10 +7,11 @@ import type { FillPart } from '../derive/openings3d';
 import { getDeckMeshes, getFenceMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
 import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
+import { CERAMIC_WHITE, isBath } from '../model/bath';
 import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { chimneyPartMaterial, fixturePartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { ceilingMaterial, chimneyPartMaterial, fixturePartMaterial, isGlassPart, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 import { firstStructure, structureOf } from '../model/structures';
@@ -23,7 +24,7 @@ import { firstStructure, structureOf } from '../model/structures';
 export const METRES_PER_INCH = 0.0254;
 
 /** The 3D view's level visibility (which levels the export includes). */
-export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode' | 'showFurniture'>>;
+export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode' | 'showFurniture' | 'show3dRoofs'>>;
 
 export type ExportFormat = 'glb' | 'obj';
 
@@ -78,11 +79,15 @@ const chimneyPartMaterialName = (part: ChimneyPart, phase: Phase) => (part === '
  * `furniture_<part>_<wood or fabric>` (`furniture_wood_hickory`, `furniture_fabric_buffaloRed`,
  * `furniture_linen`), then `_<phase>`.
  */
-const fixtureMaterialName = (f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture'>, part: FixturePart) => {
+const fixtureMaterialName = (f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor'>, part: FixturePart) => {
   const phase = f.phase;
   let base: string;
   if (f.furniture) {
     base = phase === 'demo' && part !== 'wood' ? 'furniture' : part === 'wood' ? `furniture_wood_${f.furniture.wood}` : part === 'fabric' ? `furniture_fabric_${f.furniture.fabric}` : `furniture_${part}`;
+  } else if (part === 'body') {
+    base = phase !== 'demo' && f.bodyColor && f.bodyColor !== CERAMIC_WHITE ? `bath_body_${f.bodyColor.slice(1)}` : 'bath_body';
+  } else if (part === 'chrome' || part === 'glass' || part === 'dark') {
+    base = part === 'dark' ? 'kick' : `bath_${part}`;
   } else if (part === 'carcass' || part === 'front') {
     base = phase !== 'demo' && f.wood ? `cabinet_wood_${f.wood}` : phase !== 'demo' && f.frontColor !== DEFAULT_CABINET_COLOR ? `cabinet_${f.frontColor.slice(1)}` : 'cabinet';
   } else base = part;
@@ -96,6 +101,8 @@ const counterMaterialName = (phase: Phase, color: string) => {
 const fixtureMeshName = (kind: FixtureKind, piece?: string) =>
   kind === 'furniture'
     ? `Furniture (${piece ?? 'piece'})`
+    : isBath(kind)
+      ? `Bath (${FIXTURE_LABEL[kind].toLowerCase()})`
     : isCabinet(kind) && kind !== 'sink'
       ? `Cabinet (${FIXTURE_LABEL[kind].replace(' cabinet', '').toLowerCase()})`
       : kind === 'sink'
@@ -168,6 +175,12 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     const roomName = (id: string) => level.rooms[id]?.name ?? 'room';
     for (const f of meshes.floorFinishes) {
       group.add(mesh(`Floor finish (${roomName(f.roomId)})`, f.geometry, material(interiorMaterialName('floor', f.phase, f.finish, f.color), floorFinishMaterial(f.phase, f.finish, f.color))));
+    }
+    // Ceilings, as the live view draws them: with the roofs on (absent: on).
+    if (levelVisibility.show3dRoofs !== false) {
+      for (const c of meshes.ceilings) {
+        group.add(mesh(`Ceiling (${roomName(c.roomId)})`, c.geometry, material(interiorMaterialName('interior', c.phase, c.finish, c.color), ceilingMaterial(c.phase, c.finish, c.color))));
+      }
     }
     meshes.walls.forEach((w, i) => {
       // Colours only: the live material's siding texture is dropped and its flat colour used (material()).
@@ -275,7 +288,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
       if (f.furniture && !f.furniture.builtIn && levelVisibility.showFurniture === false) continue;
       for (const p of f.parts) {
         const m = mesh(fixtureMeshName(f.kind, f.furniture?.piece), p.geometry, material(fixtureMaterialName(f, p.part), fixturePartMaterial(f, p.part)));
-        if (f.phase === 'demo') m.renderOrder = 1;
+        if (f.phase === 'demo' || isGlassPart(p.part)) m.renderOrder = 1;
         group.add(m);
       }
     }

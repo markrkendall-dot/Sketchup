@@ -1,9 +1,8 @@
 import { memo } from 'react';
 import { fixtureSymbol } from '../derive/casework';
-import { furnitureSymbol } from '../derive/furniture';
 import { furnitureNameOf } from '../model/furniture';
 import { arcPath, openingSymbol, wallPoint } from '../derive/openings';
-import { FIXTURE_LABEL } from '../model/casework';
+import { FIXTURE_DEFAULTS, FIXTURE_LABEL } from '../model/casework';
 import { defaultGradeElevation } from '../derive/site';
 import { floorToFloor, STAIRS_DEFAULTS, stairsSymbol, stairSteps } from '../derive/stairs';
 import { add, dist, midpoint, normalize, perpLeft, scale, sub } from '../model/geometry';
@@ -23,7 +22,7 @@ import {
   type Viewport,
   type WallPreview,
 } from '../store/uiStore';
-import { FixtureGlyph, StairsGlyph } from './PlanLayers';
+import { FixtureGlyph, fixtureDetail, StairsGlyph } from './PlanLayers';
 import { wallPreviewText } from './previewLabel';
 import { worldToScreen } from './viewport';
 
@@ -384,9 +383,9 @@ function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number
  * the real symbol, with its kind and width on a pill (green while the width is typed).
  */
 function FixtureGhost({ preview, v, denom }: { preview: FixturePreview; v: Viewport; denom: number }) {
-  const ghost: Fixture = { id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: 1, elevation: 0, phase: 'existing', ...(preview.piece ? { piece: preview.piece } : {}) };
+  const ghost: Fixture = { id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: FIXTURE_DEFAULTS[preview.kind].height, elevation: 0, phase: 'existing', ...(preview.piece ? { piece: preview.piece } : {}), ...(preview.glass ? { glass: preview.glass } : {}) };
   const sym = fixtureSymbol(ghost);
-  const detail = preview.piece ? furnitureSymbol(ghost) : null;
+  const detail = fixtureDetail(ghost);
   const front = worldToScreen(v, midpoint(sym.front[0], sym.front[1]));
   const back = worldToScreen(v, preview.origin);
   const out = normalize(sub(front, back));

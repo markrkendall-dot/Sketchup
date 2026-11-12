@@ -18,13 +18,17 @@ export interface Local3 {
   y: number;
 }
 
-export type FurnitureSolid =
+/** A solid in a fixture's frame, of material part P (furniture here, bath fixtures in derive/bath.ts). */
+export type Solid<P extends string = string> =
   /** An axis-aligned box; the wood's grain runs along `grain` (absent: its longest side). */
-  | { type: 'box'; part: FurniturePart; s0: number; s1: number; d0: number; d1: number; y0: number; y1: number; grain?: GrainAxis }
+  | { type: 'box'; part: P; s0: number; s1: number; d0: number; d1: number; y0: number; y1: number; grain?: GrainAxis }
   /** A sawn stick from a to b: `across` wide level and square to its axis, `thick` the other way. */
-  | { type: 'stick'; part: FurniturePart; a: Local3; b: Local3; across: number; thick: number }
+  | { type: 'stick'; part: P; a: Local3; b: Local3; across: number; thick: number }
   /** A round log (or a pole, a lamp shade) from a to b, `diameter` across. */
-  | { type: 'log'; part: FurniturePart; a: Local3; b: Local3; diameter: number };
+  | { type: 'log'; part: P; a: Local3; b: Local3; diameter: number }
+  /** A plan ring (s, d) less holes, extruded from y0 to y1: an oval tub, a toilet's bowl. */
+  | { type: 'prism'; part: P; ring: { s: number; d: number }[]; holes: { s: number; d: number }[][]; y0: number; y1: number };
+export type FurnitureSolid = Solid<FurniturePart>;
 
 interface Dims {
   /** Half the width: s runs over [-hw, hw]. */
@@ -413,7 +417,7 @@ const axisOf = (a: Local3, b: Local3) => {
  * A stick's eight corners: its cross-section is `across` wide along the level direction square to
  * its axis (along s for an upright stick) and `thick` the other way. Ends at a then at b.
  */
-export function stickCorners(st: Extract<FurnitureSolid, { type: 'stick' }>): Local3[] {
+export function stickCorners(st: Pick<Extract<Solid, { type: 'stick' }>, 'a' | 'b' | 'across' | 'thick'>): Local3[] {
   const ax = axisOf(st.a, st.b);
   // side = axis x up (level), or s for a vertical stick.
   let side = { s: -ax.d, d: ax.s, y: 0 };
@@ -440,8 +444,18 @@ export function stickCorners(st: Extract<FurnitureSolid, { type: 'stick' }>): Lo
 }
 
 /** A solid's bounding box in the fixture's frame. */
-export function solidExtent(sol: FurnitureSolid): { s0: number; s1: number; d0: number; d1: number; y0: number; y1: number } {
+export function solidExtent(sol: Solid): { s0: number; s1: number; d0: number; d1: number; y0: number; y1: number } {
   if (sol.type === 'box') return { s0: sol.s0, s1: sol.s1, d0: sol.d0, d1: sol.d1, y0: sol.y0, y1: sol.y1 };
+  if (sol.type === 'prism') {
+    return {
+      s0: Math.min(...sol.ring.map((p) => p.s)),
+      s1: Math.max(...sol.ring.map((p) => p.s)),
+      d0: Math.min(...sol.ring.map((p) => p.d)),
+      d1: Math.max(...sol.ring.map((p) => p.d)),
+      y0: sol.y0,
+      y1: sol.y1,
+    };
+  }
   if (sol.type === 'stick') {
     const c = stickCorners(sol);
     return {

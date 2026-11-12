@@ -1,18 +1,20 @@
 import { BufferGeometry, Float32BufferAttribute, Matrix4, Quaternion, ShapeUtils, Uint32BufferAttribute, Vector2, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { Column, FabricId, Fence, Fixture, FixtureKind, FloorFinish, FurniturePiece, WoodId, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
+import type { CeilingFinish, Column, FabricId, Fence, Fixture, FixtureKind, FloorFinish, FurniturePiece, WoodId, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { frontColorOf, frontStyleOf, hasCounter, isCabinet } from '../model/casework';
 import { FURNITURE, pieceFabricOf, pieceWoodOf } from '../model/furniture';
-import { furnitureSolids, stickCorners, type FurniturePart, type FurnitureSolid, type GrainAxis, type Local3 } from './furniture';
+import { furnitureSolids, stickCorners, type FurniturePart, type GrainAxis, type Local3, type Solid } from './furniture';
+import { bathSolids, type BathPart } from './bath';
+import { bathBodyColorOf, isBath } from '../model/bath';
 import type { FixtureFrame } from './casework';
 import { DECK, getDeckLayout, type DeckBox, type DeckLayout } from './decks';
 import { memberAxis, memberBoxes, type AxisPoint } from './members';
 import { isLog, isTimber } from '../model/structure';
 import { floorOpeningHoles, getFloorOpeningLayout, type FloorOpeningLayout } from './floorOpenings';
 import { getFootprints, type Footprint } from './footprint';
-import { columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookIn, isSlidingDoor, leafColorOf, roomWallLookIn, wainscotIn, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
+import { ceilingLookOf, columnColorOf, deckColorOf, fenceColorOf, surfaceColorOf, DEFAULT_INTERIOR_COLOR, DEFAULT_TRIM, floorLookIn, isSlidingDoor, leafColorOf, roomWallLookIn, wainscotIn, wallBandOf, wallColorOf, wallFinishOf } from '../model/finish';
 import { getOpeningsByWall, openingSymbol, wallPoint } from './openings';
 import { openingFill, type FillBox, type FillPart } from './openings3d';
 import { isOpeningVisible, isVisible, shownPhase } from './phase';
@@ -708,7 +710,7 @@ export function subtractConvex(poly: readonly Vec2[], hole: readonly Vec2[]): Ve
  * one upward-facing surface `lift` over the floor top. UVs in inches along the room's longer side
  * (u) and across it (v), so boards and parquet rows run the long way. Null when nothing is left.
  */
-export function buildFloorFinishGeometry(net: readonly Vec2[], holes: readonly (readonly Vec2[])[], lift = FLOOR_FINISH_LIFT): BufferGeometry | null {
+export function buildFloorFinishGeometry(net: readonly Vec2[], holes: readonly (readonly Vec2[])[], lift = FLOOR_FINISH_LIFT, facing: 'up' | 'down' = 'up'): BufferGeometry | null {
   const outer = cleanRing(net);
   if (outer.length < 3 || Math.abs(polygonSignedArea(outer)) < EPS) return null;
   const xs = outer.map((p) => p.x);
@@ -723,8 +725,9 @@ export function buildFloorFinishGeometry(net: readonly Vec2[], holes: readonly (
   const emit = (a: Vec2, b: Vec2, c: Vec2) => {
     const area = cross(sub(b, a), sub(c, a));
     if (Math.abs(area) < 1e-9) return;
-    // A triangle with positive plan area faces -Y (see the file comment): reverse it to face up.
-    const [p, q, r] = area > 0 ? [a, c, b] : [a, b, c];
+    // A triangle with positive plan area faces -Y (see the file comment): reverse it to face up (a
+    // ceiling keeps it facing down).
+    const [p, q, r] = (area > 0) === (facing === 'up') ? [a, c, b] : [a, b, c];
     for (const v of [p, q, r]) {
       pos.push(v.x, lift, v.y);
       uv.push(alongX ? v.x : v.y, alongX ? v.y : v.x);
@@ -741,9 +744,22 @@ export function buildFloorFinishGeometry(net: readonly Vec2[], holes: readonly (
   if (!pos.length) return null;
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new Float32BufferAttribute(Array.from({ length: pos.length / 3 }, () => [0, 1, 0]).flat(), 3));
+  g.setAttribute('normal', new Float32BufferAttribute(Array.from({ length: pos.length / 3 }, () => [0, facing === 'up' ? 1 : -1, 0]).flat(), 3));
   g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
   return g;
+}
+
+/** A room's ceiling sits this far under its height, so it never shares a plane with the slab above. */
+export const CEILING_DROP = 1 / 16;
+
+/**
+ * A room's ceiling (DESIGN.md "Ceilings"): its net polygon less the holes through the floor above
+ * (the level's stairs that cut it, the floor openings of the level above), one surface facing down
+ * at `height` less CEILING_DROP over the floor top. Seen from above it is culled (FrontSide), so it
+ * never hides the room in a look-down view. UVs like a floor finish's. Null when nothing is left.
+ */
+export function buildCeilingGeometry(net: readonly Vec2[], holes: readonly (readonly Vec2[])[], height: number): BufferGeometry | null {
+  return buildFloorFinishGeometry(net, holes, height - CEILING_DROP, 'down');
 }
 
 /** Open stairs: tread thickness, and the stringers' thickness (across) and depth (square to their slope). */
@@ -1059,18 +1075,22 @@ export function buildFixtureParts(f: Fixture, finishes?: LevelFinishes): Fixture
   if (f.kind === 'furniture') return buildFurnitureParts(f);
   const fr = fixtureFrame(f);
   const byPart = new Map<FixturePart, BufferGeometry[]>();
+  const put = (part: FixturePart, g: BufferGeometry) => {
+    const list = byPart.get(part);
+    if (list) list.push(g);
+    else byPart.set(part, [g]);
+  };
   for (const b of fixtureBoxes(f, finishes)) {
     const poly = [fixturePoint(fr, b.s0, b.d0), fixturePoint(fr, b.s1, b.d0), fixturePoint(fr, b.s1, b.d1), fixturePoint(fr, b.s0, b.d1)];
-    const g = addFrameUVs(prism(poly, b.y0, b.y1), fr, longestAxis(b));
-    const list = byPart.get(b.part);
-    if (list) list.push(g);
-    else byPart.set(b.part, [g]);
+    put(b.part, addFrameUVs(prism(poly, b.y0, b.y1), fr, longestAxis(b)));
   }
+  // Bath and laundry fixtures (a vanity's basins and taps over its cabinet boxes).
+  for (const sol of bathSolids(f)) put(sol.part, furnitureSolidGeometry(fr, sol));
   return [...byPart].map(([part, gs]) => ({ part, geometry: mergeAll(gs) })).filter((p) => triangleCount(p.geometry) > 0);
 }
 
-/** A material part of a fixture: a cabinet's (derive/casework.ts) or a furniture piece's (derive/furniture.ts). */
-export type FixturePart = CasePart | FurniturePart;
+/** A material part of a fixture: a cabinet's (derive/casework.ts), a bath fixture's (derive/bath.ts) or a furniture piece's (derive/furniture.ts). */
+export type FixturePart = CasePart | BathPart | FurniturePart;
 
 const longestAxis = (b: { s0: number; s1: number; d0: number; d1: number; y0: number; y1: number }): GrainAxis => {
   const s = b.s1 - b.s0;
@@ -1199,10 +1219,14 @@ export function logGeometry(a: Vector3, b: Vector3, diameter: number): BufferGeo
 }
 
 /** One furniture solid as a closed geometry with normals and UVs, level-local. */
-function furnitureSolidGeometry(fr: FixtureFrame, sol: FurnitureSolid): BufferGeometry {
+function furnitureSolidGeometry(fr: FixtureFrame, sol: Solid): BufferGeometry {
   if (sol.type === 'box') {
     const poly = [fixturePoint(fr, sol.s0, sol.d0), fixturePoint(fr, sol.s1, sol.d0), fixturePoint(fr, sol.s1, sol.d1), fixturePoint(fr, sol.s0, sol.d1)];
     return addFrameUVs(prism(poly, sol.y0, sol.y1), fr, sol.grain ?? longestAxis(sol));
+  }
+  if (sol.type === 'prism') {
+    const plan = (r: { s: number; d: number }[]) => r.map((p) => fixturePoint(fr, p.s, p.d));
+    return addFrameUVs(prism(plan(sol.ring), sol.y0, sol.y1, sol.holes.map(plan)), fr, 's');
   }
   if (sol.type === 'stick') return hexahedron(stickCorners(sol).map((p) => worldOf(fr, p)));
   return logGeometry(worldOf(fr, sol.a), worldOf(fr, sol.b), sol.diameter);
@@ -1237,6 +1261,8 @@ export interface FixtureMesh {
   frontColor: string;
   /** A cabinet's wood after the level's default (absent: painted in frontColor). */
   wood?: WoodId;
+  /** A bath or laundry fixture's body colour after the default (model/bath.ts bathBodyColorOf): china, enamel, a tray. */
+  bodyColor?: string;
   /** A furniture piece's piece, wood and fabric after the catalogue's defaults. */
   furniture?: { piece: FurniturePiece; wood: WoodId; fabric: FabricId; floorLayer: boolean; builtIn: boolean };
   /** One merged geometry per material part, level-local like the walls. */
@@ -1275,6 +1301,16 @@ export interface WallMesh {
 }
 
 /** A room's floor finish (DESIGN.md "Interior finishes"): a surface just over the slab top. */
+/** A room's ceiling (DESIGN.md "Ceilings"), level-local, facing down. */
+export interface CeilingMesh {
+  roomId: Id;
+  /** The room label's phase. */
+  phase: Phase;
+  finish: Exclude<CeilingFinish, 'none'>;
+  color: string;
+  geometry: BufferGeometry;
+}
+
 export interface FloorFinishMesh {
   roomId: Id;
   /** The room label's phase. */
@@ -1639,6 +1675,8 @@ export interface LevelMeshes {
   floor?: BufferGeometry;
   /** The floor finishes of the rooms labelled in the view mode that set one. */
   floorFinishes: FloorFinishMesh[];
+  /** The ceilings of the rooms labelled in the view mode that have one (finish.ts ceilingLookOf). */
+  ceilings: CeilingMesh[];
   stairs: StairsMesh[];
   /** Staircases (their pieces are not in `stairs`). */
   staircases: StaircaseMesh[];
@@ -1682,6 +1720,10 @@ interface FloorFinishEntry {
   net: Vec2[];
   holes: Vec2[][];
   geometry: BufferGeometry | null;
+}
+
+interface CeilingEntry extends FloorFinishEntry {
+  height: number;
 }
 
 interface FloorEntry {
@@ -1749,6 +1791,7 @@ export const isSeeThrough = (phase: Phase): boolean => phase === 'demo';
 const wallCache = new Map<string, Map<Id, WallEntry>>();
 const floorCache = new Map<string, FloorEntry>();
 const floorFinishCache = new Map<string, Map<Id, FloorFinishEntry>>();
+const ceilingCache = new Map<string, Map<Id, CeilingEntry>>();
 const stairsCache = new Map<string, Map<Id, StairsEntry>>();
 interface StaircaseEntry {
   layout: StaircaseLayout;
@@ -1837,10 +1880,12 @@ function pruneCaches(plan: Plan): void {
     e.geometry?.dispose();
     floorCache.delete(key);
   }
-  for (const [key, m] of floorFinishCache) {
-    if (alive(key)) continue;
-    for (const e of m.values()) e.geometry?.dispose();
-    floorFinishCache.delete(key);
+  for (const cache of [floorFinishCache, ceilingCache]) {
+    for (const [key, m] of cache) {
+      if (alive(key)) continue;
+      for (const e of m.values()) e.geometry?.dispose();
+      cache.delete(key);
+    }
   }
   for (const cache of [stairsCache, roofCache]) {
     for (const [key, m] of cache) {
@@ -1915,7 +1960,7 @@ function counterPhase(members: readonly Fixture[]): Phase {
  */
 export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): LevelMeshes {
   const level = plan.levels[levelId];
-  if (!level) return { walls: [], floorFinishes: [], stairs: [], staircases: [], roofs: [], openings: [], fixtures: [], counters: [] };
+  if (!level) return { walls: [], floorFinishes: [], ceilings: [], stairs: [], staircases: [], roofs: [], openings: [], fixtures: [], counters: [] };
   const key = `${levelId}|${viewMode}`;
   // Every mesh carries the phase it is drawn in (phase.ts shownPhase): red and green only in All.
   const sp = (p: Phase): Phase => shownPhase(p, viewMode);
@@ -2148,6 +2193,33 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   if (prevFinishes) for (const [id, e] of prevFinishes) if (nextFinishes.get(id) !== e) e.geometry?.dispose();
   floorFinishCache.set(key, nextFinishes);
 
+  // Ceilings: one surface per room that has one (finish.ts ceilingLookOf), at the room's ceiling
+  // height (its override, at most the wall height under a floor above), less the holes through the
+  // floor above. A room is under a floor when its label point is inside the level above's slab.
+  const aboveFaces = aboveLevel ? getFaces(aboveLevel, viewMode).outerFaces : [];
+  const ceilingHoles = aboveId ? [...floorOpeningHoles(plan, aboveId, viewMode), ...stairHoles(level, viewMode, ftf)] : [];
+  const prevCeilings = ceilingCache.get(key);
+  const nextCeilings = new Map<Id, CeilingEntry>();
+  const ceilings: CeilingMesh[] = [];
+  for (const f of faces.faces) {
+    const room = roomOf(f);
+    if (!room) continue;
+    const underFloor = aboveFaces.some((o) => pointInPolygon(f.labelPoint, o));
+    const look = ceilingLookOf(room, level.finishes, underFloor);
+    if (!look) continue;
+    const own = room.ceilingOverride && room.ceilingOverride > 0 ? room.ceilingOverride : level.wallHeight;
+    const height = underFloor ? Math.min(own, level.wallHeight) : own;
+    const old = prevCeilings?.get(room.id);
+    const entry: CeilingEntry =
+      old && old.height === height && sameRings([old.net], [f.netPolygon]) && sameRings(old.holes, ceilingHoles)
+        ? old
+        : { net: f.netPolygon, holes: ceilingHoles, height, geometry: buildCeilingGeometry(f.netPolygon, ceilingHoles, height) };
+    nextCeilings.set(room.id, entry);
+    if (entry.geometry) ceilings.push({ roomId: room.id, phase: sp(room.phase ?? 'existing'), finish: look.finish, color: look.color, geometry: entry.geometry });
+  }
+  if (prevCeilings) for (const [id, e] of prevCeilings) if (nextCeilings.get(id) !== e) e.geometry?.dispose();
+  ceilingCache.set(key, nextCeilings);
+
   // Stairs: each flight its own base, climb and riser count (a short flight, a landing).
   const prevStairs = stairsCache.get(key);
   const nextStairs = new Map<Id, StairsEntry>();
@@ -2272,6 +2344,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     nextFixtures.set(f.id, entry);
     if (!entry.parts.length) continue;
     const mesh: FixtureMesh = { id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts };
+    if (isBath(f.kind)) mesh.bodyColor = bathBodyColorOf(f);
     if (f.kind === 'furniture' && f.piece) mesh.furniture = { piece: f.piece, wood: pieceWoodOf(f), fabric: pieceFabricOf(f), floorLayer: !!FURNITURE[f.piece].floorLayer, builtIn: !!f.builtIn };
     else if (isCabinet(f.kind) || f.kind === 'wallOven' || f.kind === 'box') {
       const wood = f.wood ?? (isCabinet(f.kind) ? finishes?.cabinetWood : undefined);
@@ -2297,7 +2370,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     counterCache.set(key, { fixtures: counterFixtures, counters });
   }
 
-  const result: LevelMeshes = { walls, floorFinishes, stairs, staircases, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  const result: LevelMeshes = { walls, floorFinishes, ceilings, stairs, staircases, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
   levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, look: plan.proposedLook, result });
   return result;
 }
@@ -2308,6 +2381,8 @@ export function clearMeshCache(): void {
   for (const e of floorCache.values()) e.geometry?.dispose();
   for (const m of floorFinishCache.values()) for (const e of m.values()) e.geometry?.dispose();
   floorFinishCache.clear();
+  for (const m of ceilingCache.values()) for (const e of m.values()) e.geometry?.dispose();
+  ceilingCache.clear();
   for (const m of stairsCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of roofCache.values()) for (const e of m.values()) disposeEntry(e);
   for (const m of openingCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
