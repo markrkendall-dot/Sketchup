@@ -3,7 +3,8 @@ import { useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { MOUSE, OrthographicCamera as OrthographicCameraImpl, PerspectiveCamera, TOUCH, Vector3 } from 'three';
 import { planTerrain } from '../derive/site';
-import { getPlan, usePlanStore } from '../store/planStore';
+import { getViewPlan } from '../store/viewStore';
+import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore, type ElevationFace } from '../store/uiStore';
 import { planBox } from './bounds';
 import { GROUND_CUT_NAME, groundCutGeometry } from './capture';
@@ -71,7 +72,7 @@ function OrbitView() {
     const controls = ref.current;
     if (!controls || !(camera instanceof PerspectiveCamera)) return;
     const ui = useUiStore.getState();
-    const plan = getPlan();
+    const plan = getViewPlan();
     const box = planBox(plan, visible3dLevels(plan, ui));
     const center = new Vector3(
       (box.min[0] + box.max[0]) / 2,
@@ -130,7 +131,7 @@ function ElevationView({ face }: { face: ElevationFace }) {
   const invalidate = useThree((s) => s.invalidate);
   const fitRequest = useUiStore((s) => s.fit3dRequest);
   const viewMode = useUiStore((s) => s.viewMode);
-  const terrain = usePlanStore((s) => planTerrain(s.plan, viewMode));
+  const terrain = useViewPlanStore((s) => planTerrain(s.plan, viewMode));
   const [cutAt, setCutAt] = useState<ElevationFit | null>(null);
   const ground = useMemo(() => (cutAt ? groundCutGeometry(terrain, cutAt) : null), [terrain, cutAt]);
   useEffect(() => () => ground?.dispose(), [ground]);
@@ -141,7 +142,7 @@ function ElevationView({ face }: { face: ElevationFace }) {
     // default in a layout effect, and this runs again with it.
     if (!controls || !(camera instanceof OrthographicCameraImpl)) return;
     const ui = useUiStore.getState();
-    const plan = getPlan();
+    const plan = getViewPlan();
     const { size } = get();
     const f = elevationFit(planBox(plan, visible3dLevels(plan, ui)), face, size);
     camera.position.set(...f.position);

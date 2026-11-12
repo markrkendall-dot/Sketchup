@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { getLevelElevations } from '../derive/levels';
 import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, openingPartColor } from '../derive/meshes';
 import type { Id } from '../model/types';
-import { usePlanStore } from '../store/planStore';
+import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore } from '../store/uiStore';
 import { backsplashMaterial, ceilingMaterial, counterMaterial, fixturePartMaterial, isGlassPart, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
@@ -23,14 +23,14 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const showCeilings = useUiStore((s) => s.show3dRoofs || s.cameraMode === 'walk');
   // The furniture layer (Shift+F, the 3D bar's Furniture checkbox): off hides every loose piece (built-ins stay).
   const showFurniture = useUiStore((s) => s.showFurniture);
-  const meshes = usePlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
+  const meshes = useViewPlanStore((s) => getLevelMeshes(s.plan, levelId, viewMode));
   // Decks have their own memo: they depend on the ground and other levels (derive/meshes.ts getDeckMeshes).
-  const decks = usePlanStore((s) => getDeckMeshes(s.plan, levelId, viewMode));
+  const decks = useViewPlanStore((s) => getDeckMeshes(s.plan, levelId, viewMode));
   // So do the guards round floor openings (the level's walls and the stairs below).
-  const guards = usePlanStore((s) => getFloorOpeningMeshes(s.plan, levelId, viewMode));
+  const guards = useViewPlanStore((s) => getFloorOpeningMeshes(s.plan, levelId, viewMode));
   // And beams and posts (a post runs up to the beam over it).
-  const members = usePlanStore((s) => getMemberMeshes(s.plan, levelId, viewMode));
-  const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
+  const members = useViewPlanStore((s) => getMemberMeshes(s.plan, levelId, viewMode));
+  const floorTop = useViewPlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
   return (
     <group position={[0, floorTop, 0]} name={`level:${levelId}`}>
       {meshes.floor && <mesh name="floor" geometry={meshes.floor} material={floorMaterial} castShadow receiveShadow dispose={null} />}

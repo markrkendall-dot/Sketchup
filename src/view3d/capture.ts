@@ -1,7 +1,7 @@
 import { BufferAttribute, BufferGeometry, DirectionalLight, Mesh, OrthographicCamera, ShaderMaterial, Vector3, type Scene, type WebGLRenderer } from 'three';
 import { flushTextures } from './textureQueue';
 import { planTerrain, type TerrainGrid } from '../derive/site';
-import { getPlan } from '../store/planStore';
+import { getViewPlan } from '../store/viewStore';
 import { useUiStore, type ElevationFace } from '../store/uiStore';
 import { planBox, sunShadowFit, type Box3d } from './bounds';
 import { elevationFit, elevationGroundCut, elevationSun, type ElevationFit } from './elevation';
@@ -122,7 +122,7 @@ export function captureElevation(face: ElevationFace, scale = 2): string | null 
   // The picture shows every texture, painted or not yet (textureQueue.ts).
   flushTextures();
   const { gl, scene, size, invalidate } = state;
-  const plan = getPlan();
+  const plan = getViewPlan();
   const ui = useUiStore.getState();
   const fit = elevationFit(planBox(plan, visible3dLevels(plan, ui)), face, size);
   const w = size.width / fit.zoom;

@@ -10,6 +10,16 @@ export type Phase = 'existing' | 'demo' | 'new';
 export type ViewMode = 'existing' | 'proposed' | 'all';
 // existing view shows {existing, demo}; proposed shows {existing, new}; all shows everything, styled.
 
+/**
+ * The design options an entity's change belongs to (schema version 10, DESIGN.md "Design options"):
+ * meaningful only on a new or demolished entity. Absent (or on an existing entity): the change is in
+ * every option. In an option it does not list, a new entity is absent and a demolished one stands as
+ * existing (derive/phase.ts phaseIn).
+ */
+export interface OptionTagged {
+  optionIds?: Id[];
+}
+
 export interface Node {
   id: Id;
   x: Inches;
@@ -55,6 +65,8 @@ export interface Wall {
   thickness: Inches; // 4.5 interior, 6.5 exterior typical
   kind: WallKind;
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   heightOverride?: Inches; // defaults to level.wallHeight
   /** Absent: shingle for exterior walls, plain for interior ones (model/finish.ts). */
   finish?: WallFinish;
@@ -75,6 +87,8 @@ export interface Opening {
   height: Inches; // rough height of the hole
   sill: Inches; // bottom of hole above floor top; 0 for doors
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   swing?: { hinge: 'a' | 'b'; side: 'left' | 'right' };
   /** Divided lites of a window sash (default 2 x 3) or a glazed door (default 1 x 1: a solid panel). */
   lites?: { cols: number; rows: number };
@@ -113,6 +127,8 @@ export interface Room {
    * isVisible): a new room's name is hidden in the existing view, a demolished room's in the proposed one.
    */
   phase?: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   /**
    * Interior finishes (DESIGN.md "Interior finishes"): the faces of the walls on this room's side and
    * its floor. Absent: the walls keep their own finish and the floor its slab. A colour without a
@@ -136,6 +152,11 @@ export interface Room {
    */
   proposedWall?: { finish: RoomWallFinish; color?: string };
   /**
+   * Design options' own proposed floor and walls for this room (schema version 10), keyed by option
+   * id: in that option each one set replaces proposedFloor / proposedWall; absent, the shared one.
+   */
+  optionFinishes?: Record<Id, RoomOptionFinishes>;
+  /**
    * The ceiling (DESIGN.md "Ceilings"), flat at `ceilingOverride` (else the level's wall height)
    * under the floor above or the roof. Absent: the level's default (LevelFinishes.ceilingFinish),
    * else paint under the floor of a level above and none elsewhere. A colour without a finish is paint.
@@ -151,6 +172,8 @@ export interface Stairs {
   width: Inches;
   run: Inches; // horizontal length; the flight climbs to the next level's floor top
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   cutsFloorAbove: boolean;
   /**
    * Clear height kept between the treads and the floor above (default 80", STAIRS_HEADROOM): the
@@ -245,6 +268,8 @@ export interface Roof {
   /** Fascia (and rake) board depth. */
   fascia: Inches;
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   finish: RoofFinish;
   /** Hex colour `#rrggbb` of the roof surface. Absent: by finish (model/finish.ts). */
   color?: string;
@@ -357,6 +382,8 @@ export interface Fixture {
   /** Bottom above the level's floor top: 0 on the floor, 54 for a wall cabinet, 66 for a hood. */
   elevation: Inches;
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   /** Shown on the plan for a box (and on an appliance when set). */
   label?: string;
   /** Absent: the level's casework default, else slab. */
@@ -461,6 +488,8 @@ export interface Column {
    */
   kind: 'post' | 'chimney' | 'flue' | 'pier';
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   /** Hex colour `#rrggbb`. Absent: brick red for a chimney, tan for a post, stainless for a flue, grey-brown for a pier (model/finish.ts). */
   color?: string;
   /**
@@ -485,6 +514,8 @@ export interface Deck {
   /** One per outline edge (edge i runs from outline[i] to outline[i + 1]): a railing along it. */
   railings: boolean[];
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   /** Hex colour `#rrggbb` of the boards, framing and railing. Absent: weathered wood (model/finish.ts). */
   color?: string;
 }
@@ -502,6 +533,8 @@ export interface FloorOpening {
   /** One per outline edge (edge i runs from outline[i] to outline[i + 1]): a guard along it. */
   railings: boolean[];
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
 }
 
 /** A spot elevation of the ground (M9). */
@@ -525,6 +558,8 @@ export interface SiteSurface {
   outline: Vec2[];
   material: SurfaceMaterial;
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   /** Hex colour `#rrggbb`. Absent: by material (model/finish.ts SURFACE_COLOR). */
   color?: string;
 }
@@ -545,6 +580,8 @@ export interface Fence {
   /** The most distance between two posts (default 120", at least 24"). */
   postSpacing: Inches;
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   /** Hex colour `#rrggbb`. Absent: weathered grey wood (model/finish.ts FENCE_COLOR). */
   color?: string;
 }
@@ -588,6 +625,8 @@ export interface JoistZone {
   outline: Vec2[];
   joists: Degrees;
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
 }
 
 /**
@@ -604,6 +643,8 @@ export interface Beam {
   depth: Inches;
   mount: 'flush' | 'dropped';
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   /** What it is, e.g. "(2) 1 3/4 x 11 7/8 LVL"; placeholder sizes are for the engineer to set. */
   label?: string;
   /**
@@ -628,6 +669,8 @@ export interface Post {
   depth: Inches;
   rotation: Degrees;
   phase: Phase;
+  /** Design options of this change (OptionTagged); absent: every option. */
+  optionIds?: Id[];
   label?: string;
   /** A concrete pad under it, on the lowest level only. */
   footing?: { width: Inches; thickness: Inches };
@@ -718,8 +761,25 @@ export interface Structure {
   levelOrder: Id[]; // bottom to top
 }
 
+/** An option's own proposed floor and walls for a room (Room.optionFinishes). */
+export interface RoomOptionFinishes {
+  proposedFloor?: { finish: FloorFinish; color?: string };
+  proposedWall?: { finish: RoomWallFinish; color?: string };
+}
+
+/**
+ * A design option (schema version 10, DESIGN.md "Design options"): one alternative proposal for the
+ * same building. Entities name the options their change belongs to (OptionTagged.optionIds).
+ */
+export interface DesignOption {
+  id: Id;
+  name: string;
+  /** This option's proposed look, field by field over the plan's (Plan.proposedLook). */
+  proposedLook?: ProposedLook;
+}
+
 export interface Plan {
-  schemaVersion: 9;
+  schemaVersion: 10;
   id: Id;
   name: string;
   structures: Record<Id, Structure>;
@@ -729,4 +789,6 @@ export interface Plan {
   site: Site;
   modifiedAt: string;
   proposedLook?: ProposedLook;
+  /** The design options, at least one; the first is the one a plan opens on. */
+  options: DesignOption[];
 }

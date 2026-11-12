@@ -5,7 +5,7 @@ import { getFaces } from '../derive/rooms';
 import { wallPreviewText } from '../editor2d/previewLabel';
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import { formatLength } from '../model/units';
-import { usePlanStore } from '../store/planStore';
+import { useViewPlanStore } from '../store/viewStore';
 import { selectionSize, useUiStore, type SnapKind, type ToolName, type UnderlayMode } from '../store/uiStore';
 import { measureText } from '../editor2d/tools/measureTool';
 import { OPENING_CYCLE_HINT } from '../editor2d/tools/selectTool';
@@ -313,17 +313,19 @@ export function StatusBar() {
   const underlayPoints = useUiStore((s) => s.draft.underlayPoints.length);
   const kind = useUiStore((s) => s.nextWallKind);
   const levelId = useUiStore((s) => s.activeLevelId);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const levelName = usePlanStore((s) => s.plan.levels[levelId]?.name ?? '');
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const levelName = useViewPlanStore((s) => s.plan.levels[levelId]?.name ?? '');
   const viewMode = useUiStore((s) => s.viewMode);
   const drawPhase = useUiStore((s) => s.drawPhase);
-  const wallCount = usePlanStore((s) => {
+  // The design option shown, named while the plan has more than one.
+  const optionName = useViewPlanStore((s) => (s.plan.options.length > 1 ? s.plan.options.find((o) => o.id === s.optionId)?.name : undefined));
+  const wallCount = useViewPlanStore((s) => {
     const walls = s.plan.levels[levelId]?.walls;
     let n = 0;
     for (const w of Object.values(walls ?? {})) if (isVisible(w.phase, viewMode)) n++;
     return n;
   });
-  const openingCount = usePlanStore((s) => {
+  const openingCount = useViewPlanStore((s) => {
     const level = s.plan.levels[levelId];
     let n = 0;
     for (const o of Object.values(level?.openings ?? {})) {
@@ -331,50 +333,50 @@ export function StatusBar() {
     }
     return n;
   });
-  const openEnds = usePlanStore((s) => {
+  const openEnds = useViewPlanStore((s) => {
     const level = s.plan.levels[levelId];
     return level ? getFaces(level, viewMode).openEnds.length : 0;
   });
   const measureTo = useUiStore((s) => s.measureTo);
   const siteMode = useUiStore((s) => s.siteMode);
-  const roofCount = usePlanStore((s) => {
+  const roofCount = useViewPlanStore((s) => {
     let n = 0;
     for (const r of Object.values(s.plan.levels[levelId]?.roofs ?? {})) if (isVisible(r.phase, viewMode)) n++;
     return n;
   });
-  const deckCount = usePlanStore((s) => {
+  const deckCount = useViewPlanStore((s) => {
     let n = 0;
     for (const d of Object.values(s.plan.levels[levelId]?.decks ?? {})) if (isVisible(d.phase, viewMode)) n++;
     return n;
   });
-  const floorOpeningCount = usePlanStore((s) => {
+  const floorOpeningCount = useViewPlanStore((s) => {
     let n = 0;
     for (const o of Object.values(s.plan.levels[levelId]?.floorOpenings ?? {})) if (isVisible(o.phase, viewMode)) n++;
     return n;
   });
-  const fixtureCount = usePlanStore((s) => {
+  const fixtureCount = useViewPlanStore((s) => {
     let n = 0;
     for (const f of Object.values(s.plan.levels[levelId]?.fixtures ?? {})) if (isVisible(f.phase, viewMode)) n++;
     return n;
   });
-  const gradeCount = usePlanStore((s) => Object.keys(s.plan.site.gradePoints).length);
-  const columnCount = usePlanStore((s) => {
+  const gradeCount = useViewPlanStore((s) => Object.keys(s.plan.site.gradePoints).length);
+  const columnCount = useViewPlanStore((s) => {
     let n = 0;
     for (const c of Object.values(s.plan.site.columns)) if (isVisible(c.phase, viewMode)) n++;
     return n;
   });
-  const surfaceCount = usePlanStore((s) => {
+  const surfaceCount = useViewPlanStore((s) => {
     let n = 0;
     for (const sf of Object.values(s.plan.site.surfaces)) if (isVisible(sf.phase, viewMode)) n++;
     return n;
   });
-  const fenceCount = usePlanStore((s) => {
+  const fenceCount = useViewPlanStore((s) => {
     let n = 0;
     for (const f of Object.values(s.plan.site.fences)) if (isVisible(f.phase, viewMode)) n++;
     return n;
   });
-  const hasUnderlay = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay);
-  const underlayLocked = usePlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
+  const hasUnderlay = useViewPlanStore((s) => !!s.plan.levels[levelId]?.underlay);
+  const underlayLocked = useViewPlanStore((s) => !!s.plan.levels[levelId]?.underlay?.locked);
   const underlayMode = useUiStore((s) => s.underlayMode);
   const notice = useUiStore((s) => s.notice);
   const checks = useUiStore(useShallow((s) => issueCounts(s.issues)));
@@ -449,6 +451,7 @@ export function StatusBar() {
       )}
       <span className="status-view" title="View mode (V)">
         View: {VIEW_MODE_LABEL[viewMode]}
+        {optionName && viewMode !== 'existing' ? `, ${optionName}` : ''}
       </span>
       <span className={`status-phase phase-${drawPhase}`} title="Phase for new walls, openings, roofs, decks, floor openings, columns, surfaces and fences">
         Drawing: {PHASE_LABEL[drawPhase].toLowerCase()}

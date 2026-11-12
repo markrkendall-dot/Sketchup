@@ -2,23 +2,25 @@ import { useMemo, useState } from 'react';
 import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
 import { planSvg } from '../io/exportPlan';
 import { firstStructure, structuresOf } from '../model/structures';
-import { usePlanStore } from '../store/planStore';
+import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore } from '../store/uiStore';
+import { usePlanStore } from '../store/planStore';
 import Scene3D from '../view3d/Scene3D';
 import { PanZoom } from './PanZoom';
 
 type Tab = '3d' | 'plan';
 
 /**
- * The viewer's shell: a bar with the plan's name, the 3D / Plan tabs and the Existing / Proposed /
- * All control, then the 3D view (Scene3D, with its own level checkboxes, elevations and Fit) or
+ * The viewer's shell: a bar with the plan's name, the 3D / Plan tabs, the Existing / Proposed /
+ * All control and the design options (when there are several), then the 3D view (Scene3D, with its own level checkboxes, elevations and Fit) or
  * the chosen level's plan drawing (io/exportPlan.ts planSvg, as an image so its own styles stay
  * inside it) under a pan and pinch-zoom wrapper.
  */
 export function ViewerApp() {
   const [tab, setTab] = useState<Tab>('3d');
-  const name = usePlanStore((s) => s.plan.name);
+  const name = useViewPlanStore((s) => s.plan.name);
   const viewMode = useUiStore((s) => s.viewMode);
+  // The raw plan, so a phase that only another design option has still shows the controls.
   const hasPhases = usePlanStore((s) =>
     Object.keys(s.plan.levels).some((id) => {
       const l = s.plan.levels[id];
@@ -48,9 +50,37 @@ export function ViewerApp() {
             ))}
           </div>
         )}
+        {hasPhases && <ViewerOptions />}
         {tab === 'plan' && <FurnitureToggle />}
       </header>
       <div className="viewer-body">{tab === '3d' ? <Scene3D /> : <PlanTab />}</div>
+    </div>
+  );
+}
+
+/**
+ * The design options (DESIGN.md "Design options"), when the plan has more than one: a button each,
+ * switching what Proposed and All show (and the plan tab and 3D with them). Off in Existing.
+ */
+function ViewerOptions() {
+  const options = useViewPlanStore((s) => s.plan.options);
+  const active = useViewPlanStore((s) => s.optionId);
+  const existing = useUiStore((s) => s.viewMode === 'existing');
+  if (options.length < 2) return null;
+  return (
+    <div className="viewer-tabs viewer-options" role="group" aria-label="Design option">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          className={o.id === active ? 'active' : ''}
+          aria-pressed={o.id === active}
+          disabled={existing}
+          title={existing ? 'Existing is the same in every option' : `Show ${o.name}`}
+          onClick={() => useUiStore.getState().setActiveOption(o.id)}
+        >
+          {o.name}
+        </button>
+      ))}
     </div>
   );
 }
@@ -73,7 +103,7 @@ function FurnitureToggle() {
 }
 
 function PlanTab() {
-  const plan = usePlanStore((s) => s.plan);
+  const plan = useViewPlanStore((s) => s.plan);
   const viewMode = useUiStore((s) => s.viewMode);
   const furniture = useUiStore((s) => s.showFurniture);
   const activeLevelId = useUiStore((s) => s.activeLevelId);

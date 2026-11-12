@@ -63,7 +63,7 @@ const V8_FILE = {
 
 describe('schema 9: migration from one stack', () => {
   it('MIGRATIONS[8] wraps the stack in one house at the origin, unturned', () => {
-    expect(SCHEMA_VERSION).toBe(9);
+    expect(SCHEMA_VERSION).toBe(10);
     const up = MIGRATIONS[8](structuredClone(V8_FILE));
     expect(up.schemaVersion).toBe(9);
     expect('levelOrder' in up || 'baseFloorElevation' in up).toBe(false);
@@ -73,11 +73,13 @@ describe('schema 9: migration from one stack', () => {
     delete rest.baseFloorElevation;
     expect(loaded).toEqual({
       ...rest,
-      schemaVersion: 9,
+      schemaVersion: 10,
       structures: {
         [MIGRATED_STRUCTURE_ID]: { id: MIGRATED_STRUCTURE_ID, name: 'House', kind: 'house', origin: { x: 0, y: 0 }, rotation: 0, baseFloorElevation: -94, levelOrder: ['b', 'f'] },
       },
       structureOrder: [MIGRATED_STRUCTURE_ID],
+      // Migration 9 then makes the one design option.
+      options: [{ id: 'option-a', name: 'Option A' }],
     });
     expect(structureProblem(loaded)).toBeNull();
     // The elevations are what they were.

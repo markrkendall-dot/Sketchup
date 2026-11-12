@@ -14,7 +14,7 @@ import type { Fixture, Id, Level, Member, Plan, Vec2, ViewMode } from '../../mod
 import { FURNITURE, isLayerFurniture } from '../../model/furniture';
 import { formatLength } from '../../model/units';
 import { needsRenovationChoice, perpendicularShift, requestWallMove } from '../../ui/wallMove';
-import { pauseHistory, resumeHistory, usePlanStore } from '../../store/planStore';
+import { getPlan, pauseHistory, resumeHistory, usePlanStore } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection } from '../../store/uiStore';
 import { hitRoomLabel } from '../roomLabels';
 import { SNAP_RADIUS_PX } from '../snap';
@@ -515,7 +515,7 @@ export const selectTool: Tool = {
       origins = nodesToMove(level, next);
     }
     const walls = single ? [] : next.walls.filter((id) => level.walls[id]);
-    drag = { kind: 'move', startScreen: e.screen, grab: e.world, origins, single, started: false, ask: walls.length > 0 && needsRenovationChoice(ctx.levelId, walls), startPlan: ctx.plan(), walls, step: { x: 0, y: 0 }, paused: false };
+    drag = { kind: 'move', startScreen: e.screen, grab: e.world, origins, single, started: false, ask: walls.length > 0 && needsRenovationChoice(ctx.levelId, walls), startPlan: getPlan(), walls, step: { x: 0, y: 0 }, paused: false };
   },
 
   onPointerMove(e, ctx) {

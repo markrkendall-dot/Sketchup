@@ -6,7 +6,7 @@
 import { createContext, useContext } from 'react';
 import { createStore, useStore, type StoreApi } from 'zustand';
 import type { Plan } from '../model/types';
-import { usePlanStore } from '../store/planStore';
+import { viewPlanStore } from '../store/viewStore';
 import { useUiStore, type UiState } from '../store/uiStore';
 
 export interface PlanSnapshot {
@@ -20,7 +20,8 @@ export interface LayerStores {
 
 export const LayerStoresContext = createContext<LayerStores | null>(null);
 
-const livePlan = usePlanStore as unknown as StoreApi<PlanSnapshot>;
+// On screen the layers draw the plan as the active design option sees it (store/viewStore.ts).
+const livePlan = viewPlanStore as unknown as StoreApi<PlanSnapshot>;
 const liveUi = useUiStore as unknown as StoreApi<UiState>;
 
 /** Select from the plan the layers draw (the app's plan, or the export's snapshot). */

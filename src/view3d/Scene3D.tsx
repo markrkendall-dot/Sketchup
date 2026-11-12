@@ -7,6 +7,8 @@ import { lowestGround } from '../derive/site';
 import { structuresOf } from '../model/structures';
 import { useShallow } from 'zustand/react/shallow';
 import { usePlanStore } from '../store/planStore';
+import { viewPlanStore } from '../store/viewStore';
+import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore, type UiState, type View3dPreset } from '../store/uiStore';
 import { focusCanvas } from '../ui/focus';
 import { planBox, sunShadowFit } from './bounds';
@@ -73,7 +75,7 @@ function sceneUiChanged(s: UiState, prev: UiState): boolean {
 function InvalidateOnChange() {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
-    const offPlan = usePlanStore.subscribe((s, prev) => {
+    const offPlan = viewPlanStore.subscribe((s, prev) => {
       if (s.plan !== prev.plan) invalidate();
     });
     // Not the whole ui store: the draft changes on every mouse move over the 2D plan.
@@ -122,7 +124,7 @@ function DebugHandle() {
  */
 function GroundGrid() {
   const on = useUiStore((s) => s.show3dGrid);
-  const y = usePlanStore((s) => lowestGround(s.plan));
+  const y = useViewPlanStore((s) => lowestGround(s.plan));
   if (!on) return null;
   return (
     <Grid
@@ -143,7 +145,7 @@ function GroundGrid() {
 
 /** The sun's direction for the view: the plan's sun in perspective, the elevation's own (elevation.ts viewSun). */
 function useViewSun(): [number, number, number] {
-  const north = usePlanStore((s) => s.plan.site.northAngle);
+  const north = useViewPlanStore((s) => s.plan.site.northAngle);
   const preset = useUiStore((s) => s.view3dPreset);
   return useMemo(() => viewSun(preset, north), [preset, north]);
 }
@@ -160,7 +162,7 @@ function useViewSun(): [number, number, number] {
  * on every orbit frame.
  */
 function SunLight() {
-  const plan = usePlanStore((s) => s.plan);
+  const plan = useViewPlanStore((s) => s.plan);
   const sun = useViewSun();
   const invalidate = useThree((s) => s.invalidate);
   const light = useMemo(() => {
@@ -193,7 +195,7 @@ function SunLight() {
     const redraw = () => {
       light.shadow.needsUpdate = true;
     };
-    const offPlan = usePlanStore.subscribe((s, prev) => {
+    const offPlan = viewPlanStore.subscribe((s, prev) => {
       if (s.plan !== prev.plan) redraw();
     });
     const offUi = useUiStore.subscribe((s, prev) => {
@@ -303,7 +305,7 @@ function SkyEnvironment() {
  * a clockwise turn on the plan is a negative one about three's +Y), its shown levels inside.
  */
 function Levels() {
-  const plan = usePlanStore((s) => s.plan);
+  const plan = useViewPlanStore((s) => s.plan);
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const active = useUiStore((s) => s.activeLevelId);
@@ -443,7 +445,7 @@ function View3dToolbar() {
 function WalkOverlay() {
   const locked = useUiStore((s) => s.walkLocked);
   const levelId = useUiStore((s) => s.walkLevelId);
-  const levelName = usePlanStore((s) => (levelId ? (s.plan.levels[levelId]?.name ?? '') : ''));
+  const levelName = useViewPlanStore((s) => (levelId ? (s.plan.levels[levelId]?.name ?? '') : ''));
   return (
     <>
       <div className="walk-crosshair" aria-hidden="true" />

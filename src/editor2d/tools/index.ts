@@ -1,5 +1,6 @@
 import { isOpeningVisible, isVisible, VIEW_MODES, visibleNodeIds } from '../../derive/phase';
 import { getPlan, usePlanStore, type PlanState } from '../../store/planStore';
+import { getViewPlan } from '../../store/viewStore';
 import { isLayerFurniture } from '../../model/furniture';
 import {
   isSiteModeTool,
@@ -140,14 +141,16 @@ function ghostFor(plan: Plan, levelId: Id): GhostSnapSources | null {
 export function makeToolContext(): ToolContext | null {
   const levelId = useUiStore.getState().activeLevelId;
   if (!getPlan().levels[levelId]) return null;
+  // Tools hit-test, snap and preview on the plan as the active design option sees it; their edits
+  // go to the plan store by the same ids.
   return {
     levelId,
-    plan: getPlan,
-    level: () => getPlan().levels[levelId],
+    plan: getViewPlan,
+    level: () => getViewPlan().levels[levelId],
     actions: usePlanStore.getState(),
     ui: useUiStore.getState,
     snap: (raw, opts) => {
-      const plan = getPlan();
+      const plan = getViewPlan();
       const ghost = ghostFor(plan, levelId);
       return snapPoint(raw, {
         level: plan.levels[levelId],
@@ -221,10 +224,10 @@ export function cancelActiveTool(): void {
 // ---------------------------------------------------------------------------------------------
 // Commands that touch both stores.
 
-/** Drop selected ids that no longer exist or are hidden in the current view mode. */
+/** Drop selected ids that no longer exist or are hidden in the current view mode and design option. */
 export function pruneSelection(): void {
   const ui = useUiStore.getState();
-  const level = getPlan().levels[ui.activeLevelId];
+  const level = getViewPlan().levels[ui.activeLevelId];
   const sel = ui.selection;
   if (level && ui.underlaySelected && !level.underlay) ui.selectUnderlay(false);
   if (!level || selectionSize(sel) === 0) return;
@@ -247,7 +250,7 @@ export function pruneSelection(): void {
   const staircases = sel.staircases.filter((id) => level.staircases?.[id] && Object.values(level.stairs).some((st) => st.staircaseId === id && isVisible(st.phase, vm)));
   const members = sel.members.filter((id) => level.members?.[id] && isVisible(level.members[id].phase, vm));
   const joistZones = sel.joistZones.filter((id) => level.joistZones?.[id] && isVisible(level.joistZones[id].phase, vm));
-  const site = getPlan().site;
+  const site = getViewPlan().site;
   const gradePoints = sel.gradePoints.filter((id) => site.gradePoints[id]);
   const columns = sel.columns.filter((id) => site.columns[id] && isVisible(site.columns[id].phase, vm));
   const surfaces = sel.surfaces.filter((id) => site.surfaces[id] && isVisible(site.surfaces[id].phase, vm));
@@ -318,6 +321,15 @@ export function setViewMode(mode: ViewMode): void {
   ui.setViewMode(mode);
   pruneSelection();
   // Re-run hover / ghost logic: the hovered wall may have just been hidden.
+  if (lastPointer) dispatchPointer('move', lastPointer);
+}
+
+/** Show another design option (not an undo step): what it hides leaves the selection. */
+export function setActiveOption(id: Id): void {
+  const ui = useUiStore.getState();
+  if (ui.activeOptionId === id) return;
+  ui.setActiveOption(id);
+  pruneSelection();
   if (lastPointer) dispatchPointer('move', lastPointer);
 }
 

@@ -452,6 +452,45 @@ kbd {
   color: #166534;
 }
 
+/* Design option picker (ui/OptionPicker.tsx) ----------------------------------------------- */
+
+.option-picker .menu {
+  left: 0;
+  right: auto;
+}
+
+.option-picker .option-current {
+  font-weight: 600;
+}
+
+.option-picker .option-add {
+  color: var(--muted);
+}
+
+.option-menu > button.active {
+  font-weight: 600;
+}
+
+.option-name {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 2px 4px 4px;
+}
+
+.option-name label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.option-name input {
+  width: 100%;
+}
+
 select.phase-select.phase-new {
   color: #15803d;
   border-color: #86efac;

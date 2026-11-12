@@ -349,6 +349,13 @@ export interface UiState {
   viewMode: ViewMode;
   /** Phase given to walls and openings drawn from now on. */
   drawPhase: DrawPhase;
+  /**
+   * The design option the Proposed and All views show and new work goes to (DESIGN.md "Design
+   * options"). A view setting, not plan data, so switching is not an undo step; null, or an id the
+   * plan no longer has (after an undo), is the plan's first option (derive/optionView.ts
+   * resolveOptionId). Each load opens on the first option.
+   */
+  activeOptionId: Id | null;
   /** Draw the level below the active one as a faint ghost. */
   showLevelBelow: boolean;
   /** The Structure overlay on the plan (Y): joists, beam labels, bearing walls. */
@@ -442,6 +449,7 @@ export interface UiState {
   setViewMode: (mode: ViewMode) => void;
   /** Drawing new elements while in the existing view switches to the proposed view. */
   setDrawPhase: (phase: DrawPhase) => void;
+  setActiveOption: (id: Id | null) => void;
   toggleShowLevelBelow: () => void;
   setLayout: (layout: Layout) => void;
   setSplitRatio: (ratio: number) => void;
@@ -555,6 +563,7 @@ export const useUiStore = create<UiState>()((set) => ({
   // Each load opens on the proposed design, roofs off, furniture off (MK, 15 Oct 2026).
   viewMode: 'proposed',
   drawPhase: 'existing',
+  activeOptionId: null,
   showLevelBelow: false,
   showStructure: false,
   showFurniture: false,
@@ -670,6 +679,7 @@ export const useUiStore = create<UiState>()((set) => ({
       drawPhase,
       viewMode: drawPhase === 'new' && s.viewMode === 'existing' ? 'proposed' : s.viewMode,
     })),
+  setActiveOption: (activeOptionId) => set((s) => (s.activeOptionId === activeOptionId ? s : { activeOptionId })),
   toggleShowLevelBelow: () => set((s) => ({ showLevelBelow: !s.showLevelBelow })),
   // The 2D layout has no 3D view to walk in.
   setLayout: (layout) =>

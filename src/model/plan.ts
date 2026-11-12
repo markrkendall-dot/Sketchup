@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { coreInterval, draftFootprints, type FootprintSource } from '../derive/openings';
-import { phasesCoexist } from '../derive/phase';
+import { entitiesCoexist, isOptionTagged, optionsMeet, type Phased } from '../derive/phase';
 import { selfIntersects } from '../derive/rooms';
 import { MAX_STAIRS_BELOW, stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
@@ -12,10 +12,10 @@ import { isVariantOf } from './bath';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
 import { firstStructure, isStructureKind, normalizeDegrees, structureOf } from './structures';
-import type { CeilingFinish, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
-export const SCHEMA_VERSION = 9 as const;
+export const SCHEMA_VERSION = 10 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
 export const MERGE_EPS = 0.5;
 
@@ -129,8 +129,13 @@ export function createEmptyPlan(name = 'Untitled plan', template: PlanTemplate =
     settings: { ...DEFAULT_SETTINGS },
     site: defaultSite(),
     modifiedAt: new Date().toISOString(),
+    options: [firstOption()],
   };
 }
+
+/** The id and name of a plan's first design option (a new plan's, and the one migration 9 makes). */
+export const FIRST_OPTION_ID = 'option-a';
+export const firstOption = (): DesignOption => ({ id: FIRST_OPTION_ID, name: 'Option A' });
 
 /**
  * A structure's ground floor: the level above the lowest when the lowest is below grade (a
@@ -191,12 +196,12 @@ export function wallLength(level: Level, wall: Wall): number {
   return a && b ? dist(a, b) : 0;
 }
 
-/** Existing node within `eps` of p (closest), if any. */
-export function findNodeNear(level: Level, p: Vec2, eps = MERGE_EPS, exclude?: Id): Id | null {
+/** Existing node within `eps` of p (closest), if any; `accept` limits the candidates. */
+export function findNodeNear(level: Level, p: Vec2, eps = MERGE_EPS, exclude?: Id, accept?: (id: Id) => boolean): Id | null {
   let best: Id | null = null;
   let bestD = eps;
   for (const n of Object.values(level.nodes)) {
-    if (n.id === exclude) continue;
+    if (n.id === exclude || (accept && !accept(n.id))) continue;
     const d = dist(n, p);
     if (d <= bestD) {
       bestD = d;
@@ -206,11 +211,39 @@ export function findNodeNear(level: Level, p: Vec2, eps = MERGE_EPS, exclude?: I
   return best;
 }
 
-export function findWallBetween(level: Level, a: Id, b: Id): Wall | null {
+export function findWallBetween(level: Level, a: Id, b: Id, accept?: (w: Wall) => boolean): Wall | null {
   for (const w of Object.values(level.walls)) {
-    if ((w.a === a && w.b === b) || (w.a === b && w.b === a)) return w;
+    if (((w.a === a && w.b === b) || (w.a === b && w.b === a)) && (!accept || accept(w))) return w;
   }
   return null;
+}
+
+/** A level has a new wall that only some design options have (so nodes and walls may belong to options). */
+function hasOptionWalls(level: Level): boolean {
+  return Object.values(level.walls).some((w) => w.phase === 'new' && isOptionTagged(w));
+}
+
+/**
+ * True when a node belongs, through its walls, to a design option that `probe` exists in: a node
+ * with no walls, or one an untagged (all-options) wall uses, belongs to every option. Two corners in
+ * the same spot that belong to different options only (an option's own copy of another's addition)
+ * stay two corners.
+ */
+export function nodeMeets(level: Level, nodeId: Id, probe: Phased): boolean {
+  let touched = false;
+  for (const w of Object.values(level.walls)) {
+    if (w.a !== nodeId && w.b !== nodeId) continue;
+    touched = true;
+    if (optionsMeet(w, probe)) return true;
+  }
+  return !touched;
+}
+
+/** Two nodes share a design option through their walls (or one has no walls). */
+function nodesMeet(level: Level, p: Id, q: Id): boolean {
+  const pw = Object.values(level.walls).filter((w) => w.a === p || w.b === p);
+  if (pw.length === 0) return true;
+  return pw.some((w) => nodeMeets(level, q, w));
 }
 
 /**
@@ -342,7 +375,7 @@ function insertCrossingNode(level: Level, skip: Set<string>): boolean {
       if (p.a === q.a || p.a === q.b || p.b === q.a || p.b === q.b) continue;
       // A new wall and a demolished one never stand together: they cross without a node (the All
       // view joins them itself, derive/rooms.ts computeFaceGeometry).
-      if (!phasesCoexist(p.phase, q.phase)) continue;
+      if (!entitiesCoexist(p, q)) continue;
       const key = p.id < q.id ? `${p.id}|${q.id}` : `${q.id}|${p.id}`;
       if (skip.has(key)) continue;
       const hit = segmentIntersection(P.a, P.b, Q.a, Q.b);
@@ -379,15 +412,16 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
     return cur;
   };
 
-  // 1. Merge close nodes.
+  // 1. Merge close nodes (not two that belong to different design options only).
   const ids = Object.keys(level.nodes);
   if (moved) ids.sort((p, q) => Number(moved.has(p)) - Number(moved.has(q)));
+  const optionWalls = hasOptionWalls(level);
   for (let i = 0; i < ids.length; i++) {
     const keep = level.nodes[ids[i]];
     if (!keep) continue;
     for (let j = i + 1; j < ids.length; j++) {
       const other = level.nodes[ids[j]];
-      if (other && dist(keep, other) <= MERGE_EPS) {
+      if (other && dist(keep, other) <= MERGE_EPS && (!optionWalls || nodesMeet(level, keep.id, other.id))) {
         remap.set(other.id, keep.id);
         delete level.nodes[other.id];
       }
@@ -402,23 +436,26 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
     }
   }
 
-  // 2. Drop degenerate and duplicate walls (simple graph).
-  const seen = new Map<string, Id>();
+  // 2. Drop degenerate and duplicate walls (simple graph). Two walls between the same corners in
+  // different design options only (each option's own wall there) are both kept.
+  const seen = new Map<string, Id[]>();
   for (const w of Object.values(level.walls)) {
     if (w.a === w.b || !level.nodes[w.a] || !level.nodes[w.b]) {
       deleteWallInPlace(level, w.id);
       continue;
     }
     const key = w.a < w.b ? `${w.a}|${w.b}` : `${w.b}|${w.a}`;
-    const prev = seen.get(key);
+    const list = seen.get(key) ?? [];
+    const prev = list.find((id) => optionsMeet(level.walls[id], w));
     if (prev) {
       // Keep the existing wall (then the one with openings, then the first) and move the other's
       // openings onto it, so drawing over a wall never silently replaces the original.
       if (survivorRank(level, w) < survivorRank(level, level.walls[prev])) {
         mergeDuplicateInto(level, w.id, prev);
-        seen.set(key, w.id);
+        list[list.indexOf(prev)] = w.id;
       } else mergeDuplicateInto(level, prev, w.id);
-    } else seen.set(key, w.id);
+    } else list.push(w.id);
+    seen.set(key, list);
   }
 
   // 3. Split walls at nodes lying on their interior; then insert a node where two walls cross
@@ -430,7 +467,7 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
     let touched = false;
     for (const o of Object.values(level.walls)) {
       if (o.a !== n && o.b !== n) continue;
-      if (phasesCoexist(o.phase, w.phase)) return true;
+      if (entitiesCoexist(o, w)) return true;
       touched = true;
     }
     return !touched;
@@ -448,8 +485,9 @@ export function normalizeLevel(level: Level, moved?: ReadonlySet<Id>): Map<Id, I
         const s = pr.tRaw * len;
         if (pr.distance > MERGE_EPS || s <= MERGE_EPS || s >= len - MERGE_EPS) continue;
         if (!splitsWall(n.id, w)) continue;
-        const tailExists = findWallBetween(level, n.id, w.b);
-        const headExists = findWallBetween(level, w.a, n.id);
+        const meets = (o: Wall) => optionsMeet(o, w);
+        const tailExists = findWallBetween(level, n.id, w.b, meets);
+        const headExists = findWallBetween(level, w.a, n.id, meets);
         const rank = survivorRank(level, w);
         const headWins = !!headExists && rank < survivorRank(level, headExists);
         const tailWins = !!tailExists && rank < survivorRank(level, tailExists);
@@ -704,6 +742,13 @@ export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
     next.schemaVersion = 9;
     return next;
   },
+  /** Version 9: one proposed design. Make it the one design option, "Option A"; nothing is tagged. */
+  9: (doc) => {
+    const next: Json = { ...doc };
+    next.options = [firstOption()];
+    next.schemaVersion = 10;
+    return next;
+  },
 };
 
 /** The id migration 8 gives the one structure it makes. */
@@ -714,29 +759,29 @@ const phaseOf = (v: unknown): Phase => (typeof v === 'string' && PHASES.has(v) ?
 const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 
 const NODE_KEYS = ['id', 'x', 'y'] as const;
-const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'heightOverride', 'finish', 'color', 'bearing', 'band'] as const;
-const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
-const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'ceilingFinish', 'ceilingColor'] as const;
-const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
-const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
+const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'optionIds', 'heightOverride', 'finish', 'color', 'bearing', 'band'] as const;
+const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'optionIds', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'leafColor'] as const;
+const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'optionIds', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'optionFinishes', 'ceilingFinish', 'ceilingColor'] as const;
+const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'optionIds', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
+const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'optionIds', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
 const SITE_KEYS = ['northAngle', 'gradePoints', 'columns', 'surfaces', 'fences'] as const;
-const SURFACE_KEYS = ['id', 'outline', 'material', 'phase', 'color'] as const;
-const FENCE_KEYS = ['id', 'points', 'height', 'rails', 'postSpacing', 'phase', 'color'] as const;
+const SURFACE_KEYS = ['id', 'outline', 'material', 'phase', 'optionIds', 'color'] as const;
+const FENCE_KEYS = ['id', 'points', 'height', 'rails', 'postSpacing', 'phase', 'optionIds', 'color'] as const;
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
-const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'color', 'cap'] as const;
+const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'optionIds', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
 // The kitchen's optional fields (model/casework.ts KITCHEN_FIELDS) are checked by validKitchenFields.
-const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS] as const;
+const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'optionIds', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS] as const;
 const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle', 'cabinetWood', 'ceilingFinish', 'ceilingColor', ...KITCHEN_FINISH_KEYS] as const;
-const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
-const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
+const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'optionIds', 'color'] as const;
+const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase', 'optionIds'] as const;
 const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
-const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'label', 'za', 'zb', 'color', 'profile'] as const;
-const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
-const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase'] as const;
+const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'optionIds', 'label', 'za', 'zb', 'color', 'profile'] as const;
+const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'optionIds', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
+const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase', 'optionIds'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'underlay'] as const;
-const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook', 'options'] as const;
 const STRUCTURE_KEYS = ['id', 'name', 'kind', 'origin', 'rotation', 'baseFloorElevation', 'levelOrder'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
@@ -1574,5 +1619,81 @@ export function migrate(json: unknown): Plan {
   plan.site = migrateSite(doc.site);
   plan.modifiedAt = typeof doc.modifiedAt === 'string' ? doc.modifiedAt : new Date().toISOString();
   put(plan, 'proposedLook', migrateProposedLook(doc.proposedLook));
+  plan.options = migrateOptions(doc.options);
+  cleanOptionTags(plan as unknown as Plan);
   return plan as unknown as Plan;
+}
+
+/**
+ * The design options (DESIGN.md "Design options"): each with a unique non-empty string id and a
+ * name (blank: "Option N"); a malformed one is dropped, and with none left the plan gets one.
+ */
+function migrateOptions(raw: unknown): DesignOption[] {
+  const out: DesignOption[] = [];
+  if (Array.isArray(raw)) {
+    for (const o of raw) {
+      if (!isObject(o) || typeof o.id !== 'string' || !o.id || out.some((x) => x.id === o.id)) continue;
+      const opt: DesignOption = { id: o.id, name: typeof o.name === 'string' && o.name.trim() ? o.name : `Option ${out.length + 1}` };
+      const look = migrateProposedLook(o.proposedLook);
+      if (look) opt.proposedLook = look;
+      out.push(opt);
+    }
+  }
+  return out.length ? out : [firstOption()];
+}
+
+/** A copy of an option-id list keeping the ids `known` has, once each, in order; undefined when none is left. */
+export function knownOptionIds(v: unknown, known: ReadonlySet<Id>): Id[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: Id[] = [];
+  for (const id of v) if (typeof id === 'string' && known.has(id) && !out.includes(id)) out.push(id);
+  return out.length ? out : undefined;
+}
+
+/**
+ * Every entity's option tags (types.ts OptionTagged) against the plan's options, in place: an id the
+ * plan has no option for is dropped (the bad-value convention: the field alone), a list left empty is
+ * removed (the change is in every option), and tags on an existing entity, which mean nothing, go. A
+ * room's per-option finishes keep only the options the plan has and the valid finishes.
+ */
+export function cleanOptionTags(plan: Plan): void {
+  const known = new Set(plan.options.map((o) => o.id));
+  const clean = (e: Phased & { optionIds?: Id[] }) => {
+    if (!('optionIds' in e)) return;
+    const ids = (e.phase ?? 'existing') === 'existing' ? undefined : knownOptionIds(e.optionIds, known);
+    if (ids) e.optionIds = ids;
+    else delete e.optionIds;
+  };
+  for (const level of Object.values(plan.levels)) {
+    for (const rec of [level.walls, level.openings, level.rooms, level.stairs, level.roofs, level.fixtures, level.decks, level.floorOpenings, level.joistZones, level.members] as Record<Id, Phased & { optionIds?: Id[] }>[]) {
+      for (const e of Object.values(rec)) clean(e);
+    }
+    for (const r of Object.values(level.rooms)) {
+      if (!('optionFinishes' in r)) continue;
+      const raw: unknown = r.optionFinishes;
+      const out: NonNullable<Room['optionFinishes']> = {};
+      if (isObject(raw)) {
+        for (const [id, v] of Object.entries(raw)) {
+          if (!known.has(id) || !isObject(v)) continue;
+          const f = roomOptionFinishesOf(v);
+          if (f) out[id] = f;
+        }
+      }
+      if (Object.keys(out).length) r.optionFinishes = out;
+      else delete r.optionFinishes;
+    }
+  }
+  for (const rec of [plan.site.columns, plan.site.surfaces, plan.site.fences] as Record<Id, Phased & { optionIds?: Id[] }>[]) {
+    for (const e of Object.values(rec)) clean(e);
+  }
+}
+
+/** A room's per-option proposed floor and walls (types.ts RoomOptionFinishes), each kept when valid; undefined when neither is. */
+export function roomOptionFinishesOf(v: Record<string, unknown>): RoomOptionFinishes | undefined {
+  const out: RoomOptionFinishes = {};
+  const pf = v.proposedFloor;
+  if (isObject(pf) && typeof pf.finish === 'string' && FLOOR_FINISHES.includes(pf.finish as FloorFinish)) out.proposedFloor = { finish: pf.finish as FloorFinish, ...(isHexColor(pf.color) ? { color: pf.color.toLowerCase() } : {}) };
+  const pw = v.proposedWall;
+  if (isObject(pw) && typeof pw.finish === 'string' && ROOM_WALL_FINISHES.includes(pw.finish as RoomWallFinish)) out.proposedWall = { finish: pw.finish as RoomWallFinish, ...(isHexColor(pw.color) ? { color: pw.color.toLowerCase() } : {}) };
+  return out.proposedFloor || out.proposedWall ? out : undefined;
 }

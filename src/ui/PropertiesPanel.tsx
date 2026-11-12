@@ -9,7 +9,7 @@ import { compassName, deckTopWords, edgeOutward, getDeckLayout } from '../derive
 import { getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
-import { isVisible, PHASE_LABEL } from '../derive/phase';
+import { isOptionTagged, isVisible, PHASE_LABEL, type Phased } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, FENCE_DEFAULTS, fenceLength, fencePostPoints, groundAt, surfaceArea } from '../derive/site';
@@ -74,9 +74,10 @@ import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FEN
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
 import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
-import type { Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
-import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
+import { pauseHistory, resumeHistory, usePlanStore, type EntitySelection, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
+import { getViewPlan, useViewPlanStore } from '../store/viewStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { duplicateRoomNotice, showNotice } from './fileActions';
 import { requestWallMove, roomNameOf, wallSideNames } from './wallMove';
@@ -111,7 +112,7 @@ interface LengthFieldProps {
  * inline and leaves the plan untouched on error. Escape reverts.
  */
 function LengthField({ label, value, onCommit, bound = 'positive', allowEmpty, placeholder, hint }: LengthFieldProps) {
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const fmt = (v: number | undefined) => (v === undefined ? '' : formatLength(v, denom));
   const [text, setText] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
@@ -376,6 +377,53 @@ function common<T, V>(items: T[], get: (t: T) => V): V | null {
 
 // ---------------------------------------------------------------------------------------------
 
+/** A selection for setPhase and setEntityOption: the kinds given, the rest empty. */
+const selOf = (sel: Partial<EntitySelection>) => ({ nodes: [], walls: [], openings: [], ...sel }) as EntitySelection & { openings: Id[] };
+
+/**
+ * The Phase field (store setPhase, so a change in a plan of several design options is the active
+ * option's) and, below it, which options a new or demolished selection belongs to.
+ */
+function PhaseSelect({ sel, value, items }: { sel: Partial<EntitySelection>; value: Phase | null; items: Phased[] }) {
+  const levelId = useUiStore((s) => s.activeLevelId);
+  const setPhase = usePlanStore((s) => s.setPhase);
+  return (
+    <>
+      <SelectField label="Phase" value={value} options={phaseOptions} onChange={(p) => setPhase(levelId, selOf(sel), p)} />
+      <OptionField sel={sel} items={items} />
+    </>
+  );
+}
+
+/**
+ * Which design options a new or demolished selection belongs to, with a control to move it to one
+ * option or to every option (store setEntityOption). Shown while the plan has more than one option.
+ */
+function OptionField({ sel, items }: { sel: Partial<EntitySelection>; items: Phased[] }) {
+  const options = useViewPlanStore((s) => s.plan.options);
+  const levelId = useUiStore((s) => s.activeLevelId);
+  const setEntityOption = usePlanStore((s) => s.setEntityOption);
+  const changes = items.filter((i) => (i.phase ?? 'existing') !== 'existing');
+  if (options.length < 2 || changes.length === 0) return null;
+  const keyOf = (i: Phased) => (isOptionTagged(i) ? i.optionIds!.join(',') : '');
+  const value = common(changes, keyOf);
+  const nameOf = (id: Id) => options.find((o) => o.id === id)?.name ?? id;
+  const choices: { value: string; label: string }[] = [{ value: '', label: 'Every option' }, ...options.map((o) => ({ value: o.id, label: `${o.name} only` }))];
+  // Several options (a demolition made in two of three, a duplicated option's): named as they are.
+  if (value && value.includes(',')) choices.push({ value, label: value.split(',').map(nameOf).join(' + ') });
+  const demo = changes.every((i) => i.phase === 'demo');
+  return (
+    <>
+      <SelectField
+        label={demo ? 'Demolished in' : changes.every((i) => i.phase === 'new') ? 'New in' : 'Change in'}
+        value={value}
+        options={choices}
+        onChange={(v) => setEntityOption(levelId, selOf(sel), v ? v.split(',') : undefined)}
+      />
+    </>
+  );
+}
+
 /** Phases of the selected items that have one; a room label without a phase is existing. */
 function phasesOf(items: { phase?: Phase }[]): Phase[] {
   return items.map((i) => i.phase ?? 'existing');
@@ -464,7 +512,7 @@ function SelectionActions({
  */
 function MoveWall({ level, wall }: { level: Level; wall: Wall }) {
   const id = useId();
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const viewMode = useUiStore((s) => s.viewMode);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -533,7 +581,7 @@ function MoveWall({ level, wall }: { level: Level; wall: Wall }) {
  * measure along each face reads), each with the room on that side when a face names one.
  */
 function WallFaceLengths({ level, wall }: { level: Level; wall: Wall }) {
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const viewMode = useUiStore((s) => s.viewMode);
   const fp = getFootprints(level, viewMode).get(wall.id);
   if (!fp) return null;
@@ -560,12 +608,12 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
   const levelId = level.id;
   const [anchor, setAnchor] = useState<LengthAnchor>('start');
   const { setWallLength, updateWalls, setWallKind } = usePlanStore.getState();
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const len = wallLength(level, wall);
   const openingCount = Object.values(level.openings).filter((o) => o.wallId === wall.id).length;
   const viewMode = useUiStore((s) => s.viewMode);
   // What the tool makes of it when it is not marked (derive/structure.ts), as a string (a stable selection).
-  const inferred = usePlanStore((s) => {
+  const inferred = useViewPlanStore((s) => {
     const w = s.plan.levels[levelId]?.walls[wall.id];
     const b = w && w.bearing === undefined ? bearingOf(s.plan, levelId, w, viewMode) : undefined;
     return b ? `Auto: ${b.bearing ? `likely bearing, ${b.reason}` : b.reason === 'not bearing' ? 'not bearing, as far as the tool can tell' : `not bearing, ${b.reason}`}.` : null;
@@ -597,7 +645,7 @@ function WallProps({ level, wall }: { level: Level; wall: Wall }) {
         }}
       />
       <SelectField label="Kind" value={wall.kind} options={kindOptions} onChange={(k) => setWallKind(levelId, [wall.id], k)} />
-      <SelectField label="Phase" value={wall.phase} options={phaseOptions} onChange={(p) => updateWalls(levelId, [wall.id], { phase: p })} />
+      <PhaseSelect sel={{ walls: [wall.id] }} value={wall.phase} items={[wall]} />
       <SelectField
         label="Bearing"
         value={wall.bearing === undefined ? 'auto' : wall.bearing ? 'yes' : 'no'}
@@ -689,7 +737,7 @@ function MultiWallProps({ levelId, walls }: { levelId: Id; walls: Wall[] }) {
   return (
     <>
       <h3>{walls.length} walls</h3>
-      <SelectField label="Phase" value={common(walls, (w) => w.phase)} options={phaseOptions} onChange={(p) => updateWalls(levelId, ids, { phase: p })} />
+      <PhaseSelect sel={{ walls: ids }} value={common(walls, (w) => w.phase)} items={walls} />
       <SelectField label="Kind" value={common(walls, (w) => w.kind)} options={kindOptions} onChange={(k) => setWallKind(levelId, ids, k)} />
       <LengthField
         label="Thickness"
@@ -747,7 +795,7 @@ function swingWording(
 function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
   const levelId = level.id;
   const updateOpening = usePlanStore((s) => s.updateOpening);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const wall = level.walls[opening.wallId];
   const L = wall ? wallLength(level, wall) : 0;
   const wallH = wall ? wallHeightOf(level, wall) : level.wallHeight;
@@ -838,12 +886,7 @@ function OpeningProps({ level, opening }: { level: Level; opening: Opening }) {
         onCommit={(v) => setJamb('b', v)}
         hint="Inside face of the end corner to the near jamb."
       />
-      <SelectField
-        label="Phase"
-        value={opening.phase}
-        options={phaseOptions}
-        onChange={(p) => updateOpening(levelId, opening.id, { phase: p })}
-      />
+      <PhaseSelect sel={{ openings: [opening.id] }} value={opening.phase} items={[opening]} />
       {door && (
         <label className="check-row">
           <input
@@ -997,7 +1040,7 @@ const glazingOptions = GLAZINGS.map((g) => ({ value: g, label: GLAZING_LABEL[g] 
  * the tape: width x depth for a rectangle, and every side clockwise from the top-left corner.
  */
 function RoomDimensionsReadout({ face }: { face: Face }) {
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const dims = roomDimensions(face.netPolygon);
   if (dims.edges.length === 0) return null;
   const centerline = face.netPolygon === face.polygon;
@@ -1028,10 +1071,68 @@ function RoomDimensionsReadout({ face }: { face: Face }) {
   );
 }
 
+/**
+ * An existing room's proposed floor and walls (Room.proposedFloor / proposedWall). With several
+ * design options they are per option, over the shared ones (Room.optionFinishes): the scope field
+ * picks which the fields edit.
+ */
+function RoomProposedFinishes({ levelId, room }: { levelId: Id; room: Room }) {
+  const scope = useFinishScope();
+  const updateRoom = usePlanStore((s) => s.updateRoom);
+  const updateOwn = usePlanStore((s) => s.updateRoomOptionFinishes);
+  // `room` is the option's (its own finishes over the shared); the stored room has the shared ones.
+  const stored = usePlanStore((s) => s.plan.levels[levelId]?.rooms[room.id]);
+  const own = scope.optionId ? stored?.optionFinishes?.[scope.optionId] : undefined;
+  const shown = scope.mine ? room : (stored ?? room);
+  const set = (patch: Pick<RoomPatch, 'proposedFloor' | 'proposedWall'>) =>
+    scope.mine && scope.optionId ? updateOwn(levelId, room.id, scope.optionId, patch) : updateRoom(levelId, room.id, patch);
+  const floor = shown.proposedFloor;
+  const wall = shown.proposedWall;
+  return (
+    <>
+      <FinishScopeField scope={scope} />
+      <SelectField
+        label="Proposed floor"
+        value={floor?.finish ?? 'keep'}
+        options={proposedFloorOptions}
+        onChange={(v) => set({ proposedFloor: v === 'keep' ? undefined : { finish: v, ...(floor?.color ? { color: floor.color } : {}) } })}
+      />
+      {floor && (
+        <ColorField
+          label="Proposed floor colour"
+          value={floor.color ?? FLOOR_COLOR[floor.finish]}
+          onCommit={(color) => set({ proposedFloor: { finish: floor.finish, color } })}
+          onReset={floor.color ? () => set({ proposedFloor: { finish: floor.finish } }) : undefined}
+        />
+      )}
+      <SelectField
+        label="Proposed walls"
+        value={wall?.finish ?? 'keep'}
+        options={proposedWallOptions}
+        onChange={(v) => set({ proposedWall: v === 'keep' ? undefined : { finish: v, ...(wall?.color ? { color: wall.color } : {}) } })}
+      />
+      {wall && (
+        <ColorField
+          label="Proposed wall colour"
+          value={wall.color ?? ROOM_WALL_COLOR[wall.finish]}
+          onCommit={(color) => set({ proposedWall: { finish: wall.finish, color } })}
+          onReset={wall.color ? () => set({ proposedWall: { finish: wall.finish } }) : undefined}
+        />
+      )}
+      {scope.mine && (own?.proposedFloor || own?.proposedWall) && (
+        <div className="panel-buttons">
+          <button onClick={() => updateOwn(levelId, room.id, scope.optionId!, { proposedFloor: undefined, proposedWall: undefined })}>Use the shared floor and walls</button>
+        </div>
+      )}
+      {scope.mine && <p className="panel-note">"Keep today's" in {scope.optionName} goes back to the shared choice; set Every option to change that.</p>}
+    </>
+  );
+}
+
 function RoomProps({ level, room }: { level: Level; room: Room }) {
   const updateRoom = usePlanStore((s) => s.updateRoom);
   const viewMode = useUiStore((s) => s.viewMode);
-  const set = usePlanStore((s) => {
+  const set = useViewPlanStore((s) => {
     const l = s.plan.levels[level.id];
     return l ? getFaces(l, viewMode) : null;
   });
@@ -1079,12 +1180,7 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
           }}
         />
       </div>
-      <SelectField
-        label="Phase"
-        value={room.phase ?? 'existing'}
-        options={phaseOptions}
-        onChange={(p) => updateRoom(level.id, room.id, { phase: p === 'existing' ? undefined : p })}
-      />
+      <PhaseSelect sel={{ rooms: [room.id] }} value={room.phase ?? 'existing'} items={[room]} />
       <RoomFinishes levelId={level.id} room={room} wallHeight={level.wallHeight} />
       {face ? (
         <>
@@ -1179,36 +1275,7 @@ function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; 
         <ColorField label="Floor colour" value={floor.color} onCommit={(color) => set({ floorColor: color })} onReset={room.floorColor ? () => set({ floorColor: undefined }) : undefined} />
       )}
       {(room.phase ?? 'existing') === 'existing' && (
-        <>
-          <SelectField
-            label="Proposed floor"
-            value={room.proposedFloor?.finish ?? 'keep'}
-            options={proposedFloorOptions}
-            onChange={(v) => set({ proposedFloor: v === 'keep' ? undefined : { finish: v, ...(room.proposedFloor?.color ? { color: room.proposedFloor.color } : {}) } })}
-          />
-          {room.proposedFloor && (
-            <ColorField
-              label="Proposed floor colour"
-              value={room.proposedFloor.color ?? FLOOR_COLOR[room.proposedFloor.finish]}
-              onCommit={(color) => set({ proposedFloor: { finish: room.proposedFloor!.finish, color } })}
-              onReset={room.proposedFloor.color ? () => set({ proposedFloor: { finish: room.proposedFloor!.finish } }) : undefined}
-            />
-          )}
-          <SelectField
-            label="Proposed walls"
-            value={room.proposedWall?.finish ?? 'keep'}
-            options={proposedWallOptions}
-            onChange={(v) => set({ proposedWall: v === 'keep' ? undefined : { finish: v, ...(room.proposedWall?.color ? { color: room.proposedWall.color } : {}) } })}
-          />
-          {room.proposedWall && (
-            <ColorField
-              label="Proposed wall colour"
-              value={room.proposedWall.color ?? ROOM_WALL_COLOR[room.proposedWall.finish]}
-              onCommit={(color) => set({ proposedWall: { finish: room.proposedWall!.finish, color } })}
-              onReset={room.proposedWall.color ? () => set({ proposedWall: { finish: room.proposedWall!.finish } }) : undefined}
-            />
-          )}
-        </>
+        <RoomProposedFinishes levelId={levelId} room={room} />
       )}
       <SelectField
         label="Ceiling"
@@ -1271,7 +1338,7 @@ function StaircaseMembership({ level, stairs }: { level: Level; stairs: Stairs }
       <button
         title="Join this piece and the pieces of the stairway it is part of into one staircase, selected, moved and styled together"
         onClick={() => {
-          const chain = stairChains(usePlanStore.getState().plan, level.id, viewMode).find((c) => c.includes(stairs.id)) ?? [stairs.id];
+          const chain = stairChains(getViewPlan(), level.id, viewMode).find((c) => c.includes(stairs.id)) ?? [stairs.id];
           const id = groupStairs(level.id, chain);
           if (id) select(id);
         }}
@@ -1348,11 +1415,10 @@ function StaircaseStyleFields({ level, staircase }: { level: Level; staircase: S
 function StaircaseProps({ level, staircase }: { level: Level; staircase: Staircase }) {
   const updateStaircase = usePlanStore((s) => s.updateStaircase);
   const ungroupStaircase = usePlanStore((s) => s.ungroupStaircase);
-  const setPhase = usePlanStore((s) => s.setPhase);
-  const ftf = usePlanStore((s) => floorToFloor(s.plan, level.id));
-  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
+  const ftf = useViewPlanStore((s) => floorToFloor(s.plan, level.id));
+  const northAngle = useViewPlanStore((s) => s.plan.site.northAngle);
   const viewMode = useUiStore((s) => s.viewMode);
-  const plan = usePlanStore((s) => s.plan);
+  const plan = useViewPlanStore((s) => s.plan);
   const chains = useMemo(() => stairChains(plan, level.id, viewMode), [plan, level.id, viewMode]);
   const pieces = Object.values(level.stairs).filter((st) => st.staircaseId === staircase.id);
   // In stairway order where they chain, the rest after.
@@ -1380,12 +1446,7 @@ function StaircaseProps({ level, staircase }: { level: Level; staircase: Stairca
         />
       </div>
       {phases.length === 1 && (
-        <SelectField
-          label="Phase"
-          value={phases[0]}
-          options={phaseOptions}
-          onChange={(phase) => setPhase(level.id, { walls: [], openings: [], staircases: [staircase.id] }, phase)}
-        />
+        <PhaseSelect sel={{ staircases: [staircase.id] }} value={phases[0]} items={pieces} />
       )}
       <StaircaseStyleFields level={level} staircase={staircase} />
       <div className="field">
@@ -1420,14 +1481,14 @@ function StaircaseProps({ level, staircase }: { level: Level; staircase: Stairca
 
 function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
   const updateStairs = usePlanStore((s) => s.updateStairs);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const ftf = usePlanStore((s) => floorToFloor(s.plan, level.id));
-  const aboveName = usePlanStore((s) => {
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const ftf = useViewPlanStore((s) => floorToFloor(s.plan, level.id));
+  const aboveName = useViewPlanStore((s) => {
     const above = levelAboveId(s.plan, level.id);
     return (above && s.plan.levels[above]?.name) ?? null;
   });
   // Only the lowest level's flights may start below the floor (outdoor steps down a slope).
-  const lowest = usePlanStore((s) => isLowestLevel(s.plan, level.id));
+  const lowest = useViewPlanStore((s) => isLowestLevel(s.plan, level.id));
   const base = stairsBase(stairs);
   const climb = stairsRise(stairs, ftf);
   const { risers, rise } = flightSteps(stairs, ftf);
@@ -1502,12 +1563,7 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
         onCommit={(v) => setHeights({ risers: v ?? undefined })}
         hint={`${risers} x ${formatLength(rise, denom)}. Blank follows the 7 1/2" rule; 1 makes a landing.`}
       />
-      <SelectField
-        label="Phase"
-        value={stairs.phase}
-        options={phaseOptions}
-        onChange={(p) => updateStairs(level.id, stairs.id, { phase: p })}
-      />
+      <PhaseSelect sel={{ stairs: [stairs.id] }} value={stairs.phase} items={[stairs]} />
       <label className="check-row">
         <input
           type="checkbox"
@@ -1564,7 +1620,7 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
  */
 function StairsOpeningFields({ level, stairs, ftf }: { level: Level; stairs: Stairs; ftf: number }) {
   const updateStairs = usePlanStore((s) => s.updateStairs);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const byRule = headroomHoleStart(stairs, ftf, level.wallHeight);
   const start = stairsHoleStart(stairs, ftf, level.wallHeight);
   const hole = stairsHoleOutline(stairs, ftf, level.wallHeight);
@@ -1627,7 +1683,7 @@ const FACING_OPTIONS: { value: string; label: string }[] = [
 function FixtureToolProps() {
   const kind = useUiStore((s) => s.draft.fixtureKind);
   const def = FIXTURE_DEFAULTS[kind];
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   return (
     <>
       <h3>Cabinet tool</h3>
@@ -1651,7 +1707,7 @@ function FurnitureToolProps() {
   const bed = useUiStore((s) => s.draft.furnitureBed);
   const wood = useUiStore((s) => s.draft.furnitureWood);
   const fabric = useUiStore((s) => s.draft.furnitureFabric);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const spec = FURNITURE[piece];
   const def = furnitureDefaults(piece, bed);
   const choose = (patch: Parameters<typeof setFurnitureChoice>[1]) => setFurnitureChoice(makeToolContext(), patch);
@@ -1747,7 +1803,7 @@ function FurnitureProps({ level, fixture }: { level: Level; fixture: Fixture }) 
       <LengthField label="Depth" value={fixture.depth} onCommit={(v) => void (v !== null && set({ depth: v }))} hint={p === 'bed' ? 'Head to foot.' : 'Back to front.'} />
       <LengthField label="Height" value={fixture.height} onCommit={(v) => void (v !== null && set({ height: v }))} hint={p === 'bed' ? 'To the top of the headboard.' : undefined} />
       <SelectField label="Facing" value={dir} options={facing} onChange={(v) => set({ direction: Number(v) })} />
-      <SelectField label="Phase" value={fixture.phase} options={phaseOptions} onChange={(ph) => set({ phase: ph })} />
+      <PhaseSelect sel={{ fixtures: [fixture.id] }} value={fixture.phase} items={[fixture]} />
       <div className="field">
         <label htmlFor={`fixture-label-${fixture.id}`}>Label</label>
         <input
@@ -1773,7 +1829,7 @@ function FixtureProps({ level, fixture }: { level: Level; fixture: Fixture }) {
 
 function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
   const updateFixture = usePlanStore((s) => s.updateFixture);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
   const dir = String(fixture.direction);
   const facing = FACING_OPTIONS.some((o) => o.value === dir) ? FACING_OPTIONS : [...FACING_OPTIONS, { value: dir, label: `${dir}°` }];
@@ -1817,7 +1873,7 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
         hint={fixture.kind === 'dryer' || fixture.kind === 'washer' ? 'Above the floor: set it to the other machine\'s height to stack it.' : 'Above the floor: 0 on the floor, 54 for a wall cabinet.'}
       />
       <SelectField label="Facing" value={dir} options={facing} onChange={(v) => set({ direction: Number(v) })} />
-      <SelectField label="Phase" value={fixture.phase} options={phaseOptions} onChange={(p) => set({ phase: p })} />
+      <PhaseSelect sel={{ fixtures: [fixture.id] }} value={fixture.phase} items={[fixture]} />
       <div className="field">
         <label htmlFor={`fixture-label-${fixture.id}`}>Label</label>
         <input
@@ -1886,7 +1942,7 @@ function KitchenOptions({ level, fixture }: { level: Level; fixture: Fixture }) 
   const updateFixture = usePlanStore((s) => s.updateFixture);
   const updateFixtures = usePlanStore((s) => s.updateFixtures);
   const viewMode = useUiStore((s) => s.viewMode);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
   const f = level.finishes;
   // The counter run this fixture is in (its own id alone when it has no counter or touches none).
@@ -2194,7 +2250,7 @@ const RIDGE_BUTTONS: Record<RoofShape, { angle: number; label: string; title: st
 
 function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
   const updateRoof = usePlanStore((s) => s.updateRoof);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const viewMode = useUiStore((s) => s.viewMode);
   const [fitNote, setFitNote] = useState<{ text: string; error: boolean } | null>(null);
   const set = (patch: Partial<Roof>) => updateRoof(level.id, roof.id, patch);
@@ -2309,7 +2365,7 @@ function RoofProps({ level, roof }: { level: Level; roof: Roof }) {
           hint={`Rust streaks, 0 (none) to 1. Default ${DEFAULT_WEATHERING}.`}
         />
       )}
-      <SelectField label="Phase" value={roof.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      <PhaseSelect sel={{ roofs: [roof.id] }} value={roof.phase} items={[roof]} />
       <ReadOnly label={roof.shape === 'shed' ? 'High side' : roof.shape === 'flat' ? 'Underside' : 'Ridge'}>{formatLength(ridge, denom)} above the floor</ReadOnly>
       <ReadOnly label="Eave">{formatLength(eave, denom)} above the floor</ReadOnly>
       {b && (
@@ -2354,11 +2410,11 @@ function IssueNotes({ levelId, target }: { levelId: Id; target: IssueTarget }) {
 
 function DeckProps({ level, deck }: { level: Level; deck: Deck }) {
   const updateDeck = usePlanStore((s) => s.updateDeck);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
-  const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop ?? 0);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const northAngle = useViewPlanStore((s) => s.plan.site.northAngle);
+  const floorTop = useViewPlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop ?? 0);
   const viewMode = useUiStore((s) => s.viewMode);
-  const layout = usePlanStore((s) => getDeckLayout(s.plan, level.id, deck.id, viewMode));
+  const layout = useViewPlanStore((s) => getDeckLayout(s.plan, level.id, deck.id, viewMode));
   const set = (patch: DeckPatch) => updateDeck(level.id, deck.id, patch);
   const n = deck.outline.length;
   const lens = deck.outline.map((p, i) => dist(p, deck.outline[(i + 1) % n]));
@@ -2406,7 +2462,7 @@ function DeckProps({ level, deck }: { level: Level; deck: Deck }) {
         </div>
       )}
       <ColorField label="Colour" value={deckColorOf(deck)} onCommit={(color) => set({ color })} onReset={deck.color ? () => set({ color: undefined }) : undefined} hint={`Boards, framing and railing. Default ${DECK_COLOR}.`} />
-      <SelectField label="Phase" value={deck.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      <PhaseSelect sel={{ decks: [deck.id] }} value={deck.phase} items={[deck]} />
       {b && (
         <ReadOnly label="Outline">
           {n} corners, {formatLength(b.maxX - b.minX, denom)} x {formatLength(b.maxY - b.minY, denom)}, {formatArea(Math.abs(polygonSignedArea(deck.outline)))}
@@ -2426,10 +2482,10 @@ function DeckProps({ level, deck }: { level: Level; deck: Deck }) {
 
 function FloorOpeningProps({ level, opening }: { level: Level; opening: FloorOpening }) {
   const updateFloorOpening = usePlanStore((s) => s.updateFloorOpening);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const northAngle = useViewPlanStore((s) => s.plan.site.northAngle);
   const viewMode = useUiStore((s) => s.viewMode);
-  const layout = usePlanStore((s) => getFloorOpeningLayout(s.plan, level.id, opening.id, viewMode));
+  const layout = useViewPlanStore((s) => getFloorOpeningLayout(s.plan, level.id, opening.id, viewMode));
   const set = (patch: FloorOpeningPatch) => updateFloorOpening(level.id, opening.id, patch);
   const n = opening.outline.length;
   const lens = opening.outline.map((p, i) => dist(p, opening.outline[(i + 1) % n]));
@@ -2466,7 +2522,7 @@ function FloorOpeningProps({ level, opening }: { level: Level; opening: FloorOpe
           </button>
         </div>
       )}
-      <SelectField label="Phase" value={opening.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      <PhaseSelect sel={{ floorOpenings: [opening.id] }} value={opening.phase} items={[opening]} />
       {b && (
         <ReadOnly label="Outline">
           {n} corners, {formatLength(b.maxX - b.minX, denom)} x {formatLength(b.maxY - b.minY, denom)}, {formatArea(Math.abs(polygonSignedArea(opening.outline)))}
@@ -2512,8 +2568,8 @@ function LabelField({ id, value, placeholder, onCommit }: { id: string; value: s
 /** A beam or a post (DESIGN.md "Structure"): sizes are placeholders for the engineer. */
 function MemberProps({ level, member }: { level: Level; member: Member }) {
   const updateMember = usePlanStore((s) => s.updateMember);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const plan = usePlanStore((s) => s.plan);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const plan = useViewPlanStore((s) => s.plan);
   const viewMode = useUiStore((s) => s.viewMode);
   const lowest = isLowestLevel(plan, level.id);
   const set = (patch: MemberPatch) => updateMember(level.id, member.id, patch);
@@ -2596,7 +2652,7 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
         )}
         {!timber && <SelectField label="Mount" value={member.mount} options={mountOptions} onChange={(mount) => set({ mount })} />}
         {timberFields}
-        <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+        <PhaseSelect sel={{ members: [member.id] }} value={member.phase} items={[member]} />
         <ReadOnly label="Length">{formatLength(dist(member.a, member.b), denom)}{timber ? ' in plan' : ''}</ReadOnly>
         <ReadOnly label="Over the floor">
           {formatLength(h.bottom, denom)} to {formatLength(h.top, denom)}
@@ -2625,7 +2681,7 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
           <NumberField label="Rotation" value={member.rotation} onCommit={(v) => set({ rotation: v })} hint="Degrees, clockwise on the plan." />
         </>
       )}
-      <SelectField label="Phase" value={member.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      <PhaseSelect sel={{ members: [member.id] }} value={member.phase} items={[member]} />
       {timberFields}
       {lowest && !timber && (
         <>
@@ -2676,8 +2732,8 @@ function joistOptions(current: number | null, northAngle: number): { value: stri
 
 function JoistZoneProps({ level, zone }: { level: Level; zone: JoistZone }) {
   const updateJoistZone = usePlanStore((s) => s.updateJoistZone);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const northAngle = useViewPlanStore((s) => s.plan.site.northAngle);
   const set = (patch: JoistZonePatch) => updateJoistZone(level.id, zone.id, patch);
   const b = boundsOf(zone.outline);
   return (
@@ -2686,7 +2742,7 @@ function JoistZoneProps({ level, zone }: { level: Level; zone: JoistZone }) {
       <p className="panel-note">An area over this level whose joists run another way than the level's (a part built in another stage).</p>
       <SelectField label="Joists" value={String(zone.joists)} options={joistOptions(zone.joists, northAngle)} onChange={(v) => set({ joists: Number(v) })} />
       <NumberField label="Joist angle" value={zone.joists} onCommit={(v) => set({ joists: v })} hint="Degrees on the plan, 0 along x." />
-      <SelectField label="Phase" value={zone.phase} options={phaseOptions} onChange={(phase) => set({ phase })} />
+      <PhaseSelect sel={{ joistZones: [zone.id] }} value={zone.phase} items={[zone]} />
       {b && (
         <ReadOnly label="Outline">
           {zone.outline.length} corners, {formatLength(b.maxX - b.minX, denom)} x {formatLength(b.maxY - b.minY, denom)}
@@ -2701,9 +2757,9 @@ function JoistZoneProps({ level, zone }: { level: Level; zone: JoistZone }) {
 /** The Level panel's framing: the joists over this level, their depth, and joist zones. */
 function LevelFramingFields({ level }: { level: Level }) {
   const setLevelFraming = usePlanStore((s) => s.setLevelFraming);
-  const northAngle = usePlanStore((s) => s.plan.site.northAngle);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const derivedDepth = usePlanStore((s) => {
+  const northAngle = useViewPlanStore((s) => s.plan.site.northAngle);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const derivedDepth = useViewPlanStore((s) => {
     const l = s.plan.levels[level.id];
     return l ? joistDepth({ ...s.plan, levels: { ...s.plan.levels, [level.id]: { ...l, framing: undefined } } }, level.id) : 0;
   });
@@ -2753,8 +2809,8 @@ const columnKindOptions: { value: Column['kind']; label: string }[] = [
 
 function GradePointProps({ point }: { point: GradePoint }) {
   const updateGradePoint = usePlanStore((s) => s.updateGradePoint);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
-  const firstTop = usePlanStore((s) => {
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const firstTop = useViewPlanStore((s) => {
     const id = groundLevelId(firstStructure(s.plan));
     return id ? getLevelElevations(s.plan)[id]?.floorTop : undefined;
   });
@@ -2783,8 +2839,8 @@ function GradePointProps({ point }: { point: GradePoint }) {
 
 function ColumnProps({ column }: { column: Column }) {
   const updateColumn = usePlanStore((s) => s.updateColumn);
-  const ground = usePlanStore((s) => groundAt(s.plan, column.at));
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const ground = useViewPlanStore((s) => groundAt(s.plan, column.at));
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const set = (patch: Partial<Column>): string | null => {
     const problem = columnProblem({ ...column, ...patch });
     if (problem) return problem[0].toUpperCase() + problem.slice(1) + '.';
@@ -2795,7 +2851,7 @@ function ColumnProps({ column }: { column: Column }) {
     <LengthField label={label} value={column[key]} bound={bound} onCommit={(v) => (v === null ? null : set({ [key]: v }))} hint={hint} />
   );
   const resetHeights = () => {
-    const plan = usePlanStore.getState().plan;
+    const plan = getViewPlan();
     const def = columnDefaults(plan, column.kind, column.at, column.phase);
     updateColumn(column.id, { base: def.base, top: def.top });
   };
@@ -2849,7 +2905,7 @@ function ColumnProps({ column }: { column: Column }) {
           Rain cap (a disc twice the pipe's width, 3" above its top)
         </label>
       )}
-      <SelectField label="Phase" value={column.phase} options={phaseOptions} onChange={(phase) => updateColumn(column.id, { phase })} />
+      <PhaseSelect sel={{ columns: [column.id] }} value={column.phase} items={[column]} />
       <ReadOnly label="Height">{formatLength(column.top - column.base, denom)}</ReadOnly>
       <ReadOnly label="Position">
         x {formatLength(column.at.x, denom)}, y {formatLength(column.at.y, denom)}
@@ -2890,7 +2946,7 @@ function SurfaceProps({ surface }: { surface: SiteSurface }) {
         onReset={surface.color ? () => updateSurface(surface.id, { color: undefined }) : undefined}
         hint={`Default for ${surface.material}: ${SURFACE_COLOR[surface.material]}.${surface.material === 'gravel' ? ' The 3D view speckles it with stones.' : surface.material === 'stone' ? ' The 3D view draws it as flagstones.' : ''}`}
       />
-      <SelectField label="Phase" value={surface.phase} options={phaseOptions} onChange={(phase) => updateSurface(surface.id, { phase })} />
+      <PhaseSelect sel={{ surfaces: [surface.id] }} value={surface.phase} items={[surface]} />
       <ReadOnly label="Area">{formatArea(surfaceArea(surface))}</ReadOnly>
       <ReadOnly label="Corners">{surface.outline.length}</ReadOnly>
       <p className="panel-note">It lies on the ground in 3D, following the grade points. Drag it with the select tool to move it.</p>
@@ -2900,7 +2956,7 @@ function SurfaceProps({ surface }: { surface: SiteSurface }) {
 
 function FenceProps({ fence }: { fence: Fence }) {
   const updateFence = usePlanStore((s) => s.updateFence);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const set = (patch: Partial<Fence>): string | null => {
     const problem = fenceProblem({ ...fence, ...patch });
     if (problem) return problem[0].toUpperCase() + problem.slice(1) + '.';
@@ -2931,7 +2987,7 @@ function FenceProps({ fence }: { fence: Fence }) {
         onReset={fence.color ? () => updateFence(fence.id, { color: undefined }) : undefined}
         hint={`Default: weathered grey wood, ${FENCE_COLOR}. The logs' ends show a lighter end grain.`}
       />
-      <SelectField label="Phase" value={fence.phase} options={phaseOptions} onChange={(phase) => updateFence(fence.id, { phase })} />
+      <PhaseSelect sel={{ fences: [fence.id] }} value={fence.phase} items={[fence]} />
       <ReadOnly label="Length">{formatLength(fenceLength(fence), denom)}</ReadOnly>
       <ReadOnly label="Posts">{fencePostPoints(fence).length}</ReadOnly>
       <div className="panel-buttons">
@@ -3022,7 +3078,6 @@ function MixedProps({
   fences: Fence[];
   rooms: Room[];
 }) {
-  const setPhase = usePlanStore((s) => s.setPhase);
   const updateFixture = usePlanStore((s) => s.updateFixture);
   const parts: string[] = [];
   if (walls.length) parts.push(`${walls.length} ${walls.length === 1 ? 'wall' : 'walls'}`);
@@ -3064,31 +3119,24 @@ function MixedProps({
         </div>
       )}
       {phases.length > 0 && (
-        <SelectField
-          label="Phase"
+        <PhaseSelect
+          sel={{
+            walls: walls.map((w) => w.id),
+            openings: openings.map((o) => o.id),
+            stairs: stairs.map((st) => st.id),
+            roofs: roofs.map((r) => r.id),
+            fixtures: fixtures.map((f) => f.id),
+            decks: decks.map((d) => d.id),
+            floorOpenings: floorOpenings.map((o) => o.id),
+            members: members.map((m) => m.id),
+            joistZones: joistZones.map((z) => z.id),
+            columns: columns.map((c) => c.id),
+            surfaces: surfaces.map((sf) => sf.id),
+            fences: fences.map((f) => f.id),
+            rooms: rooms.map((r) => r.id),
+          }}
           value={common(phases, (p) => p)}
-          options={phaseOptions}
-          onChange={(p) =>
-            setPhase(
-              levelId,
-              {
-                walls: walls.map((w) => w.id),
-                openings: openings.map((o) => o.id),
-                stairs: stairs.map((st) => st.id),
-                roofs: roofs.map((r) => r.id),
-                fixtures: fixtures.map((f) => f.id),
-                decks: decks.map((d) => d.id),
-                floorOpenings: floorOpenings.map((o) => o.id),
-                members: members.map((m) => m.id),
-                joistZones: joistZones.map((z) => z.id),
-                columns: columns.map((c) => c.id),
-                surfaces: surfaces.map((sf) => sf.id),
-                fences: fences.map((f) => f.id),
-                rooms: rooms.map((r) => r.id),
-              },
-              p,
-            )
-          }
+          items={[...walls, ...openings, ...stairs, ...roofs, ...fixtures, ...decks, ...floorOpenings, ...members, ...joistZones, ...columns, ...surfaces, ...fences, ...rooms]}
         />
       )}
       {onlyFixtures && (
@@ -3334,7 +3382,7 @@ function OpacitySlider({ levelId, value }: { levelId: Id; value: number }) {
 function UnderlayProps({ level }: { level: Level }) {
   const u = level.underlay;
   const updateUnderlay = usePlanStore((s) => s.updateUnderlay);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const tool = useUiStore((s) => s.activeTool);
   const mode = useUiStore((s) => s.underlayMode);
   if (!u) {
@@ -3481,18 +3529,63 @@ const shutterOptions: { value: ShutterChoice; label: string }[] = [
   { value: 'remove', label: 'Remove' },
 ];
 
+/** Whose proposed finishes a field edits: the active design option's own, or the shared ones. */
+interface FinishScope {
+  /** The plan has more than one design option (else there is only the shared scope). */
+  multi: boolean;
+  /** Editing the active option's own finishes. */
+  mine: boolean;
+  optionId: Id | undefined;
+  optionName: string;
+  setMine: (mine: boolean) => void;
+}
+
+function useFinishScope(): FinishScope {
+  const multi = useViewPlanStore((s) => s.plan.options.length > 1);
+  const optionId = useViewPlanStore((s) => s.optionId);
+  const optionName = useViewPlanStore((s) => s.plan.options.find((o) => o.id === s.optionId)?.name ?? '');
+  const [mine, setMine] = useState(true);
+  return { multi, mine: multi && mine, optionId, optionName, setMine };
+}
+
+/** "Proposed finishes for": the active option only, or every option (shown with more than one option). */
+function FinishScopeField({ scope }: { scope: FinishScope }) {
+  if (!scope.multi) return null;
+  return (
+    <SelectField
+      label="Proposed finishes for"
+      value={scope.mine ? 'mine' : 'all'}
+      options={[
+        { value: 'mine', label: `${scope.optionName} only` },
+        { value: 'all', label: 'Every option (shared)' },
+      ]}
+      onChange={(v) => scope.setMine(v === 'mine')}
+    />
+  );
+}
+
 /**
  * The plan's proposed look (types.ts ProposedLook): the siding, roof and windows after the work,
  * shown in the Proposed view only. Each field has "As today" or a reset to clear it.
  */
 function ProposedExterior() {
-  const look = usePlanStore((s) => s.plan.proposedLook);
-  const update = usePlanStore((s) => s.updateProposedLook);
+  const scope = useFinishScope();
+  const shown = useViewPlanStore((s) => s.plan.proposedLook);
+  const shared = usePlanStore((s) => s.plan.proposedLook);
+  const own = usePlanStore((s) => s.plan.options.find((o) => o.id === scope.optionId)?.proposedLook);
+  const updateShared = usePlanStore((s) => s.updateProposedLook);
+  const updateOption = usePlanStore((s) => s.updateOptionLook);
+  // In one option's scope it shows the look that option gets and sets that option's own fields
+  // (a reset goes back to the shared field); in every option's, the shared look.
+  const look = scope.mine ? shown : shared;
+  const update = (patch: Partial<ProposedLook>) => (scope.mine && scope.optionId ? updateOption(scope.optionId, patch) : updateShared(patch));
+  const resettable = (key: keyof ProposedLook) => (scope.mine ? own?.[key] !== undefined : look?.[key] !== undefined);
   const color = (label: string, key: 'wallColor' | 'roofColor' | 'boardColor' | 'trimColor' | 'sashColor', fallback: string, hint?: string) => (
-    <ColorField label={label} value={look?.[key] ?? fallback} onCommit={(c) => update({ [key]: c })} onReset={look?.[key] ? () => update({ [key]: undefined }) : undefined} hint={hint} />
+    <ColorField label={label} value={look?.[key] ?? fallback} onCommit={(c) => update({ [key]: c })} onReset={resettable(key) ? () => update({ [key]: undefined }) : undefined} hint={hint} />
   );
   return (
     <>
+      <FinishScopeField scope={scope} />
       <SelectField label="Proposed siding" value={look?.wallFinish ?? 'default'} options={sidingOptions} onChange={(v) => update({ wallFinish: v === 'default' ? undefined : v })} />
       {color('Proposed siding colour', 'wallColor', defaultWallColor('exterior'))}
       <SelectField label="Proposed roof" value={look?.roofFinish ?? 'default'} options={proposedRoofOptions} onChange={(v) => update({ roofFinish: v === 'default' ? undefined : v })} />
@@ -3502,6 +3595,7 @@ function ProposedExterior() {
       {color('Proposed window sashes', 'sashColor', DEFAULT_SASH_COLOR, 'Window sashes and door frames.')}
       <SelectField label="Proposed shutters" value={look?.shutters === false ? 'remove' : 'keep'} options={shutterOptions} onChange={(v) => update({ shutters: v === 'remove' ? false : undefined })} />
       <p className="panel-note">The whole house after the work, in the Proposed view only; Existing and All keep today's look.</p>
+      {scope.mine && <p className="panel-note">What {scope.optionName} sets here replaces the shared look in that option; a field it leaves (or resets) is the shared one.</p>}
     </>
   );
 }
@@ -3514,12 +3608,12 @@ const structureKindOptions = STRUCTURE_KINDS.map((k) => ({ value: k, label: STRU
  */
 function StructureProps({ structureId }: { structureId: Id }) {
   const update = usePlanStore((s) => s.updateStructure);
-  const name = usePlanStore((s) => s.plan.structures[structureId]?.name ?? '');
-  const kind = usePlanStore((s) => s.plan.structures[structureId]?.kind ?? 'other');
-  const x = usePlanStore((s) => s.plan.structures[structureId]?.origin.x ?? 0);
-  const y = usePlanStore((s) => s.plan.structures[structureId]?.origin.y ?? 0);
-  const rotation = usePlanStore((s) => s.plan.structures[structureId]?.rotation ?? 0);
-  const many = usePlanStore((s) => s.plan.structureOrder.length > 1);
+  const name = useViewPlanStore((s) => s.plan.structures[structureId]?.name ?? '');
+  const kind = useViewPlanStore((s) => s.plan.structures[structureId]?.kind ?? 'other');
+  const x = useViewPlanStore((s) => s.plan.structures[structureId]?.origin.x ?? 0);
+  const y = useViewPlanStore((s) => s.plan.structures[structureId]?.origin.y ?? 0);
+  const rotation = useViewPlanStore((s) => s.plan.structures[structureId]?.rotation ?? 0);
+  const many = useViewPlanStore((s) => s.plan.structureOrder.length > 1);
   return (
     <>
       <h3>Building: {name}</h3>
@@ -3534,16 +3628,16 @@ function StructureProps({ structureId }: { structureId: Id }) {
 
 function LevelProps({ level }: { level: Level }) {
   const { updateLevel, setBaseFloorElevation, updateSettings } = usePlanStore.getState();
-  const extThickness = usePlanStore((s) => s.plan.settings.defaultExteriorThickness);
-  const intThickness = usePlanStore((s) => s.plan.settings.defaultInteriorThickness);
-  const structureId = usePlanStore((s) => structureOf(s.plan, level.id)?.id);
-  const base = usePlanStore((s) => structureOf(s.plan, level.id)?.baseFloorElevation ?? 0);
+  const extThickness = useViewPlanStore((s) => s.plan.settings.defaultExteriorThickness);
+  const intThickness = useViewPlanStore((s) => s.plan.settings.defaultInteriorThickness);
+  const structureId = useViewPlanStore((s) => structureOf(s.plan, level.id)?.id);
+  const base = useViewPlanStore((s) => structureOf(s.plan, level.id)?.baseFloorElevation ?? 0);
   // Select primitives: an object built in a selector would never compare equal.
-  const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop);
-  const ceiling = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.ceiling);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const floorTop = useViewPlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop);
+  const ceiling = useViewPlanStore((s) => getLevelElevations(s.plan)[level.id]?.ceiling);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const viewMode = useUiStore((s) => s.viewMode);
-  const faces = usePlanStore((s) => {
+  const faces = useViewPlanStore((s) => {
     const l = s.plan.levels[level.id];
     return l ? getFaces(l, viewMode) : null;
   });
@@ -3644,8 +3738,8 @@ export function PropertiesPanel() {
   const underlayTool = useUiStore((s) => s.activeTool === 'underlay');
   const fixtureTool = useUiStore((s) => s.activeTool === 'fixture');
   const furnitureTool = useUiStore((s) => s.activeTool === 'furniture');
-  const level = usePlanStore((s) => s.plan.levels[levelId]);
-  const site = usePlanStore((s) => s.plan.site);
+  const level = useViewPlanStore((s) => s.plan.levels[levelId]);
+  const site = useViewPlanStore((s) => s.plan.site);
   const siteMode = useUiStore((s) => s.siteMode);
   if (!level) return <aside className="side-panel" />;
   const walls = sel.walls.map((id) => level.walls[id]).filter(Boolean);

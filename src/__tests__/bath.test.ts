@@ -280,9 +280,10 @@ describe('validation and old files', () => {
     expect(out.rooms.r).toMatchObject({ ceilingFinish: 'boards' });
     expect(out.rooms.r.ceilingColor).toBeUndefined();
     expect(out.rooms.q.ceilingFinish).toBeUndefined();
-    // A version 9 file from before (the example as committed before this change has none of the
-    // fields): it loads as it was, the ceilings filled in by default at render time.
-    expect(raw.schemaVersion).toBe(9);
+    // A file from before (the example as committed before this change has none of the fields; it
+    // has since gone to version 10, design options): it loads as it was, the ceilings filled in by
+    // default at render time.
+    expect(raw.schemaVersion).toBe(10);
     const before = createEmptyPlan();
     expect(JSON.stringify(migrate(JSON.parse(JSON.stringify(before))))).toBe(JSON.stringify(before));
   });

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 9,
+  "schemaVersion": 10,
   "id": "plan-146-mick-road",
   "name": "146 Mick Road (starter, estimates flagged)",
   "structures": {
@@ -6686,6 +6686,12 @@
     }
   },
   "modifiedAt": "2026-01-01T00:00:00.000Z",
+  "options": [
+    {
+      "id": "option-a",
+      "name": "Option A"
+    }
+  ],
   "proposedLook": {
     "wallFinish": "shake",
     "wallColor": "#4b3a32",

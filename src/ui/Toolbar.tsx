@@ -3,11 +3,14 @@ import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
 import { activateUnderlayTool, setViewMode, switchTool } from '../editor2d/tools';
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import type { MeasureTo } from '../model/types';
-import { getPlan, redo, undo, usePlanStore, useTemporal } from '../store/planStore';
+import { redo, undo, usePlanStore, useTemporal } from '../store/planStore';
 import { isSiteModeTool, SITE_MODE_TOOL_HINT, useUiStore, type DrawPhase, type Layout, type ToolName } from '../store/uiStore';
 import { visible3dLevels } from '../view3d/visibility';
 import { choosePlanFile, newPlan, openExample, savePlan, zoomToFit } from './fileActions';
 import { focusCanvas, releaseFocus } from './focus';
+import { OptionPicker } from './OptionPicker';
+import { optionOf } from '../derive/optionView';
+import { getActiveOptionId, getViewPlan, useViewPlanStore } from '../store/viewStore';
 
 /** `short` replaces the label below 1100 px (index.css hides one of the two spans). */
 const TOOLS: { name: ToolName; label: string; short?: string; key: string }[] = [
@@ -58,6 +61,17 @@ const LAYOUT_BUTTONS: { layout: Layout; label: string }[] = [
 ];
 
 /**
+ * The plan the exports write: the active design option's (store/viewStore.ts), named after it when
+ * the plan has several and the view shows options, so the file and title block say which.
+ */
+function exportedPlan() {
+  const plan = getViewPlan();
+  if (plan.options.length < 2 || useUiStore.getState().viewMode === 'existing') return plan;
+  const name = optionOf(plan, getActiveOptionId())?.name;
+  return name ? { ...plan, name: `${plan.name} - ${name}` } : plan;
+}
+
+/**
  * Export menu: the 3D model as binary glTF (metres) or OBJ (inches), exactly as the 3D view shows
  * it (view mode and visible levels); the 2D plan as SVG or PNG; the four elevations as PNG images
  * rendered by the 3D view. The exporters and three load on first use.
@@ -74,6 +88,7 @@ function ExportMenu() {
   const layout = useUiStore((s) => s.layout);
   const plan = usePlanStore((s) => s.plan);
   const levels = usePlanStore((s) => s.plan.levels);
+  const optionName = useViewPlanStore((s) => (s.plan.options.length > 1 && viewMode !== 'existing' ? optionOf(s.plan, s.optionId)?.name : undefined));
 
   useEffect(() => {
     if (!open) return;
@@ -89,7 +104,7 @@ function ExportMenu() {
     try {
       const { downloadPlanExport } = await import('../io/exportPlan');
       const ui = useUiStore.getState();
-      await downloadPlanExport(format, getPlan(), ui.activeLevelId, ui.viewMode);
+      await downloadPlanExport(format, exportedPlan(), ui.activeLevelId, ui.viewMode);
       setOpen(false);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : String(err));
@@ -103,7 +118,7 @@ function ExportMenu() {
     try {
       const { downloadExport } = await import('../io/export3d');
       const ui = useUiStore.getState();
-      await downloadExport(format, getPlan(), ui.viewMode, ui);
+      await downloadExport(format, exportedPlan(), ui.viewMode, ui);
       setOpen(false);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : String(err));
@@ -116,7 +131,7 @@ function ExportMenu() {
     setBusy(true);
     try {
       const { downloadElevations } = await import('../io/exportElevation');
-      downloadElevations(getPlan());
+      downloadElevations(exportedPlan());
       setOpen(false);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : String(err));
@@ -154,7 +169,7 @@ function ExportMenu() {
             <small>Wavefront OBJ, in inches</small>
           </button>
           <p className="menu-note">
-            Exports what the 3D view shows: the {VIEW_MODE_LABEL[viewMode]} view of {shown || 'no levels'}.
+            Exports what the 3D view shows: the {VIEW_MODE_LABEL[viewMode]} view{optionName ? ` of ${optionName}` : ''} of {shown || 'no levels'}.
           </p>
           <p className="menu-note">Siding textures are not exported; colours are.</p>
           <p className="menu-note">
@@ -271,6 +286,7 @@ export function Toolbar() {
             </button>
           ))}
         </div>
+        <OptionPicker />
         <div className="group" role="group" aria-label="Layout">
           {LAYOUT_BUTTONS.map((b) => (
             <button

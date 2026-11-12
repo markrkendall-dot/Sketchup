@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { issueCounts, type Issue, type Severity } from '../derive/checks';
 import { CODE_EDITION } from '../model/codeLimits';
-import { usePlanStore } from '../store/planStore';
+import { useViewPlanStore } from '../store/viewStore';
 import { EMPTY_SELECTION, useUiStore, type Selection } from '../store/uiStore';
 import { allLevelIds, structureOf } from '../model/structures';
 
@@ -40,10 +40,10 @@ export function ChecksPanel() {
   const open = useUiStore((s) => s.checksOpen);
   const issues = useUiStore((s) => s.issues);
   const picked = useUiStore((s) => s.pickedIssueId);
-  const levels = usePlanStore((s) => s.plan.levels);
-  const order = usePlanStore((s) => allLevelIds(s.plan));
-  const many = usePlanStore((s) => s.plan.structureOrder.length > 1);
-  const plan = usePlanStore((s) => s.plan);
+  const levels = useViewPlanStore((s) => s.plan.levels);
+  const order = useViewPlanStore((s) => allLevelIds(s.plan));
+  const many = useViewPlanStore((s) => s.plan.structureOrder.length > 1);
+  const plan = useViewPlanStore((s) => s.plan);
   const [showNotes, setShowNotes] = useState(false);
   if (!open) return null;
   const { toCheck, notes } = issueCounts(issues);

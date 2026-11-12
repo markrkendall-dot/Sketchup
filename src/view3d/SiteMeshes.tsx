@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { getFarGroundGeometry, getFenceMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry } from '../derive/meshes';
-import { usePlanStore } from '../store/planStore';
+import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore } from '../store/uiStore';
 import { chimneyPartMaterial, columnMaterial, farGroundMaterial, fenceMaterial, surfaceMaterial, terrainMaterial } from './materials';
 
@@ -19,7 +19,7 @@ const GROUND_RENDER_ORDER = 1;
  */
 export const Terrain = memo(function Terrain() {
   const viewMode = useUiStore((s) => s.viewMode);
-  const geometry = usePlanStore((s) => getTerrainGeometry(s.plan, viewMode));
+  const geometry = useViewPlanStore((s) => getTerrainGeometry(s.plan, viewMode));
   return <mesh name="terrain" geometry={geometry} material={terrainMaterial} renderOrder={GROUND_RENDER_ORDER} receiveShadow dispose={null} />;
 });
 
@@ -30,7 +30,7 @@ export const Terrain = memo(function Terrain() {
  */
 export const FarGround = memo(function FarGround() {
   const viewMode = useUiStore((s) => s.viewMode);
-  const geometry = usePlanStore((s) => getFarGroundGeometry(s.plan, viewMode));
+  const geometry = useViewPlanStore((s) => getFarGroundGeometry(s.plan, viewMode));
   return <mesh name="far-ground" geometry={geometry} material={farGroundMaterial} renderOrder={GROUND_RENDER_ORDER} receiveShadow dispose={null} />;
 });
 
@@ -42,7 +42,7 @@ export const FarGround = memo(function FarGround() {
  */
 export const SiteColumns = memo(function SiteColumns() {
   const viewMode = useUiStore((s) => s.viewMode);
-  const meshes = usePlanStore((s) => getSiteMeshes(s.plan, viewMode));
+  const meshes = useViewPlanStore((s) => getSiteMeshes(s.plan, viewMode));
   return (
     <group name="site">
       {meshes.columns.map((c) => (
@@ -82,7 +82,7 @@ export const SiteColumns = memo(function SiteColumns() {
  */
 export const SiteSurfaces = memo(function SiteSurfaces() {
   const viewMode = useUiStore((s) => s.viewMode);
-  const meshes = usePlanStore((s) => getSurfaceMeshes(s.plan, viewMode));
+  const meshes = useViewPlanStore((s) => getSurfaceMeshes(s.plan, viewMode));
   return (
     <group name="site-surfaces">
       {meshes.map((sf) => (
@@ -107,7 +107,7 @@ export const SiteSurfaces = memo(function SiteSurfaces() {
  */
 export const SiteFences = memo(function SiteFences() {
   const viewMode = useUiStore((s) => s.viewMode);
-  const meshes = usePlanStore((s) => getFenceMeshes(s.plan, viewMode));
+  const meshes = useViewPlanStore((s) => getFenceMeshes(s.plan, viewMode));
   return (
     <group name="site-fences">
       {meshes.map((f) => (

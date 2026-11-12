@@ -2,7 +2,7 @@ import { PointerLockControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useRef } from 'react';
 import { Euler, PerspectiveCamera, type PointLight } from 'three';
-import { getPlan } from '../store/planStore';
+import { getViewPlan } from '../store/viewStore';
 import { useUiStore } from '../store/uiStore';
 import { getLevelElevations } from '../derive/levels';
 import {
@@ -74,7 +74,7 @@ export function FirstPerson() {
   // Enter: eye height on the start level, at the start point (the picked one, the entry door, or
   // the middle of the house; walk.ts walkStart), looking the way it says.
   useEffect(() => {
-    const plan = getPlan();
+    const plan = getViewPlan();
     const ui = useUiStore.getState();
     const levels = walkLevels(plan, ui);
     const id = walkStartLevel(plan, ui);
@@ -106,7 +106,7 @@ export function FirstPerson() {
 
   const changeLevel = useCallback(
     (dir: -1 | 1) => {
-      const plan = getPlan();
+      const plan = getViewPlan();
       const current = levelId.current;
       if (!current) return;
       const next = stepLevel(walkLevels(plan, useUiStore.getState()), current, dir, plan);
@@ -216,7 +216,7 @@ export function FirstPerson() {
     euler.setFromQuaternion(camera.quaternion);
     const [dx, dz] = walkStep(euler.y, forward, right, distance);
     // Feet on what is there: up a step, down to what is below, stopped by rails and stair sides.
-    const plan = getPlan();
+    const plan = getViewPlan();
     const ui = useUiStore.getState();
     const levels = walkLevels(plan, ui);
     const at = { x: camera.position.x, y: camera.position.z };

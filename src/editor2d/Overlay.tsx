@@ -10,7 +10,7 @@ import type { Column, Fixture, Underlay, Vec2 } from '../model/types';
 import { COLUMN_KIND_NAME, nextColumnKind } from './tools/siteTools';
 import { formatPxScale, nearestAxis, pixelDistance } from '../model/underlay';
 import { formatLength, formatLengthCompact, parseLength } from '../model/units';
-import { usePlanStore } from '../store/planStore';
+import { useViewPlanStore } from '../store/viewStore';
 import {
   useUiStore,
   type Draft,
@@ -369,7 +369,7 @@ function UnderlayCalibration({ u, mode, draft, v, denom }: { u: Underlay; mode: 
 /** Ghost of the stairs about to be placed, drawn in world space like the real symbol. */
 function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number; v: Viewport }) {
   const levelId = useUiStore((s) => s.activeLevelId);
-  const ftf = usePlanStore((s) => floorToFloor(s.plan, levelId));
+  const ftf = useViewPlanStore((s) => floorToFloor(s.plan, levelId));
   const sym = stairsSymbol({ origin, direction, ...STAIRS_DEFAULTS }, stairSteps(ftf).risers);
   return (
     <g transform={`translate(${v.tx} ${v.ty}) scale(${v.k})`}>
@@ -450,13 +450,13 @@ function ColumnGhost({ at, kind, width, depth, v }: { at: Vec2; kind: Column['ki
 export const Overlay = memo(function Overlay() {
   const draft = useUiStore((s) => s.draft);
   const v = useUiStore((s) => s.viewport);
-  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
   const tool = useUiStore((s) => s.activeTool);
   const underlayMode = useUiStore((s) => s.underlayMode);
   const levelId = useUiStore((s) => s.activeLevelId);
-  const underlay = usePlanStore((s) => s.plan.levels[levelId]?.underlay);
+  const underlay = useViewPlanStore((s) => s.plan.levels[levelId]?.underlay);
   const calibrating = tool === 'underlay' && underlayMode !== 'move' && !!underlay;
-  const gradeDefault = usePlanStore((s) => (tool === 'gradePoint' ? formatLength(defaultGradeElevation(s.plan), denom) : ''));
+  const gradeDefault = useViewPlanStore((s) => (tool === 'gradePoint' ? formatLength(defaultGradeElevation(s.plan), denom) : ''));
   const cursor = draft.cursor ? worldToScreen(v, draft.cursor) : null;
   const box = draft.box
     ? { a: worldToScreen(v, draft.box.a), b: worldToScreen(v, draft.box.b) }

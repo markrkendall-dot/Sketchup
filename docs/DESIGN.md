@@ -216,13 +216,15 @@ export interface Structure {
 }
 
 export interface Plan {
-  schemaVersion: 9; id: Id; name: string;
+  schemaVersion: 10; id: Id; name: string;
   structures: Record<Id, Structure>;
   structureOrder: Id[];      // the first is the main building
   levels: Record<Id, Level>; // every structure's levels, each in exactly one levelOrder
   settings: PlanSettings; site: Site; modifiedAt: string;
   proposedLook?: ProposedLook; // the siding, roof and windows after the work (see "The proposed look")
+  options: DesignOption[];     // schema 10, at least one (see "Design options")
 }
+// Schema 10: every phased entity may carry optionIds?: Id[] (see "Design options").
 ```
 
 Elevation rule, within each structure's stack: `floorTop[0] = baseFloorElevation`; `floorTop[i] =
@@ -1880,6 +1882,55 @@ changes the existing view: `existingViewSignature` (the points every 3" along ea
 demolished wall on a grid from the origin, its ends but for joints where two pieces of one wall run
 on straight, and each such opening's centre and size) must come out the same. The new walls (between
 new nodes) come back to be selected.
+
+## Design options (`derive/phase.ts phaseIn`, `derive/optionView.ts`, `model/optionOps.ts`, `store/viewStore.ts`, `ui/OptionPicker.tsx`)
+
+Schema 10. `Plan.options: DesignOption[]` (`{ id, name, proposedLook? }`, at least one; a new plan
+and migration 9 give one, `option-a` "Option A"). Every entity with a phase (walls, openings, room
+labels, stairs, roofs, fixtures, decks, floor openings, joist zones, beams and posts, site columns,
+surfaces and fences) may carry `optionIds?: Id[]`, meaningful only on `new` or `demo`: absent, the
+change is in every option. A list, not one id, so a demolition can be made in A and C but not B
+(duplicating A gives C the same demolition). Structures and staircases carry no tag (a staircase
+follows its pieces; a building only one option builds has all its contents tagged). On load
+(`cleanOptionTags`) ids the plan has no option for are dropped, an emptied list goes, and tags on an
+existing entity go; a malformed option is dropped, none left gives the default one.
+
+The rule lives in `phaseIn(entity, optionId)`: tagged for other options only, a new entity is absent
+(null) and a demolished one is existing. `viewPlanOf(plan, optionId)` applies it to a whole plan:
+left out entities (with openings in left-out walls and corners only left-out walls used; staircases
+with no piece left), re-phased demolitions (tags dropped), the option's proposed look over the
+plan's field by field, and each room's `optionFinishes[optionId]` over its `proposedFloor` /
+`proposedWall`. It is memoized per source object and option (`WeakMap<Level, Map<optionId,
+Level>>`, the same for the site and the plan): a level nothing in it depends on comes back as the
+same object, so the Level-keyed derive caches keep their entries, and a level that differs between
+options is a different object per option, so a cache keyed on the level and the view mode is keyed
+on the option too. Untagged plans view as themselves.
+
+`store/viewStore.ts` keeps `viewPlanOf(plan, resolveOptionId(plan, ui.activeOptionId))` in a
+vanilla store, subscribed to both stores at import (before any component). Everything that draws,
+checks or exports reads it: the plan layers (`layerStores`), the tools' context (hit tests, snaps,
+previews), `pruneSelection`, the properties panel, the status bar, checks, 3D, walk, capture and
+the exports. Edits go to the plan store by the same ids, so the drawing code tests phases as before
+and needs no option logic. The Existing view of the option plan is the same in every option.
+
+The active option is UI state (`uiStore.activeOptionId`, null = first, an id an undo removed falls
+back to the first), not undone, not saved: a plan opens on its first option. With more than one
+option, new entities made by the store's add actions (and a renovation's or a starter box's new
+and demolished pieces) are tagged for it (`workOptionOf`, `tagWork`); with one they stay untagged.
+`setPhase` goes through `applyPhaseIn`: demolish tags the demolition for the option (adding it to
+one other options make), keep takes the option back out (an every-option demolition then names the
+others), new makes it that option's. `addOption`, `duplicateOption`, `renameOption`,
+`deleteOption`, `setEntityOption`, `updateOptionLook` and `updateRoomOptionFinishes` are one undo
+step each. Duplicating copies each new entity tagged for the source under a new id, tagged for the
+copy; references follow (openings to copied walls, flights to a copied staircase whose pieces are
+all the source's); a copied wall keeps a corner an every-option wall uses and gets its own copy of a
+corner only option walls use; demolitions add the copy's id. Deleting removes entities tagged for
+that option only (new) or makes them existing again (demo), and untags the rest.
+
+`normalizeLevel` is option-aware: two corners in one spot whose walls belong to different options
+only stay apart, two walls between the same corners in different options only are both kept, and
+splits and crossings use `entitiesCoexist` (phasesCoexist in some option where both exist). Adding a
+wall is refused only on top of a wall of an option it shares.
 
 ## Derivation and memoization
 

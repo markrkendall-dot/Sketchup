@@ -382,6 +382,35 @@ glass.
    shows the structure overlay: the joists, their direction, beam labels and bearing walls; export
    the plan with it on for a framing plan. Nothing is sized: the sizes are for the engineer.
 
+7. Compare alternatives with **design options**. A plan starts with one proposal, Option A, and the
+   toolbar shows **+ Option** beside Existing / Proposed / All. Choose **New option** to add Option
+   B: it starts with only the changes every option shares. Choose **Duplicate** to start from a copy
+   of the option shown (its new work is copied, so you can change the copy on its own; its
+   demolition applies to the copy too). With more than one option the button shows the option's
+   name; click it to switch, rename or delete one (deleting removes the new work only that option
+   has and undoes its demolition). The status bar says which option is shown.
+   - New work drawn with **Draw as: new**, and **Mark demolish**, go to the option shown. **Keep
+     (existing)** takes the demolition back out of that option only. Work drawn while the plan had
+     one option is in every option.
+   - In an option a change does not belong to, it is as if it had never been made: its new walls,
+     cabinets and so on are not there, and what it demolishes is still standing, drawn as existing
+     (not red) in Proposed and All. Existing is the same in every option, so the option button is
+     off there.
+   - The properties of a new or demolished selection show **New in** / **Demolished in**: one
+     option, or every option. Change it to move the selection.
+   - Rooms, checks, the plan, 3D, walk, the elevations, the plan export and the glTF/OBJ export all
+     show the option shown, and an export's file name carries the option's name. The shared viewer
+     gets a button per option.
+   - The proposed look (siding, roof, windows) and an existing room's proposed floor and walls can
+     be set per option: with several options their panels have **Proposed finishes for**: the option
+     shown, or every option (shared). An option's own value replaces the shared one; where the option
+     sets nothing, it gets the shared one, so "as today" in one option while the others re-side is
+     not possible (leave the shared look as today and set each option's own).
+   - A building is not tagged itself: a garage that only one option builds is a building whose
+     walls are all new work of that option; in the others it is listed but empty.
+   - Switching option is not an undo step; adding, duplicating, renaming and deleting options are.
+     A plan opens on its first option.
+
 ## Editing walls
 
 - **Move a wall by a distance.** Select the wall; in the properties panel type the distance in

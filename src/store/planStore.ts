@@ -30,14 +30,20 @@ import {
   WALL_OVERLAP_MESSAGE,
   wallLength,
   wallOverlapping,
+  knownOptionIds,
+  nodeMeets,
+  roomOptionFinishesOf,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import { planRenovation } from '../model/renovate';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from '../model/structure';
-import type { Beam, Column, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { Beam, Column, RoomOptionFinishes, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
+import { resolveOptionId } from '../derive/optionView';
+import { optionsMeet } from '../derive/phase';
+import { addOptionTo, applyPhaseIn, deleteOptionFrom, duplicateOptionIn, renameOptionIn, setEntityOptionsIn } from '../model/optionOps';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
 import { isWoodId } from '../model/furniture';
 import { isVariantOf } from '../model/bath';
@@ -52,6 +58,8 @@ export interface AddWallOptions {
    * otherwise kept): it may lie along that demolished wall. Never along a wall that stays.
    */
   replacesDemolished?: boolean;
+  /** Design options of a new wall (absent: the work option's, store workOptionOf; see tagWork). */
+  optionIds?: Id[];
 }
 
 export interface AddWallResult {
@@ -390,6 +398,66 @@ export interface PlanState {
    * rotation is normalized to [0, 360). No-op without an underlay. One undo step.
    */
   updateUnderlay: (levelId: Id, patch: UnderlayPatch) => void;
+  /** Add a design option (blank name: the next "Option X"); returns its id. One undo step. */
+  addOption: (name?: string) => Id;
+  /** Add an option copied from another (model/optionOps.ts duplicateOptionIn); null when there is no such option. */
+  duplicateOption: (id: Id, name?: string) => Id | null;
+  renameOption: (id: Id, name: string) => void;
+  /** Delete an option and its own changes (model/optionOps.ts deleteOptionFrom); false for the last one. */
+  deleteOption: (id: Id) => boolean;
+  /** Put the selected new and demolished entities in these options (undefined: every option). */
+  setEntityOption: (levelId: Id, sel: EntitySelection, optionIds: Id[] | undefined) => void;
+  /** Set or clear fields of an option's own proposed look (over the plan's); undefined clears a field. */
+  updateOptionLook: (optionId: Id, patch: Partial<ProposedLook>) => void;
+  /** Set or clear (undefined) a room's own proposed floor or walls in an option (Room.optionFinishes). */
+  updateRoomOptionFinishes: (levelId: Id, roomId: Id, optionId: Id, patch: Partial<RoomOptionFinishes>) => void;
+}
+
+/**
+ * The design option new work goes to (DESIGN.md "Design options"): the active one (uiStore) while
+ * the plan has several, else none: with one option, new work is untagged and so in every option.
+ */
+export function workOptionOf(plan: Pick<Plan, 'options'>): Id | undefined {
+  if (plan.options.length < 2) return undefined;
+  return resolveOptionId(plan, useUiStore.getState().activeOptionId);
+}
+
+/**
+ * Tag an entity being created as new work of the work option. Existing entities carry no tags; tags
+ * the input already has are kept (those of options the plan has).
+ */
+function tagWork(e: { phase?: Phase; optionIds?: Id[] }, plan: Plan): void {
+  if ((e.phase ?? 'existing') === 'existing') {
+    delete e.optionIds;
+    return;
+  }
+  if (e.optionIds !== undefined) {
+    const ids = knownOptionIds(e.optionIds, new Set(plan.options.map((o) => o.id)));
+    if (ids) e.optionIds = ids;
+    else delete e.optionIds;
+    return;
+  }
+  const work = workOptionOf(plan);
+  if (work) e.optionIds = [work];
+}
+
+/**
+ * After an edit that made walls and openings by its own rules (a renovation, a starter box): tag
+ * what it made new or demolished as the work option's (tagWork), leaving what was already there.
+ */
+function tagWorkSince(before: Pick<Level, 'walls' | 'openings'>, level: Level, plan: Plan): void {
+  const work = workOptionOf(plan);
+  if (!work) return;
+  for (const rec of [level.walls, level.openings] as Record<Id, Wall | Opening>[]) {
+    const old = rec === level.walls ? before.walls : before.openings;
+    for (const e of Object.values(rec)) {
+      const prev = (old as Record<Id, Wall | Opening>)[e.id];
+      if (e.phase === 'existing') continue;
+      if (!prev) {
+        if (e.optionIds === undefined) e.optionIds = [work];
+      } else if (prev.phase === 'existing') e.optionIds = [work];
+    }
+  }
 }
 
 const touch = (plan: Plan) => {
@@ -539,7 +607,7 @@ function cleanRoof(r: Roof): Roof {
 
 /** A floor opening's stored form: outline points copied, railings fitted to the outline. */
 function cleanFloorOpening(o: Omit<FloorOpening, 'railings'> & { railings?: boolean[] }): FloorOpening {
-  return { id: o.id, outline: o.outline.map((p) => ({ x: p.x, y: p.y })), railings: normalizeRailings(o.railings, o.outline.length), phase: o.phase };
+  return { id: o.id, outline: o.outline.map((p) => ({ x: p.x, y: p.y })), railings: normalizeRailings(o.railings, o.outline.length), phase: o.phase, ...(o.optionIds ? { optionIds: [...o.optionIds] } : {}) };
 }
 
 /** A deck's stored form: outline points copied, railings fitted to the outline, colour lower-cased. */
@@ -665,10 +733,12 @@ function applySitePatch<T extends object>(target: T, next: T, keys: readonly (ke
  * is degenerate, 'overlap' when it would lie on top of a wall already there (nothing changed).
  */
 function addWallInPlace(level: Level, aRef: Vec2 | Id, bRef: Vec2 | Id, opts: AddWallOptions): AddWallResult | 'overlap' | null {
+  // The wall as the option tests see it: walls and corners of other design options only are not in its way.
+  const probe = { phase: opts.phase, optionIds: opts.optionIds };
   // Where each end lands: a node id, an existing node within MERGE_EPS, or a new point.
   const locate = (ref: Vec2 | Id): { id: Id | null; at: Vec2 } | null => {
     if (typeof ref === 'string') return level.nodes[ref] ? { id: ref, at: level.nodes[ref] } : null;
-    const near = findNodeNear(level, ref);
+    const near = findNodeNear(level, ref, MERGE_EPS, undefined, (id) => nodeMeets(level, id, probe));
     return near ? { id: near, at: level.nodes[near] } : { id: null, at: ref };
   };
   const la = locate(aRef);
@@ -677,7 +747,7 @@ function addWallInPlace(level: Level, aRef: Vec2 | Id, bRef: Vec2 | Id, opts: Ad
   // A wall on top of a wall already there (any phase) would replace a piece of it when the level
   // is normalized: refuse it instead (docs/history/REVIEW-2.md A1).
   const rebuilt = opts.replacesDemolished && opts.phase === 'new';
-  if (wallOverlapping(level, la.at, lb.at, rebuilt ? (w) => w.phase === 'demo' : undefined)) return 'overlap';
+  if (wallOverlapping(level, la.at, lb.at, (w) => (rebuilt && w.phase === 'demo') || !optionsMeet(w, probe))) return 'overlap';
   const place = (l: { id: Id | null; at: Vec2 }): { id: Id; existing: boolean } => {
     if (l.id) return { id: l.id, existing: true };
     const id = newId();
@@ -687,11 +757,19 @@ function addWallInPlace(level: Level, aRef: Vec2 | Id, bRef: Vec2 | Id, opts: Ad
   const a = place(la);
   const b = place(lb);
   const wall: Wall = { id: newId(), a: a.id, b: b.id, thickness: opts.thickness, kind: opts.kind, phase: opts.phase };
+  if (opts.optionIds?.length && opts.phase !== 'existing') wall.optionIds = [...opts.optionIds];
   level.walls[wall.id] = wall;
   const remap = normalizeLevel(level);
   const finalA = remap.get(a.id) ?? a.id;
   const finalB = remap.get(b.id) ?? b.id;
-  return { a: finalA, b: finalB, wallIds: wallsAlong(level, finalA, finalB), bWasExisting: b.existing };
+  return { a: finalA, b: finalB, wallIds: wallsAlong(level, finalA, finalB).filter((id) => optionsMeet(level.walls[id], probe)), bWasExisting: b.existing };
+}
+
+/** A wall's options as tagWork would give them. */
+function wallOpts(opts: AddWallOptions, plan: Plan): AddWallOptions {
+  const probe: { phase: Phase; optionIds?: Id[] } = { phase: opts.phase, ...(opts.optionIds ? { optionIds: opts.optionIds } : {}) };
+  tagWork(probe, plan);
+  return { ...opts, optionIds: probe.optionIds };
 }
 
 /** Walls lying along the straight path a..b, following the graph after splits. */
@@ -748,8 +826,8 @@ export const usePlanStore = create<PlanState>()(
         addWall: (levelId, aRef, bRef, opts) => {
           let result: AddWallResult | null = null;
           let overlap = false;
-          editLevel(levelId, (level) => {
-            const r = addWallInPlace(level, aRef, bRef, opts);
+          editLevel(levelId, (level, plan) => {
+            const r = addWallInPlace(level, aRef, bRef, wallOpts(opts, plan));
             if (r === 'overlap') overlap = true;
             if (r === null || r === 'overlap') return false;
             result = r;
@@ -758,8 +836,9 @@ export const usePlanStore = create<PlanState>()(
           return result;
         },
 
-        addWalls: (levelId, segments, opts) => {
+        addWalls: (levelId, segments, given) => {
           const current = get().plan.levels[levelId];
+          const opts = wallOpts(given, get().plan);
           if (!current || segments.length === 0) return null;
           // Dry run on a copy first: the walls go in together or not at all (one undo step).
           const trial = structuredClone(current) as Level;
@@ -815,7 +894,7 @@ export const usePlanStore = create<PlanState>()(
 
         renovateWalls: (levelId, shiftsIn) => {
           let out: { walls: Id[] } | { error: string } = { error: 'Nothing to move.' };
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const shifts = new Map(Object.entries(shiftsIn).filter(([, s]) => isPoint(s) && Math.hypot(s.x, s.y) > 1e-9));
             if (shifts.size === 0) return false;
             const r = planRenovation(current(level), shifts);
@@ -823,9 +902,11 @@ export const usePlanStore = create<PlanState>()(
               out = r;
               return false;
             }
+            const before = { walls: { ...current(level).walls }, openings: { ...current(level).openings } };
             level.nodes = r.level.nodes;
             level.walls = r.level.walls;
             level.openings = r.level.openings;
+            tagWorkSince(before, level, plan);
             out = { walls: r.walls };
           });
           return out;
@@ -957,7 +1038,7 @@ export const usePlanStore = create<PlanState>()(
 
         addOpening: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const wall = level.walls[input.wallId];
             if (!wall) return false;
             if (!(input.width > 0) || !(input.height > 0) || !(input.sill >= 0)) return false;
@@ -971,6 +1052,7 @@ export const usePlanStore = create<PlanState>()(
               offset: clampOpeningOffset(input.offset, input.width, s0, s1),
             };
             if (opening.type !== 'door') delete opening.swing;
+            tagWork(opening, plan);
             level.openings[opening.id] = opening;
             id = opening.id;
           });
@@ -1008,12 +1090,13 @@ export const usePlanStore = create<PlanState>()(
 
         addRoom: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const name = input.name.trim();
             if (!name || !Number.isFinite(input.anchor.x) || !Number.isFinite(input.anchor.y)) return false;
             const room: Room = { ...input, id: input.id ?? newId(), name, anchor: { x: input.anchor.x, y: input.anchor.y } };
             if (input.proposedFloor) room.proposedFloor = { finish: input.proposedFloor.finish, ...(input.proposedFloor.color ? { color: input.proposedFloor.color.toLowerCase() } : {}) };
             if (input.proposedWall) room.proposedWall = { finish: input.proposedWall.finish, ...(input.proposedWall.color ? { color: input.proposedWall.color.toLowerCase() } : {}) };
+            tagWork(room, plan);
             level.rooms[room.id] = room;
             id = room.id;
           });
@@ -1087,6 +1170,7 @@ export const usePlanStore = create<PlanState>()(
             else delete stairs.railings;
             if (!stairs.staircaseId || !level.staircases[stairs.staircaseId]) delete stairs.staircaseId;
             for (const k of ['headroom', 'holeStart', 'open', ...STAIRS_HEIGHT_KEYS] as const) if (stairs[k] === undefined) delete stairs[k];
+            tagWork(stairs, plan);
             level.stairs[stairs.id] = stairs;
             id = stairs.id;
           });
@@ -1191,9 +1275,10 @@ export const usePlanStore = create<PlanState>()(
 
         addRoof: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const roof = cleanRoof({ ...input, id: input.id ?? newId() });
             if (roofProblem(roof) || roofOptionProblem(roof)) return false;
+            tagWork(roof, plan);
             level.roofs[roof.id] = roof;
             id = roof.id;
           });
@@ -1230,9 +1315,10 @@ export const usePlanStore = create<PlanState>()(
 
         addDeck: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const deck = cleanDeck({ ...input, id: input.id ?? newId() });
             if (deckProblem(deck)) return false;
+            tagWork(deck, plan);
             level.decks[deck.id] = deck;
             id = deck.id;
           });
@@ -1269,9 +1355,10 @@ export const usePlanStore = create<PlanState>()(
 
         addFloorOpening: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const fo = cleanFloorOpening({ ...input, id: input.id ?? newId() });
             if (floorOpeningProblem(fo)) return false;
+            tagWork(fo, plan);
             level.floorOpenings[fo.id] = fo;
             id = fo.id;
           });
@@ -1301,6 +1388,7 @@ export const usePlanStore = create<PlanState>()(
           editLevel(levelId, (level, plan) => {
             const m = cleanMember({ ...input, id: input.id ?? newId() } as Member);
             if (memberProblem(m, isLowestLevel(plan, levelId))) return false;
+            tagWork(m, plan);
             level.members[m.id] = m;
             id = m.id;
           });
@@ -1335,9 +1423,10 @@ export const usePlanStore = create<PlanState>()(
 
         addJoistZone: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const z: JoistZone = { ...input, id: input.id ?? newId(), outline: input.outline.map((p) => ({ x: p.x, y: p.y })), joists: normalizeJoists(input.joists) };
             if (joistZoneProblem(z)) return false;
+            tagWork(z, plan);
             level.joistZones[z.id] = z;
             id = z.id;
           });
@@ -1368,9 +1457,10 @@ export const usePlanStore = create<PlanState>()(
 
         addFixture: (levelId, input) => {
           let id: Id | null = null;
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             const f = cleanFixture({ ...input, id: input.id ?? newId() });
             if (fixtureProblem(f)) return false;
+            tagWork(f, plan);
             level.fixtures[f.id] = f;
             id = f.id;
           });
@@ -1406,12 +1496,15 @@ export const usePlanStore = create<PlanState>()(
 
         duplicateFixtures: (levelId, ids, offset) => {
           const made: Id[] = [];
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             if (!isPoint(offset)) return false;
             for (const id of ids) {
               const f = level.fixtures[id];
               if (!f) continue;
               const copy = cleanFixture({ ...f, id: newId(), origin: { x: f.origin.x + offset.x, y: f.origin.y + offset.y } });
+              // A copy is new work of its own: it goes to the option being drawn in.
+              delete copy.optionIds;
+              tagWork(copy, plan);
               level.fixtures[copy.id] = copy;
               made.push(copy.id);
             }
@@ -1505,9 +1598,10 @@ export const usePlanStore = create<PlanState>()(
 
         addColumn: (input) => {
           let id: Id | null = null;
-          editSite((site) => {
+          editSite((site, plan) => {
             const col = cleanColumn({ ...input, id: input.id ?? newId() });
             if (columnProblem(col)) return false;
+            tagWork(col, plan);
             site.columns[col.id] = col;
             id = col.id;
           });
@@ -1539,9 +1633,10 @@ export const usePlanStore = create<PlanState>()(
 
         addSurface: (input) => {
           let id: Id | null = null;
-          editSite((site) => {
+          editSite((site, plan) => {
             const sf = cleanSurface({ ...input, id: input.id ?? newId() });
             if (surfaceProblem(sf)) return false;
+            tagWork(sf, plan);
             site.surfaces[sf.id] = sf;
             id = sf.id;
           });
@@ -1565,9 +1660,10 @@ export const usePlanStore = create<PlanState>()(
 
         addFence: (input) => {
           let id: Id | null = null;
-          editSite((site) => {
+          editSite((site, plan) => {
             const f = cleanFence({ ...input, id: input.id ?? newId() });
             if (fenceProblem(f)) return false;
+            tagWork(f, plan);
             site.fences[f.id] = f;
             id = f.id;
           });
@@ -1630,68 +1726,115 @@ export const usePlanStore = create<PlanState>()(
 
         setPhase: (levelId, sel, phase) =>
           editLevel(levelId, (level, plan) => {
-            for (const id of sel.columns ?? []) {
-              const c = plan.site.columns[id];
-              if (c && c.phase !== phase) c.phase = phase;
-            }
-            for (const id of sel.surfaces ?? []) {
-              const sf = plan.site.surfaces[id];
-              if (sf && sf.phase !== phase) sf.phase = phase;
-            }
-            for (const id of sel.fences ?? []) {
-              const f = plan.site.fences[id];
-              if (f && f.phase !== phase) f.phase = phase;
-            }
-            for (const id of sel.roofs ?? []) {
-              const r = level.roofs[id];
-              if (r && r.phase !== phase) r.phase = phase;
-            }
+            // In a plan of several design options the change is the active option's (optionOps applyPhaseIn).
+            const work = workOptionOf(plan);
+            const all = plan.options.map((o) => o.id);
+            let changed = false;
+            const apply = (e: { id: Id; phase?: Phase; optionIds?: Id[] } | undefined): boolean => {
+              if (!e || !applyPhaseIn(e, phase, work, all)) return false;
+              changed = true;
+              return true;
+            };
+            for (const id of sel.columns ?? []) apply(plan.site.columns[id]);
+            for (const id of sel.surfaces ?? []) apply(plan.site.surfaces[id]);
+            for (const id of sel.fences ?? []) apply(plan.site.fences[id]);
+            for (const id of sel.roofs ?? []) apply(level.roofs[id]);
             const staircases = new Set(sel.staircases ?? []);
             for (const st of Object.values(level.stairs)) {
-              if ((sel.stairs?.includes(st.id) || (st.staircaseId && staircases.has(st.staircaseId))) && st.phase !== phase) st.phase = phase;
+              if (sel.stairs?.includes(st.id) || (st.staircaseId && staircases.has(st.staircaseId))) apply(st);
             }
-            for (const id of sel.fixtures ?? []) {
-              const f = level.fixtures[id];
-              if (f && f.phase !== phase) f.phase = phase;
-            }
-            for (const id of sel.decks ?? []) {
-              const d = level.decks[id];
-              if (d && d.phase !== phase) d.phase = phase;
-            }
-            for (const id of sel.members ?? []) {
-              const m = level.members[id];
-              if (m && m.phase !== phase) m.phase = phase;
-            }
-            for (const id of sel.joistZones ?? []) {
-              const z = level.joistZones[id];
-              if (z && z.phase !== phase) z.phase = phase;
-            }
-            for (const id of sel.floorOpenings ?? []) {
-              const o = level.floorOpenings[id];
-              if (o && o.phase !== phase) o.phase = phase;
-            }
+            for (const id of sel.fixtures ?? []) apply(level.fixtures[id]);
+            for (const id of sel.decks ?? []) apply(level.decks[id]);
+            for (const id of sel.members ?? []) apply(level.members[id]);
+            for (const id of sel.joistZones ?? []) apply(level.joistZones[id]);
+            for (const id of sel.floorOpenings ?? []) apply(level.floorOpenings[id]);
             // A room label's phase is optional: existing is stored as no phase at all.
             for (const id of sel.rooms ?? []) {
               const r = level.rooms[id];
-              if (!r || (r.phase ?? 'existing') === phase) continue;
-              if (phase === 'existing') delete r.phase;
-              else r.phase = phase;
+              if (apply(r) && r.phase === 'existing') delete r.phase;
             }
             let wallPhase = false;
-            for (const id of sel.walls) {
-              const w = level.walls[id];
-              if (w && w.phase !== phase) {
-                w.phase = phase;
-                wallPhase = true;
-              }
-            }
-            for (const id of sel.openings) {
-              const o = level.openings[id];
-              if (o && o.phase !== phase) o.phase = phase;
-            }
+            for (const id of sel.walls) if (apply(level.walls[id])) wallPhase = true;
+            for (const id of sel.openings) apply(level.openings[id]);
+            if (!changed) return false;
             // A wall that now stands with a wall it crosses (a demolished one kept) is split there.
             if (wallPhase) normalizeLevel(level);
             clampOpenings(level);
+          }),
+
+        addOption: (name) => {
+          let id = '';
+          set((s) => {
+            id = addOptionTo(s.plan, name).id;
+            touch(s.plan);
+          });
+          return id;
+        },
+
+        duplicateOption: (srcId, name) => {
+          let id: Id | null = null;
+          set((s) => {
+            const opt = duplicateOptionIn(s.plan, srcId, name);
+            if (!opt) return;
+            id = opt.id;
+            touch(s.plan);
+          });
+          return id;
+        },
+
+        renameOption: (id, name) =>
+          set((s) => {
+            if (renameOptionIn(s.plan, id, name)) touch(s.plan);
+          }),
+
+        deleteOption: (id) => {
+          let ok = false;
+          set((s) => {
+            ok = deleteOptionFrom(s.plan, id);
+            if (ok) touch(s.plan);
+          });
+          return ok;
+        },
+
+        setEntityOption: (levelId, sel, optionIds) =>
+          set((s) => {
+            if (setEntityOptionsIn(s.plan, levelId, sel, optionIds)) {
+              const level = s.plan.levels[levelId];
+              if (level) clampOpenings(level);
+              touch(s.plan);
+            }
+          }),
+
+        updateOptionLook: (optionId, patch) =>
+          set((s) => {
+            const opt = s.plan.options.find((o) => o.id === optionId);
+            if (!opt) return;
+            const look: Record<string, unknown> = { ...(opt.proposedLook ?? {}) };
+            for (const [k, v] of Object.entries(patch)) {
+              if (v === undefined) delete look[k];
+              else look[k] = typeof v === 'string' && k.endsWith('Color') ? v.toLowerCase() : v;
+            }
+            if (Object.keys(look).length) opt.proposedLook = look as ProposedLook;
+            else delete opt.proposedLook;
+            touch(s.plan);
+          }),
+
+        updateRoomOptionFinishes: (levelId, roomId, optionId, patch) =>
+          editLevel(levelId, (level, plan) => {
+            const r = level.rooms[roomId];
+            if (!r || !plan.options.some((o) => o.id === optionId)) return false;
+            const cur: Record<string, unknown> = { ...(r.optionFinishes?.[optionId] ?? {}) };
+            for (const [k, v] of Object.entries(patch)) {
+              if (k !== 'proposedFloor' && k !== 'proposedWall') continue;
+              if (v === undefined) delete cur[k];
+              else cur[k] = v;
+            }
+            const next = roomOptionFinishesOf(cur);
+            const all = { ...(r.optionFinishes ?? {}) };
+            if (next) all[optionId] = next;
+            else delete all[optionId];
+            if (Object.keys(all).length) r.optionFinishes = all;
+            else delete r.optionFinishes;
           }),
 
         copyWallsFromLevel: (fromId, toId) => {
@@ -1812,7 +1955,12 @@ export const usePlanStore = create<PlanState>()(
         addStructure: (input) => {
           let id = '';
           set((s) => {
-            id = addStructureTo(s.plan, input).id;
+            const st = addStructureTo(s.plan, input);
+            id = st.id;
+            for (const lid of st.levelOrder) {
+              const level = s.plan.levels[lid];
+              if (level) tagWorkSince({ walls: {}, openings: {} }, level, s.plan);
+            }
             touch(s.plan);
           });
           return id;
