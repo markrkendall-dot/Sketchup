@@ -8,12 +8,14 @@ import { getFaces } from './derive/rooms';
 import { pruneDerivedCaches } from './derive/openings';
 import { fallbackElevation, groundAt, planTerrain, terrainHeightAt } from './derive/site';
 import { pruneSelection } from './editor2d/tools';
-import { loadAutosave, startAutosave } from './io/file';
+import { startAutosave } from './io/file';
+import { library, startupPlan, writeLastPlanId } from './io/library';
 import { defaultLevelId } from './model/plan';
+import type { Plan } from './model/types';
 import { clearHistory, usePlanStore } from './store/planStore';
 import { clearNoticeOnEdit, useUiStore } from './store/uiStore';
 import { startChecks } from './ui/checks';
-import { showNotice } from './ui/fileActions';
+import { setAutosave, showNotice } from './ui/fileActions';
 import './index.css';
 import { PLAN_STYLES } from './editor2d/planStyles';
 
@@ -50,8 +52,17 @@ declare global {
 }
 
 async function boot(): Promise<void> {
-  const saved = await loadAutosave();
+  // The property that was open last (or the most recently modified), else a new one, which goes
+  // into the library at once so the Properties dialog lists it.
+  let saved: Plan | null = null;
+  try {
+    saved = await startupPlan();
+  } catch (err) {
+    console.warn('Could not read the property library', err);
+  }
   if (saved) usePlanStore.getState().setPlan(saved);
+  else void library.save(usePlanStore.getState().plan).catch((err) => console.warn('Could not save the new plan', err));
+  writeLastPlanId(usePlanStore.getState().plan.id);
   clearHistory();
   useUiStore.getState().setActiveLevel(defaultLevelId(usePlanStore.getState().plan));
 
@@ -76,13 +87,14 @@ async function boot(): Promise<void> {
     if (s.showFurniture !== prev.showFurniture) pruneSelection();
   });
   startChecks();
-  startAutosave(usePlanStore, {
+  const autosave = startAutosave(usePlanStore, {
     // A failure stays in the status bar until a later save works.
     onStatus: (error) => {
       if (error) showNotice(error, true);
       else if (useUiStore.getState().notice?.error) showNotice(null);
     },
   });
+  setAutosave(autosave);
 
   if (import.meta.env.DEV) {
     const handle = {

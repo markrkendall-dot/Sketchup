@@ -9,6 +9,7 @@ import { useUiStore } from './store/uiStore';
 import { HelpOverlay } from './ui/HelpOverlay';
 import { bindingFor } from './ui/keymap';
 import { LevelBar } from './ui/LevelBar';
+import { PropertiesDialog } from './ui/PropertiesDialog';
 import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
@@ -30,8 +31,8 @@ function isEditable(target: EventTarget | null): boolean {
 
 /**
  * One keyboard entry point. Keys typed into a text field, select or text area never reach the
- * plan; neither do keys while walking (FirstPerson.tsx captures them) or while the help is open
- * (Esc or ? closes it). Otherwise the active tool sees keys first (length buffer, Esc, Delete),
+ * plan; neither do keys while walking (FirstPerson.tsx captures them), while the Properties dialog
+ * is open, or while the help is open (Esc or ? closes it). Otherwise the active tool sees keys first (length buffer, Esc, Delete),
  * then the keyboard map (ui/keymap.ts). While a typed length is being entered every other plain
  * key is swallowed, and while a wall chain or calibration is in progress only the bindings marked
  * whileDrawing run (tool switches, layout, undo, save), so typing never toggles anything.
@@ -54,6 +55,8 @@ function onKeyDown(e: KeyboardEvent): void {
   const ui = useUiStore.getState();
   // Walk mode owns the keyboard (view3d/FirstPerson.tsx captures keys before they get here).
   if (document.pointerLockElement || ui.cameraMode === 'walk') return;
+  // The Properties dialog has its own buttons and Esc; plan keys wait until it closes.
+  if (ui.libraryOpen) return;
   if (ui.helpOpen && !mod) {
     if (e.key === 'Escape' || e.key === '?') ui.setHelpOpen(false);
     e.preventDefault();
@@ -191,6 +194,7 @@ export function App() {
       <StatusBar />
       <UnderlayFileInput />
       <HelpOverlay />
+      <PropertiesDialog />
     </div>
   );
 }

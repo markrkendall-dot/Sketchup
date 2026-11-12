@@ -1,9 +1,8 @@
-import { get, set } from 'idb-keyval';
 import { migrate } from '../model/plan';
 import type { Plan } from '../model/types';
 import type { usePlanStore } from '../store/planStore';
+import { library, planKey } from './library';
 
-export const AUTOSAVE_KEY = 'homeplan:autosave';
 const AUTOSAVE_DEBOUNCE_MS = 300;
 
 /** Download file name for the plan: its name as a slug, plus the extension (without the dot). */
@@ -54,8 +53,8 @@ export function autosaveFailureReason(err: unknown): string {
 }
 
 export interface AutosaveOptions {
-  /** Store function; defaults to idb-keyval's set (tests pass their own). */
-  save?: (key: string, plan: Plan) => Promise<void>;
+  /** Store function, given the plan's library key; defaults to the library's save (tests pass their own). */
+  save?: (key: string, plan: Plan) => Promise<unknown>;
   /**
    * Told about failures and recoveries: a message after a failed save, null after the next save
    * that works. Never throws into the caller.
@@ -63,15 +62,28 @@ export interface AutosaveOptions {
   onStatus?: (error: string | null) => void;
 }
 
+/** A running autosave: call it to stop (after a last flush); flush() saves what is pending now. */
+export interface Autosave {
+  (): void;
+  /** Save the pending change at once; resolves when that save has finished (or failed, reported). */
+  flush: () => Promise<void>;
+}
+
 /**
- * Persist the plan to IndexedDB whenever it changes (debounced). Also flushes when the page is
- * hidden. A failed save (storage full, IndexedDB unavailable) is reported through onStatus and
- * retried with the next change. Returns an unsubscribe function.
+ * Persist the plan to its library key in IndexedDB whenever it changes (debounced). Also flushes
+ * when the page is hidden. A failed save (storage full, IndexedDB unavailable) is reported through
+ * onStatus and retried with the next change.
+ *
+ * When the store's plan is replaced by a different property (another id), the outgoing plan's
+ * pending change is saved at once, under its own key, and the incoming plan is not saved until it
+ * is edited: opening a property does not rewrite it. Whoever switches puts the incoming plan in
+ * the library first (ui/fileActions.ts).
  */
-export function startAutosave(store: typeof usePlanStore, opts: AutosaveOptions = {}): () => void {
-  const save = opts.save ?? ((key: string, plan: Plan) => set(key, plan));
+export function startAutosave(store: typeof usePlanStore, opts: AutosaveOptions = {}): Autosave {
+  const save = opts.save ?? ((_key: string, plan: Plan) => library.save(plan));
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Plan | null = null;
+  let last: Promise<void> = Promise.resolve();
   let failing = false;
   const report = (error: string | null) => {
     try {
@@ -85,20 +97,20 @@ export function startAutosave(store: typeof usePlanStore, opts: AutosaveOptions 
     failing = true;
     report(`Autosave failed: ${autosaveFailureReason(err)}.`);
   };
-  const flush = () => {
+  const flush = (): Promise<void> => {
     if (timer) clearTimeout(timer);
     timer = null;
-    if (!pending) return;
+    if (!pending) return last;
     const plan = pending;
     pending = null;
-    let result: Promise<void>;
+    let result: Promise<unknown>;
     try {
-      result = save(AUTOSAVE_KEY, plan);
+      result = save(planKey(plan.id), plan);
     } catch (err) {
       failed(err);
-      return;
+      return last;
     }
-    result.then(
+    last = result.then(
       () => {
         if (failing) {
           failing = false;
@@ -107,33 +119,29 @@ export function startAutosave(store: typeof usePlanStore, opts: AutosaveOptions 
       },
       failed,
     );
+    return last;
   };
   const unsubscribe = store.subscribe((state, prev) => {
     if (state.plan === prev.plan) return;
+    if (state.plan.id !== prev.plan.id) {
+      void flush();
+      return;
+    }
     pending = state.plan;
     if (timer) clearTimeout(timer);
     timer = setTimeout(flush, AUTOSAVE_DEBOUNCE_MS);
   });
   const onHide = () => {
-    if (document.visibilityState === 'hidden') flush();
+    if (document.visibilityState === 'hidden') void flush();
   };
+  const onPageHide = () => void flush();
   document.addEventListener('visibilitychange', onHide);
-  window.addEventListener('pagehide', flush);
-  return () => {
-    flush();
+  window.addEventListener('pagehide', onPageHide);
+  const stop = () => {
+    void flush();
     unsubscribe();
     document.removeEventListener('visibilitychange', onHide);
-    window.removeEventListener('pagehide', flush);
+    window.removeEventListener('pagehide', onPageHide);
   };
-}
-
-/** The last autosaved plan, or null if none (or unreadable). */
-export async function loadAutosave(): Promise<Plan | null> {
-  try {
-    const raw: unknown = await get(AUTOSAVE_KEY);
-    return raw === undefined ? null : migrate(raw);
-  } catch (err) {
-    console.warn('Ignoring unreadable autosave', err);
-    return null;
-  }
+  return Object.assign(stop, { flush });
 }

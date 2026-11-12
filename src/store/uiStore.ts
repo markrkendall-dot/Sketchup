@@ -387,6 +387,8 @@ export interface UiState {
   walkLocked: boolean;
   /** The keyboard help overlay is open. */
   helpOpen: boolean;
+  /** The Properties dialog (the property library, ui/PropertiesDialog.tsx) is open. */
+  libraryOpen: boolean;
   notice: Notice | null;
   /** The walk start the user picked in 2D (not part of the plan, so not saved or undone). */
   walkFrom: WalkFrom | null;
@@ -455,6 +457,7 @@ export interface UiState {
   setWalkLevel: (id: Id | null) => void;
   setWalkLocked: (locked: boolean) => void;
   setHelpOpen: (open: boolean) => void;
+  setLibraryOpen: (open: boolean) => void;
   /** Show (or clear) a notice; an info notice clears itself after NOTICE_MS. */
   setNotice: (notice: Notice | null) => void;
   setWalkFrom: (walkFrom: WalkFrom | null) => void;
@@ -568,6 +571,7 @@ export const useUiStore = create<UiState>()((set) => ({
   walkLevelId: null,
   walkLocked: false,
   helpOpen: false,
+  libraryOpen: false,
   notice: null,
   walkFrom: null,
   contextMenu: null,
@@ -703,6 +707,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setWalkLevel: (walkLevelId) => set({ walkLevelId }),
   setWalkLocked: (walkLocked) => set((s) => (s.walkLocked === walkLocked ? s : { walkLocked })),
   setHelpOpen: (helpOpen) => set({ helpOpen }),
+  setLibraryOpen: (libraryOpen) => set({ libraryOpen }),
   setNotice: (notice) => {
     if (noticeTimer) clearTimeout(noticeTimer);
     noticeTimer = null;

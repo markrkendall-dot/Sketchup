@@ -7,7 +7,7 @@ This document is the detailed design that the milestone plan refers to. Read it 
 ## Stack
 
 Vite, React 19, TypeScript, three + @react-three/fiber 9 + @react-three/drei 10, zustand 5 + immer +
-zundo (undo/redo), nanoid, idb-keyval (autosave), vitest. No backend, no CSG library.
+zundo (undo/redo), nanoid, idb-keyval (the property library and autosave), vitest. No backend, no CSG library.
 
 ## Units and coordinates
 
@@ -1861,11 +1861,25 @@ it, a bad colour alone, a colour lower-cased). The upgraded document is
 then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
 file's order so a current file round-trips byte for byte), with defaults for missing optional
 values and broken openings, rooms, stairs and underlays dropped (a broken roof, deck or floor opening is dropped
-with a console warning naming it; railings are fitted to the outline). New and Open replace the plan and
-clear the undo history (New confirms when the plan has walls, rooms, stairs, roofs, fixtures, decks, site elements or an image). Autosave
-to IndexedDB (idb-keyval) on every plan change (debounced), restored on load; a failed save
+with a console warning naming it; railings are fitted to the outline). Property library (`io/library.ts`, idb-keyval): each plan
+under `homeplan:plan:<id>`, plus an index under `homeplan:library` of `{id, name, modifiedAt,
+thumbnail?}` entries (no thumbnails are made yet); the index is rebuilt from the plan keys when it is
+missing. Every library call runs after the one before it finishes, so the index's read-modify-write
+never interleaves. `load` runs the plan through `migrate`; the key's id wins over the file's. `add`
+(Import, Open, the examples) keeps the file's id unless the library has it, else gives a new one, so
+an import never overwrites. On first run, when the library is empty, the old single autosave slot
+`homeplan:autosave` is moved in and deleted. The open plan's id is kept in localStorage
+(`homeplan:lastPlanId`); startup opens it, else the most recently modified, else a new plan (saved at
+once). Switching property (`ui/fileActions.ts` `switchTo`) awaits the autosave's flush of the outgoing
+plan, then replaces the plan and clears the undo history; the incoming plan is put in the library
+first. Autosave writes the plan to its own key on every change (debounced) and updates its entry;
+when the store's plan changes id it saves the outgoing plan's pending change at once and does not
+save the incoming one until it is edited, so a late debounce never writes one property's edit over
+another and opening does not touch the file. A failed save
 (storage full, IndexedDB unavailable) shows "Autosave failed: ..." in the status bar until a later
-save works (or the next edit, below), and is never thrown. Status bar notices (`uiStore.notice`, REVIEW-2
+save works (or the next edit, below), and is never thrown. The Properties dialog
+(`ui/PropertiesDialog.tsx`, `uiStore.libraryOpen`; plan keys are off while it is open) lists the
+index with the open plan's live name and time. Status bar notices (`uiStore.notice`, REVIEW-2
 C3): an info notice clears itself 8 s after it is set (`NOTICE_MS`, the timer lives in `setNotice`, so
 every caller gets it); an error stays until the next notice; any plan edit clears either
 (`clearNoticeOnEdit`, from the plan-store subscription in `main.tsx`), so a notice that belongs to an
@@ -1895,7 +1909,8 @@ passes `normalizeLevel`, clamping and validation) and written by `npm run build:
 TypeScript; ids are renamed to stable ones and the date is fixed, so a second run changes nothing).
 `example.test.ts` loads the file through `migrate()` and checks it against the script's output. The
 toolbar's "Open example" (`fileActions.openExample`) loads it with a dynamic import (a separate
-chunk), after the same confirmation as New when the plan has content. Dimensions and the estimates
+chunk) and adds it to the property library as a new property (a new id when the library already has
+the example's), then opens it. Dimensions and the estimates
 are in the README ("Modelling 146 Mick Road").
 
 The exterior follows the photos with the appearance fields (realism plan, docs/history/PLAN-v3-realism.md):

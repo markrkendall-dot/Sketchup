@@ -247,6 +247,14 @@ export function Toolbar() {
       <div className="toolbar-row">
         <span className="brand">HomePlan</span>
         <PlanName />
+        <button
+          className="library-button"
+          onClick={() => useUiStore.getState().setLibraryOpen(true)}
+          title="Properties: every plan kept in this browser; open, add, copy, rename, export or delete one"
+          aria-haspopup="dialog"
+        >
+          All properties
+        </button>
         <div className="group view-modes" role="group" aria-label="View mode">
           {VIEW_MODES.map((m) => (
             <button
@@ -303,16 +311,16 @@ export function Toolbar() {
           </button>
         </div>
         <div className="group" role="group" aria-label="File">
-          <button onClick={() => afterAction(newPlan)} title="Start a new, empty plan">
+          <button onClick={() => afterAction(() => void newPlan())} title="Start a new, empty property (this one stays under Properties)">
             New
           </button>
-          <button onClick={() => afterAction(choosePlanFile)} title="Open a plan file (Ctrl+O); replaces this plan">
+          <button onClick={() => afterAction(choosePlanFile)} title="Open a plan file (Ctrl+O) as a new property; this one stays under Properties">
             Open
           </button>
           <button
             aria-label="Open example"
             onClick={() => afterAction(() => void openExample())}
-            title="Open the 146 Mick Road starter plan (estimates flagged); replaces this plan"
+            title="Open a copy of the 146 Mick Road starter plan (estimates flagged) as a new property"
           >
             <span className="lbl-long">Open example</span>
             <span className="lbl-short">Example</span>
@@ -320,7 +328,7 @@ export function Toolbar() {
           <button
             aria-label="Open rebuild"
             onClick={() => afterAction(() => void openExample('rebuild'))}
-            title="Open the 146 Mick Road rebuild (the house rebuilt on its foundation; design study); replaces this plan"
+            title="Open a copy of the 146 Mick Road rebuild (the house rebuilt on its foundation; design study) as a new property"
           >
             <span className="lbl-long">Open rebuild</span>
             <span className="lbl-short">Rebuild</span>

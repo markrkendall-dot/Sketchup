@@ -60,7 +60,7 @@ unit tests. `npm run build:example` rebuilds `docs/examples/146-mick-road.json` 
 [Modelling 146 Mick Road](#modelling-146-mick-road)).
 
 To see what the tool does before drawing anything, click **Open example** in the toolbar: it
-loads the starter plan of 146 Mick Road, then press the **3D** button. **Open rebuild** loads the
+adds the starter plan of 146 Mick Road as a property and opens it, then press the **3D** button. **Open rebuild** loads the
 second plan, the same house knocked down and rebuilt on its foundation (see
 [The rebuild](#the-rebuild-a-second-plan)).
 
@@ -436,13 +436,24 @@ keyboard back to the plan.
 
 ## Files and saving
 
-The plan is saved automatically in your browser (IndexedDB) after every change, and comes back
-when you reopen the page in the same browser. That copy lives only in that browser profile:
-clearing site data removes it, and if the browser's storage is full the status bar says
-"Autosave failed". Use **Save** (Ctrl+S) to download the plan as a `.json` file and keep it
-somewhere safe; **Open** (Ctrl+O) loads one back, replacing the current plan (and its undo
-history). **Open example** loads the 146 Mick Road starter plan the same way. **New** and **Open
-example** ask before discarding a plan that has walls, roofs or site elements.
+Your browser keeps a library of **properties**: each is a whole plan, saved automatically
+(IndexedDB) after every change. **All properties** (next to the plan name in the toolbar) lists
+them, most recently changed first, with the open one marked; there you can **Open** another,
+start a **New** one, **Duplicate** one (it is added as "name copy"), **Rename**, **Delete** (it
+asks first; deleting the open one opens the next most recent, or a new empty plan), **Import
+JSON** (adds a plan file as a new property) and **Export JSON** (downloads one). The page reopens
+on the property you had open last. Switching property clears Undo, so Undo never reaches into
+another property.
+
+The toolbar's **New**, **Open** (Ctrl+O), **Open example** and **Open rebuild** add a property
+and switch to it; the plan you were working on stays in the list. Each Open example adds a
+fresh copy of the example, so a copy you have changed is never overwritten. **Save** (Ctrl+S)
+downloads the open plan as a `.json` file.
+
+The library lives only in that browser profile: clearing site data removes it, and if the
+browser's storage is full the status bar says "Autosave failed". Export the properties you care
+about and keep the files somewhere safe. A plan saved by an older version (before the library)
+is moved into the library the first time the page opens.
 
 The file is plain JSON with a `schemaVersion`; lengths are inches. Older files are upgraded on
 open, and unknown fields are dropped. Underlay images are stored inside the file (downscaled),

@@ -3,7 +3,8 @@
 import { siteGhostLevelId } from '../derive/site';
 import { cancelActiveTool } from '../editor2d/tools';
 import { fitLevel, initialViewport } from '../editor2d/viewport';
-import { downloadPlan, planFileName, readPlanFile } from '../io/file';
+import { autosaveFailureReason, downloadPlan, planFileName, readPlanFile, type Autosave } from '../io/file';
+import { library, writeLastPlanId } from '../io/library';
 import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
 import type { Plan } from '../model/types';
 import { clearHistory, getPlan, usePlanStore } from '../store/planStore';
@@ -47,22 +48,9 @@ export function zoomToFit(): void {
   ui.setViewport(fitLevel(level, ui.canvasSize, ui.showUnderlay) ?? initialViewport(ui.canvasSize));
 }
 
-/** True when the plan has anything worth asking about before it is replaced. */
-export function planHasContent(plan: Plan): boolean {
-  const site = plan.site;
-  if (site && (Object.keys(site.gradePoints).length > 0 || Object.keys(site.columns).length > 0 || Object.keys(site.surfaces ?? {}).length > 0 || Object.keys(site.fences ?? {}).length > 0)) return true;
-  return plan.levelOrder.some((id) => {
-    const l = plan.levels[id];
-    return (
-      l &&
-      (Object.keys(l.walls).length > 0 || Object.keys(l.rooms).length > 0 || Object.keys(l.stairs).length > 0 || Object.keys(l.roofs ?? {}).length > 0 || Object.keys(l.fixtures ?? {}).length > 0 || Object.keys(l.decks ?? {}).length > 0 || Object.keys(l.floorOpenings ?? {}).length > 0 || !!l.underlay)
-    );
-  });
-}
-
 /**
- * Replace the whole plan (New, Open) and clear the undo history: undoing back into the previous
- * plan after opening a file would be a surprise, and the old plan is one Save away anyway.
+ * Replace the whole plan (switching property) and clear the undo history: undoing back into
+ * another property would be a surprise, and the old plan is still in the library.
  */
 export function replacePlan(plan: Plan): void {
   cancelActiveTool();
@@ -75,55 +63,183 @@ export function replacePlan(plan: Plan): void {
   zoomToFit();
 }
 
-/** Start an empty plan, after confirming when the current one has walls (or rooms, stairs, images). */
-export function newPlan(): void {
-  const plan = getPlan();
-  if (
-    planHasContent(plan) &&
-    !window.confirm(`Start a new, empty plan? "${plan.name}" will be replaced and Undo cannot bring it back. Use Save first to keep a copy.`)
-  ) {
-    return;
+// The property library (io/library.ts): New, Open a file and the examples add a property and
+// switch to it, so nothing replaces the plan the user was working on; it stays in the library.
+
+let autosave: Pick<Autosave, 'flush'> | null = null;
+
+/** main.tsx hands over the running autosave, so a switch can save the outgoing plan first. */
+export function setAutosave(a: Pick<Autosave, 'flush'> | null): void {
+  autosave = a;
+}
+
+/** Save the open plan's pending change now (before it is switched away from, copied or exported). */
+export async function flushAutosave(): Promise<void> {
+  await autosave?.flush();
+}
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/**
+ * Make the plan the open property: the outgoing plan's pending autosave is written first (under
+ * its own key), then the plan replaces it in the editor (undo history cleared) and is remembered
+ * as the one to reopen. The plan must already be in the library.
+ */
+async function switchTo(plan: Plan): Promise<void> {
+  await flushAutosave();
+  replacePlan(plan);
+  writeLastPlanId(plan.id);
+}
+
+/** Store a plan that is not in the library yet and open it; a failed store is said, the plan still opens. */
+async function storeAndOpen(plan: Plan, add = false): Promise<Plan> {
+  let stored = plan;
+  try {
+    stored = add ? await library.add(plan) : (await library.save(plan), plan);
+  } catch (err) {
+    showNotice(`Could not save in this browser: ${autosaveFailureReason(err)}.`, true);
   }
-  replacePlan(createEmptyPlan());
-  showNotice('Started a new plan.');
+  await switchTo(stored);
+  return stored;
+}
+
+/** Open a property from the library. */
+export async function openProperty(id: string): Promise<boolean> {
+  if (id === getPlan().id) return true;
+  try {
+    await flushAutosave();
+    const plan = await library.load(id);
+    if (!plan) {
+      showNotice('That property is no longer in this browser.', true);
+      return false;
+    }
+    await switchTo(plan);
+    showNotice(`Opened ${plan.name}.`);
+    return true;
+  } catch (err) {
+    showNotice(`Could not open that property: ${errorText(err)}`, true);
+    return false;
+  }
+}
+
+/** Start a new, empty property; the current one stays in the library. */
+export async function newPlan(): Promise<void> {
+  const plan = await storeAndOpen(createEmptyPlan());
+  showNotice(`Started a new property, ${plan.name}. The one before is under Properties.`);
+}
+
+/** Copy a property in the library as "<name> copy" (the open one with its latest change). */
+export async function duplicateProperty(id: string): Promise<Plan | null> {
+  try {
+    if (id === getPlan().id) await flushAutosave();
+    const copy = await library.duplicate(id);
+    showNotice(`Added ${copy.name}.`);
+    return copy;
+  } catch (err) {
+    showNotice(`Could not copy that property: ${errorText(err)}`, true);
+    return null;
+  }
+}
+
+/** Rename a property: the open one through the plan (like the toolbar's name field), others in the library. */
+export async function renameProperty(id: string, name: string): Promise<void> {
+  const v = name.trim();
+  if (!v) return;
+  try {
+    if (id === getPlan().id) {
+      if (v !== getPlan().name) usePlanStore.getState().renamePlan(v);
+      await flushAutosave();
+    } else {
+      await library.rename(id, v);
+    }
+  } catch (err) {
+    showNotice(`Could not rename that property: ${errorText(err)}`, true);
+  }
+}
+
+/**
+ * Delete a property from the library, after confirming. Deleting the open one opens the most
+ * recently modified of the others, or a new empty plan when it was the last.
+ */
+export async function deleteProperty(id: string, name: string): Promise<boolean> {
+  if (!window.confirm(`Delete "${name}" from this browser? This cannot be undone. Use Export first to keep a copy.`)) return false;
+  try {
+    if (id === getPlan().id) {
+      await flushAutosave();
+      let next: Plan | null = null;
+      for (const e of await library.list()) {
+        if (e.id === id) continue;
+        try {
+          next = await library.load(e.id);
+        } catch (err) {
+          console.warn(`Skipping unreadable property ${e.id}`, err);
+        }
+        if (next) break;
+      }
+      if (next) await switchTo(next);
+      else await storeAndOpen(createEmptyPlan());
+    }
+    await library.remove(id);
+    showNotice(`Deleted ${name}.`);
+    return true;
+  } catch (err) {
+    showNotice(`Could not delete ${name}: ${errorText(err)}`, true);
+    return false;
+  }
+}
+
+/** Download a property as JSON (the open one as it is now). */
+export async function exportProperty(id: string): Promise<void> {
+  try {
+    if (id === getPlan().id) {
+      savePlan();
+      return;
+    }
+    const plan = await library.load(id);
+    if (!plan) throw new Error('it is no longer in this browser');
+    downloadPlan(plan);
+    showNotice(`Saved a copy as ${planFileName(plan, 'json')} (your browser's downloads).`);
+  } catch (err) {
+    showNotice(`Could not export that property: ${errorText(err)}`, true);
+  }
 }
 
 /** The bundled 146 Mick Road plans (docs/examples): the starter with its renovation, and the house rebuilt on its foundation. */
 export type ExamplePlan = 'starter' | 'rebuild';
 
 /**
- * Open a bundled 146 Mick Road plan (docs/examples), after confirming when the current plan has
- * content. The JSON loads on demand, so it is not part of the first download.
+ * Add a bundled 146 Mick Road plan (docs/examples) to the library and open it; the current
+ * property stays as it is. Opened again it is another copy (a new id), so a changed copy is never
+ * overwritten. The JSON loads on demand, so it is not part of the first download.
  */
 export async function openExample(which: ExamplePlan = 'starter'): Promise<void> {
-  const current = getPlan();
-  const what = which === 'rebuild' ? 'the 146 Mick Road rebuild' : 'the 146 Mick Road example';
-  if (planHasContent(current) && !window.confirm(`Open ${what}? "${current.name}" will be replaced and Undo cannot bring it back. Use Save first to keep a copy.`)) {
-    return;
-  }
   try {
     const { default: example } = which === 'rebuild' ? await import('../../docs/examples/146-mick-road-rebuild.json') : await import('../../docs/examples/146-mick-road.json');
-    const plan = migrate(example);
-    replacePlan(plan);
+    const plan = await storeAndOpen(migrate(example), true);
     showNotice(which === 'rebuild' ? `Opened ${plan.name}: today's house in the Existing view, the rebuild in Proposed.` : `Opened the example: ${plan.name}. Replace its estimates with your measurements.`);
   } catch (err) {
-    showNotice(`Could not open the example: ${err instanceof Error ? err.message : String(err)}`, true);
+    showNotice(`Could not open the example: ${errorText(err)}`, true);
   }
 }
 
-/** Load a chosen plan file, replacing the current plan. Errors are reported, not thrown. */
+/**
+ * Add a chosen plan file to the library and open it (a new id when the library already has the
+ * file's). Errors are reported, not thrown.
+ */
 export async function openPlanFile(file: File): Promise<void> {
+  let plan: Plan;
   try {
-    const plan = await readPlanFile(file);
-    replacePlan(plan);
-    showNotice(`Opened ${file.name}.`);
+    plan = await readPlanFile(file);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorText(err);
     // Replace any earlier notice (e.g. "Saved a copy") with the rejection, which stays until the
     // next notice, and tell the user in the alert as well.
     showNotice(`Could not open ${file.name}: ${message}`, true);
     window.alert(message);
+    return;
   }
+  const stored = await storeAndOpen(plan, true);
+  showNotice(`Opened ${file.name} as ${stored.name}; it is in Properties now.`);
 }
 
 /** Ask for a plan file (the browser's file picker) and open it. */

@@ -201,7 +201,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     repeat: true,
   },
   { keys: 'Ctrl/Cmd+S', label: 'Save the plan as a JSON file', group: 'Edit and file', combos: ['mod+s'], run: () => savePlan(), whileDrawing: true },
-  { keys: 'Ctrl/Cmd+O', label: 'Open a plan file (replaces this plan)', group: 'Edit and file', combos: ['mod+o'], run: () => choosePlanFile(), whileDrawing: true },
+  { keys: 'Ctrl/Cmd+O', label: 'Open a plan file (as a new property)', group: 'Edit and file', combos: ['mod+o'], run: () => choosePlanFile(), whileDrawing: true },
 
   {
     keys: 'F',

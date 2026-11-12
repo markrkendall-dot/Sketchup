@@ -1639,3 +1639,70 @@ button.primary:hover:not(:disabled) {
   color: inherit;
   opacity: 0.85;
 }
+
+/* Properties dialog (the property library, ui/PropertiesDialog.tsx). */
+.library-dialog {
+  width: min(760px, 100%);
+}
+
+.library-head-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.library-note {
+  margin: 0 0 8px;
+}
+
+.library-error {
+  color: var(--danger);
+  margin: 0 0 8px;
+}
+
+.library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.library-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.library-row.current {
+  background: var(--accent-soft);
+}
+
+.library-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.library-name strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.library-name small {
+  color: var(--muted);
+}
+
+.library-name input {
+  font: inherit;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.library-actions button.library-delete:not(:disabled) {
+  color: var(--danger);
+}
