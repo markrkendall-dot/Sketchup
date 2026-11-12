@@ -23,7 +23,11 @@ import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, wallSideFaces, type FaceSet } from './rooms';
 import { CHIMNEY_CAP, chimneyPartBoxes, circleOutline, columnOutline, drapeSurface, FENCE_DEFAULTS, fenceLayout, fallbackElevation, hasChimneyCap, planTerrain, terrainHeightAt, type ChimneyPart, type FenceLayout, type TerrainGrid } from './site';
 import { boardColorOf, DEFAULT_SASH_COLOR, ROOF_COLOR, roofColorOf, ROOF_TILE, SIDING_FINISHES, TRIM_COLOR, weatheringOf } from '../model/finish';
-import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
+import { convexMinusAll, convexPieces, profileAt, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type JoinRegion, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
+import { getLevelRoofs } from './roofJoin';
+import { foundationLayout, type FoundationLayout } from './foundation';
+import { getLevelElevations } from './levels';
+import { toSite, structureOf } from '../model/structures';
 import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsPoint } from './stairs';
 import { getStaircaseLayout, heightAt, type StairPartGroup, type StairPartMat, type StairSolid, type StaircaseLayout } from './staircase';
 import { levelAboveId, levelBelowId } from '../model/structures';
@@ -924,8 +928,8 @@ export function buildStairsRailingGeometry(
  * fascia and rake boards (roofs.ts roofSolid). Each part is a closed solid. The rafter tails and
  * the ridge cap are drawn by buildRoofParts only.
  */
-export function buildRoofGeometry(roof: Roof, bearingHeight: number): BufferGeometry {
-  const { slab, boards } = roofSolid(roof, bearingHeight);
+export function buildRoofGeometry(roof: Roof, bearingHeight: number, join?: readonly JoinRegion[] | null): BufferGeometry {
+  const { slab, boards } = roofSolid(roof, bearingHeight, join);
   return geometryFrom(boards.reduce((all, b) => all.concat(b), slab));
 }
 
@@ -943,8 +947,8 @@ export interface RoofParts {
  * The roof as separate geometries: the slab with the ridge cap merged into it (both take the
  * roof's material), the fascia and rake boards, and the rafter tails (both in the board colour).
  */
-export function buildRoofParts(roof: Roof, bearingHeight: number): RoofParts {
-  const { slab, boards, rafters, ridge } = roofSolid(roof, bearingHeight);
+export function buildRoofParts(roof: Roof, bearingHeight: number, join?: readonly JoinRegion[] | null): RoofParts {
+  const { slab, boards, rafters, ridge } = roofSolid(roof, bearingHeight, join);
   const fascia = boards.flat();
   const tails = rafters.flat();
   return {
@@ -954,8 +958,8 @@ export function buildRoofParts(roof: Roof, bearingHeight: number): RoofParts {
   };
 }
 
-function roofParts(roof: Roof, bearing: number): { geometry: BufferGeometry; fascia: BufferGeometry | null; rafters: BufferGeometry | null } {
-  const { slab, fascia, rafters } = buildRoofParts(roof, bearing);
+function roofParts(roof: Roof, bearing: number, join?: readonly JoinRegion[] | null): { geometry: BufferGeometry; fascia: BufferGeometry | null; rafters: BufferGeometry | null } {
+  const { slab, fascia, rafters } = buildRoofParts(roof, bearing, join);
   return { geometry: slab, fascia, rafters };
 }
 
@@ -1525,6 +1529,91 @@ export interface MemberMesh {
 /** How far a member stops short of a slab face it would otherwise share (no coplanar faces). */
 export const MEMBER_INSET = 1 / 16;
 
+const keptFloorCache = new Map<string, { slab: BufferGeometry | null; finishes: FloorFinishMesh[] }>();
+
+/**
+ * A floor opened by demolition (DESIGN.md "A floor opened by demolition"): demolishing part of an
+ * exterior wall leaves the room it closed unclosed, so the view finds no outline or room there. The
+ * floor is still there: the slab of the Existing view where the view's slab outlines do not reach,
+ * and each room labelled in the Existing view that is still shown but labels no area of the view,
+ * keeping its floor finish (its proposed one in Proposed) where no room of the view lies. Null when
+ * there is nothing to keep.
+ */
+export function keptFloor(level: Level, viewMode: ViewMode, faces: FaceSet, holes: readonly (readonly Vec2[])[]): { slab: BufferGeometry | null; finishes: FloorFinishMesh[] } | null {
+  const ex = getFaces(level, 'existing');
+  if (ex.outerFaces.length === 0) return null;
+  const minWidth = (poly: readonly Vec2[]) => {
+    let per = 0;
+    for (let i = 0; i < poly.length; i++) per += Math.hypot(poly[(i + 1) % poly.length].x - poly[i].x, poly[(i + 1) % poly.length].y - poly[i].y);
+    return per > 0 ? (2 * Math.abs(polygonSignedArea(poly))) / per : 0;
+  };
+  const minus = (polys: readonly (readonly Vec2[])[], from: readonly (readonly Vec2[])[]) => {
+    const cut = from.flatMap((r) => convexPieces(r));
+    return polys.flatMap((r) => convexPieces(r)).flatMap((c) => convexMinusAll(c, cut)).filter((k) => minWidth(k) >= 1);
+  };
+  const slabPieces = level.floorThickness > EPS ? minus(slabOutlines(ex, true), slabOutlines(faces, true)) : [];
+  const slab = slabPieces.length ? mergeAll(slabPieces.map((k) => prism(k, -level.floorThickness, 0))) : null;
+  const shown = new Set(faces.faces.flatMap((f) => (f.roomId ? [f.roomId] : [])));
+  const roomed = faces.faces.filter((f) => f.roomId).map((f) => f.netPolygon);
+  const finishes: FloorFinishMesh[] = [];
+  for (const f of ex.faces) {
+    const room = f.roomId ? level.rooms[f.roomId] : undefined;
+    if (!room || shown.has(room.id) || !isVisible(room.phase ?? 'existing', viewMode)) continue;
+    const look = floorLookIn(room, viewMode);
+    if (!look) continue;
+    const parts = minus([f.netPolygon], roomed).flatMap((k) => {
+      const g = buildFloorFinishGeometry(k, holes);
+      return g ? [g] : [];
+    });
+    if (parts.length) finishes.push({ roomId: room.id, phase: room.phase ?? 'existing', finish: look.finish, color: look.color, geometry: mergeAll(parts) });
+  }
+  return slab || finishes.length ? { slab, finishes } : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Foundations (foundation.ts)
+
+export interface FoundationMesh {
+  /** The slab, or the stem walls with their footings, of one phase (level-local). */
+  geometry: BufferGeometry;
+  phase: Phase;
+  material: FoundationLayout['material'];
+  kind: FoundationLayout['kind'];
+}
+
+const NO_FOUNDATION: FoundationMesh[] = [];
+const foundationMemo = new Map<string, { level: Level; below: Level | undefined; grade: Site['gradePoints']; floorTop: number; plan: Plan; result: FoundationMesh[] }>();
+
+/**
+ * The level's foundation as meshes, one per phase (DESIGN.md "Foundations"): rebuilt when the level,
+ * the level below, the grade points or the level's height change.
+ */
+export function getFoundationMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): FoundationMesh[] {
+  const level = plan.levels[levelId];
+  if (!level?.foundation) return NO_FOUNDATION;
+  const key = `${levelId}|${viewMode}`;
+  const belowId = levelBelowId(plan, levelId);
+  const below = belowId ? plan.levels[belowId] : undefined;
+  const floorTop = getLevelElevations(plan)[levelId]?.floorTop ?? 0;
+  const hit = foundationMemo.get(key);
+  if (hit && hit.level === level && hit.below === below && hit.grade === plan.site.gradePoints && hit.floorTop === floorTop) return hit.result;
+  const s = structureOf(plan, levelId);
+  const fallback = fallbackElevation(plan);
+  const ground = (p: Vec2) => terrainHeightAt(plan.site, s ? toSite(s, p) : p, fallback) - floorTop;
+  const layout = foundationLayout(plan, levelId, viewMode, ground);
+  const result: FoundationMesh[] = [];
+  if (layout) {
+    for (const phase of ['existing', 'new'] as const) {
+      const pos: number[] = [];
+      for (const sol of layout.solids) if (sol.phase === phase) slopedPrismPositions(sol.poly, () => sol.bottom, () => sol.top, {}, pos);
+      if (pos.length) result.push({ geometry: addBoxUVs(geometryFrom(pos)), phase: shownPhase(phase, viewMode), material: layout.material, kind: layout.kind });
+    }
+  }
+  if (hit) for (const m of hit.result) m.geometry.dispose();
+  foundationMemo.set(key, { level, below, grade: plan.site.gradePoints, floorTop, plan, result });
+  return result;
+}
+
 /**
  * The visible beams and posts of a level in a view mode, memoized per level and view like the decks
  * (a post's height depends on the beams over it): a flush beam is drawn only where it hangs below the
@@ -1710,6 +1799,11 @@ export interface LevelMeshes {
   walls: WallMesh[];
   /** The slab under this level (level-local Y from -floorThickness to 0). */
   floor?: BufferGeometry;
+  /**
+   * The existing slab where the view's own floor outline no longer reaches: a floor opened by
+   * demolition (an exterior wall taken out) still stands (keptFloor).
+   */
+  keptFloor?: BufferGeometry;
   /** The floor finishes of the rooms labelled in the view mode that set one. */
   floorFinishes: FloorFinishMesh[];
   /** The ceilings of the rooms labelled in the view mode that have one (finish.ts ceilingLookOf). */
@@ -1802,6 +1896,8 @@ interface RoofEntry {
   /** The finish it was built for (the proposed look's can differ from the roof's: the ridge cap follows). */
   finish: Roof['finish'];
   bearing: number;
+  /** The regions it was built from when joined to other roofs (roofJoin.ts), else null. */
+  join: readonly JoinRegion[] | null;
   geometry: BufferGeometry;
   fascia: BufferGeometry | null;
   rafters: BufferGeometry | null;
@@ -1827,6 +1923,8 @@ interface LevelEntry {
   below: Level | undefined;
   /** The plan's proposed look, which the Proposed view's meshes follow. */
   look: Plan['proposedLook'];
+  /** The building's roofs and their joins (roofJoin.ts): a roof on another level can trim this level's. */
+  roofs: RoofOnLevel[];
   result: LevelMeshes;
 }
 
@@ -2025,7 +2123,9 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const ftf = floorToFloor(plan, levelId);
   const aboveLevel = aboveId ? plan.levels[aboveId] : undefined;
   const hit = levelCache.get(key);
-  if (hit && hit.level === level && hit.belowStairs === below?.stairs && hit.ftf === ftf && hit.above === aboveLevel && hit.below === below && hit.look === plan.proposedLook) return hit.result;
+  const levelRoofs = getLevelRoofs(plan, levelId, viewMode);
+  const sameRoofs = (p: readonly RoofOnLevel[]) => p.length === levelRoofs.building.length && p.every((r, i) => r.roof === levelRoofs.building[i].roof && r.bearing === levelRoofs.building[i].bearing && r.join === levelRoofs.building[i].join);
+  if (hit && hit.level === level && hit.belowStairs === below?.stairs && hit.ftf === ftf && hit.above === aboveLevel && hit.below === below && hit.look === plan.proposedLook && sameRoofs(hit.roofs)) return hit.result;
   pruneCaches(plan);
 
   // Walls.
@@ -2067,16 +2167,16 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   // Heights of the visible walls at each node, for the join faces. Only a neighbour drawn the same
   // way covers a join: through a translucent (demolished) wall you would see into an opaque wall
   // whose join face was left out, so mixed joins keep their faces.
-  // Roofs visible in the view mode raise the exterior walls under them (roofs.ts wallRoofProfile).
-  const roofsOnLevel: RoofOnLevel[] = Object.values(level.roofs ?? {})
-    .filter((r) => isVisible(r.phase, viewMode))
-    .map((roof) => ({ roof, bearing: roofBearing(level.wallHeight, roof) }));
+  // Roofs visible in the view mode raise the exterior walls under them (roofs.ts wallRoofProfile),
+  // where they are drawn once joined to the roofs they meet, and no higher than another roof of the
+  // building that passes over the wall (roofJoin.ts).
+  const roofsOnLevel: RoofOnLevel[] = levelRoofs.own;
   const profiles = new Map<Id, WallProfile>();
   if (roofsOnLevel.length) {
     for (const w of Object.values(level.walls)) {
       const fp = fps.get(w.id);
       if (!fp || w.kind !== 'exterior') continue;
-      const pr = wallRoofProfile(fp, topOf(w), roofsOnLevel);
+      const pr = wallRoofProfile(fp, topOf(w), roofsOnLevel, levelRoofs.building);
       if (pr) profiles.set(w.id, pr);
     }
   }
@@ -2246,6 +2346,17 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   if (prevFinishes) for (const [id, e] of prevFinishes) if (nextFinishes.get(id) !== e) e.geometry?.dispose();
   floorFinishCache.set(key, nextFinishes);
 
+  // A floor opened by demolition (keptFloor): the existing floor where the view's own outline no
+  // longer reaches, and an existing room's finish where the view finds no room of its own there.
+  const prevKept = keptFloorCache.get(key);
+  if (prevKept) {
+    prevKept.slab?.dispose();
+    for (const f of prevKept.finishes) f.geometry.dispose();
+  }
+  const kept = viewMode === 'existing' ? null : keptFloor(level, viewMode, faces, finishHoles);
+  keptFloorCache.set(key, kept ?? { slab: null, finishes: [] });
+  if (kept) floorFinishes.push(...kept.finishes.map((f) => ({ ...f, phase: sp(f.phase) })));
+
   // Ceilings: one surface per room that has one (finish.ts ceilingLookOf), at the room's ceiling
   // height (its override, at most the wall height under a floor above), less the holes through the
   // floor above. A room is under a floor when its label point is inside the level above's slab.
@@ -2320,15 +2431,15 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const prevRoofs = roofCache.get(key);
   const nextRoofs = new Map<Id, RoofEntry>();
   const roofs: RoofMesh[] = [];
-  for (const { roof, bearing } of roofsOnLevel) {
+  for (const { roof, bearing, join } of roofsOnLevel) {
     // A re-roof: the proposed look's finish and colour, new (no weathering), its board colour.
     const finish = look?.roofFinish ?? roof.finish;
     const reroofed = !!look && (look.roofFinish !== undefined || look.roofColor !== undefined);
     const old = prevRoofs?.get(roof.id);
     const entry: RoofEntry =
-      old && old.roof === roof && old.finish === finish && old.bearing === bearing
+      old && old.roof === roof && old.finish === finish && old.bearing === bearing && old.join === (join ?? null)
         ? old
-        : { roof, finish, bearing, ...roofParts(finish === roof.finish ? roof : { ...roof, finish }, bearing) };
+        : { roof, finish, bearing, join: join ?? null, ...roofParts(finish === roof.finish ? roof : { ...roof, finish }, bearing, join) };
     nextRoofs.set(roof.id, entry);
     roofs.push({
       id: roof.id,
@@ -2442,13 +2553,20 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     backsplashCache.set(key, { level: { fixtures: level.fixtures, finishes: level.finishes, walls: level.walls, openings: level.openings, wallHeight: level.wallHeight }, fps, backsplashes });
   }
 
-  const result: LevelMeshes = { walls, floorFinishes, ceilings, stairs, staircases, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(backsplashes.length ? { backsplashes } : {}), ...(floor.geometry ? { floor: floor.geometry } : {}) };
-  levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, look: plan.proposedLook, result });
+  const result: LevelMeshes = { ...(kept?.slab ? { keptFloor: kept.slab } : {}), walls, floorFinishes, ceilings, stairs, staircases, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(backsplashes.length ? { backsplashes } : {}), ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, look: plan.proposedLook, roofs: levelRoofs.building, result });
   return result;
 }
 
 /** Dispose every cached geometry (tests, or when the 3D view is torn down for good). */
 export function clearMeshCache(): void {
+  for (const e of keptFloorCache.values()) {
+    e.slab?.dispose();
+    for (const f of e.finishes) f.geometry.dispose();
+  }
+  keptFloorCache.clear();
+  for (const e of foundationMemo.values()) for (const m of e.result) m.geometry.dispose();
+  foundationMemo.clear();
   for (const m of wallCache.values()) for (const e of m.values()) disposeWallEntry(e);
   for (const e of floorCache.values()) e.geometry?.dispose();
   for (const m of floorFinishCache.values()) for (const e of m.values()) e.geometry?.dispose();

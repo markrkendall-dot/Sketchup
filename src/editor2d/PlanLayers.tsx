@@ -14,7 +14,8 @@ import { getFootprints, type Footprint } from '../derive/footprint';
 import { arcPath, getOpeningsByWall, openingSymbol, wallPieces, type WallPieces } from '../derive/openings';
 import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
 import { faceAt, getFaces, interiorPoint, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
-import { roofOutlineWithOverhang, roofRidgeLines } from '../derive/roofs';
+import { roofOutlineWithOverhang, roofRidgeLines, type JoinRegion } from '../derive/roofs';
+import { getLevelRoofJoins } from '../derive/roofJoin';
 import { FENCE_DEFAULTS, fencePostPoints, siteGhostLevelId } from '../derive/site';
 import { getStaircaseLayout } from '../derive/staircase';
 import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
@@ -911,12 +912,12 @@ const StructureLayer = memo(function StructureLayer({ levelId, part }: { levelId
   );
 });
 
-/** A roof's plan paths, built once per roof object. */
-const roofPathCache = new WeakMap<Roof, { outline: string; overhang: string; ridge: string }>();
-function roofPaths(roof: Roof) {
+/** A roof's plan paths, built once per roof object and join (its valleys with the roofs it meets). */
+const roofPathCache = new WeakMap<Roof, { join: readonly JoinRegion[] | null; outline: string; overhang: string; ridge: string }>();
+function roofPaths(roof: Roof, join: readonly JoinRegion[] | null) {
   let hit = roofPathCache.get(roof);
-  if (!hit) {
-    hit = { outline: polyPath(roof.outline), overhang: polyPath(roofOutlineWithOverhang(roof)), ridge: segPath(roofRidgeLines(roof)) };
+  if (!hit || hit.join !== join) {
+    hit = { join, outline: polyPath(roof.outline), overhang: polyPath(roofOutlineWithOverhang(roof)), ridge: segPath(roofRidgeLines(roof, join)) };
     roofPathCache.set(roof, hit);
   }
   return hit;
@@ -932,8 +933,9 @@ const RoofShape = memo(function RoofShape({ levelId, roofId, ghost }: { levelId:
   const roof = useLayerPlan((s) => s.plan.levels[levelId]?.roofs?.[roofId]);
   const viewMode = useLayerUi((s) => s.viewMode);
   const selected = useLayerUi((s) => !ghost && s.selection.roofs.includes(roofId));
+  const join = useLayerPlan((s) => (roof && isVisible(roof.phase, viewMode) ? (getLevelRoofJoins(s.plan, levelId, viewMode).get(roofId) ?? null) : null));
   if (!roof || !isVisible(roof.phase, viewMode)) return null;
-  const d = roofPaths(roof);
+  const d = roofPaths(roof, join);
   return (
     <g className={`roof phase-${shownPhase(roof.phase, viewMode)}${selected ? ' is-selected' : ''}${ghost ? ' roof-ghost' : ''}`} data-roof-id={ghost ? undefined : roofId}>
       <path className="roof-overhang" d={d.overhang} vectorEffect="non-scaling-stroke" />

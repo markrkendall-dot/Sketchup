@@ -180,6 +180,15 @@ Once the walls are in, these make the 3D model look like the house.
   12), overhang, thickness and fascia, the finish (metal or shingle) and colour. **Fit to walls**
   sets the outline to the outer face of the level's walls when they close one ring. Small roofs
   (a porch, a wing) go on the level they sit on; their ridge and slope are set the same way.
+  **Roofs that meet are joined**: where two roofs of one building overlap (on one level or on
+  different levels), each is drawn only where it is the higher, so a wing's roof runs into the main
+  roof and stops at the valleys, and the main roof is cut only beneath the wing. Draw a wing's roof
+  outline on into the main block (to the main ridge, or across it for a cross gable) and the part
+  under the main roof is taken off. A roof run into the walls of the storey above is cut at their
+  outside face. A lower roof whose overhang passes clear under a higher eave is not cut, and roofs
+  that only touch along an edge are not changed. The plan shows the valleys. A hip roof over an
+  L-shaped outline is roofed over the L, with a valley at the inside corner (any other
+  non-rectangular hip outline uses its bounding rectangle).
 - **Decks (`J`).** Draw the outline like a roof's, on the level whose floor the deck steps out
   from. A new deck's top is one step (6") below that floor; set "Top" in the properties panel
   (negative is below the floor). An edge against a wall, on any level (the house, a retaining wall
@@ -349,11 +358,19 @@ glass.
 2. Set **Draw as: new**. Everything you draw from now on is new work: new walls, roofs and posts,
    the addition (start its walls on the existing exterior wall so they join as T junctions),
    new doors.
+   An addition on the First Floor beside a basement that does not reach under it stands on
+   nothing until you give the First Floor a **Foundation** in the Level panel: **slab on grade**
+   (its thickness) or **stem wall and footing** (wall thickness, depth below the floor, poured
+   concrete or concrete block); **None** is the default. It is drawn under the part of the floor
+   with nothing of the building below it (the whole floor on the lowest level), reaches 6" into the
+   ground where the ground is lower, and the ground is cut round it as round the basement.
 3. To remove something, select it and click **Mark demolish**. That works for walls, doors,
    windows, stairs, roofs, cabinets, chimneys and posts; a window that becomes a door is a
    demolished window plus a new door. To take out part of a wall (open a kitchen to the living
    room), right-click the wall with the select tool and choose **Split wall here**, then mark the
-   piece you want gone.
+   piece you want gone. Taking out part of an exterior wall leaves the room behind it open: in
+   Proposed it keeps its floor and its floor finish (the proposed one), but shows no label or area
+   until walls close it again (a new addition, say), and its ceiling is not drawn.
 4. Flip between **Existing** (what is there, with the demolition shown) and **Proposed** (what
    it will be). Rooms are found per view, so in Proposed two rooms whose dividing wall is
    demolished become one, with its new net area. Roofs and posts follow the view too, and walls
@@ -458,7 +475,9 @@ tool) and choose **Walk from here** ("Clear walk start" goes back to the door). 
 look with the mouse, WASD or the arrows to move, Shift to go faster, Q/E to jump a level, Esc to
 leave. You walk on what is there: up stairs and steps (9" at most), down to what is below, and the
 rails, guards and the sides of stairs stop you; the level follows your feet, so walking up the
-grand stair puts you on the Second Floor. Walls are not solid in walk mode.
+grand stair puts you on the Second Floor. Walls are solid: you go through doors (open or shut) and
+passages only, and leave the house by a door. Untick **Walls are solid** in the walk hint (or press
+`C`) to walk through them. Cabinets and furniture do not stop you.
 
 **N**, **S**, **E** and **W** in the 3D bar show an elevation: a straight-on view of that side of
 the house, without perspective, framed to fill the view and lit from over your left shoulder, so
@@ -1176,7 +1195,8 @@ the engineer, the trades and the tape measure):
 - How is the basement reached today? No stair down to it is drawn inside the house; where are the
   water heater, the panel and the well equipment, and is an inside stair wanted?
 - The porch's size and roofline wait on MK's reference pictures (estimated 8' out; the foyer's
-  gable and the porch's shed overlap with no valley, which the tool cannot draw).
+  gable and the porch's shed are joined where their overhangs overlap, as drawn; their roofline
+  itself is still an estimate).
 - The garage (24' x 26', 55' west of the house, 20' from the road, 3' off the west property line)
   is drawn as a second building, **Garage**: a ring of new 7" walls, outside faces x -948..-660
   (24' east-west: 55' west of the house and 3' off the line agree) and y 142..454 (its south side
@@ -1353,8 +1373,8 @@ piers at its outer corners, a 10" log plate between them under the eave with 6" 
 renovation's Adirondack entry, simplified), and a flagstone landing between it and the gravel
 pull-off; today's porch pad and stones go. The **screen room** (8' x 12', south of it) has screens
 above a 36" river-stone knee wall, three bays west, two north and one south beside a screen door to
-the lawn, a door from the great room, and a shed roof 3:12 down to the west; the two roofs overlap
-at their junction (no valley, a known limitation). The stove's stainless chimney rises outside the
+the lawn, a door from the great room, and a shed roof 3:12 down to the west; the two roofs are
+joined where their overhangs overlap. The stove's stainless chimney rises outside the
 west wall south of the screen room's roof, 3' over the rake and 2' over the ridge.
 
 **Outside.** The outdoor wooden stair is rebuilt along the suite's east side, 23" east of today's
@@ -1390,12 +1410,14 @@ bedrooms); change them in each room's panel.
 
 ## Known limitations
 
-- **Roofs**: no valleys or dormers; roofs that meet (a wing roof running into the main wall,
-  porch roofs, the starter's proposed foyer gable and porch shed) simply overlap, and the walls
-  only follow the roofs on their own level. A roof's overhang on an edge against a wall runs into
-  the house unless its outline stops short of the wall by the overhang. A hip roof
-  over an L-shaped outline uses the bounding box of the outline. Overhangs are the same on every
-  edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
+- **Roofs**: no dormers. Roofs that meet are joined (see "Roofs, site and appearance"), but a
+  board stops square at a valley (no valley flashing or cut rafters are drawn), and a wing's roof
+  must be drawn on into the main roof to reach it: one stopped at the main wall leaves an open
+  triangle under the main eave. Walls rise only to the roofs on their own level (a roof of another
+  level only stops them). A roof's overhang on an edge against a wall of its own level runs into
+  the house unless its outline stops short of the wall by the overhang. A hip roof over an outline
+  other than a rectangle or an L uses the bounding box of the outline. Overhangs are the same on
+  every edge of a roof. Rafter tails are not cut round a chimney that stands in the eave: a tail can
   show a short stub on the chimney's face.
 - **Staircases**: a turn is a landing; there are no winders, curved or flared flights. The handrail
   of each flight dies into a newel at a turn (no goosenecks or easings); the round rail is drawn as
@@ -1404,7 +1426,8 @@ bedrooms); change them in each room's panel.
   round the stair well instead; it has one), handrails on a wall,
   exterior steps other than a flight (an outside stair is a flight on the lowest level, open and,
   down a slope, starting below its floor, as the starter's are), fences,
-  the lot outline, porch floors and steps, foundations under additions and porches, gutters,
+  the lot outline, porch floors and steps (and the examples' foundations under the wing and porches:
+  set them with the Level panel's "Foundation" once measured), gutters,
   sloped ceilings (a ceiling is flat, at one height), crown and baseboards, furniture outside (below a level's floor), and text or dimension notes
   you place yourself. A wood stove is a labelled box, and so are a shower's tiled bench and the vents. A retaining wall is a
   wall on the lowest level; its free end shows as an open wall end.
@@ -1415,12 +1438,13 @@ bedrooms); change them in each room's panel.
   leaves a 3/8" gap when only one of the two walls has one; it is not drawn on the plan; "up to
   the wall cabinets" is a height above the counter (18"), not the cabinets' own bottoms; "to the
   ceiling" goes to the wall's height.
-- **Walk mode has no collision**: you can walk through walls and the ground.
+- **Walk mode** stops at walls but not at cabinets, furniture, window sills or columns, and the
+  ground is not solid from below.
 - The terrain is the triangulated surface through your grade points: straight between neighbouring
   points, level between points at one height, and level beyond the outermost ones. Under the lowest level's
   footprint (out to its walls' outside faces) it drops to 2" below that level's slab, so the
-  basement is empty; the ground is not shaped any further around the house (no window wells,
-  no foundation under a wing or porch that has no basement).
+  basement is empty, and likewise under a level's foundation (see "Planning the renovation"); the
+  ground is not shaped any further around the house (no window wells).
 - A wall has one thickness; layered walls (siding, sheathing, studs, drywall) are not modeled.
   Both faces of an exterior wall show the siding unless a room on one side sets its own wall
   finish, and window and door reveals always show the wall's own finish. A room's wall finish runs

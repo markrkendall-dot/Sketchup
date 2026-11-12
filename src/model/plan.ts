@@ -12,7 +12,7 @@ import { isVariantOf } from './bath';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
 import { firstStructure, isStructureKind, normalizeDegrees, structureOf } from './structures';
-import type { CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 10 as const;
@@ -1473,6 +1473,24 @@ function migrateUnderlay(raw: unknown): Underlay | undefined {
   return isValidUnderlay(u as unknown as Underlay) ? (u as unknown as Underlay) : undefined;
 }
 
+/** Why a foundation cannot be stored, or null (sizes positive where given). */
+export function foundationProblem(f: Foundation): string | null {
+  if (!['none', 'slab', 'stem'].includes(f.kind)) return 'unknown foundation';
+  for (const k of ['thickness', 'wallThickness', 'depth'] as const) {
+    const v = f[k];
+    if (v !== undefined && !(isNum(v) && v > 0 && v <= 600)) return `${k} must be a positive size`;
+  }
+  if (f.material !== undefined && f.material !== 'block' && f.material !== 'concrete') return 'unknown foundation material';
+  return null;
+}
+
+/** A stored foundation, or undefined (none, or not a valid one). */
+function migrateFoundation(raw: unknown): Foundation | undefined {
+  if (!isObject(raw) || typeof raw.kind !== 'string' || raw.kind === 'none') return undefined;
+  const f = pick(raw, ['kind', 'thickness', 'wallThickness', 'depth', 'material'] as const) as unknown as Foundation;
+  return foundationProblem(f) ? undefined : f;
+}
+
 function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   if (!isObject(raw)) fail(`level ${id} is not an object`);
   const where = `level ${id}`;
@@ -1508,6 +1526,7 @@ function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   level.members = migrateMembers(record(raw.members, `${where} members`), where, lowest);
   put(level, 'finishes', migrateFinishes(raw.finishes));
   put(level, 'underlay', migrateUnderlay(raw.underlay));
+  put(level, 'foundation', migrateFoundation(raw.foundation));
   return level as unknown as Level;
 }
 

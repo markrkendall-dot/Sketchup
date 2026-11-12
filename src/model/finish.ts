@@ -225,3 +225,6 @@ export const FENCE_COLOR = '#8b8478';
 export const fenceColorOf = (f: Pick<Fence, 'color'>): string => f.color ?? FENCE_COLOR;
 /** A chimney's cap: pale concrete. */
 export const CHIMNEY_CAP_COLOR = '#b8b4ac';
+
+/** A foundation's colour by material (DESIGN.md "Foundations"): grey concrete block, or poured concrete. */
+export const FOUNDATION_COLOR: Record<'block' | 'concrete', string> = { block: '#8f8a84', concrete: '#b3b0a8' };

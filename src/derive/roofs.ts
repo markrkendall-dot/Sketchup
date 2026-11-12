@@ -133,8 +133,9 @@ function outlines(roof: Roof): { base: Vec2[]; grown: Vec2[] } {
   let hit = outlineCache.get(roof);
   if (!hit) {
     let base: Vec2[];
-    if (roof.shape === 'hip') {
-      // Hip roofs are built over the outline's bounding rectangle in the ridge frame.
+    if (roof.shape === 'hip' && !hipArms(roof)) {
+      // Hip roofs are built over the outline's bounding rectangle in the ridge frame, unless the
+      // outline is an L (hipArms): then over the L itself.
       const f = roofFrame(roof);
       const at = (a: number, b: number) => add(scale(f.u, a), scale(f.v, b));
       base = cleanPositive([at(f.umin, f.vmin), at(f.umax, f.vmin), at(f.umax, f.vmax), at(f.umin, f.vmax)]);
@@ -148,7 +149,7 @@ function outlines(roof: Roof): { base: Vec2[]; grown: Vec2[] } {
 
 /**
  * The outline the roof bears on, positive (clockwise on screen): the stored outline, or for a hip
- * roof its bounding rectangle in the ridge frame.
+ * roof its bounding rectangle in the ridge frame (an L-shaped hip keeps its L, hipArms).
  */
 export const roofBaseOutline = (roof: Roof): Vec2[] => outlines(roof).base;
 
@@ -168,7 +169,230 @@ const insideOrOn = (p: Vec2, poly: readonly Vec2[]) => pointInPolygon(p, poly) |
 /** Underside height at a plan point, or null outside the overhang outline. */
 export function roofHeightAt(roof: Roof, bearingHeight: number, p: Vec2): number | null {
   if (!insideOrOn(p, roofOutlineWithOverhang(roof))) return null;
-  return planesHeightAt(roofPlanes(roof, bearingHeight), p);
+  const arms = hipArms(roof);
+  if (!arms) return planesHeightAt(roofPlanes(roof, bearingHeight), p);
+  // An L-shaped hip: the higher of its two arms' hips where both cover the point (the valley).
+  let h = -Infinity;
+  for (const s of roofSections(roof, bearingHeight)) if (insideOrOn(p, s.grown)) h = Math.max(h, planesHeightAt(s.planes, p));
+  return Number.isFinite(h) ? h : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sections: the convex roofs a roof is built from
+
+/**
+ * An L-shaped hip roof (DESIGN.md "Roofs that meet"): the two rectangles, in the ridge frame, whose
+ * union is the outline when it is an L of six corners with every side along or across the ridge,
+ * each holding the corner square. Null for any other outline (a hip over it uses its bounding
+ * rectangle).
+ */
+export function hipArms(roof: Pick<Roof, 'shape' | 'outline' | 'ridgeAngle'>): [Vec2[], Vec2[]] | null {
+  if (roof.shape !== 'hip') return null;
+  const hit = armsCache.get(roof as Roof);
+  if (hit !== undefined) return hit;
+  const f = roofFrame(roof);
+  const toFrame = (p: Vec2) => ({ x: dot(p, f.u), y: dot(p, f.v) });
+  const fromFrame = (q: Vec2) => add(scale(f.u, q.x), scale(f.v, q.y));
+  let ring = cleanPositive(roof.outline.map(toFrame));
+  // Drop corners on a straight run.
+  ring = ring.filter((p, i) => Math.abs(cross(sub(p, ring[(i + ring.length - 1) % ring.length]), sub(ring[(i + 1) % ring.length], p))) > 1e-6);
+  let out: [Vec2[], Vec2[]] | null = null;
+  const square = ring.every((p, i) => {
+    const q = ring[(i + 1) % ring.length];
+    return Math.abs(p.x - q.x) < 1e-6 || Math.abs(p.y - q.y) < 1e-6;
+  });
+  if (ring.length === 6 && square) {
+    const xs = ring.map((p) => p.x);
+    const ys = ring.map((p) => p.y);
+    const x0 = Math.min(...xs);
+    const x1 = Math.max(...xs);
+    const y0 = Math.min(...ys);
+    const y1 = Math.max(...ys);
+    const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+    // The one corner of the bounding rectangle the L leaves out, and the reflex corner.
+    const corners = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+    const missing = corners.find((c) => !ring.some((p) => near(p.x, c.x) && near(p.y, c.y)));
+    const reflex = ring.find((p) => !near(p.x, x0) && !near(p.x, x1) && !near(p.y, y0) && !near(p.y, y1));
+    if (missing && reflex) {
+      const rect = (a0: number, a1: number, b0: number, b1: number) => [fromFrame({ x: a0, y: b0 }), fromFrame({ x: a1, y: b0 }), fromFrame({ x: a1, y: b1 }), fromFrame({ x: a0, y: b1 })];
+      const ax = near(missing.x, x1) ? [x0, reflex.x] : [reflex.x, x1];
+      const by = near(missing.y, y1) ? [y0, reflex.y] : [reflex.y, y1];
+      out = [cleanPositive(rect(ax[0], ax[1], y0, y1)), cleanPositive(rect(x0, x1, by[0], by[1]))];
+    }
+  }
+  armsCache.set(roof as Roof, out);
+  return out;
+}
+
+const armsCache = new WeakMap<Roof, [Vec2[], Vec2[]] | null>();
+
+/** A convex polygon (every corner turning one way or straight). */
+export function isConvex(poly: readonly Vec2[]): boolean {
+  const n = poly.length;
+  let sign = 0;
+  for (let i = 0; i < n; i++) {
+    const c = cross(sub(poly[(i + 1) % n], poly[i]), sub(poly[(i + 2) % n], poly[(i + 1) % n]));
+    if (Math.abs(c) < 1e-9) continue;
+    if (sign === 0) sign = Math.sign(c);
+    else if (Math.sign(c) !== sign) return false;
+  }
+  return true;
+}
+
+/**
+ * A simple polygon as convex pieces, positive: itself when convex, else its triangles merged
+ * across their shared diagonals while the union stays convex (Hertel-Mehlhorn).
+ */
+export function convexPieces(poly: readonly Vec2[]): Vec2[][] {
+  const ring = cleanPositive(poly);
+  if (ring.length < 3) return [];
+  if (isConvex(ring)) return [ring];
+  let pieces: number[][] = triangulate(ring).map((t) => [...t]);
+  let merged = true;
+  while (merged) {
+    merged = false;
+    outer: for (let i = 0; i < pieces.length; i++) {
+      for (let j = i + 1; j < pieces.length; j++) {
+        const a = pieces[i];
+        const b = pieces[j];
+        // A shared edge: a has u -> v, b has v -> u.
+        for (let k = 0; k < a.length; k++) {
+          const u = a[k];
+          const v = a[(k + 1) % a.length];
+          const m = b.findIndex((x, l) => x === v && b[(l + 1) % b.length] === u);
+          if (m < 0) continue;
+          // a from v round to u, then b from u round to v (without the shared ends twice).
+          const joined: number[] = [];
+          for (let t = 0; t < a.length; t++) joined.push(a[(k + 1 + t) % a.length]);
+          for (let t = 2; t < b.length; t++) joined.push(b[(m + t) % b.length]);
+          if (!isConvex(joined.map((x) => ring[x]))) continue;
+          pieces = pieces.filter((_, x) => x !== i && x !== j);
+          pieces.push(joined);
+          merged = true;
+          break outer;
+        }
+      }
+    }
+  }
+  return pieces.map((pc) => cleanPositive(pc.map((x) => ring[x])));
+}
+
+/** Convex `poly` clipped to convex `clip` (both any winding). */
+export function clipConvex(poly: readonly Vec2[], clip: readonly Vec2[]): Vec2[] {
+  const c = cleanPositive(clip);
+  let out: Vec2[] = [...poly];
+  for (let i = 0; i < c.length && out.length; i++) {
+    const d = sub(c[(i + 1) % c.length], c[i]);
+    const n = { x: d.y, y: -d.x }; // outward on a positive ring
+    out = clipHalfPlane(out, n, dot(n, c[i]));
+  }
+  return out;
+}
+
+/** Convex `poly` less convex `hole`: convex pieces, positive (poly itself when they do not overlap). */
+export function convexMinus(poly: readonly Vec2[], hole: readonly Vec2[]): Vec2[][] {
+  const h = cleanPositive(hole);
+  const out: Vec2[][] = [];
+  let rest: Vec2[] = [...poly];
+  if (!boxesMeet(poly, h)) return [cleanPositive(poly)];
+  for (let i = 0; i < h.length; i++) {
+    const d = sub(h[(i + 1) % h.length], h[i]);
+    if (Math.hypot(d.x, d.y) < 1e-12) continue;
+    const n = { x: d.y, y: -d.x };
+    const k = dot(n, h[i]);
+    const outside = clipHalfPlane(rest, scale(n, -1), -k);
+    if (outside.length >= 3 && Math.abs(polygonSignedArea(outside)) > AREA_EPS) out.push(cleanPositive(outside));
+    rest = clipHalfPlane(rest, n, k);
+    if (rest.length < 3) return out;
+  }
+  // What is left is inside the hole.
+  return out;
+}
+
+/** Pieces smaller than this (square inches) are slivers of the clipping and are dropped. */
+const AREA_EPS = 1e-6;
+
+function boxesMeet(p: readonly Vec2[], q: readonly Vec2[], pad = 1e-9): boolean {
+  const b = (poly: readonly Vec2[]) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const v of poly) {
+      x0 = Math.min(x0, v.x); y0 = Math.min(y0, v.y); x1 = Math.max(x1, v.x); y1 = Math.max(y1, v.y);
+    }
+    return { x0, y0, x1, y1 };
+  };
+  const a = b(p);
+  const c = b(q);
+  return a.x0 <= c.x1 + pad && c.x0 <= a.x1 + pad && a.y0 <= c.y1 + pad && c.y0 <= a.y1 + pad;
+}
+
+/** Convex pieces of `poly` less every convex hole in `holes`. */
+export function convexMinusAll(poly: readonly Vec2[], holes: readonly (readonly Vec2[])[]): Vec2[][] {
+  let pieces: Vec2[][] = [cleanPositive(poly)];
+  for (const h of holes) {
+    const next: Vec2[][] = [];
+    for (const pc of pieces) next.push(...convexMinus(pc, h));
+    pieces = next;
+    if (!pieces.length) break;
+  }
+  return pieces.filter((pc) => pc.length >= 3 && Math.abs(polygonSignedArea(pc)) > AREA_EPS);
+}
+
+/**
+ * One convex roof a roof is built from: the roof itself, or one arm of an L-shaped hip
+ * (hipArms). `regions` are where each plane is the underside, in convex pieces of `grown`.
+ */
+export interface RoofSection {
+  /** The outline it bears on and that grown by the overhang, positive. */
+  base: Vec2[];
+  grown: Vec2[];
+  planes: RoofPlane[];
+  regions: RoofRegion[];
+  /** Convex pieces of `base`. */
+  baseParts: Vec2[][];
+}
+
+const sectionCache = new WeakMap<Roof, Map<number, RoofSection[]>>();
+
+/** The roof's sections at a bearing height (memoized per roof object and bearing). */
+export function roofSections(roof: Roof, bearingHeight: number): RoofSection[] {
+  let byBearing = sectionCache.get(roof);
+  if (!byBearing) sectionCache.set(roof, (byBearing = new Map()));
+  const hit = byBearing.get(bearingHeight);
+  if (hit) return hit;
+  const arms = hipArms(roof);
+  const make = (base: Vec2[], grown: Vec2[], planes: RoofPlane[]): RoofSection => ({
+    base,
+    grown,
+    planes,
+    regions: convexPieces(grown).flatMap((g) => regionsOver(planes, g)),
+    baseParts: convexPieces(base),
+  });
+  const out = arms
+    ? arms.map((rect) => {
+        const part: Roof = { ...roof, outline: rect };
+        const grown = roof.overhang > 0 ? insetPolygon(rect, rect.map(() => -roof.overhang)) : rect;
+        return make(rect, cleanPositive(grown), roofPlanes(part, bearingHeight));
+      })
+    : [make(roofBaseOutline(roof), roofOutlineWithOverhang(roof), roofPlanes(roof, bearingHeight))];
+  byBearing.set(bearingHeight, out);
+  return out;
+}
+
+/** `over` split into where each plane is the lowest (roofRegions over given planes). */
+function regionsOver(planes: readonly RoofPlane[], over: readonly Vec2[]): RoofRegion[] {
+  const out: RoofRegion[] = [];
+  planes.forEach((pl, i) => {
+    let poly: Vec2[] = [...over];
+    for (let j = 0; j < planes.length && poly.length; j++) {
+      if (j === i) continue;
+      const o = planes[j];
+      const n = { x: pl.gx - o.gx, y: pl.gy - o.gy };
+      if (Math.hypot(n.x, n.y) < 1e-12) continue;
+      poly = clipHalfPlane(poly, n, o.c - pl.c);
+    }
+    if (poly.length >= 3 && Math.abs(polygonSignedArea(poly)) > 1e-6) out.push({ plane: pl, poly: cleanPositive(poly) });
+  });
+  return out;
 }
 
 /** Where one plane is the underside: the overhang outline clipped to where it is the lowest. */
@@ -205,8 +429,14 @@ function onPolygonEdge(p: Vec2, q: Vec2, poly: readonly Vec2[]): boolean {
   return false;
 }
 
-/** Ridge and hip lines (where two planes meet), over the overhang outline. */
-export function roofRidgeLines(roof: Roof): [Vec2, Vec2][] {
+/**
+ * Ridge and hip lines (where two planes meet), over the overhang outline; for an L-shaped hip
+ * (hipArms) the valley too. A roof joined to others (joinRoof) passes its regions as `join`: its
+ * lines are then where it is drawn, with the valleys where it meets the others.
+ */
+export function roofRidgeLines(roof: Roof, join?: readonly JoinRegion[] | null): [Vec2, Vec2][] {
+  const j = join ?? (hipArms(roof) ? joinRoof(roof, 0, []) : null);
+  if (j) return joinedLines(roof, j);
   const over = roofOutlineWithOverhang(roof);
   const out: [Vec2, Vec2][] = [];
   const key = (p: Vec2) => `${Math.round(p.x * 1e4)},${Math.round(p.y * 1e4)}`;
@@ -230,6 +460,14 @@ export function roofRidgeLines(roof: Roof): [Vec2, Vec2][] {
  * (the ridge of a gable or hip, the high side of a shed), `eave` the lowest point of the overhang.
  */
 export function roofExtremes(roof: Roof, bearingHeight: number): { ridge: number; eave: number } {
+  if (hipArms(roof)) {
+    // An L-shaped hip: the higher arm's ridge; the eave is the lowest corner of the overhang.
+    let ridge = -Infinity;
+    for (const sec of roofSections(roof, bearingHeight)) for (const r of regionsOver(sec.planes, sec.base)) for (const p of r.poly) ridge = Math.max(ridge, planeAt(r.plane, p));
+    let eave = Infinity;
+    for (const p of roofOutlineWithOverhang(roof)) eave = Math.min(eave, roofHeightAt(roof, bearingHeight, p) ?? Infinity);
+    return { ridge: Number.isFinite(ridge) ? ridge : bearingHeight, eave: Number.isFinite(eave) ? eave : bearingHeight };
+  }
   let ridge = -Infinity;
   for (const r of roofRegions(roof, bearingHeight, roofBaseOutline(roof))) for (const p of r.poly) ridge = Math.max(ridge, planeAt(r.plane, p));
   const planes = roofPlanes(roof, bearingHeight);
@@ -387,7 +625,11 @@ interface EdgeSeg {
   p: Vec2;
   q: Vec2;
   plane: RoofPlane;
+  /** The planes of the section it is on (the roof's, or an L-shaped hip's arm). */
+  planes?: RoofPlane[];
 }
+
+const samePt = (p: Vec2, q: Vec2) => Math.abs(p.x - q.x) < 1e-6 && Math.abs(p.y - q.y) < 1e-6;
 
 /** An outline edge: its start, unit direction and length. */
 interface OutlineEdge {
@@ -406,29 +648,60 @@ interface OutlineEdge {
  * rafter tails under it instead of a board (rafterTails); a shed's high edge and every edge of a
  * flat roof keep their boards. A metal gable or hip roof has a ridge cap (ridgeCap).
  */
-export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
+export function roofSolid(roof: Roof, bearingHeight: number, join?: readonly JoinRegion[] | null): RoofSolid {
   const over = roofOutlineWithOverhang(roof);
-  const regions = roofRegions(roof, bearingHeight, over);
   const T = roof.thickness;
   const slab: number[] = [];
-  const segs: EdgeSeg[] = [];
-  for (const r of regions) {
-    const z = (p: Vec2) => planeAt(r.plane, p);
-    slopedPrismPositions(r.poly, z, (p) => z(p) + T, { side: (p, q) => onPolygonEdge(p, q, over) }, slab);
-    const ring = cleanPositive(r.poly);
-    for (let i = 0; i < ring.length; i++) {
-      const p = ring[i];
-      const q = ring[(i + 1) % ring.length];
-      if (Math.hypot(q.x - p.x, q.y - p.y) > 1e-6 && onPolygonEdge(p, q, over)) segs.push({ p, q, plane: r.plane });
+  let segs: EdgeSeg[] = [];
+  const capped = isMetalRoof(roof.finish) && (roof.shape === 'gable' || roof.shape === 'hip');
+  let ridge: number[] = [];
+  const j = join ?? (hipArms(roof) ? joinRoof(roof, bearingHeight, []) : null);
+  if (!j) {
+    const regions = roofRegions(roof, bearingHeight, over);
+    for (const r of regions) {
+      const z = (p: Vec2) => planeAt(r.plane, p);
+      slopedPrismPositions(r.poly, z, (p) => z(p) + T, { side: (p, q) => onPolygonEdge(p, q, over) }, slab);
+      const ring = cleanPositive(r.poly);
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i];
+        const q = ring[(i + 1) % ring.length];
+        if (Math.hypot(q.x - p.x, q.y - p.y) > 1e-6 && onPolygonEdge(p, q, over)) segs.push({ p, q, plane: r.plane, planes: regions.map((x) => x.plane) });
+      }
+    }
+    if (capped) ridge = ridgeCap(regions, over, T);
+  } else {
+    // A joined roof: what is left of each region once the others are cut out of it, each piece a
+    // closed solid where it meets another piece or a cut (DESIGN.md "Roofs that meet").
+    const pieces = keptPieces(j);
+    segs = emitPieces(pieces, 0, T, slab).filter((e) => onPolygonEdge(e.p, e.q, over));
+    if (capped) {
+      // The cap runs along the lines where two drawn pieces of different slopes meet in a ridge or a
+      // hip (not a valley, and not between two arms of an L-shaped hip lying in one plane).
+      const bands: Piece[] = [];
+      const innerOf = (r: RoofRegion, ring: Vec2[]) =>
+        ring.map((p, k) => {
+          const q = ring[(k + 1) % ring.length];
+          if (dist(p, q) < 1e-6) return false;
+          const d = normalize(sub(q, p));
+          const m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+          const outward = add(m, scale({ x: d.y, y: -d.x }, 1e-4));
+          const inward = add(m, scale({ x: -d.y, y: d.x }, 1e-4));
+          const across = pieces.find((o) => o.poly !== r.poly && insideOrOn(outward, o.poly));
+          if (!across || coplanar(across.plane, r.plane)) return false;
+          return planeAt(r.plane, inward) <= planeAt(across.plane, inward) + 1e-9;
+        });
+      ridgeCap(pieces, over, T, (poly, plane) => {
+        for (const c of convexPieces(poly)) bands.push({ plane, poly: c });
+      }, innerOf);
+      emitPieces(bands, T, RIDGE_CAP_THICKNESS, ridge);
     }
   }
-  const ridge = isMetalRoof(roof.finish) && (roof.shape === 'gable' || roof.shape === 'hip') ? ridgeCap(regions, over, T) : [];
   const boards: number[][] = [];
   const rafters: number[][] = [];
   if (segs.length === 0) return { slab, boards, rafters, ridge };
 
   // Put the boundary stretches in ring order: by outline edge, then along it.
-  const ordered: { s: EdgeSeg; edge: OutlineEdge }[] = [];
+  let ordered: { s: EdgeSeg; edge: OutlineEdge }[] = [];
   const taken = new Set<EdgeSeg>();
   for (let e = 0; e < over.length; e++) {
     const a = over[e];
@@ -448,10 +721,20 @@ export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
       ordered.push({ s, edge: { a, e: scale(d, 1 / len), len } });
     }
   }
+  if (j) {
+    // The pieces split a stretch where another piece meets it: join the runs back up.
+    const merged: typeof ordered = [];
+    for (const o of ordered) {
+      const last = merged[merged.length - 1];
+      if (last && last.edge === o.edge && last.s.plane === o.s.plane && samePt(last.s.q, o.s.p)) last.s = { ...last.s, q: o.s.q };
+      else merged.push({ s: { ...o.s }, edge: o.edge });
+    }
+    ordered = merged;
+  }
   const t = BOARD_THICKNESS;
   const F = roof.fascia;
   const open = roofEaveOf(roof) === 'open';
-  const planes = regions.map((r) => r.plane);
+  const planes = segs[0].planes ?? [];
   const info = ordered.map(({ s, edge }) => {
     const d0 = sub(s.q, s.p);
     const len = Math.hypot(d0.x, d0.y);
@@ -466,12 +749,16 @@ export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
   });
   info.forEach((s, i) => {
     if (s.tails) {
-      rafterTails(roof, s, planes, rafters);
+      rafterTails(roof, s, s.planes ?? planes, rafters, j ? cutsOf(j, s.plane) : []);
       return;
     }
     if (!(F > 0)) return;
-    const prev = info[(i + info.length - 1) % info.length];
-    const next = info[(i + 1) % info.length];
+    // The stretches either side, when they meet this one (a cut of a joined roof ends a stretch
+    // with nothing after it: the board stops square there).
+    const prevS = info[(i + info.length - 1) % info.length];
+    const nextS = info[(i + 1) % info.length];
+    const prev = samePt(prevS.q, s.p) ? prevS : { d: s.d, level: s.level };
+    const next = samePt(s.q, nextS.p) ? nextS : { d: s.d, level: s.level };
     const turnIn = cross(prev.d, s.d);
     const turnOut = cross(s.d, next.d);
     let e0 = 0;
@@ -503,7 +790,7 @@ export function roofSolid(roof: Roof, bearingHeight: number): RoofSolid {
  * plane (the slab's underside) and its bottom `depth` lower. Each is clipped to where its plane is
  * the lowest (the half-planes roofRegions uses), so a tail near a hip stays under its own slope.
  */
-function rafterTails(roof: Roof, s: EdgeSeg & { edge: OutlineEdge }, planes: readonly RoofPlane[], out: number[][]): void {
+function rafterTails(roof: Roof, s: EdgeSeg & { edge: OutlineEdge }, planes: readonly RoofPlane[], out: number[][], cuts: readonly (readonly Vec2[])[] = []): void {
   const { depth, spacing } = rafterOf(roof);
   if (!(roof.overhang > RAFTER_SETBACK) || !(depth > 0) || !(spacing > 0)) return;
   const { a, e, len } = s.edge;
@@ -529,7 +816,9 @@ function rafterTails(roof: Roof, s: EdgeSeg & { edge: OutlineEdge }, planes: rea
       if (!poly.length) break;
     }
     if (poly.length < 3 || Math.abs(polygonSignedArea(poly)) < 1e-6) continue;
-    out.push(slopedPrismPositions(poly, (p) => z(p) - depth, z));
+    // A joined roof: no tail where the roof is cut away (under the roof it runs into).
+    const parts = cuts.length ? convexMinusAll(poly, cuts) : [poly];
+    for (const part of parts) out.push(slopedPrismPositions(part, (p) => z(p) - depth, z));
   }
 }
 
@@ -542,7 +831,13 @@ function rafterTails(roof: Roof, s: EdgeSeg & { edge: OutlineEdge }, planes: rea
  * shares them), so the bands together are one closed surface. A region too small to hold its band
  * gets none.
  */
-function ridgeCap(regions: readonly RoofRegion[], over: readonly Vec2[], T: number): number[] {
+function ridgeCap(
+  regions: readonly RoofRegion[],
+  over: readonly Vec2[],
+  T: number,
+  collect?: (band: Vec2[], plane: RoofPlane) => void,
+  innerOf?: (r: RoofRegion, ring: Vec2[]) => boolean[],
+): number[] {
   const out: number[] = [];
   const W = RIDGE_CAP_WIDTH;
   for (const r of regions) {
@@ -550,7 +845,7 @@ function ridgeCap(regions: readonly RoofRegion[], over: readonly Vec2[], T: numb
     const n = ring.length;
     if (n < 3) continue;
     const next = (i: number) => ring[(i + 1) % n];
-    const inner = ring.map((p, i) => dist(p, next(i)) > 1e-6 && !onPolygonEdge(p, next(i), over));
+    const inner = innerOf ? innerOf(r, ring) : ring.map((p, i) => dist(p, next(i)) > 1e-6 && !onPolygonEdge(p, next(i), over));
     if (!inner.some(Boolean) || inner.every(Boolean)) continue;
     // Edge i's line moved `off` into the region (right of travel on a positive ring).
     const line = (i: number, off: number) => {
@@ -583,8 +878,252 @@ function ridgeCap(regions: readonly RoofRegion[], over: readonly Vec2[], T: numb
         }
         return false;
       };
+      if (collect) {
+        collect([...vs, ...[...ws].reverse()], r.plane);
+        continue;
+      }
       const zb = (p: Vec2) => planeAt(r.plane, p) + T;
       slopedPrismPositions([...vs, ...[...ws].reverse()], zb, (p) => zb(p) + RIDGE_CAP_THICKNESS, { side: (p, q) => !onRun(p, q) }, out);
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Roofs that meet (DESIGN.md "Roofs that meet")
+
+/** Another roof a roof is joined against, its heights in the joined roof's level-local frame. */
+export interface JoinOther {
+  roof: Roof;
+  /** Its bearing height in the joined roof's frame. */
+  bearing: number;
+  /** True when this one is drawn where the two coincide exactly (the earlier roof). */
+  wins: boolean;
+}
+
+/**
+ * A region of a joined roof: a convex piece of the overhang outline where `plane` is the underside,
+ * and the convex `cuts` out of it where the roof is not drawn because another roof (or the other
+ * arm of an L-shaped hip) is drawn there instead. `planes` are the planes of its section.
+ */
+export interface JoinRegion {
+  plane: RoofPlane;
+  poly: Vec2[];
+  cuts: Vec2[][];
+  planes: RoofPlane[];
+}
+
+interface Piece {
+  plane: RoofPlane;
+  poly: Vec2[];
+  planes?: RoofPlane[];
+}
+
+/**
+ * Trim a roof against the roofs it meets: the upper envelope of the solids. In each region, the
+ * roof is cut away where another roof's top is higher and either the two slabs overlap in height
+ * there, or the point is inside the other roof's bearing outline (over its walls). An overhang that passes clear under another roof's overhang is left whole, and roofs that
+ * only touch along an edge are not changed. The two arms of an L-shaped hip are one surface: the
+ * lower is cut wherever they overlap. Where two tops coincide exactly the one that `wins` is kept.
+ * Null when nothing is cut and the roof is not an L-shaped hip (draw it whole, roofSolid).
+ */
+export function joinRoof(roof: Roof, bearing: number, others: readonly JoinOther[]): JoinRegion[] | null {
+  const own = roofSections(roof, bearing);
+  const T = roof.thickness;
+  interface Rival {
+    sec: RoofSection;
+    T: number;
+    same: boolean;
+    wins: boolean;
+  }
+  const out: JoinRegion[] = [];
+  let any = own.length > 1;
+  own.forEach((sec, si) => {
+    const rivals: Rival[] = [];
+    own.forEach((o, oi) => {
+      if (oi !== si) rivals.push({ sec: o, T, same: true, wins: oi < si });
+    });
+    for (const o of others) for (const os of roofSections(o.roof, o.bearing)) rivals.push({ sec: os, T: o.roof.thickness, same: false, wins: o.wins });
+    for (const r of sec.regions) {
+      const cuts: Vec2[][] = [];
+      const push = (poly: Vec2[]) => {
+        if (poly.length >= 3 && Math.abs(polygonSignedArea(poly)) > AREA_EPS) cuts.push(cleanPositive(poly));
+      };
+      const a = r.plane;
+      for (const q of rivals) {
+        if (!boxesMeet(r.poly, q.sec.grown)) continue;
+        for (const sr of q.sec.regions) {
+          let x = clipConvex(r.poly, sr.poly);
+          if (x.length < 3 || Math.abs(polygonSignedArea(x)) <= AREA_EPS) continue;
+          const b = sr.plane;
+          // Where this top is below the other's: a + T <= b + T' (n . p <= c).
+          const n = { x: a.gx - b.gx, y: a.gy - b.gy };
+          const c = b.c - a.c + q.T - T;
+          if (Math.hypot(n.x, n.y) < 1e-12) {
+            if (!(Math.abs(c) < 1e-6 ? q.wins : c > 0)) continue;
+          } else {
+            x = clipHalfPlane(x, n, c);
+            if (x.length < 3) continue;
+          }
+          if (q.same) {
+            push(x);
+            continue;
+          }
+          // The slabs overlap in height: the other's underside below this top (b < a + T).
+          const m = { x: -n.x, y: -n.y };
+          const lim = a.c + T - b.c - 1e-6;
+          if (Math.hypot(m.x, m.y) < 1e-12) {
+            if (lim > 0) push(x);
+          } else push(clipHalfPlane(x, m, lim));
+          // Over the other's walls: inside its bearing outline (a porch roof run into the wall of the
+          // storey above, a wing's overhang into the main house).
+          for (const k of q.sec.baseParts) push(clipConvex(x, k));
+        }
+      }
+      if (cuts.length) any = true;
+      out.push({ plane: a, poly: r.poly, cuts, planes: sec.planes });
+    }
+  });
+  return any ? out : null;
+}
+
+/**
+ * What is drawn of a joined roof: each region less its cuts, in convex pieces, each with the corners
+ * of its neighbours that lie on its sides (withTJunctions).
+ */
+function keptPieces(join: readonly JoinRegion[]): Piece[] {
+  const out: Piece[] = [];
+  for (const r of join) for (const poly of r.cuts.length ? convexMinusAll(r.poly, r.cuts) : [cleanPositive(r.poly)]) out.push({ plane: r.plane, poly, planes: r.planes });
+  const rings = withTJunctions(out.map((pc) => pc.poly));
+  return out.map((pc, i) => ({ ...pc, poly: rings[i] }));
+}
+
+/** Two planes that are one (an L-shaped hip's arms share their outer slopes). */
+const coplanar = (a: RoofPlane, b: RoofPlane) => Math.abs(a.c - b.c) < 1e-6 && Math.abs(a.gx - b.gx) < 1e-9 && Math.abs(a.gy - b.gy) < 1e-9;
+
+/** The cuts of every region of a plane (the plane objects are shared, roofSections). */
+function cutsOf(join: readonly JoinRegion[], plane: RoofPlane): Vec2[][] {
+  const out: Vec2[][] = [];
+  for (const r of join) if (r.plane === plane) out.push(...r.cuts);
+  return out;
+}
+
+/**
+ * True where a plan point is under a part of the roof that is drawn: inside or on a region and not
+ * inside or on any of its cuts (a point on a cut's edge, a valley, counts as cut).
+ */
+export function joinedCovers(join: readonly JoinRegion[], p: Vec2): boolean {
+  for (const r of join) {
+    if (!insideOrOn(p, r.poly)) continue;
+    if (!r.cuts.some((c) => insideOrOn(p, c))) return true;
+  }
+  return false;
+}
+
+/** Each ring with the corners of the others that lie on its sides put in (no T-junctions). */
+function withTJunctions(rings: readonly Vec2[][]): Vec2[][] {
+  const all = rings.flat();
+  return rings.map((ring) => {
+    const out: Vec2[] = [];
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      out.push(a);
+      const d = sub(b, a);
+      const len2 = dot(d, d);
+      if (len2 < 1e-12) continue;
+      const on: { t: number; v: Vec2 }[] = [];
+      for (const v of all) {
+        const t = dot(sub(v, a), d) / len2;
+        if (t <= 1e-9 || t >= 1 - 1e-9) continue;
+        if (Math.abs(cross(d, sub(v, a))) / Math.sqrt(len2) > 1e-6) continue;
+        if (samePt(v, a) || samePt(v, b)) continue;
+        on.push({ t, v });
+      }
+      on.sort((p, q) => p.t - q.t);
+      for (const o of on) if (!samePt(o.v, out[out.length - 1])) out.push(o.v);
+    }
+    return cleanPositive(out);
+  });
+}
+
+/**
+ * The pieces as one closed solid: each from its plane + `lift` up `thick`, with a side face on each
+ * stretch of its edge that no other piece lies beyond. Returns those outside stretches.
+ */
+function emitPieces(pieces: readonly Piece[], lift: number, thick: number, out: number[]): EdgeSeg[] {
+  const rings = withTJunctions(pieces.map((pc) => cleanPositive(pc.poly)));
+  const exterior: EdgeSeg[] = [];
+  const outside = (p: Vec2, q: Vec2, self: number) => {
+    const d = normalize(sub(q, p));
+    const x = add({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }, scale({ x: d.y, y: -d.x }, 1e-4));
+    return !rings.some((r, i) => i !== self && insideOrOn(x, r));
+  };
+  rings.forEach((ring, i) => {
+    const pl = pieces[i].plane;
+    const z = (p: Vec2) => planeAt(pl, p) + lift;
+    slopedPrismPositions(ring, z, (p) => z(p) + thick, { side: (p, q) => outside(p, q, i) }, out);
+    for (let k = 0; k < ring.length; k++) {
+      const p = ring[k];
+      const q = ring[(k + 1) % ring.length];
+      if (dist(p, q) > 1e-6 && outside(p, q, i)) exterior.push({ p, q, plane: pl, planes: pieces[i].planes });
+    }
+  });
+  return exterior;
+}
+
+/** A joined roof's lines on the plan: where two of its planes meet, and where it is cut (the valleys). */
+function joinedLines(roof: Roof, join: readonly JoinRegion[]): [Vec2, Vec2][] {
+  const over = roofOutlineWithOverhang(roof);
+  const pieces = keptPieces(join);
+  const rings = pieces.map((pc) => pc.poly);
+  const out: [Vec2, Vec2][] = [];
+  const key = (p: Vec2) => `${Math.round(p.x * 1e4)},${Math.round(p.y * 1e4)}`;
+  const seen = new Set<string>();
+  rings.forEach((ring, i) => {
+    for (let k = 0; k < ring.length; k++) {
+      const p = ring[k];
+      const q = ring[(k + 1) % ring.length];
+      if (dist(p, q) < 1e-6 || onPolygonEdge(p, q, over)) continue;
+      const d = normalize(sub(q, p));
+      const x = add({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }, scale({ x: d.y, y: -d.x }, 1e-4));
+      const across = rings.findIndex((r, j) => j !== i && insideOrOn(x, r));
+      // Inside one plane (between two pieces of it): no line.
+      if (across >= 0 && coplanar(pieces[across].plane, pieces[i].plane)) continue;
+      const kk = [key(p), key(q)].sort().join('|');
+      if (seen.has(kk)) continue;
+      seen.add(kk);
+      out.push([p, q]);
+    }
+  });
+  return mergeCollinear(out);
+}
+
+/** Segments that continue one another in a straight line, joined. */
+function mergeCollinear(segs: [Vec2, Vec2][]): [Vec2, Vec2][] {
+  const out = segs.map((s) => [s[0], s[1]] as [Vec2, Vec2]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < out.length && !changed; i++) {
+      for (let j = i + 1; j < out.length && !changed; j++) {
+        const [a, b] = out[i];
+        for (const [c, d] of [out[j], [out[j][1], out[j][0]] as [Vec2, Vec2]]) {
+          const ab = sub(b, a);
+          if (samePt(b, c) && Math.abs(cross(normalize(ab), normalize(sub(d, c)))) < 1e-9 && dot(ab, sub(d, c)) > 0) {
+            out[i] = [a, d];
+            out.splice(j, 1);
+            changed = true;
+            break;
+          }
+          if (samePt(a, d) && Math.abs(cross(normalize(ab), normalize(sub(d, c)))) < 1e-9 && dot(ab, sub(d, c)) > 0) {
+            out[i] = [c, b];
+            out.splice(j, 1);
+            changed = true;
+            break;
+          }
+        }
+      }
     }
   }
   return out;
@@ -597,6 +1136,8 @@ function ridgeCap(regions: readonly RoofRegion[], over: readonly Vec2[], T: numb
 export interface RoofOnLevel {
   roof: Roof;
   bearing: number;
+  /** Its regions when it is joined to the roofs it meets (joinRoof); absent or null: whole. */
+  join?: readonly JoinRegion[] | null;
 }
 
 /** A wall's top as a polyline over its centerline position `s` (from the wall's a end). */
@@ -634,7 +1175,7 @@ export function profileAt(pr: WallProfile, s: number): number {
  * when no roof raises the wall above `base`: an eave wall, whose outside face is on the eave line,
  * stays at the plate.
  */
-export function wallRoofProfile(fp: WallLine, base: number, roofs: readonly RoofOnLevel[]): WallProfile | null {
+export function wallRoofProfile(fp: WallLine, base: number, roofs: readonly RoofOnLevel[], caps: readonly RoofOnLevel[] = []): WallProfile | null {
   if (roofs.length === 0 || !(fp.length > 0)) return null;
   const mid = add(fp.a, scale(fp.dir, fp.length / 2));
   let smin = Infinity;
@@ -648,16 +1189,36 @@ export function wallRoofProfile(fp: WallLine, base: number, roofs: readonly Roof
   const half = fp.thickness / 2;
   // Each covering roof's planes along the wall's outside face, as lines h = a + b * s.
   const groups: { a: number; b: number }[][] = [];
-  for (const { roof, bearing } of roofs) {
+  const covering = new Set<Roof>();
+  // The planes of the roof's sections over p (an L-shaped hip has two), as lines along the face.
+  const planesOver = (roof: Roof, bearing: number, p: Vec2) => {
+    const secs = roofSections(roof, bearing);
+    return secs.length === 1 ? secs[0].planes : secs.filter((sc) => insideOrOn(p, sc.grown)).flatMap((sc) => sc.planes);
+  };
+  for (const { roof, bearing, join } of roofs) {
     const outline = roofBaseOutline(roof);
     if (outline.length < 3 || !pointInPolygon(mid, outline) || distanceToBoundary(mid, outline) < 1e-6) continue;
+    // A joined roof covers the wall only where it is drawn (not where another roof is instead).
+    if (join && !joinedCovers(join, mid)) continue;
+    covering.add(roof);
     const left = add(mid, scale(fp.normal, half));
     const right = sub(mid, scale(fp.normal, half));
     const side = distanceToBoundary(left, outline) <= distanceToBoundary(right, outline) ? 1 : -1;
     const origin = add(fp.a, scale(fp.normal, side * half));
-    groups.push(roofPlanes(roof, bearing).map((pl) => ({ a: planeAt(pl, origin), b: pl.gx * fp.dir.x + pl.gy * fp.dir.y })));
+    groups.push(planesOver(roof, bearing, mid).map((pl) => ({ a: planeAt(pl, origin), b: pl.gx * fp.dir.x + pl.gy * fp.dir.y })));
   }
   if (groups.length === 0) return null;
+  // Another roof of the building over the whole wall, above its plate: the wall stops under it too,
+  // so a wall that rises to its own roof does not come up through a roof that passes over it.
+  const end = add(fp.a, scale(fp.dir, fp.length));
+  for (const { roof, bearing, join } of caps) {
+    if (covering.has(roof)) continue;
+    const over = (p: Vec2) => (join ? joinedCovers(join, p) : insideOrOn(p, roofOutlineWithOverhang(roof)));
+    if (![fp.a, mid, end].every((p) => over(p) && distanceToBoundary(p, roofOutlineWithOverhang(roof)) > 1e-6)) continue;
+    const under = roofHeightAt(roof, bearing, mid);
+    if (under === null || !(under > base + 1e-6)) continue;
+    groups.push(planesOver(roof, bearing, mid).map((pl) => ({ a: planeAt(pl, fp.a), b: pl.gx * fp.dir.x + pl.gy * fp.dir.y })));
+  }
   const g = (s: number) => {
     let v = Infinity;
     for (const gr of groups) for (const l of gr) v = Math.min(v, l.a + l.b * s);

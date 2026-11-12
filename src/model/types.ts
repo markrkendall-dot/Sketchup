@@ -684,6 +684,22 @@ export interface Post {
 
 export type Member = Beam | Post;
 
+/**
+ * What carries a level where nothing of its building is under it (DESIGN.md "Foundations"): the
+ * lowest level's whole floor, or the part of an upper level's floor that is over no floor of the
+ * level below (an addition drawn on the First Floor beside a basement). `none` (or absent): nothing
+ * is drawn, as before. `slab`: a concrete slab on grade under the floor, `thickness` thick (4").
+ * `stem`: a perimeter stem wall `wallThickness` thick (8") from the floor framing down to `depth`
+ * below the floor top (36") on a footing, in concrete block or poured concrete.
+ */
+export interface Foundation {
+  kind: 'none' | 'slab' | 'stem';
+  thickness?: Inches;
+  wallThickness?: Inches;
+  depth?: Inches;
+  material?: 'block' | 'concrete';
+}
+
 export interface Level {
   id: Id;
   name: string;
@@ -711,6 +727,8 @@ export interface Level {
   members: Record<Id, Member>;
   finishes?: LevelFinishes;
   underlay?: Underlay;
+  /** Under the parts of the floor with nothing of the building below (absent: none). */
+  foundation?: Foundation;
 }
 
 export type MeasureTo = 'center' | 'inside' | 'outside';

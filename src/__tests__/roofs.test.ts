@@ -194,9 +194,14 @@ describe('shed, hip and flat roofs', () => {
     expect(lines).toHaveLength(5);
     const ridge = lines.find(([p, q]) => Math.abs(p.y - q.y) < 1e-6)!;
     expect(Math.abs(ridge[0].x - ridge[1].x)).toBeCloseTo(W - D, 6);
-    // A non-rectangular outline is roofed over its bounding rectangle.
+    // An L-shaped outline is roofed over the L (two arms joined at a valley, DESIGN.md "Roofs that
+    // meet"); any other non-rectangular outline over its bounding rectangle.
     const ell = roof({ shape: 'hip', outline: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 100 }, { x: 100, y: 100 }, { x: 100, y: 200 }, { x: 0, y: 200 }] });
-    expect(roofHeightAt(ell, B, { x: 150, y: 150 })).toBeCloseTo(B + 50 * k, 9);
+    expect(roofHeightAt(ell, B, { x: 150, y: 150 })).toBeNull();
+    expect(roofHeightAt(ell, B, { x: 150, y: 50 })).toBeCloseTo(B + 50 * k, 9);
+    expect(roofHeightAt(ell, B, { x: 50, y: 50 })).toBeCloseTo(B + 50 * k, 9);
+    const tee = roof({ shape: 'hip', outline: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }, { x: 100, y: 200 }, { x: 100, y: 100 }, { x: 0, y: 100 }] });
+    expect(roofHeightAt(tee, B, { x: 250, y: 150 })).toBeCloseTo(B + 50 * k, 9);
   });
 
   it('a flat roof is level at the bearing height', () => {

@@ -2,6 +2,7 @@ import { getDeckLayout, type DeckBox } from '../derive/decks';
 import { floorOpeningHoles, getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getLevelElevations } from '../derive/levels';
 import { getFootprints } from '../derive/footprint';
+import { foundationOf, foundationRegion } from '../derive/foundation';
 import { levelCentroid, outwardSide } from '../derive/meshes';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { getFaces, slabOutlines } from '../derive/rooms';
@@ -178,8 +179,10 @@ export function walkStep(yaw: number, forward: number, right: number, distance: 
 // Walking on what is there (DESIGN.md "3D", walk mode): the feet stand on the highest surface
 // within a step of them (floors less their holes, treads and landings, deck boards, the ground
 // outside), climb a step up to STEP_UP, fall to what is below, and are stopped by what stands in
-// the way between a step and the waist (stair sides, guards, rails, deck edges). Walls stay
-// walk-through, as in the orbit view's cutaway: the walk is for looking, not a collision game.
+// the way between a step and the waist (stair sides, guards, rails, deck edges) and, with
+// collision on (the default; the walk hint's "Walls are solid"), by the walls: a wall is in the way
+// except over its doors and passages (open or shut, any phase shown) and, in the All view, a wall
+// being demolished. Windows, cabinets and furniture are not in the way.
 
 /** The highest step the walker climbs, inches. */
 export const STEP_UP = 9;
@@ -193,6 +196,8 @@ const SUBSTEP = 2;
 const DECK_RAIL_HEIGHT = 36;
 /** How fast the eye follows the feet up and down (per second, as a fraction of the gap). */
 export const EYE_EASE = 12;
+/** How close the walker comes to a wall's face, inches (the eye stays in front of it). */
+export const WALL_PAD = 4;
 
 type Height = (p: Vec2) => number;
 
@@ -259,22 +264,88 @@ function placeShapes<T extends Shape & { top: Height; bottom?: Height }>(st: Pla
 
 const worldCache = new WeakMap<Plan, Map<string, WalkWorld>>();
 
-/** The surfaces and obstacles of the levels one walks on, in a view (memoized per plan). */
-export function walkWorld(plan: Plan, viewMode: ViewMode, levels: readonly Id[]): WalkWorld {
+/**
+ * The walls of a level in the way of the walker (level-local plan, absolute heights): each visible
+ * wall's outline cut square across at its doors and passages, which are left open; the rest from
+ * the floor to the wall's top. A wall being demolished is open in the All view.
+ */
+export function wallObstacles(plan: Plan, levelId: Id, viewMode: ViewMode, z: number): WalkObstacle[] {
+  const level = plan.levels[levelId];
+  if (!level) return [];
+  const out: WalkObstacle[] = [];
+  const fps = getFootprints(level, viewMode);
+  const byWall = new Map<Id, { from: number; to: number }[]>();
+  for (const o of Object.values(level.openings)) {
+    if (o.type === 'window' || !isOpeningVisible(o, level.walls[o.wallId], viewMode)) continue;
+    const list = byWall.get(o.wallId) ?? [];
+    list.push({ from: o.offset - o.width / 2, to: o.offset + o.width / 2 });
+    byWall.set(o.wallId, list);
+  }
+  for (const w of Object.values(level.walls)) {
+    const fp = fps.get(w.id);
+    if (!fp || (viewMode === 'all' && w.phase === 'demo')) continue;
+    const top = flat(z + (w.heightOverride ?? level.wallHeight));
+    const gaps = (byWall.get(w.id) ?? []).sort((p, q) => p.from - q.from);
+    // The solid stretches along the wall between the gaps, as plan pieces of its outline.
+    let start = -Infinity;
+    const cuts: [number, number][] = [];
+    for (const g of gaps) {
+      if (g.from > start) cuts.push([start, g.from]);
+      start = Math.max(start, g.to);
+    }
+    cuts.push([start, Infinity]);
+    for (const [a, b] of cuts) {
+      let poly: Vec2[] = fp.poly.map((p) => ({ ...p }));
+      if (Number.isFinite(a)) poly = clipAlong(poly, fp.dir, dot(fp.a, fp.dir) + a, 1);
+      if (Number.isFinite(b)) poly = clipAlong(poly, fp.dir, dot(fp.a, fp.dir) + b, -1);
+      if (poly.length < 3 || Math.abs(polygonSignedArea(poly)) < 1e-6) continue;
+      out.push({ ...shape(poly), bottom: flat(z), top, pad: WALL_PAD });
+    }
+  }
+  return out;
+}
+
+/** The part of poly with dot(p, d) >= c (sign 1) or <= c (sign -1). */
+function clipAlong(poly: Vec2[], d: Vec2, c: number, sign: 1 | -1): Vec2[] {
+  const out: Vec2[] = [];
+  const f = (p: Vec2) => sign * (dot(p, d) - c);
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    const fp = f(p);
+    const fq = f(q);
+    if (fp >= 0) out.push(p);
+    if ((fp >= 0) !== (fq >= 0)) {
+      const t = fp / (fp - fq);
+      out.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+    }
+  }
+  return out;
+}
+
+/**
+ * The surfaces and obstacles of the levels one walks on, in a view (memoized per plan). `walls`:
+ * the walls are in the way (collision on).
+ */
+export function walkWorld(plan: Plan, viewMode: ViewMode, levels: readonly Id[], walls = false): WalkWorld {
   let byKey = worldCache.get(plan);
   if (!byKey) worldCache.set(plan, (byKey = new Map()));
-  const key = `${viewMode}|${levels.join(',')}`;
+  const key = `${viewMode}|${levels.join(',')}|${walls}`;
   const hit = byKey.get(key);
   if (hit) return hit;
   const elev = getLevelElevations(plan);
   const surfaces: WalkSurface[] = [];
   const obstacles: WalkObstacle[] = [];
   const box = (b: DeckBox, z: number, pad = 0): WalkObstacle => ({ ...shape(b.poly, b.holes), bottom: flat(z + b.bottom), top: flat(z + b.top), pad });
+  // Where the ground is cut out (site.ts terrainCut): under each building's lowest level and under
+  // a foundation; elsewhere, under an upper level's floor too, the ground is there to stand on.
   const footprints: Vec2[][] = [];
   for (const id of allLevelIds(plan)) {
     const level = plan.levels[id];
     const st = structureOf(plan, id);
-    if (level && st) footprints.push(...slabOutlines(getFaces(level, viewMode), true).map((f) => f.map((p) => toSite(st, p))));
+    if (!level || !st) continue;
+    if (st.levelOrder[0] === id) footprints.push(...slabOutlines(getFaces(level, viewMode), true).map((f) => f.map((p) => toSite(st, p))));
+    if (foundationOf(level)) footprints.push(...foundationRegion(plan, id, viewMode).pieces.map((f) => f.map((p) => toSite(st, p))));
   }
   for (const id of levels) {
     const level = plan.levels[id];
@@ -343,6 +414,7 @@ export function walkWorld(plan: Plan, viewMode: ViewMode, levels: readonly Id[])
       const layout = getFloorOpeningLayout(plan, id, o.id, viewMode);
       for (const r of [...(layout?.railing ?? []), ...(layout?.rail ?? [])]) obstacles.push(box(r, z, BODY_RADIUS));
     }
+    if (walls) obstacles.push(...wallObstacles(plan, id, viewMode, z));
     placeShapes(st, surfaces, firstSurface);
     placeShapes(st, obstacles, firstObstacle);
   }
@@ -393,18 +465,39 @@ export function walkMove(world: WalkWorld, from: WalkState, to: Vec2): WalkState
   const total = dist(at, to);
   const n = Math.max(1, Math.ceil(total / SUBSTEP));
   const step = scale(sub(to, at), 1 / n);
+  // Started inside something (a walk start in a wall): free to walk out of it.
+  const stuck = blockedAt(world, at, feet);
   const tryTo = (p: Vec2): boolean => {
-    if (blockedAt(world, p, feet)) return false;
-    const s = surfaceAt(world, p, feet);
+    if (!stuck && blockedAt(world, p, feet)) return false;
+    let s = surfaceAt(world, p, feet);
     if (s === null) return false;
+    // A gap narrower than the body (a floor's edge an inch short of the wall below it) is stepped over, not fallen into.
+    if (s < feet - STEP_UP && total > 0) {
+      const d = scale(sub(to, from.at), 1 / total);
+      for (const k of [2, 4, 6]) {
+        const q = surfaceAt(world, add(p, scale(d, k)), feet);
+        if (q !== null && q >= feet - STEP_UP) {
+          s = feet;
+          break;
+        }
+      }
+    }
     at = p;
     feet = s;
     return true;
+  };
+  // Turned by `a` radians and shortened to the part of the step along that way (a glide).
+  const turned = (a: number) => {
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    return scale({ x: step.x * c - step.y * sn, y: step.x * sn + step.y * c }, c);
   };
   for (let k = 0; k < n; k++) {
     if (tryTo(add(at, step))) continue;
     if (step.x && tryTo(add(at, { x: step.x, y: 0 }))) continue;
     if (step.y && tryTo(add(at, { x: 0, y: step.y }))) continue;
+    // Along a wall at an angle, or round a door jamb's corner: glide at 30 or 60 degrees off.
+    if ([Math.PI / 6, -Math.PI / 6, Math.PI / 3, -Math.PI / 3].some((a) => tryTo(add(at, turned(a))))) continue;
     break;
   }
   return { at, feet };

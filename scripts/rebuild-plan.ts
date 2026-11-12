@@ -414,7 +414,7 @@ function rebuild(ids: ExistingIds): void {
   // Floor; the suite's shed on the First Floor, 3:12 down to the east so its top meets the main
   // wall 138" up, 30" over the Second Floor and under the east bedroom's window; the covered
   // entry's gable facing west over the front door and the screen room's shed down to the west
-  // (they overlap at y 120, no valley). Metal in the Existing view's galvanized; the Proposed view
+  // (they overlap at y 120 and are joined there). Metal in the Existing view's galvanized; the Proposed view
   // paints every roof the hunter green standing seam of the look.
   roof(sId, { shape: 'gable', outline: outline(MAIN), ridgeAngle: 0, pitch: 6, overhang: 24 }, ROOF_GALVANIZED, 0, NEW);
   roof(fId, { shape: 'shed', outline: outline({ x0: MAIN.x1 + 18, x1: SUITE.x1, y0: MAIN.y0, y1: MAIN.y1 }), ridgeAngle: 0, pitch: 3, overhang: 18 }, ROOF_GALVANIZED, 0, NEW);

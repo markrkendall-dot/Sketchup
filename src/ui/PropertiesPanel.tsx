@@ -11,6 +11,7 @@ import { getLevelElevations } from '../derive/levels';
 import { coreInterval, jambDistances, liveFootprints } from '../derive/openings';
 import { isOptionTagged, isVisible, PHASE_LABEL, type Phased } from '../derive/phase';
 import { facesBesideWall, getFaces, roomDimensions, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
+import { FOUNDATION_DEFAULTS } from '../derive/foundation';
 import { RAFTER_WIDTH, roofBearing, roofExtremes, ROOF_SHAPE_LABEL } from '../derive/roofs';
 import { columnDefaults, FENCE_DEFAULTS, fenceLength, fencePostPoints, groundAt, surfaceArea } from '../derive/site';
 import { directionVector, flightSteps, floorToFloor, headroomHoleStart, STAIRS_HEADROOM, STAIRS_LIMITS, stairsBase, stairsHeightProblem, stairsHoleOutline, stairsHoleStart, stairsRise, stairsRunOk, stairsWidthOk, stairSteps } from '../derive/stairs';
@@ -74,7 +75,7 @@ import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FEN
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
 import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
-import type { ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type EntitySelection, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { getViewPlan, useViewPlanStore } from '../store/viewStore';
@@ -2754,6 +2755,43 @@ function JoistZoneProps({ level, zone }: { level: Level; zone: JoistZone }) {
   );
 }
 
+/**
+ * The level's foundation (DESIGN.md "Foundations"): what is drawn under the parts of its floor with
+ * nothing of the building below (the whole floor on the lowest level).
+ */
+function FoundationFields({ level }: { level: Level }) {
+  const updateLevel = usePlanStore((s) => s.updateLevel);
+  const f = level.foundation;
+  const kind = f?.kind ?? 'none';
+  const set = (patch: Partial<Foundation>) => updateLevel(level.id, { foundation: { ...(f ?? { kind: 'none' }), ...patch } as Foundation });
+  const options: { value: Foundation['kind']; label: string }[] = [
+    { value: 'none', label: 'None' },
+    { value: 'slab', label: 'Slab on grade' },
+    { value: 'stem', label: 'Stem wall and footing' },
+  ];
+  return (
+    <>
+      <SelectField label="Foundation" value={kind} options={options} onChange={(k) => updateLevel(level.id, { foundation: k === 'none' ? { kind: 'none' } : { ...(f ?? {}), kind: k } })} />
+      {kind === 'slab' && <LengthField label="Slab thickness" value={f?.thickness ?? FOUNDATION_DEFAULTS.thickness} onCommit={(v) => void (v !== null && set({ thickness: v }))} hint="Under the floor where nothing of the building is below it." />}
+      {kind === 'stem' && (
+        <>
+          <LengthField label="Stem wall" value={f?.wallThickness ?? FOUNDATION_DEFAULTS.wallThickness} onCommit={(v) => void (v !== null && set({ wallThickness: v }))} hint="Thickness, round the floor where nothing is below it." />
+          <LengthField label="Depth below floor" value={f?.depth ?? FOUNDATION_DEFAULTS.depth} onCommit={(v) => void (v !== null && set({ depth: v }))} hint="To the footing; deeper where the ground is lower." />
+          <SelectField
+            label="Material"
+            value={f?.material ?? FOUNDATION_DEFAULTS.material}
+            options={[
+              { value: 'concrete', label: 'Poured concrete' },
+              { value: 'block', label: 'Concrete block' },
+            ]}
+            onChange={(m) => set({ material: m })}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
 /** The Level panel's framing: the joists over this level, their depth, and joist zones. */
 function LevelFramingFields({ level }: { level: Level }) {
   const setLevelFraming = usePlanStore((s) => s.setLevelFraming);
@@ -3687,6 +3725,7 @@ function LevelProps({ level }: { level: Level }) {
         onCommit={(v) => void (v !== null && updateLevel(level.id, { floorThickness: v }))}
         hint="Slab or framing under this level."
       />
+      <FoundationFields level={level} />
       <LengthField
         label="Base floor elevation"
         value={base}

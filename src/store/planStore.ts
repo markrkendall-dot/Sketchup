@@ -33,6 +33,7 @@ import {
   knownOptionIds,
   nodeMeets,
   roomOptionFinishesOf,
+  foundationProblem,
 } from '../model/plan';
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import { planRenovation } from '../model/renovate';
@@ -130,7 +131,7 @@ export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
 /** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
 const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS]);
 export type UnderlayPatch = Partial<Underlay>;
-export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
+export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness' | 'foundation'>>;
 /** A level's casework defaults; undefined clears a field. */
 export type FinishesPatch = Partial<Record<keyof LevelFinishes, LevelFinishes[keyof LevelFinishes] | undefined>>;
 /** Which end of a wall stays put when its length is edited. */
@@ -1912,8 +1913,15 @@ export const usePlanStore = create<PlanState>()(
             if (patch.wallHeight !== undefined && !(patch.wallHeight > 0)) return false;
             if (patch.floorThickness !== undefined && !(patch.floorThickness >= 0)) return false;
             if (patch.name !== undefined && !patch.name.trim()) return false;
+            if (patch.foundation !== undefined && foundationProblem(patch.foundation)) return false;
             const lowered = patch.wallHeight !== undefined && patch.wallHeight < level.wallHeight;
-            Object.assign(level, patch);
+            const { foundation, ...rest } = patch;
+            Object.assign(level, rest);
+            // A foundation of none is no foundation: the field goes (the plan reads as before).
+            if (foundation !== undefined) {
+              if (foundation.kind === 'none') delete level.foundation;
+              else level.foundation = { ...foundation };
+            }
             if (lowered) clampOpeningHeights(level);
           }),
 

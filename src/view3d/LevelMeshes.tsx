@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { getLevelElevations } from '../derive/levels';
-import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getFloorOpeningMeshes, getFoundationMeshes, getLevelMeshes, getMemberMeshes, openingPartColor } from '../derive/meshes';
+import { FOUNDATION_COLOR } from '../model/finish';
 import type { Id } from '../model/types';
 import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore } from '../store/uiStore';
@@ -31,9 +32,24 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   // And beams and posts (a post runs up to the beam over it).
   const members = useViewPlanStore((s) => getMemberMeshes(s.plan, levelId, viewMode));
   const floorTop = useViewPlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
+  // The foundation under the parts of the floor with nothing below (DESIGN.md "Foundations").
+  const foundation = useViewPlanStore((s) => getFoundationMeshes(s.plan, levelId, viewMode));
   return (
     <group position={[0, floorTop, 0]} name={`level:${levelId}`}>
+      {foundation.map((f) => (
+        <mesh
+          key={f.phase}
+          name={`foundation:${f.phase}`}
+          geometry={f.geometry}
+          material={wallMaterial(f.phase, 'exterior', f.material === 'block' ? 'block' : 'plain', FOUNDATION_COLOR[f.material])}
+          renderOrder={f.phase === 'demo' ? 1 : 0}
+          castShadow
+          receiveShadow
+          dispose={null}
+        />
+      ))}
       {meshes.floor && <mesh name="floor" geometry={meshes.floor} material={floorMaterial} castShadow receiveShadow dispose={null} />}
+      {meshes.keptFloor && <mesh name="floor:kept" geometry={meshes.keptFloor} material={floorMaterial} castShadow receiveShadow dispose={null} />}
       {meshes.floorFinishes.map((f) => (
         <mesh key={f.roomId} name={`floor-finish:${f.roomId}`} geometry={f.geometry} material={floorFinishMaterial(f.phase, f.finish, f.color)} receiveShadow dispose={null} />
       ))}

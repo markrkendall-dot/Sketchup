@@ -55,8 +55,8 @@ const exitWalk = () => useUiStore.getState().setCameraMode('orbit');
 /**
  * First-person walkthrough: drei PointerLockControls for mouse look (a click on the canvas locks
  * the pointer), WASD / arrows to walk at WALK_SPEED (Shift runs) on what is there: up stairs and
- * steps, down to what is below, stopped by rails, guards and the sides of stairs (walk.ts walkMove;
- * walls stay walk-through), the active level following the feet. Q / E or
+ * steps, down to what is below, stopped by rails, guards, the sides of stairs and (collision on,
+ * C toggles it) the walls (walk.ts walkMove), the active level following the feet. Q / E or
  * PageDown / PageUp jump a level, Esc (or losing the pointer lock) back to orbit. When the
  * browser refuses the pointer lock, dragging with the left button looks around instead. Mounted only
  * in walk mode (Controls.tsx), so it never coexists with the orbit controls; the canvas renders
@@ -135,6 +135,7 @@ export function FirstPerson() {
         exitWalk();
       } else if (e.code === 'KeyQ' || e.code === 'PageDown') changeLevel(-1);
       else if (e.code === 'KeyE' || e.code === 'PageUp') changeLevel(1);
+      else if (e.code === 'KeyC') useUiStore.getState().setWalkCollision(!useUiStore.getState().walkCollision);
     };
     const onUp = (e: KeyboardEvent) => {
       pressed.delete(e.code);
@@ -220,7 +221,7 @@ export function FirstPerson() {
     const ui = useUiStore.getState();
     const levels = walkLevels(plan, ui);
     const at = { x: camera.position.x, y: camera.position.z };
-    const moved = walkMove(walkWorld(plan, ui.viewMode, levels), { at, feet: feet.current }, { x: at.x + dx, y: at.y + dz });
+    const moved = walkMove(walkWorld(plan, ui.viewMode, levels, ui.walkCollision), { at, feet: feet.current }, { x: at.x + dx, y: at.y + dz });
     camera.position.x = moved.at.x;
     camera.position.z = moved.at.y;
     feet.current = moved.feet;

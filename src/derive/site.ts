@@ -1,5 +1,6 @@
 import { boundsOf, clipHalfPlane, cross, dist, lerp, pointInPolygon, polygonSignedArea, projectPointToSegment, sub, type Bounds } from '../model/geometry';
-import type { Column, Fence, Id, Plan, Site, SiteSurface, Structure, Vec2, ViewMode } from '../model/types';
+import type { Column, Fence, Id, Level, Plan, Site, SiteSurface, Structure, Vec2, ViewMode } from '../model/types';
+import { foundationOf, foundationRegion } from './foundation';
 import { groundLevelId } from '../model/plan';
 import { firstStructure, structureOf, structuresOf, toLocal, toSite } from '../model/structures';
 import { getLevelElevations } from './levels';
@@ -541,14 +542,28 @@ export function terrainCut(plan: Plan, viewMode: ViewMode): TerrainCut | undefin
     if (faces.outerFaces.length === 0) continue;
     parts.push({ s, faces, under: (elev[lowest.id]?.slabBottom ?? 0) - TERRAIN_UNDER_SLAB });
   }
-  if (parts.length === 0) return undefined;
+  // Foundations (foundation.ts): the ground is cut under the part of a level's floor with nothing
+  // below it, as under the lowest level, to just under the slab or the floor framing.
+  const founds: { s: Structure; level: Level; pieces: Vec2[][]; under: number }[] = [];
+  for (const s of structuresOf(plan)) {
+    for (const id of s.levelOrder) {
+      const level = plan.levels[id];
+      const f = level ? foundationOf(level) : null;
+      if (!level || !f) continue;
+      const { pieces } = foundationRegion(plan, id, viewMode);
+      if (!pieces.length) continue;
+      const top = (elev[id]?.floorTop ?? 0) - level.floorThickness;
+      founds.push({ s, level, pieces, under: (f.kind === 'slab' ? top - f.thickness : top) - TERRAIN_UNDER_SLAB });
+    }
+  }
+  if (parts.length === 0 && founds.length === 0) return undefined;
   const outlines = () => parts.map((p) => slabOutlines(p.faces, true).map((ring) => ring.map((q) => toSite(p.s, q))));
   return {
-    keys: parts.map((p) => p.faces.outerFaces),
-    sig: parts.map((p) => `${p.under},${p.s.origin.x},${p.s.origin.y},${p.s.rotation}`).join(';'),
+    keys: [...parts.map((p) => p.faces.outerFaces), ...founds.map((f) => f.level)],
+    sig: [...parts.map((p) => `${p.under},${p.s.origin.x},${p.s.origin.y},${p.s.rotation}`), ...founds.map((f) => `f${f.under},${f.s.origin.x},${f.s.origin.y},${f.s.rotation},${f.pieces.length}`)].join(';'),
     // One depth per footprint, in the order footprints() gives them.
-    floorUnder: parts.flatMap((p) => slabOutlines(p.faces, true).map(() => p.under)),
-    footprints: () => outlines().flat(),
+    floorUnder: [...parts.flatMap((p) => slabOutlines(p.faces, true).map(() => p.under)), ...founds.flatMap((f) => f.pieces.map(() => f.under))],
+    footprints: () => [...outlines().flat(), ...founds.flatMap((f) => f.pieces.map((ring) => ring.map((q) => toSite(f.s, q))))],
   };
 }
 

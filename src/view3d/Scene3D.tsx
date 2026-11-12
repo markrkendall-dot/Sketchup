@@ -445,6 +445,7 @@ function View3dToolbar() {
 function WalkOverlay() {
   const locked = useUiStore((s) => s.walkLocked);
   const levelId = useUiStore((s) => s.walkLevelId);
+  const collision = useUiStore((s) => s.walkCollision);
   const levelName = useViewPlanStore((s) => (levelId ? (s.plan.levels[levelId]?.name ?? '') : ''));
   return (
     <>
@@ -464,7 +465,9 @@ function WalkOverlay() {
         <span>
           <kbd>Esc</kbd> back to orbit
         </span>
-        <span className="walk-note">Walls are not solid in walk mode.</span>
+        <label className="walk-collision">
+          <input type="checkbox" checked={collision} onChange={(e) => useUiStore.getState().setWalkCollision(e.target.checked)} /> Walls are solid (<kbd>C</kbd>)
+        </label>
       </div>
     </>
   );

@@ -886,7 +886,7 @@ function proposed(ids: ExistingIds): void {
   // its underside is 156.4" above the first floor at the main wall (96 + 145 x 5/12), its top 158.9",
   // 50.9" above the Second Floor, under the transoms. The foyer: a gable facing west over the front
   // door like the old porch's; the screen porch: a shed high at the house wall (128") and down to 96"
-  // at its outer wall, meeting the gable's eave line. The two overlap at y 158 (no valley). The
+  // at its outer wall, meeting the gable's eave line. The two overlap at y 158, joined there. The
   // outlines stop 18" short of the house wall (x -18, and x 336 for the wing): an overhang is the
   // same on every edge, so the overhang on the house side ends at the wall's outside face instead of
   // running 18" into the house (a board and the roof's high edge upstairs). The slopes are the same

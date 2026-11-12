@@ -4,11 +4,11 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
 import type { FixtureMesh, FixturePart } from '../derive/meshes';
 import type { FillPart } from '../derive/openings3d';
-import { getDeckMeshes, getFenceMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
+import { getDeckMeshes, getFenceMeshes, getFloorOpeningMeshes, getFoundationMeshes, getLevelMeshes, getMemberMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
 import { DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
 import { CERAMIC_WHITE, isBath } from '../model/bath';
-import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
+import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, FOUNDATION_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { BacksplashFinish, Column, CounterMaterial, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
 import { backsplashMaterial, ceilingMaterial, chimneyPartMaterial, fixturePartMaterial, isGlassPart, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
@@ -170,7 +170,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     const decks = getDeckMeshes(plan, id, viewMode);
     const guards = getFloorOpeningMeshes(plan, id, viewMode);
     const members = getMemberMeshes(plan, id, viewMode);
-    if (!level || (!members.length &&!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.staircases.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length)) continue;
+    if (!level || (!members.length && !level.foundation && !meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.staircases.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length)) continue;
     const group = new Group();
     // A level of another structure stands at its structure's place and turn, named after it too.
     const st = structureOf(plan, id);
@@ -178,6 +178,12 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     group.position.set(st?.origin.x ?? 0, elev[id]?.floorTop ?? 0, st?.origin.y ?? 0);
     if (st?.rotation) group.rotation.y = (-st.rotation * Math.PI) / 180;
     if (meshes.floor) group.add(mesh('Floor', meshes.floor, material('floor', floorMaterial)));
+    if (meshes.keptFloor) group.add(mesh('Floor', meshes.keptFloor, material('floor', floorMaterial)));
+    // The foundation under the floor with nothing below (DESIGN.md "Foundations").
+    for (const f of getFoundationMeshes(plan, id, viewMode)) {
+      const finish = f.material === 'block' ? 'block' : 'plain';
+      group.add(mesh(`Foundation (${f.kind === 'slab' ? 'slab' : 'stem wall'})`, f.geometry, material(wallMaterialName(f.phase, 'exterior', finish, FOUNDATION_COLOR[f.material]), wallMaterial(f.phase, 'exterior', finish, FOUNDATION_COLOR[f.material]))));
+    }
     const roomName = (id: string) => level.rooms[id]?.name ?? 'room';
     for (const f of meshes.floorFinishes) {
       group.add(mesh(`Floor finish (${roomName(f.roomId)})`, f.geometry, material(interiorMaterialName('floor', f.phase, f.finish, f.color), floorFinishMaterial(f.phase, f.finish, f.color))));

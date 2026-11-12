@@ -397,6 +397,8 @@ export interface UiState {
   walkLevelId: Id | null;
   /** Walk mode: the pointer is locked to the 3D canvas (mouse looks around). */
   walkLocked: boolean;
+  /** Walk mode: the walls are solid (doors and passages open). Not saved; on by default. */
+  walkCollision: boolean;
   /** The keyboard help overlay is open. */
   helpOpen: boolean;
   /** The Properties dialog (the property library, ui/PropertiesDialog.tsx) is open. */
@@ -474,6 +476,7 @@ export interface UiState {
   /** Show (or clear) a notice; an info notice clears itself after NOTICE_MS. */
   setNotice: (notice: Notice | null) => void;
   setWalkFrom: (walkFrom: WalkFrom | null) => void;
+  setWalkCollision: (on: boolean) => void;
   setContextMenu: (menu: ContextMenu | null) => void;
   setIssues: (issues: readonly Issue[]) => void;
   setChecksOpen: (open: boolean) => void;
@@ -584,6 +587,7 @@ export const useUiStore = create<UiState>()((set) => ({
   view3dPreset: 'perspective',
   walkLevelId: null,
   walkLocked: false,
+  walkCollision: true,
   helpOpen: false,
   libraryOpen: false,
   notice: null,
@@ -721,6 +725,7 @@ export const useUiStore = create<UiState>()((set) => ({
     ),
   setWalkLevel: (walkLevelId) => set({ walkLevelId }),
   setWalkLocked: (walkLocked) => set((s) => (s.walkLocked === walkLocked ? s : { walkLocked })),
+  setWalkCollision: (walkCollision) => set((s) => (s.walkCollision === walkCollision ? s : { walkCollision })),
   setHelpOpen: (helpOpen) => set({ helpOpen }),
   setLibraryOpen: (libraryOpen) => set({ libraryOpen }),
   setNotice: (notice) => {

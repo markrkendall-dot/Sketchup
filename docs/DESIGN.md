@@ -518,7 +518,11 @@ is the outside face of the eave walls and the overhang hangs lower by `overhang 
 - Gable: two planes at the bearing height on `v = vmin` and `v = vmax`, meeting at the ridge through
   the middle. Shed: one plane at the bearing height on `u = umax`, rising against `u` (it slopes down
   in the ridgeAngle direction). Hip: the gable's planes plus one on `u = umin` and one on `u = umax`,
-  over the outline's bounding rectangle in the ridge frame (the panel says so). Flat, or pitch 0:
+  over the outline's bounding rectangle in the ridge frame (the panel says so), unless the outline
+  is an L (six corners, every side along or across the ridge, `hipArms`): then two hips, one over
+  each arm's rectangle (each holding the corner square), joined as two roofs that meet (below), as
+  one surface: the lower is cut wherever they overlap, so the valley runs from the reflex corner.
+  The upper envelope of the two arms' hips is the straight-skeleton roof of the L. Flat, or pitch 0:
   one level plane.
 - The underside at a point is the lowest of the planes there (`roofHeightAt`, null outside the
   overhang outline): for convex roofs the planes' lower envelope is the roof. Splitting the overhang
@@ -528,8 +532,8 @@ is the outside face of the eave walls and the overhang hangs lower by `overhang 
   overhang outline and none along ridge or hip lines, so the slab is one closed surface. Boards 1.5"
   proud of every edge, top flush with the roof's top, `fascia` deep: level stretches (eaves) are
   fascia boards that run on past a convex corner to cover it, sloped stretches are rake boards; at a
-  reflex corner the incoming board stops short so boards never overlap. Each board is closed. No CSG;
-  roofs that overlap (a wing roof running into the main wall) just overlap.
+  reflex corner the incoming board stops short so boards never overlap. Each board is closed. Roofs
+  that meet are trimmed (below).
 - Open eaves (`eave: 'open'`; absent is `fascia`, so older files look the same): a level stretch the
   roof descends toward (its plane's gradient points away from the edge) gets no board and has rafter
   tails under it instead; a shed's high edge and every edge of a flat roof keep their boards, and
@@ -564,8 +568,48 @@ roof (same thickness and class), are internal. The level's walls stay one closed
 present (tested). Openings keep their heights and are still clamped to the wall height. Interior
 walls are not raised (an attic over a flat ceiling).
 
-Phase and view mode apply like walls: a roof hidden in the view is not drawn, not exported and does
-not raise walls. `getLevelMeshes` caches each roof's geometries (slab with cap, boards, tails) per
+### Roofs that meet (`roofs.ts joinRoof`, `derive/roofJoin.ts`)
+
+Every roof of a building is trimmed against the other roofs of the same building shown in the view,
+on any of its levels (heights put in one frame by the levels' floor tops), so what is drawn is the
+upper envelope of the roof solids. The rule, per pair: a roof is cut away where the other's top is
+higher and either the two slabs overlap in height there, or the point is inside the other's bearing
+outline (over its walls: a wing's overhang into the main house, a porch roof run into the wall of
+the storey above). An overhang that passes clear under another roof's overhang (a lean-to under a
+higher eave) is left whole, and roofs that only touch along an edge are unchanged. Where two tops
+coincide exactly (two arms of an L hip, two roofs drawn in one place) the earlier roof is kept. A
+gable wing drawn into the main block (to its ridge, or across it) therefore stops at the valleys
+where its planes meet the main roof's; the main roof stays whole where it is above the wing and is
+cut only beneath it (a cross gable when the wing's ridge is higher). Two blocks whose eaves overhang
+each other meet in a valley over the wall between them. Roofs of different buildings never trim each
+other, and a demolished and a new roof never stand together, so they never trim each other either
+(in All both show whole).
+
+The geometry: each roof's planes over convex pieces of its overhang outline (`roofSections`; Hertel
+Mehlhorn merging of the ear-clipping triangles for a non-convex outline). For each region and each
+region of another roof, the cut is the intersection clipped by the half-plane where this top is lower
+and by the height-overlap half-plane, or by the other's bearing outline (convex pieces); all convex,
+so no general polygon booleans. What is drawn (`keptPieces`) is each region less its cuts, in convex
+pieces with the corners of their neighbours inserted on their sides (no T-junctions); each piece is a
+prism from its plane up `thickness`, with a side face only on a stretch no other piece lies beyond,
+so a trimmed roof is still watertight (where two cuts meet at one point, as valleys meeting at a
+ridge, a vertical edge is shared four ways). Boards go on the stretches of the overhang outline that
+remain, joined back into runs; a board stops square at a cut. Rafter tails are cut like the slab.
+The ridge cap runs along the lines where two drawn pieces of different slopes meet in a ridge or hip
+(not a valley, nor between two coplanar arms of an L hip). UVs are per face as before. A roof with
+nothing cut (and not an L hip) is built exactly as before. Joins are memoized per roof object and
+the roofs it meets; `getLevelMeshes` rebuilds a roof when its join changes and its level cache
+checks the building's roofs, so a roof on another level trims this level's.
+
+Walls under joined roofs: a roof covers a wall only where it is drawn (`joinedCovers` at the middle
+of the centerline), and another roof of the building that is drawn over the whole wall and above its
+plate also caps it (the wall stops under it). So a main gable end under a wing drawn into it keeps its
+full gable, a wall that rises to its own roof does not come up through a roof passing over it, and
+the main wall under the wing stays at the plate where the wing is drawn over it. In 2D the plan draws
+a joined roof's valleys and its ridges where it is drawn (`roofRidgeLines` with the join).
+
+Phase and view mode apply like walls: a roof hidden in the view is not drawn, not exported, does
+not raise walls and trims nothing. `getLevelMeshes` caches each roof's geometries (slab with cap, boards, tails) per
 roof object and bearing height, and disposes all three when they drop out.
 
 2D: the outline dashed, the overhang outline lighter, ridge and hip lines thin and solid; demolished
@@ -582,6 +626,42 @@ outline to the level's outer-face polygon when the walls close exactly one ring.
 only; at least 3", and the default 5.5" x 24" is stored as no field), "Board colour" with a reset to
 tan, and for metal "Weathering" (0 to 1). The store refuses unusable values of these fields
 (`roofOptionProblem`).
+
+## Foundations (`derive/foundation.ts`, `Level.foundation`)
+
+`Level.foundation` (optional; absent or `none` draws nothing, as before, so no schema bump) says
+what carries the part of the level's floor with nothing of its building beneath it
+(`foundationRegion`: the level's slab outlines out to its walls' outside faces, less the slab
+outlines of the level below, in convex pieces; slivers under 3" wide, from a wall-thickness mismatch
+with the level below, are dropped). On the lowest level that is the whole floor; on the First Floor
+of a house whose Basement does not reach under a wing, it is the wing.
+
+- `slab`: a concrete slab from the floor framing's underside down `thickness` (4"), deeper to 6"
+  into the ground at its lowest corner where the ground is lower.
+- `stem`: a stem wall `wallThickness` (8") thick inside every outside edge of the region that is not
+  against the level below's floor, mitred at the corners, from the floor framing down to `depth` (36")
+  below the floor top, or 6" into the ground where it is lower, on a footing 4" wider each side and
+  8" deep. In concrete block (the block siding texture, `#8f8a84`) or poured concrete (plain,
+  `#b3b0a8`).
+
+The ground (`site.ts terrainCut`) is cut under the region as under the lowest level: to 2" under the
+slab, or under the floor framing inside a stem wall, so it meets the foundation's outside face. A
+piece is new (green in All) where the level's floor in the Existing view does not reach.
+`getFoundationMeshes` builds one geometry per phase (box UVs in inches, like a column), memoized on
+the level, the level below, the grade points and the floor top; the export names it `Foundation`.
+The Level panel has "Foundation" (none, slab on grade, stem wall and footing) and its sizes. The
+rebuild's block walls under the suite are a real basement with a walkout door, not a foundation, and
+stay walls.
+
+## A floor opened by demolition (`meshes.ts keptFloor`)
+
+Demolishing part of an exterior wall in a view leaves the room it closed unclosed, so the view finds
+no outline there and the room no area. The floor is still there: in Proposed (and an option's view)
+the Existing view's slab is kept where the view's slab outlines do not reach (`LevelMeshes.keptFloor`,
+same material, exported as `Floor`), and each room labelled in the Existing view that is still shown
+but labels no area in the view keeps its floor finish (its proposed one) over its existing outline,
+less the areas of the view's rooms. The room's label and area do not show in that view (it is not a
+closed room there); its walls' finishes go with the walls; its ceiling is not kept.
 
 ## Decks (`derive/decks.ts`, `tools/deckTool.ts`)
 
@@ -2077,7 +2157,7 @@ looks around instead. WASD / arrows (by `KeyboardEvent.code`) move at 60"/s rela
 Shift doubles it, using `useFrame` delta (clamped to 0.25 s), on what is there (`walkWorld`,
 memoized per plan, view and the levels shown): surfaces to stand on (each shown level's slab
 outline less its floor openings and the holes the flights below cut, a staircase's `stair` solids,
-a lone flight tread by tread, deck boards, and the ground outside every level's outline) and
+a lone flight tread by tread, deck boards, and the ground where the terrain is not cut out) and
 obstacles (stair solids from their underside to their top, rails and guards kept `BODY_RADIUS` 6"
 away, lone flights' railings, deck boards and railings, floor opening guards). `walkMove` cuts a
 move into 2" pieces; each goes where nothing stands between a step (`STEP_UP`, 9") and the waist
@@ -2091,7 +2171,17 @@ or the pointer-lock `unlock` event return to orbit, restoring the orbit pose. Ke
 `window` in the capture phase while walking, so the 2D tools and hotkeys never see them (App's
 handler also ignores keys while a pointer lock is active). `frameloop="always"` while walking,
 `"demand"` otherwise. A point light follows the eye (indoors the sky and sun reach only floors).
-Crosshair and a hint ("Walls are not solid in walk mode": the walk is for looking).
+Crosshair and a hint with a "Walls are solid" checkbox (`C` toggles it; `uiStore.walkCollision`,
+on by default, not saved). With it on the walls are obstacles too (`wallObstacles`): each visible
+wall's outline from the floor to its top, cut square across at its doors and passages (open or
+shut, any phase the view shows), and in All a wall being demolished is open; windows, cabinets and
+furniture are not in the way. Walls are kept `WALL_PAD` 4" away. A blocked piece also tries gliding
+30 or 60 degrees off its way (round a jamb or along a wall at an angle), and a walker that starts
+inside something may walk out of it. A gap narrower than the body (6") is stepped over, not fallen
+into, and the ground counts as missing only where the terrain is cut (under each building's lowest
+level and under a foundation), so the edge of an upper floor that stops short of the wall below
+does not drop the walker into the basement. The tests walk through every door and passage of both
+example plans, both ways, straight and 8" to one side.
 
 **Elevations** (`uiStore.view3dPreset`: `perspective`, `north`, `south`, `east` or `west`; pure maths in
 `view3d/elevation.ts`). The sides are the plan's: north looks toward +plan y from the road side, south

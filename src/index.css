@@ -1146,6 +1146,11 @@ button.primary:hover:not(:disabled) {
   color: #fcd34d;
 }
 
+.walk-hint .walk-collision {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 .view3d-host.walking .view3d-canvas {
   cursor: crosshair;
 }

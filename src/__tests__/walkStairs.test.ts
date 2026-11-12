@@ -45,7 +45,7 @@ describe('walking the grand stair', () => {
   });
 
   it('the guard on the opening\'s east edge keeps the walker on the landing', () => {
-    // (Walls are not solid in walk mode; the Master's north wall carries the opening's south edge.)
+    // (This world has no walls, collision off; the Master's north wall carries the opening's south edge.)
     const end = walk({ x: 196, y: 80 }, s, { x: 140, y: 80 });
     expect(end.at.x).toBeGreaterThan(167.5);
     expect(end.feet).toBe(elev[s].floorTop);

@@ -240,7 +240,9 @@ describe('buildExportScene', () => {
     };
     expect(store().addRoof(second, { ...roof, eave: 'open', boardColor: '#5a3a35', color: '#8a8378', weathering: 0.6 })).not.toBeNull();
     expect(store().addRoof(first, { ...roof, eave: 'open' })).not.toBeNull();
-    expect(store().addRoof(first, { ...roof, eave: 'open', boardColor: '#5a3a35', phase: 'demo' })).not.toBeNull();
+    // Apart from the existing one (two roofs in one place are joined: the later is not drawn).
+    const apart = roof.outline.map((p) => ({ x: p.x + 1000, y: p.y }));
+    expect(store().addRoof(first, { ...roof, outline: apart, eave: 'open', boardColor: '#5a3a35', phase: 'demo' })).not.toBeNull();
     const root = buildExportScene(store().plan, 'all', allVisible(first));
     const parts = (level: string, name: string) => byName(root, level)!.children.filter((c) => c.name === name) as Mesh[];
     const names = (level: string, name: string) => parts(level, name).map((m) => (m.material as MeshStandardMaterial).name).sort();
