@@ -5,7 +5,7 @@ import { FOUNDATION_COLOR } from '../model/finish';
 import type { Id } from '../model/types';
 import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore } from '../store/uiStore';
-import { backsplashMaterial, ceilingMaterial, counterMaterial, fixturePartMaterial, isGlassPart, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { backsplashMaterial, ceilingMaterial, counterMaterial, fixturePartMaterial, isGlassPart, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, flashingMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -227,6 +227,16 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
               material={rafterMaterial(r.phase, r.boardColor)}
               renderOrder={r.phase === 'demo' ? 1 : 0}
               castShadow={r.phase !== 'demo'}
+              receiveShadow
+              dispose={null}
+            />
+          )}
+          {r.flashing && (
+            <mesh
+              name={`flashing:${r.id}`}
+              geometry={r.flashing}
+              material={flashingMaterial(r.phase, r.color)}
+              renderOrder={r.phase === 'demo' ? 1 : 0}
               receiveShadow
               dispose={null}
             />

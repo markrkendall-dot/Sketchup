@@ -1,4 +1,4 @@
-import type { BathVariant, Fixture, FixtureKind } from './types';
+import type { BathVariant, Fixture, FixtureKind, TubShower } from './types';
 
 // Bath and laundry fixtures (DESIGN.md "Bath and laundry"): kinds of fixture like the kitchen's
 // appliances, placed by the Cabinet tool and shown like casework (never on the furniture layer).
@@ -30,6 +30,20 @@ export const variantOf = (f: Pick<Fixture, 'kind' | 'variant'>): BathVariant | n
   if (!list) return null;
   return f.variant && list.includes(f.variant) ? f.variant : list[0];
 };
+
+/** A shower over a tub: the head alone, or with a glass screen, sliding doors or a curtain rail. */
+export const TUB_SHOWERS: readonly TubShower[] = ['head', 'screen', 'doors', 'curtain'];
+export const TUB_SHOWER_LABEL: Record<TubShower, string> = {
+  head: 'Shower head only',
+  screen: 'With a glass screen',
+  doors: 'With sliding glass doors',
+  curtain: 'With a curtain rail',
+};
+/** The shower over a tub, null for none (only an alcove tub has one). */
+export const tubShowerOf = (f: Pick<Fixture, 'kind' | 'variant' | 'tubShower'>): TubShower | null =>
+  f.kind === 'bathtub' && variantOf(f) === 'alcove' && f.tubShower && TUB_SHOWERS.includes(f.tubShower) ? f.tubShower : null;
+/** A tub shower's sizes: the screen's length along the tub, the glass's height over the rim, the curtain rail's height over the floor. */
+export const TUB_SHOWER = { screen: 30, glass: 56, rail: 76 } as const;
 
 /** A shower's glass sides, each false when absent. */
 export const glassOf = (f: Pick<Fixture, 'glass'>): { front: boolean; left: boolean; right: boolean } => ({

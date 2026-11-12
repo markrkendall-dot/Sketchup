@@ -74,7 +74,13 @@ interface Span {
   material: CounterMaterial;
   /** Backs are placed before ends. */
   back: boolean;
+  /** "Up to the wall cabinets": the top follows the bottoms of what hangs above (uppersOn), up to `cap`. */
+  toUppers: boolean;
+  cap: number;
 }
+
+/** What hangs on the wall over a counter (a backsplash "up to the wall cabinets" stops under it). */
+const UPPER_KINDS: readonly Fixture['kind'][] = ['wall', 'cornerWall', 'hood', 'microwave'];
 
 /** A side within this of a face line, and facing the way the face does, lies on it. */
 const ON_FACE = 1;
@@ -151,6 +157,24 @@ export function backsplashPieces(level: Pick<Level, 'fixtures' | 'finishes' | 'w
   const counters = fixtures.filter((f) => hasCounter(f.kind));
   const faces = wallFaces(fps);
   const spans = new Map<Face, Span[]>();
+  // The wall cabinets, hoods and microwaves hung on each face: their interval along it and their bottom.
+  const uppers = new Map<Face, { t0: number; t1: number; bottom: number }[]>();
+  for (const f of fixtures) {
+    if (!UPPER_KINDS.includes(f.kind)) continue;
+    const fr = fixtureFrame(f);
+    const h = f.width / 2;
+    for (const side of [
+      { p: fixturePoint(fr, -h, 0), q: fixturePoint(fr, h, 0), out: fr.u },
+      { p: fixturePoint(fr, -h, 0), q: fixturePoint(fr, -h, f.depth), out: fr.v },
+      { p: fixturePoint(fr, h, 0), q: fixturePoint(fr, h, f.depth), out: { x: -fr.v.x, y: -fr.v.y } },
+    ]) {
+      const hit = faceUnder(faces, side.p, side.q, side.out);
+      if (!hit) continue;
+      const list = uppers.get(hit.face) ?? [];
+      list.push({ t0: hit.t0, t1: hit.t1, bottom: f.elevation });
+      uppers.set(hit.face, list);
+    }
+  }
   const touches = (a: Fixture, b: Fixture): boolean => {
     const box = (f: Fixture) => {
       const pts = counterRects(f).flat();
@@ -187,10 +211,26 @@ export function backsplashPieces(level: Pick<Level, 'fixtures' | 'finishes' | 'w
       const top = Math.min(wallTop, spec.backsplash === 'upstand' ? bottom + BACKSPLASH.upstand : spec.backsplash === 'toWall' ? bottom + spec.height : wallTop);
       if (top - bottom < 0.25) continue;
       const list = spans.get(hit.face) ?? [];
-      list.push({ fixture: f, t0: hit.t0, t1: hit.t1, y0: bottom, y1: top, thick, spec, counterColor: counter.color, material: counter.material, back: side.back });
+      list.push({ fixture: f, t0: hit.t0, t1: hit.t1, y0: bottom, y1: top, thick, spec, counterColor: counter.color, material: counter.material, back: side.back, toUppers: spec.backsplash === 'toWall', cap: wallTop });
       spans.set(hit.face, list);
     }
   }
+  // Whether a back's piece stands at a face's end (an inside corner): a back on another face whose
+  // interval reaches the point, not cut away there by an opening at the counter.
+  const standsAt = (face: Face, t: number): boolean => {
+    const p = { x: face.origin.x + face.tangent.x * t, y: face.origin.y + face.tangent.y * t };
+    for (const [other, list] of spans) {
+      if (other === face || Math.abs(dot(sub(p, other.origin), other.normal)) > ON_FACE) continue;
+      const u = dot(sub(p, other.origin), other.tangent);
+      const cuts = openingCuts(level, other, viewMode);
+      for (const sp of list) {
+        if (!sp.back || u < sp.t0 - ON_FACE || u > sp.t1 + ON_FACE) continue;
+        if (cuts.some((c) => c.t0 <= u + 1e-6 && c.t1 >= u - 1e-6 && c.y0 <= sp.y0 + 1e-6 && c.y1 >= sp.y1 - 1e-6)) continue;
+        return true;
+      }
+    }
+    return false;
+  };
   const pieces: BacksplashPiece[] = [];
   for (const [face, list] of spans) {
     // Backs first, then ends; each in fixture id order. An inside corner: the end on the other wall
@@ -198,23 +238,35 @@ export function backsplashPieces(level: Pick<Level, 'fixtures' | 'finishes' | 'w
     list.sort((p, q) => (p.back === q.back ? (p.fixture.id < q.fixture.id ? -1 : 1) : p.back ? -1 : 1));
     const placed: [number, number][] = [];
     const cuts = openingCuts(level, face, viewMode);
+    const above = uppers.get(face) ?? [];
     for (const sp of list) {
       let t0 = sp.t0;
       let t1 = sp.t1;
       // An end piece stops short of the face it meets at an inside corner by the thickness of the
-      // piece standing there (its own back's, on the other wall).
+      // piece standing there (a back's, on the other wall); with none there it runs into the corner.
       if (!sp.back) {
-        if (t0 - face.t0 < ON_FACE) t0 = face.t0 + sp.thick;
-        if (face.t1 - t1 < ON_FACE) t1 = face.t1 - sp.thick;
+        if (t0 - face.t0 < ON_FACE) t0 = face.t0;
+        if (face.t1 - t1 < ON_FACE) t1 = face.t1;
+        if (standsAt(face, t0)) t0 += sp.thick;
+        if (standsAt(face, t1)) t1 -= sp.thick;
       }
       const boxes: BacksplashBox[] = [];
       for (const [a0, a1] of subtract(t0, t1, placed)) {
-        // Along the piece, the openings' edges split it; in each part the height less the openings there.
-        const edges = [...new Set([a0, a1, ...cuts.flatMap((c) => [c.t0, c.t1]).filter((t) => t > a0 && t < a1)])].sort((p, q) => p - q);
+        // Along the piece, the openings' edges split it (and, up to the wall cabinets, the ends of
+        // what hangs above); in each part the height less the openings there.
+        const marks = [...cuts.flatMap((c) => [c.t0, c.t1]), ...(sp.toUppers ? above.flatMap((u) => [u.t0, u.t1]) : [])];
+        const edges = [...new Set([a0, a1, ...marks.filter((t) => t > a0 && t < a1)])].sort((p, q) => p - q);
         for (let i = 0; i + 1 < edges.length; i++) {
           const m = (edges[i] + edges[i + 1]) / 2;
+          // Up to the wall cabinets: the lowest bottom of what hangs over this part (above the
+          // counter), else the set height.
+          let top = sp.y1;
+          if (sp.toUppers) {
+            const bottoms = above.filter((u) => u.t0 < m && u.t1 > m && u.bottom > sp.y0 + 0.25).map((u) => u.bottom);
+            if (bottoms.length) top = Math.min(sp.cap, Math.min(...bottoms));
+          }
           const over = cuts.filter((c) => c.t0 < m && c.t1 > m).map((c) => [c.y0, c.y1] as [number, number]);
-          for (const [y0, y1] of subtract(sp.y0, sp.y1, over)) boxes.push({ s0: edges[i], s1: edges[i + 1], d0: 0, d1: sp.thick, y0, y1 });
+          for (const [y0, y1] of subtract(sp.y0, top, over)) boxes.push({ s0: edges[i], s1: edges[i + 1], d0: 0, d1: sp.thick, y0, y1 });
         }
         placed.push([a0, a1]);
       }
@@ -235,6 +287,26 @@ export function backsplashPieces(level: Pick<Level, 'fixtures' | 'finishes' | 'w
     }
   }
   return pieces.sort((p, q) => (p.fixtureId < q.fixtureId ? -1 : p.fixtureId > q.fixtureId ? 1 : 0));
+}
+
+/**
+ * The backsplashes on the plan (DESIGN.md "Casework"): per piece, a line along its face, its
+ * thickness off the wall, one segment per stretch along the face (a stretch a window splits into
+ * heights is drawn once).
+ */
+export function backsplashPlanLines(pieces: readonly BacksplashPiece[]): { fixtureId: Id; phase: Phase; segs: [Vec2, Vec2][] }[] {
+  return pieces.map((p) => {
+    const fr = fixtureFrame(p);
+    const seen = new Set<string>();
+    const segs: [Vec2, Vec2][] = [];
+    for (const b of p.boxes) {
+      const k = `${b.s0.toFixed(4)}|${b.s1.toFixed(4)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      segs.push([fixturePoint(fr, b.s0, b.d1), fixturePoint(fr, b.s1, b.d1)]);
+    }
+    return { fixtureId: p.fixtureId, phase: p.phase, segs };
+  });
 }
 
 /** The openings in a face's wall as rectangles along the face (t) and up it (y). */

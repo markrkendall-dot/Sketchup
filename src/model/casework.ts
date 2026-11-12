@@ -1,4 +1,4 @@
-import { BATH_KINDS } from './bath';
+import { BATH_KINDS, TUB_SHOWERS } from './bath';
 import { isHexColor } from './finish';
 import type { Backsplash, BacksplashFinish, CounterMaterial, Fixture, FixtureKind, FrontStyle, HandleFinish, HandleStyle, Level, LevelFinishes } from './types';
 
@@ -267,6 +267,8 @@ export const KITCHEN_FIELDS = {
   corner: { kinds: isCorner, ok: (v: unknown) => v === 'left' || v === 'right' },
   shelves: { kinds: (k: FixtureKind) => k === 'shelf', ok: (v: unknown) => isIntIn(v, 1, SHELF.maxCount) },
   shelfThickness: { kinds: (k: FixtureKind) => k === 'shelf', ok: (v: unknown) => isFiniteNum(v) && v > 0 && v <= 6 },
+  // Not the kitchen's, but checked the same way: a shower over a bathtub (model/bath.ts).
+  tubShower: { kinds: (k: FixtureKind) => k === 'bathtub', ok: oneOf(TUB_SHOWERS) },
 } as const;
 export type KitchenField = keyof typeof KITCHEN_FIELDS;
 export const KITCHEN_FIELD_KEYS = Object.keys(KITCHEN_FIELDS) as KitchenField[];

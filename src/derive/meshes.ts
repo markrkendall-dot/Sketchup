@@ -23,8 +23,10 @@ import { slabInsets, wallExtensions } from './platform';
 import { facesBesideWall, getFaces, slabOutlines, wallSideFaces, type FaceSet } from './rooms';
 import { CHIMNEY_CAP, chimneyPartBoxes, circleOutline, columnOutline, drapeSurface, FENCE_DEFAULTS, fenceLayout, fallbackElevation, hasChimneyCap, planTerrain, terrainHeightAt, type ChimneyPart, type FenceLayout, type TerrainGrid } from './site';
 import { boardColorOf, DEFAULT_SASH_COLOR, ROOF_COLOR, roofColorOf, ROOF_TILE, SIDING_FINISHES, TRIM_COLOR, weatheringOf } from '../model/finish';
-import { convexMinusAll, convexPieces, profileAt, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type JoinRegion, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
+import { profileAt, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type JoinRegion, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { getLevelRoofs } from './roofJoin';
+import { canFollowRoof, followsRoof, slopedCeilingPieces, type CeilingPiece } from './ceilings';
+import { openRooms, piecesMinus } from './openRooms';
 import { foundationLayout, type FoundationLayout } from './foundation';
 import { getLevelElevations } from './levels';
 import { toSite, structureOf } from '../model/structures';
@@ -767,6 +769,63 @@ export function buildCeilingGeometry(net: readonly Vec2[], holes: readonly (read
   return buildFloorFinishGeometry(net, holes, height - CEILING_DROP, 'down');
 }
 
+/** A wall profile no higher than `cap` (stations added where it crosses the cap). */
+export function capProfile(pr: WallProfile, cap: number): WallProfile {
+  const s: number[] = [];
+  const h: number[] = [];
+  for (let i = 0; i < pr.s.length; i++) {
+    if (i > 0) {
+      const [h0, h1] = [pr.h[i - 1], pr.h[i]];
+      if ((h0 - cap) * (h1 - cap) < 0) {
+        const t = (cap - h0) / (h1 - h0);
+        s.push(pr.s[i - 1] + t * (pr.s[i] - pr.s[i - 1]));
+        h.push(cap);
+      }
+    }
+    s.push(pr.s[i]);
+    h.push(Math.min(pr.h[i], cap));
+  }
+  return { s, h };
+}
+
+/**
+ * A ceiling that follows the roof (DESIGN.md "Ceilings", ceilings.ts slopedCeilingPieces): each
+ * convex piece on its plane less CEILING_DROP, facing down, normals square to it. UVs in inches like
+ * a flat ceiling's (plan position, along the longer side of the room). Null when nothing is left.
+ */
+export function buildSlopedCeilingGeometry(net: readonly Vec2[], pieces: readonly CeilingPiece[]): BufferGeometry | null {
+  const xs = net.map((p) => p.x);
+  const ys = net.map((p) => p.y);
+  const alongX = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  for (const pc of pieces) {
+    const z = (p: Vec2) => pc.plane.c + pc.plane.gx * p.x + pc.plane.gy * p.y - CEILING_DROP;
+    // Facing down: a surface h = c + gx x + gy y has the downward normal (gx, -1, gy) in (x, Y, y).
+    const len = Math.hypot(pc.plane.gx, 1, pc.plane.gy);
+    const n = [pc.plane.gx / len, -1 / len, pc.plane.gy / len];
+    const ring = pc.poly;
+    for (let m = 1; m + 1 < ring.length; m++) {
+      const [a, b, c] = [ring[0], ring[m], ring[m + 1]];
+      const area = cross(sub(b, a), sub(c, a));
+      if (Math.abs(area) < 1e-9) continue;
+      // Positive plan area faces -Y (down) as is.
+      for (const v of area > 0 ? [a, b, c] : [a, c, b]) {
+        pos.push(v.x, z(v), v.y);
+        nor.push(n[0], n[1], n[2]);
+        uv.push(alongX ? v.x : v.y, alongX ? v.y : v.x);
+      }
+    }
+  }
+  if (!pos.length) return null;
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
+}
+
 /** Open stairs: tread thickness, and the stringers' thickness (across) and depth (square to their slope). */
 export const OPEN_TREAD = 1.5;
 export const STRINGER = { thick: 1.5, depth: 9.25 } as const;
@@ -941,6 +1000,8 @@ export interface RoofParts {
   fascia: BufferGeometry | null;
   /** Rafter tails under open eaves, null when the roof has none. */
   rafters: BufferGeometry | null;
+  /** Valley flashing where a joined roof meets another, null when it has none. */
+  flashing: BufferGeometry | null;
 }
 
 /**
@@ -948,19 +1009,20 @@ export interface RoofParts {
  * roof's material), the fascia and rake boards, and the rafter tails (both in the board colour).
  */
 export function buildRoofParts(roof: Roof, bearingHeight: number, join?: readonly JoinRegion[] | null): RoofParts {
-  const { slab, boards, rafters, ridge } = roofSolid(roof, bearingHeight, join);
+  const { slab, boards, rafters, ridge, valley } = roofSolid(roof, bearingHeight, join);
   const fascia = boards.flat();
   const tails = rafters.flat();
   return {
     slab: addRoofUVs(geometryFrom(ridge.length ? slab.concat(ridge) : slab), roofFrame(roof).v),
     fascia: fascia.length ? geometryFrom(fascia) : null,
     rafters: tails.length ? geometryFrom(tails) : null,
+    flashing: valley.length ? geometryFrom(valley) : null,
   };
 }
 
-function roofParts(roof: Roof, bearing: number, join?: readonly JoinRegion[] | null): { geometry: BufferGeometry; fascia: BufferGeometry | null; rafters: BufferGeometry | null } {
-  const { slab, fascia, rafters } = buildRoofParts(roof, bearing, join);
-  return { geometry: slab, fascia, rafters };
+function roofParts(roof: Roof, bearing: number, join?: readonly JoinRegion[] | null): { geometry: BufferGeometry; fascia: BufferGeometry | null; rafters: BufferGeometry | null; flashing: BufferGeometry | null } {
+  const { slab, fascia, rafters, flashing } = buildRoofParts(roof, bearing, join);
+  return { geometry: slab, fascia, rafters, flashing };
 }
 
 /**
@@ -1543,26 +1605,14 @@ const keptFloorCache = new Map<string, { slab: BufferGeometry | null; finishes: 
 export function keptFloor(level: Level, viewMode: ViewMode, faces: FaceSet, holes: readonly (readonly Vec2[])[]): { slab: BufferGeometry | null; finishes: FloorFinishMesh[] } | null {
   const ex = getFaces(level, 'existing');
   if (ex.outerFaces.length === 0) return null;
-  const minWidth = (poly: readonly Vec2[]) => {
-    let per = 0;
-    for (let i = 0; i < poly.length; i++) per += Math.hypot(poly[(i + 1) % poly.length].x - poly[i].x, poly[(i + 1) % poly.length].y - poly[i].y);
-    return per > 0 ? (2 * Math.abs(polygonSignedArea(poly))) / per : 0;
-  };
-  const minus = (polys: readonly (readonly Vec2[])[], from: readonly (readonly Vec2[])[]) => {
-    const cut = from.flatMap((r) => convexPieces(r));
-    return polys.flatMap((r) => convexPieces(r)).flatMap((c) => convexMinusAll(c, cut)).filter((k) => minWidth(k) >= 1);
-  };
-  const slabPieces = level.floorThickness > EPS ? minus(slabOutlines(ex, true), slabOutlines(faces, true)) : [];
+  const slabPieces = level.floorThickness > EPS ? piecesMinus(slabOutlines(ex, true), slabOutlines(faces, true)) : [];
   const slab = slabPieces.length ? mergeAll(slabPieces.map((k) => prism(k, -level.floorThickness, 0))) : null;
-  const shown = new Set(faces.faces.flatMap((f) => (f.roomId ? [f.roomId] : [])));
-  const roomed = faces.faces.filter((f) => f.roomId).map((f) => f.netPolygon);
   const finishes: FloorFinishMesh[] = [];
-  for (const f of ex.faces) {
-    const room = f.roomId ? level.rooms[f.roomId] : undefined;
-    if (!room || shown.has(room.id) || !isVisible(room.phase ?? 'existing', viewMode)) continue;
+  for (const open of openRooms(level, viewMode, faces)) {
+    const room = level.rooms[open.roomId];
     const look = floorLookIn(room, viewMode);
     if (!look) continue;
-    const parts = minus([f.netPolygon], roomed).flatMap((k) => {
+    const parts = open.pieces.flatMap((k) => {
       const g = buildFloorFinishGeometry(k, holes);
       return g ? [g] : [];
     });
@@ -1767,6 +1817,8 @@ export interface RoofMesh {
   fascia: BufferGeometry | null;
   /** Rafter tails under open eaves, null when the roof has none. */
   rafters: BufferGeometry | null;
+  /** Valley flashing where the roof meets another (joined), null when it has none. */
+  flashing: BufferGeometry | null;
   phase: Phase;
   finish: RoofFinish;
   /** Hex colour of the slab (the roof's own, else by finish). */
@@ -1866,6 +1918,8 @@ interface FloorFinishEntry {
 
 interface CeilingEntry extends FloorFinishEntry {
   height: number;
+  /** A ceiling that follows the roof: the roofs it follows and its flat top; null when flat. */
+  sloped: { roofs: readonly RoofOnLevel[]; flatTop: number | undefined; wall: number } | null;
 }
 
 interface FloorEntry {
@@ -1902,6 +1956,7 @@ interface RoofEntry {
   geometry: BufferGeometry;
   fascia: BufferGeometry | null;
   rafters: BufferGeometry | null;
+  flashing: BufferGeometry | null;
 }
 
 interface OpeningEntry {
@@ -2007,8 +2062,9 @@ function disposeWallEntry(e: WallEntry, keep?: WallEntry): void {
   }
 }
 
-function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null; rafters?: BufferGeometry | null; railing?: BufferGeometry | null }): void {
+function disposeEntry(e: { geometry: BufferGeometry; fascia?: BufferGeometry | null; rafters?: BufferGeometry | null; railing?: BufferGeometry | null; flashing?: BufferGeometry | null }): void {
   e.geometry.dispose();
+  e.flashing?.dispose();
   e.fascia?.dispose();
   e.rafters?.dispose();
   e.railing?.dispose();
@@ -2172,13 +2228,38 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   // where they are drawn once joined to the roofs they meet, and no higher than another roof of the
   // building that passes over the wall (roofJoin.ts).
   const roofsOnLevel: RoofOnLevel[] = levelRoofs.own;
+  // Rooms whose ceiling follows the roof (DESIGN.md "Ceilings"): not under the floor above, a roof
+  // of the level drawn over the label point. Their flat top, if any.
+  const aboveFaces = aboveLevel ? getFaces(aboveLevel, viewMode).outerFaces : [];
+  const slopedRooms = new Map<Id, number | undefined>();
+  for (const f of faces.faces) {
+    const room = roomOf(f);
+    if (!room || !followsRoof(room)) continue;
+    const underFloor = aboveFaces.some((o) => pointInPolygon(f.labelPoint, o));
+    if (canFollowRoof(roofsOnLevel, f.labelPoint, underFloor)) slopedRooms.set(room.id, room.ceilingFlatTop);
+  }
   const profiles = new Map<Id, WallProfile>();
   if (roofsOnLevel.length) {
     for (const w of Object.values(level.walls)) {
       const fp = fps.get(w.id);
-      if (!fp || w.kind !== 'exterior') continue;
+      if (!fp) continue;
+      if (w.kind === 'exterior') {
+        const pr = wallRoofProfile(fp, topOf(w), roofsOnLevel, levelRoofs.building);
+        if (pr) profiles.set(w.id, pr);
+        continue;
+      }
+      // An interior wall beside a room whose ceiling follows the roof rises to the roof too (to the
+      // highest flat top of those rooms when they all have one), so it meets the sloped ceiling.
+      const sides = sideFaces.get(w.id);
+      const tops = (['left', 'right'] as const).flatMap((side) => {
+        const room = roomOf(sides?.[side]);
+        return room && slopedRooms.has(room.id) ? [slopedRooms.get(room.id)] : [];
+      });
+      if (!tops.length) continue;
       const pr = wallRoofProfile(fp, topOf(w), roofsOnLevel, levelRoofs.building);
-      if (pr) profiles.set(w.id, pr);
+      const cap = tops.every((t) => t !== undefined) ? Math.max(...(tops as number[])) : undefined;
+      const capped = pr && cap !== undefined ? capProfile(pr, Math.max(cap, topOf(w))) : pr;
+      if (capped) profiles.set(w.id, capped);
     }
   }
   const atNode = new Map<Id, { id: Id; h: number; seeThrough: boolean; dir: Vec2; t: number }[]>();
@@ -2361,7 +2442,10 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   // Ceilings: one surface per room that has one (finish.ts ceilingLookOf), at the room's ceiling
   // height (its override, at most the wall height under a floor above), less the holes through the
   // floor above. A room is under a floor when its label point is inside the level above's slab.
-  const aboveFaces = aboveLevel ? getFaces(aboveLevel, viewMode).outerFaces : [];
+  // A ceiling that follows the roof runs parallel to it, the rise across the thickest exterior wall
+  // below it, so it meets the eave walls' tops at their inside faces (ceilings.ts slopedCeilingPieces).
+  let eaveWall = 0;
+  for (const w of Object.values(level.walls)) if (w.kind === 'exterior' && fps.has(w.id)) eaveWall = Math.max(eaveWall, w.thickness);
   const ceilingHoles = aboveId ? [...floorOpeningHoles(plan, aboveId, viewMode), ...stairHoles(level, viewMode, ftf)] : [];
   const prevCeilings = ceilingCache.get(key);
   const nextCeilings = new Map<Id, CeilingEntry>();
@@ -2370,17 +2454,45 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const room = roomOf(f);
     if (!room) continue;
     const underFloor = aboveFaces.some((o) => pointInPolygon(f.labelPoint, o));
-    const look = ceilingLookOf(room, level.finishes, underFloor);
+    const sloped = slopedRooms.has(room.id) ? { roofs: roofsOnLevel, flatTop: slopedRooms.get(room.id), wall: eaveWall } : null;
+    // A ceiling that follows the roof is painted unless the room or level sets one.
+    const look = ceilingLookOf(room, level.finishes, underFloor || !!sloped);
     if (!look) continue;
     const own = room.ceilingOverride && room.ceilingOverride > 0 ? room.ceilingOverride : level.wallHeight;
     const height = underFloor ? Math.min(own, level.wallHeight) : own;
     const old = prevCeilings?.get(room.id);
+    const sameSlope = (a: CeilingEntry['sloped'], b: CeilingEntry['sloped']) =>
+      a === b || (!!a && !!b && a.flatTop === b.flatTop && a.wall === b.wall && a.roofs.length === b.roofs.length && a.roofs.every((r, i) => r.roof === b.roofs[i].roof && r.bearing === b.roofs[i].bearing && r.join === b.roofs[i].join));
+    const build = (): BufferGeometry | null => {
+      const pieces = sloped ? slopedCeilingPieces(f.netPolygon, sloped.roofs, height, sloped.flatTop, sloped.wall) : null;
+      return pieces ? buildSlopedCeilingGeometry(f.netPolygon, pieces) : buildCeilingGeometry(f.netPolygon, ceilingHoles, height);
+    };
     const entry: CeilingEntry =
-      old && old.height === height && sameRings([old.net], [f.netPolygon]) && sameRings(old.holes, ceilingHoles)
+      old && old.height === height && sameRings([old.net], [f.netPolygon]) && sameRings(old.holes, ceilingHoles) && sameSlope(old.sloped, sloped)
         ? old
-        : { net: f.netPolygon, holes: ceilingHoles, height, geometry: buildCeilingGeometry(f.netPolygon, ceilingHoles, height) };
+        : { net: f.netPolygon, holes: ceilingHoles, height, sloped, geometry: build() };
     nextCeilings.set(room.id, entry);
     if (entry.geometry) ceilings.push({ roomId: room.id, phase: sp(room.phase ?? 'existing'), finish: look.finish, color: look.color, geometry: entry.geometry });
+  }
+  // A room opened by demolition keeps its ceiling over the floor it keeps (openRooms.ts).
+  for (const open of openRooms(level, viewMode, faces)) {
+    const room = level.rooms[open.roomId];
+    const underFloor = aboveFaces.some((o) => pointInPolygon(open.labelPoint, o));
+    const sloped = followsRoof(room) && canFollowRoof(roofsOnLevel, open.labelPoint, underFloor);
+    const look = ceilingLookOf(room, level.finishes, underFloor || sloped);
+    if (!look) continue;
+    const own = room.ceilingOverride && room.ceilingOverride > 0 ? room.ceilingOverride : level.wallHeight;
+    const height = underFloor ? Math.min(own, level.wallHeight) : own;
+    const parts = open.pieces.flatMap((k) => {
+      const pcs = sloped ? slopedCeilingPieces(k, roofsOnLevel, height, room.ceilingFlatTop, eaveWall) : null;
+      const g = pcs ? buildSlopedCeilingGeometry(k, pcs) : buildCeilingGeometry(k, ceilingHoles, height);
+      return g ? [g] : [];
+    });
+    if (!parts.length) continue;
+    const geometry = parts.length === 1 ? parts[0] : mergeAll(parts);
+    // Rebuilt with the level (the open room depends on the whole level's walls).
+    nextCeilings.set(`open:${room.id}`, { net: [], holes: [], height, sloped: null, geometry });
+    ceilings.push({ roomId: room.id, phase: sp(room.phase ?? 'existing'), finish: look.finish, color: look.color, geometry });
   }
   if (prevCeilings) for (const [id, e] of prevCeilings) if (nextCeilings.get(id) !== e) e.geometry?.dispose();
   ceilingCache.set(key, nextCeilings);
@@ -2447,6 +2559,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
       geometry: entry.geometry,
       fascia: entry.fascia,
       rafters: entry.rafters,
+      flashing: entry.flashing,
       phase: sp(roof.phase),
       finish,
       color: look?.roofColor ?? (look?.roofFinish ? ROOF_COLOR[look.roofFinish] : roofColorOf(roof)),

@@ -829,7 +829,7 @@ const OPENING_TYPES = new Set(['door', 'window', 'passage']);
 const NODE_KEYS = ['id', 'x', 'y'] as const;
 const WALL_KEYS = ['id', 'a', 'b', 'thickness', 'kind', 'phase', 'optionIds', 'heightOverride', 'finish', 'color', 'bearing', 'band'] as const;
 const OPENING_KEYS = ['id', 'wallId', 'type', 'offset', 'width', 'height', 'sill', 'phase', 'optionIds', 'swing', 'lites', 'shutters', 'trim', 'sashes', 'fixedCenter', 'glazing', 'halfLite', 'sliding', 'overhead', 'leafColor'] as const;
-const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'optionIds', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'optionFinishes', 'ceilingFinish', 'ceilingColor'] as const;
+const ROOM_KEYS = ['id', 'name', 'anchor', 'ceilingOverride', 'phase', 'optionIds', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'optionFinishes', 'ceilingFinish', 'ceilingColor', 'ceilingShape', 'ceilingFlatTop'] as const;
 const STAIRS_KEYS = ['id', 'origin', 'direction', 'width', 'run', 'phase', 'optionIds', 'cutsFloorAbove', 'headroom', 'holeStart', 'base', 'rise', 'risers', 'open', 'railings', 'staircaseId'] as const;
 const ROOF_KEYS = ['id', 'shape', 'outline', 'ridgeAngle', 'pitch', 'overhang', 'bearingOffset', 'thickness', 'fascia', 'phase', 'optionIds', 'finish', 'color', 'eave', 'rafter', 'boardColor', 'weathering'] as const;
 const ROOF_SHAPES = new Set<string>(['gable', 'shed', 'hip', 'flat']);
@@ -981,6 +981,8 @@ function migrateRooms(raw: Json): Level['rooms'] {
     // Optional ceiling (DESIGN.md "Ceilings"): a known finish and a colour, each dropped alone when malformed.
     put(room, 'ceilingFinish', isCeilingFinish(r.ceilingFinish) ? r.ceilingFinish : undefined);
     put(room, 'ceilingColor', isHexColor(r.ceilingColor) ? r.ceilingColor.toLowerCase() : undefined);
+    put(room, 'ceilingShape', r.ceilingShape === 'roof' ? 'roof' : undefined);
+    put(room, 'ceilingFlatTop', r.ceilingShape === 'roof' && isNum(r.ceilingFlatTop) && r.ceilingFlatTop > 0 ? r.ceilingFlatTop : undefined);
     out[rid] = room as unknown as Room;
   }
   return out;

@@ -5,7 +5,7 @@ import { solidExtent } from '../derive/furniture';
 import { buildCeilingGeometry, buildFixtureParts, CEILING_DROP, clearMeshCache, getLevelMeshes, triangleCount } from '../derive/meshes';
 import { dispatchPointer, switchTool, type ToolPointerEvent } from '../editor2d/tools';
 import { buildExportScene, disposeExportScene } from '../io/export3d';
-import { BATH_KINDS, CERAMIC_WHITE, isBath, VARIANTS } from '../model/bath';
+import { BATH_KINDS, CERAMIC_WHITE, isBath, TUB_SHOWERS, VARIANTS } from '../model/bath';
 import { CASEWORK_KINDS, FIXTURE_DEFAULTS, FIXTURE_KINDS } from '../model/casework';
 import { CEILING_COLOR, ceilingLookOf } from '../model/finish';
 import { createEmptyPlan, fixtureProblem, migrate } from '../model/plan';
@@ -89,6 +89,83 @@ describe('bath and laundry kinds', () => {
     expect(Math.max(...top.ring.map((p) => p.s))).toBeCloseTo(30, 6);
     expect(Math.max(...top.ring.map((p) => p.d))).toBeCloseTo(30, 6);
     expect(top.ring.length).toBeGreaterThan(20);
+  });
+
+  it('a shower over an alcove tub: a head on a riser at the tap end, and a screen, doors or a curtain rail', () => {
+    for (const tubShower of TUB_SHOWERS) {
+      const f = fixture('bathtub', { tubShower });
+      for (const sol of bathSolids(f)) {
+        const e = solidExtent(sol);
+        expect(e.s0, tubShower).toBeGreaterThanOrEqual(-30 - 1e-6);
+        expect(e.s1, tubShower).toBeLessThanOrEqual(30 + 1e-6);
+        expect(e.d0, tubShower).toBeGreaterThanOrEqual(-1e-6);
+        expect(e.d1, tubShower).toBeLessThanOrEqual(30 + 1e-6);
+      }
+      // The head at 80" at the tap end (s < 0).
+      const head = solidsOf(f, 'log').map(solidExtent).find((e) => Math.abs((e.y0 + e.y1) / 2 - 80) < 3 && e.s1 < -20 && e.d1 - e.d0 > 4);
+      expect(head, tubShower).toBeDefined();
+      const glass = bathSolids(f).filter((x) => x.part === 'glass').map(solidExtent);
+      expect(glass.length, tubShower).toBe(tubShower === 'screen' ? 1 : tubShower === 'doors' ? 2 : 0);
+      for (const g of glass) {
+        expect(g.y0).toBeGreaterThanOrEqual(20);
+        expect(g.d1).toBeGreaterThan(27);
+      }
+    }
+    // The screen is 30" from the tap end; the doors span the front.
+    const [screen] = bathSolids(fixture('bathtub', { tubShower: 'screen' })).filter((x) => x.part === 'glass').map(solidExtent);
+    expect(screen.s1 - screen.s0).toBeCloseTo(30, 6);
+    expect(screen.s0).toBe(-30);
+    // The curtain rail runs the length of the tub.
+    const rail = solidsOf(fixture('bathtub', { tubShower: 'curtain' }), 'log').map(solidExtent).find((e) => e.s1 - e.s0 > 59);
+    expect(rail).toBeDefined();
+    // None on a freestanding tub, nor with no shower.
+    expect(bathSolids(fixture('bathtub', { variant: 'freestanding', tubShower: 'doors' }))).toEqual(bathSolids(fixture('bathtub', { variant: 'freestanding' })));
+    // On the plan: the head as a circle, the doors as two offset panels.
+    const plain = bathSymbol(fixture('bathtub'));
+    const doors = bathSymbol(fixture('bathtub', { tubShower: 'doors' }));
+    expect(doors.circles.length).toBe(plain.circles.length + 1);
+    expect(doors.rects.length).toBe(plain.rects.length + 2);
+    expect(bathSymbol(fixture('bathtub', { tubShower: 'curtain' })).lines.length).toBe(plain.lines.length + 1);
+  });
+
+  it('a tub body is closed and consistently wound, its normals agreeing with its faces, at any turn (no flipped face or seam in the basin)', () => {
+    for (const direction of [0, 45, 90, 180, 270]) {
+      const body = buildFixtureParts(fixture('bathtub', { direction })).find((p) => p.part === 'body')!.geometry;
+      const pos = body.getAttribute('position');
+      const nor = body.getAttribute('normal');
+      const key = (i: number) => [pos.getX(i), pos.getY(i), pos.getZ(i)].map((v) => Math.round(v * 1e3)).join(',');
+      const edges = new Map<string, number>();
+      for (let t = 0; t < pos.count; t += 3) {
+        const u = [pos.getX(t + 1) - pos.getX(t), pos.getY(t + 1) - pos.getY(t), pos.getZ(t + 1) - pos.getZ(t)];
+        const v = [pos.getX(t + 2) - pos.getX(t), pos.getY(t + 2) - pos.getY(t), pos.getZ(t + 2) - pos.getZ(t)];
+        const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+        expect(n[0] * nor.getX(t) + n[1] * nor.getY(t) + n[2] * nor.getZ(t), `${direction}`).toBeGreaterThan(0);
+        for (let k = 0; k < 3; k++) {
+          const e = `${key(t + k)}>${key(t + ((k + 1) % 3))}`;
+          edges.set(e, (edges.get(e) ?? 0) + 1);
+        }
+      }
+      for (const [e, n] of edges) {
+        const [p, q] = e.split('>');
+        expect(edges.get(`${q}>${p}`), `${direction} ${e}`).toBe(n);
+      }
+    }
+  });
+
+  it('a tub shower is stored only on a bathtub, from the list; others are dropped on load', () => {
+    const lid = firstStructure(store().plan).levelOrder[1];
+    const id = store().addFixture(lid, { ...fixture('bathtub'), id: undefined } as never)!;
+    expect(id).toBeTruthy();
+    store().updateFixture(lid, id, { tubShower: 'screen' });
+    expect(store().plan.levels[lid].fixtures[id].tubShower).toBe('screen');
+    store().updateFixture(lid, id, { tubShower: 'shower-curtain' as never });
+    expect(store().plan.levels[lid].fixtures[id].tubShower).toBe('screen');
+    const doc = JSON.parse(JSON.stringify(store().plan));
+    doc.levels[lid].fixtures[id].tubShower = 'glassbox';
+    doc.levels[lid].fixtures.t = { ...doc.levels[lid].fixtures[id], id: 't', kind: 'toilet', tubShower: 'head' };
+    const out = migrate(doc).levels[lid].fixtures;
+    expect(out[id].tubShower).toBeUndefined();
+    expect(out.t.tubShower).toBeUndefined();
   });
 
   it('a shower is a tray (3") or a curbless floor (1/2"), a head and valve on the back wall, glass where set', () => {

@@ -74,12 +74,14 @@ import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, 
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
-import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
-import type { RoomOptionFinishes, OptionLook, ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, TUB_SHOWER_LABEL, TUB_SHOWERS, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
+import type { TubShower, RoomOptionFinishes, OptionLook, ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { AS_TODAY } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type EntitySelection, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { getViewPlan, useViewPlanStore } from '../store/viewStore';
+import { roomCanFollowRoof } from '../derive/ceilings';
+import { openRooms } from '../derive/openRooms';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
 import { duplicateRoomNotice, showNotice } from './fileActions';
 import { requestWallMove, roomNameOf, wallSideNames } from './wallMove';
@@ -1181,6 +1183,10 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
   const face = set?.faces.find((f) => f.roomId === room.id) ?? null;
   // An orphan whose anchor is in a face that an earlier room already names.
   const sharing = !face && set ? set.faces.find((f) => f.roomId && f.roomId !== room.id && pointInPolygon(room.anchor, f.polygon)) : null;
+  // A room opened by demolition in this view: it keeps its floor (openRooms.ts).
+  const openPlan = useViewPlanStore((s) => s.plan);
+  const openLevel = openPlan.levels[level.id];
+  const open = !face && set && openLevel ? (openRooms(openLevel, viewMode, set).find((o) => o.roomId === room.id) ?? null) : null;
   const [name, setName] = useState(room.name);
   const skipBlur = useRef(false);
   useEffect(() => setName(room.name), [room.name]);
@@ -1231,6 +1237,11 @@ function RoomProps({ level, room }: { level: Level; room: Room }) {
           <RoomDimensionsReadout face={face} />
           <p className="panel-note">Net is inside the wall faces; gross is to the wall centerlines.</p>
         </>
+      ) : open ? (
+        <>
+          <ReadOnly label="Net area">{formatArea(open.area)}</ReadOnly>
+          <p className="panel-note">Open to the outside in this view (a wall that closed it is taken out): the area is of the floor it keeps.</p>
+        </>
       ) : (
         <p className="panel-note warning">
           {sharing
@@ -1265,6 +1276,10 @@ function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; 
   const wall = roomWallLookOf(room);
   const floor = floorLookOf(room);
   const w = room.wainscot;
+  const viewMode = useUiStore((s) => s.viewMode);
+  // A ceiling that follows the roof is offered only with a roof of the level over the room.
+  const roofOver = useViewPlanStore((s) => roomCanFollowRoof(s.plan, levelId, room.id, viewMode));
+  const sloped = room.ceilingShape === 'roof';
   return (
     <>
       <SelectField
@@ -1334,6 +1349,32 @@ function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; 
           hint={room.ceilingFinish === undefined && !room.ceilingColor ? 'Setting it paints the ceiling in it.' : undefined}
         />
       )}
+      {(roofOver || sloped) && (
+        <SelectField
+          label="Ceiling shape"
+          value={sloped ? 'roof' : 'flat'}
+          options={ceilingShapeOptions}
+          onChange={(v) => set({ ceilingShape: v === 'roof' ? 'roof' : undefined })}
+        />
+      )}
+      {sloped && !roofOver && <p className="panel-note warning">No roof of this level is over the room in this view: the ceiling is flat.</p>}
+      {sloped && (
+        <LengthField
+          label="Flat top at"
+          value={room.ceilingFlatTop}
+          allowEmpty
+          placeholder="none"
+          onCommit={(h) => {
+            if (h === null) {
+              set({ ceilingFlatTop: undefined });
+              return;
+            }
+            if (!(h > 0)) return 'Must be above the floor.';
+            set({ ceilingFlatTop: h });
+          }}
+          hint="Leave empty for a ceiling up to the ridge; a height makes it flat where the roof is higher (a collar tie)."
+        />
+      )}
       <LengthField
         label="Ceiling height"
         value={room.ceilingOverride ?? wallHeight}
@@ -1341,7 +1382,7 @@ function RoomFinishes({ levelId, room, wallHeight }: { levelId: Id; room: Room; 
           if (h === null) return;
           set({ ceilingOverride: h === wallHeight ? undefined : h });
         }}
-        hint="Flat, over the floor; under a floor above it is at most the wall height."
+        hint={sloped ? 'Where no roof is over the room.' : 'Flat, over the floor; under a floor above it is at most the wall height.'}
       />
       {(wall || w || floor) && <p className="panel-note">They dress the faces of the walls round the room, and its floor, in 3D; each wall keeps its own finish on its other side.</p>}
       {room.proposedFloor && (room.phase ?? 'existing') === 'existing' && <p className="panel-note">The proposed floor is a new floor laid in this room in the proposed design; the Proposed view shows it.</p>}
@@ -2148,6 +2189,14 @@ function BathOptions({ level, fixture }: { level: Level; fixture: Fixture }) {
           onChange={(v) => set({ variant: v === variants[0] ? undefined : v })}
         />
       )}
+      {fixture.kind === 'bathtub' && variantOf(fixture) === 'alcove' && (
+        <SelectField
+          label="Shower over it"
+          value={(fixture.tubShower ?? 'none') as TubShower | 'none'}
+          options={[{ value: 'none', label: 'None' }, ...TUB_SHOWERS.map((v) => ({ value: v, label: TUB_SHOWER_LABEL[v] }))]}
+          onChange={(v) => set({ tubShower: v === 'none' ? undefined : v })}
+        />
+      )}
       {fixture.kind === 'shower' &&
         (['front', 'left', 'right'] as const).map((side) => (
           <label className="check-row" key={side}>
@@ -2178,6 +2227,10 @@ function BathOptions({ level, fixture }: { level: Level; fixture: Fixture }) {
 }
 
 type CeilingChoice = 'default' | CeilingFinish;
+const ceilingShapeOptions: { value: 'flat' | 'roof'; label: string }[] = [
+  { value: 'flat', label: 'Flat' },
+  { value: 'roof', label: 'Follows the roof' },
+];
 const roomCeilingOptions: { value: CeilingChoice; label: string }[] = [{ value: 'default', label: 'Default (the level\'s)' }, ...CEILING_FINISHES.map((f) => ({ value: f, label: CEILING_FINISH_LABEL[f] }))];
 const levelCeilingOptions: { value: CeilingChoice; label: string }[] = [
   { value: 'default', label: 'Default (paint under a floor, none under a roof)' },

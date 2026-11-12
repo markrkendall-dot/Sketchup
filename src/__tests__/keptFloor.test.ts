@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearMeshCache, getLevelMeshes, triangleCount } from '../derive/meshes';
 import { getFaces } from '../derive/rooms';
+import { openRooms } from '../derive/openRooms';
 import { createEmptyPlan, defaultLevelId } from '../model/plan';
 import type { Phase, Vec2 } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
@@ -57,5 +58,30 @@ describe('a floor opened by demolition', () => {
     const m = getLevelMeshes(plan(), lid(), 'proposed');
     expect(m.keptFloor).toBeUndefined();
     expect(m.floorFinishes.map((f) => f.finish)).toEqual(['tile']);
+  });
+
+  it('keeps the room: its label point, the area of the floor it keeps, and its ceiling', () => {
+    const room = Object.keys(plan().levels[lid()].rooms)[0];
+    store().updateRoom(lid(), room, { ceilingFinish: 'boards' });
+    expect(getLevelMeshes(plan(), lid(), 'proposed').ceilings.map((c) => c.roomId)).toEqual([room]);
+    expect(openRooms(plan().levels[lid()], 'proposed')).toEqual([]);
+    store().setPhase(lid(), { walls: [wallAt(240, 90).id], openings: [] }, 'demo');
+    const level = plan().levels[lid()];
+    // An orphan in the view's faces, but open: the floor inside the old wall faces, 234" x 174".
+    expect(getFaces(level, 'proposed').orphanRoomIds).toEqual([room]);
+    const [open] = openRooms(level, 'proposed');
+    expect(open.roomId).toBe(room);
+    expect(open.area).toBeCloseTo(234 * 174, 6);
+    expect(open.labelPoint).toEqual({ x: 120, y: 90 });
+    // Not in Existing, where the wall still closes it.
+    expect(openRooms(level, 'existing')).toEqual([]);
+    const m = getLevelMeshes(plan(), lid(), 'proposed');
+    expect(m.ceilings.map((c) => [c.roomId, c.finish])).toEqual([[room, 'boards']]);
+    expect(triangleCount(m.ceilings[0].geometry)).toBeGreaterThan(0);
+    // Closed again by a new addition: a room of the view again, nothing open.
+    wall({ x: 240, y: 0 }, { x: 360, y: 0 }, 'new');
+    wall({ x: 360, y: 0 }, { x: 360, y: 180 }, 'new');
+    wall({ x: 360, y: 180 }, { x: 240, y: 180 }, 'new');
+    expect(openRooms(plan().levels[lid()], 'proposed')).toEqual([]);
   });
 });

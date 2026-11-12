@@ -2,6 +2,7 @@ import { isSwingDoor } from '../model/finish';
 import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
+import { backsplashPieces, backsplashPlanLines } from '../derive/backsplash';
 import { furnitureSymbol, type FurnitureSymbol } from '../derive/furniture';
 import { bathSymbol } from '../derive/bath';
 import { isBath } from '../model/bath';
@@ -17,6 +18,7 @@ import { isOpeningVisible, isVisible, shownPhase } from '../derive/phase';
 import { faceAt, getFaces, interiorPoint, slabOutlines, type Face, type FaceSet } from '../derive/rooms';
 import { roofOutlineWithOverhang, roofRidgeLines, type JoinRegion } from '../derive/roofs';
 import { getLevelRoofJoins } from '../derive/roofJoin';
+import { openRooms } from '../derive/openRooms';
 import { FENCE_DEFAULTS, fencePostPoints, siteGhostLevelId } from '../derive/site';
 import { getStaircaseLayout } from '../derive/staircase';
 import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
@@ -520,6 +522,28 @@ const CounterLayer = memo(function CounterLayer({ levelId }: { levelId: Id }) {
 });
 
 /**
+ * The backsplashes (derive/backsplash.ts) where they stand in the view: a thin line along each
+ * piece's face, its thickness off the wall, over the cabinets whose backs it stands on.
+ */
+const BacksplashLayer = memo(function BacksplashLayer({ levelId }: { levelId: Id }) {
+  const level = useLayerPlan((s) => s.plan.levels[levelId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
+  const splashes = useMemo(() => {
+    if (!level) return [];
+    const pieces = backsplashPieces(level, getFootprints(level, viewMode), viewMode, (f) => isVisible(f.phase, viewMode));
+    return backsplashPlanLines(pieces).map((p, i) => ({ id: `${p.fixtureId}:${i}`, d: segPath(p.segs), phase: shownPhase(p.phase, viewMode) }));
+  }, [level, viewMode]);
+  if (splashes.length === 0) return null;
+  return (
+    <g className="layer-backsplashes" pointerEvents="none">
+      {splashes.map((b) => (
+        <path key={b.id} className={`backsplash phase-${b.phase}`} d={b.d} vectorEffect="non-scaling-stroke" data-backsplash={b.id} />
+      ))}
+    </g>
+  );
+});
+
+/**
  * Cabinets, appliances, sinks and furniture, under the walls (their backs sit against the wall
  * faces); rugs first, so the pieces standing on them draw over them.
  */
@@ -544,6 +568,7 @@ const FixturesLayer = memo(function FixturesLayer({ levelId }: { levelId: Id }) 
           <FixtureShape key={id} levelId={levelId} fixtureId={id} />
         ))}
       </g>
+      <BacksplashLayer levelId={levelId} />
     </>
   );
 });
@@ -914,11 +939,11 @@ const StructureLayer = memo(function StructureLayer({ levelId, part }: { levelId
 });
 
 /** A roof's plan paths, built once per roof object and join (its valleys with the roofs it meets). */
-const roofPathCache = new WeakMap<Roof, { join: readonly JoinRegion[] | null; outline: string; overhang: string; ridge: string }>();
-function roofPaths(roof: Roof, join: readonly JoinRegion[] | null) {
+const roofPathCache = new WeakMap<Roof, { join: readonly JoinRegion[] | null; shown: Roof; outline: string; overhang: string; ridge: string }>();
+function roofPaths(roof: Roof, shown: Roof, join: readonly JoinRegion[] | null) {
   let hit = roofPathCache.get(roof);
-  if (!hit || hit.join !== join) {
-    hit = { join, outline: polyPath(roof.outline), overhang: polyPath(roofOutlineWithOverhang(roof)), ridge: segPath(roofRidgeLines(roof, join)) };
+  if (!hit || hit.join !== join || hit.shown !== shown) {
+    hit = { join, shown, outline: polyPath(roof.outline), overhang: polyPath(roofOutlineWithOverhang(roof)), ridge: segPath(roofRidgeLines(shown, join)) };
     roofPathCache.set(roof, hit);
   }
   return hit;
@@ -934,9 +959,11 @@ const RoofShape = memo(function RoofShape({ levelId, roofId, ghost }: { levelId:
   const roof = useLayerPlan((s) => s.plan.levels[levelId]?.roofs?.[roofId]);
   const viewMode = useLayerUi((s) => s.viewMode);
   const selected = useLayerUi((s) => !ghost && s.selection.roofs.includes(roofId));
-  const join = useLayerPlan((s) => (roof && isVisible(roof.phase, viewMode) ? (getLevelRoofJoins(s.plan, levelId, viewMode).get(roofId) ?? null) : null));
-  if (!roof || !isVisible(roof.phase, viewMode)) return null;
-  const d = roofPaths(roof, join);
+  // As drawn: joined to the roofs it meets, an end run on into a higher roof (roofJoin.ts).
+  const shown = useLayerPlan((s) => (roof && isVisible(roof.phase, viewMode) ? (getLevelRoofJoins(s.plan, levelId, viewMode).get(roofId)?.roof ?? roof) : roof));
+  const join = useLayerPlan((s) => (roof && isVisible(roof.phase, viewMode) ? (getLevelRoofJoins(s.plan, levelId, viewMode).get(roofId)?.join ?? null) : null));
+  if (!roof || !shown || !isVisible(roof.phase, viewMode)) return null;
+  const d = roofPaths(roof, shown, join);
   return (
     <g className={`roof phase-${shownPhase(roof.phase, viewMode)}${selected ? ' is-selected' : ''}${ghost ? ' roof-ghost' : ''}`} data-roof-id={ghost ? undefined : roofId}>
       <path className="roof-overhang" d={d.overhang} vectorEffect="non-scaling-stroke" />
@@ -1297,16 +1324,37 @@ const FaceLabel = memo(function FaceLabel({ levelId, faceId }: { levelId: Id; fa
   );
 });
 
-/** A room whose anchor is in no face, or in one an earlier room names: a warning at its anchor. */
+/**
+ * A room whose anchor is in no face, or in one an earlier room names: a warning at its anchor. A room
+ * opened by demolition (openRooms.ts) instead shows its name and the area of the floor it keeps,
+ * marked open to the outside, at its label point in the plain style.
+ */
 const OrphanLabel = memo(function OrphanLabel({ levelId, roomId }: { levelId: Id; roomId: Id }) {
   const room = useLayerPlan((s) => s.plan.levels[levelId]?.rooms[roomId]);
+  const viewMode = useLayerUi((s) => s.viewMode);
   const shared = useFaceSetValue(levelId, (set, level) => {
     const r = level.rooms[roomId];
     return !!r && !!faceAt(set, r.anchor);
   }, false);
+  const openArea = useFaceSetValue(levelId, (set, level) => openRooms(level, viewMode, set).find((o) => o.roomId === roomId)?.area ?? null, null);
+  const openX = useFaceSetValue(levelId, (set, level) => openRooms(level, viewMode, set).find((o) => o.roomId === roomId)?.labelPoint.x ?? 0, 0);
+  const openY = useFaceSetValue(levelId, (set, level) => openRooms(level, viewMode, set).find((o) => o.roomId === roomId)?.labelPoint.y ?? 0, 0);
   const selected = useLayerUi((s) => s.selection.rooms.includes(roomId));
   const editing = useLayerUi((s) => s.roomEdit?.roomId === roomId);
   if (!room || editing) return null;
+  if (openArea !== null) {
+    return (
+      <RoomLabelGroup
+        className={`room-label open${selected ? ' is-selected' : ''}`}
+        roomId={roomId}
+        faceId={undefined}
+        x={openX}
+        y={openY}
+        name={room.name}
+        area={`${formatArea(openArea)}, open to outside`}
+      />
+    );
+  }
   return (
     <RoomLabelGroup
       className={`room-label orphan${selected ? ' is-selected' : ''}`}

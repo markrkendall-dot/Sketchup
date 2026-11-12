@@ -191,11 +191,18 @@ Once the walls are in, these make the 3D model look like the house.
   (a porch, a wing) go on the level they sit on; their ridge and slope are set the same way.
   **Roofs that meet are joined**: where two roofs of one building overlap (on one level or on
   different levels), each is drawn only where it is the higher, so a wing's roof runs into the main
-  roof and stops at the valleys, and the main roof is cut only beneath the wing. Draw a wing's roof
-  outline on into the main block (to the main ridge, or across it for a cross gable) and the part
-  under the main roof is taken off. A roof run into the walls of the storey above is cut at their
+  roof and stops at the valleys, and the main roof is cut only beneath the wing. A wing's roof
+  drawn to the main block's wall (its gable end, or a shed's high end, at the wall or up to 6"
+  short of it, counting the overhang) runs on into the main roof by itself when the main roof
+  slopes up away from that wall, so the valleys close with no gap and no gable board on that end;
+  you can also draw the outline on into the main block (to the main ridge, or across it for a cross
+  gable) and the part under the main roof is taken off. A roof that ends against a wall rising
+  above it (a lean-to under a higher eave, a wing against a gable end or a taller storey) is left
+  as drawn. A roof run into the walls of the storey above is cut at their
   outside face. A lower roof whose overhang passes clear under a higher eave is not cut, and roofs
-  that only touch along an edge are not changed. The plan shows the valleys. A hip roof over an
+  that only touch along an edge are not changed. The plan shows the valleys. The sheets or
+  shingles are cut along each valley (the pattern runs to the valley line on both slopes), and a
+  valley flashing 8" wide each side, a little darker than the roof, lies along it. A hip roof over an
   L-shaped outline is roofed over the L, with a valley at the inside corner (any other
   non-rectangular hip outline uses its bounding rectangle).
 - **Decks (`J`).** Draw the outline like a roof's, on the level whose floor the deck steps out
@@ -261,9 +268,15 @@ Once the walls are in, these make the 3D model look like the house.
   room inside the wall faces. "Default" clears each one. "Ceiling" (paint, painted boards, knotty
   pine, or none) with "Ceiling colour" and "Ceiling height" sets the room's ceiling; by default a room
   under a floor has a white painted ceiling and a room under a roof none (open to it). The Level
-  panel's "Ceilings" changes that default for every room on the level. Ceilings are flat, show in 3D
-  with the Roofs checkbox on and in walk mode, and are seen only from below, so a look-down view
-  still shows the room.
+  panel's "Ceilings" changes that default for every room on the level. Where a roof of the room's
+  level is over it (and no floor above), "Ceiling shape" offers **Flat** (as before) or **Follows
+  the roof**: a cathedral ceiling on the underside of the roof (of each roof, where joined roofs
+  meet over the room), painted unless you set a finish, with "Flat top at" for a flat part where
+  the roof rises above that height (a collar tie; leave it empty to go up to the ridge). "Ceiling
+  height" is then the height where no roof is over the room. The partitions beside such a room rise
+  to the roof (or the flat top) and the room's wall finish goes up them. Ceilings show in 3D with
+  the Roofs checkbox on and in walk mode, and are seen only from below, so a look-down view still
+  shows the room.
 - **Windows and doors.** A window's panel sets its "Sashes" (1 to 6 side by side with 2" mullions
   between them; the lites, cols x rows, are per sash), "Fixed centre pane" (at 3 sashes: a picture
   window, one undivided pane between two casements at most 24" wide), "Glazing" (glass, or an
@@ -308,23 +321,30 @@ pick one there. Then:
 - **Counters** are drawn by themselves: one top over each run of touching base cabinets, corner
   units, the sink and the dishwasher, 1" past their fronts, mitred where a run turns a corner, cut
   out at the sink. An island has a counter 1" all round. The counter is 1 1/2" thick on top of the
-  cabinets unless you set another thickness.
+  cabinets unless you set another thickness. A run along a wall at any angle (45 degrees, say) is
+  joined the same way, a corner unit turned with it too; a cabinet at an odd angle to the one it
+  touches keeps its own top (a corner unit still one over both legs).
 - **Counter materials**: laminate (a plain colour, as before), butcher block (wood strips), or
   stone, speckled (granite) or veined (marble), in the counter colour (a butcher block without a
   colour is maple). The Level panel sets the material, colour and thickness for the level; a
   cabinet's panel sets them for its whole run (every cabinet under that top), and the island's for
   the island. A vanity's top follows the same settings.
-- **Backsplash**: none (the default), a 4" upstand, up to the wall cabinets (18" above the counter,
-  or the height you set) or to the ceiling; tile (3" x 6" subway tile) or a slab of the counter's
-  material; and a colour. Set it in the Level panel, or for one run in a cabinet's panel. It is
-  drawn on the wall behind base runs and a range (a range takes the setting of the run beside it),
-  and on a wall at the end of a run; it stops at windows and doors (under a window it runs up to
-  the sill). An island, or a cabinet that is not against a wall, has none; nor does a vanity.
+- **Backsplash**: none (the default), a 4" upstand, up to the wall cabinets or to the ceiling; tile
+  (3" x 6" subway tile) or a slab of the counter's material; and a colour. "Up to the wall
+  cabinets" runs up to the bottom of whatever hangs on that wall above each stretch (a wall
+  cabinet, a hood, a microwave), and to the height you set (18" above the counter unless set)
+  where nothing does. Set it in the Level panel, or for one run in a cabinet's panel. It is drawn
+  on the wall behind base runs and a range (a range takes the setting of the run beside it), and on
+  a wall at the end of a run, into the corner when the other wall has none there; it stops at
+  windows and doors (under a window it runs up to the sill). On the plan it is a thin line along
+  the wall face, its thickness off the wall. An island, or a cabinet that is not against a wall,
+  has none; nor does a vanity.
 - **Pulls**: none (the default), knobs or bar pulls, in brushed steel, black or brass; level
   default, or per cabinet. Door pulls sit on the stile away from the hinge, near the top of a base
   door, near the bottom of a wall door, at about 40" on a tall cabinet; drawer pulls are centred.
 - **Fronts layout** (base cabinets): doors under a drawer (the default) or a drawer bank of 2 to 6
-  drawers. **Glass doors** (wall and corner wall cabinets): framed glass.
+  drawers. **Glass doors** (wall and corner wall cabinets): framed glass, with the cabinet open
+  behind it and two shelves inside (three in a cabinet over 37" high), in the cabinet colour.
 - **Select a cabinet** (`S`, click it) to change its kind, width, depth, height, bottom, facing,
   phase, label, fronts (slab or framed panel), front colour, pulls, counter and backsplash and
   counter overhangs; drag it to move it, Shift+click to select several and move them together.
@@ -353,6 +373,10 @@ undermount basin; two basins from 60" wide), a pedestal basin, 27" front-load wa
   floor with a linear drain); a basin on a pedestal or wall-hung.
 - **Glass** (showers): the front (a fixed panel and a door) and either end. A separate "Glass panel"
   is a fixed screen of any size.
+- **Shower over it** (an alcove tub): none, a shower head only (a riser up the tap end to a head at
+  80"), or the head with a fixed 30" glass screen at the tap end, sliding glass doors across the
+  front, or a curtain rail. The plan shows the head as a circle at the tap end and the screen, the
+  doors (two offset panels) or the rail along the front.
 - **China colour** (or "Colour" for the laundry): white unless set. A vanity has cabinet fronts,
   wood and front colour instead, and the level's counter colour.
 - To stack a dryer on a washer, set its "Bottom" to the washer's height.
@@ -381,8 +405,9 @@ glass.
    demolished window plus a new door. To take out part of a wall (open a kitchen to the living
    room), right-click the wall with the select tool and choose **Split wall here**, then mark the
    piece you want gone. Taking out part of an exterior wall leaves the room behind it open: in
-   Proposed it keeps its floor and its floor finish (the proposed one), but shows no label or area
-   until walls close it again (a new addition, say), and its ceiling is not drawn.
+   Proposed it keeps its floor and its floor finish (the proposed one), its ceiling and its label,
+   with the area of the floor it keeps marked "open to outside", until walls close it again (a new
+   addition, say).
 4. Flip between **Existing** (what is there, with the demolition shown) and **Proposed** (what
    it will be). Rooms are found per view, so in Proposed two rooms whose dividing wall is
    demolished become one, with its new net area. Roofs and posts follow the view too, and walls
@@ -1375,7 +1400,8 @@ first floor top 2" over grade on the road side).
 - **Second Floor.** The stair's top landing at the north wall; the **hall**, 5' wide along the
   well's south side (over the First Floor's hall wall, so the ceiling joists bear down through it),
   with a window over the well; the **bath** (6' x 7'11 1/2") in the north-west corner over the
-  entry: a 60" tub-shower across its north end, the WC and a 24" vanity; a **linen closet** (4'4" x
+  entry: a 60" tub-shower across its north end (the shower head and riser only: what closes its
+  front is not chosen), the WC and a 24" vanity; a **linen closet** (4'4" x
   7'11 1/2") in the north-east over the powder room and pantry, a wet stack if the laundry is ever
   wanted upstairs; and the two **bedrooms** on the lake side, west 13'6" and east 11'6 1/2" by
   16'9 1/2", each with a 6' x 2' closet along its north wall against the outside wall, a casement
@@ -1445,9 +1471,8 @@ bedrooms); change them in each room's panel.
 ## Known limitations
 
 - **Roofs**: no dormers. Roofs that meet are joined (see "Roofs, site and appearance"), but a
-  board stops square at a valley (no valley flashing or cut rafters are drawn), and a wing's roof
-  must be drawn on into the main roof to reach it: one stopped at the main wall leaves an open
-  triangle under the main eave. Walls rise only to the roofs on their own level (a roof of another
+  rake or fascia board stops square where it runs into the other roof, and no valley rafters are
+  drawn. Walls rise only to the roofs on their own level (a roof of another
   level only stops them). A roof's overhang on an edge against a wall of its own level runs into
   the house unless its outline stops short of the wall by the overhang. A hip roof over an outline
   other than a rectangle or an L uses the bounding box of the outline. Overhangs are the same on
@@ -1462,16 +1487,13 @@ bedrooms); change them in each room's panel.
   down a slope, starting below its floor, as the starter's are), fences,
   the lot outline, porch floors and steps (and the examples' foundations under the wing and porches:
   set them with the Level panel's "Foundation" once measured), gutters,
-  sloped ceilings (a ceiling is flat, at one height), crown and baseboards, furniture outside (below a level's floor), and text or dimension notes
+  crown and baseboards, furniture outside (below a level's floor), and text or dimension notes
   you place yourself. A wood stove is a labelled box, and so are a shower's tiled bench and the vents. A retaining wall is a
   wall on the lowest level; its free end shows as an open wall end.
-- **Cabinets** are boxes with simple fronts: no door swings on the plan, a glass door shows the
-  painted carcass behind it (no inside shelves), the corner unit is an L (no blind corner), and a
-  counter is only joined across cabinets turned by a quarter turn (a cabinet at 45° carries its
-  own; a corner unit at 45° carries one top per leg). A backsplash on a wall's inside corner
-  leaves a 3/8" gap when only one of the two walls has one; it is not drawn on the plan; "up to
-  the wall cabinets" is a height above the counter (18"), not the cabinets' own bottoms; "to the
-  ceiling" goes to the wall's height.
+- **Cabinets** are boxes with simple fronts: no door swings on the plan, the corner unit is an L
+  (no blind corner), and a counter is joined only across cabinets square to one another (one at an
+  odd angle to its neighbour carries its own). A backsplash "to the ceiling" goes to the wall's
+  height.
 - **Walk mode** stops at walls but not at cabinets, furniture, window sills or columns, and the
   ground is not solid from below.
 - The terrain is the triangulated surface through your grade points: straight between neighbouring
@@ -1482,7 +1504,7 @@ bedrooms); change them in each room's panel.
 - A wall has one thickness; layered walls (siding, sheathing, studs, drywall) are not modeled.
   Both faces of an exterior wall show the siding unless a room on one side sets its own wall
   finish, and window and door reveals always show the wall's own finish. A room's wall finish runs
-  the full height of the wall (there are no ceilings yet).
+  the full height of the wall (above a flat ceiling too).
 - At most one wall between two corners, and walls are straight (no curved walls). A wall cannot
   be drawn on top of another one: to rebuild a wall, mark the old one *demolish* and draw the new
   one beside it.

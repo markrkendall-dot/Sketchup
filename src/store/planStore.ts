@@ -95,7 +95,7 @@ const OPTIONAL_OPENING_KEYS: ReadonlySet<keyof Opening> = new Set<keyof Opening>
 ]);
 export type RoomPatch = Partial<Omit<Room, 'id'>>;
 /** Room fields that a patch clears with undefined. */
-const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'ceilingFinish', 'ceilingColor'] as const;
+const OPTIONAL_ROOM_KEYS = ['ceilingOverride', 'phase', 'wallFinish', 'wallColor', 'wainscot', 'floorFinish', 'floorColor', 'proposedFloor', 'proposedWall', 'ceilingFinish', 'ceilingColor', 'ceilingShape', 'ceilingFlatTop'] as const;
 export type NewRoom = Omit<Room, 'id'> & { id?: Id };
 /** A flight's fields; its staircase is set by groupStairs and ungroupStaircase, not here. */
 export type StairsPatch = Partial<Omit<Stairs, 'id' | 'staircaseId'>>;
@@ -1147,6 +1147,20 @@ export const usePlanStore = create<PlanState>()(
                 const w = v as NonNullable<Room['wainscot']>;
                 r.wainscot = { height: w.height, finish: w.finish, ...(w.color ? { color: w.color.toLowerCase() } : {}) };
               } else (r as unknown as Record<string, string>)[key] = key.endsWith('Color') ? (v as string).toLowerCase() : (v as string);
+            }
+            // The ceiling's shape (DESIGN.md "Ceilings"): a flat top only on one that follows the roof.
+            if ('ceilingShape' in patch) {
+              if (patch.ceilingShape === 'roof') r.ceilingShape = 'roof';
+              else if (patch.ceilingShape === undefined) {
+                delete r.ceilingShape;
+                delete r.ceilingFlatTop;
+              } else return false;
+            }
+            if ('ceilingFlatTop' in patch) {
+              const h = patch.ceilingFlatTop;
+              if (h === undefined) delete r.ceilingFlatTop;
+              else if (!(Number.isFinite(h) && h > 0) || r.ceilingShape !== 'roof') return false;
+              else r.ceilingFlatTop = h;
             }
             if ('proposedFloor' in patch) {
               const p = patch.proposedFloor;

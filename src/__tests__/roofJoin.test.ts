@@ -3,6 +3,7 @@ import { clearMeshCache, getLevelMeshes } from '../derive/meshes';
 import { viewPlanOf } from '../derive/optionView';
 import { getLevelRoofs } from '../derive/roofJoin';
 import {
+  abuttingRoof,
   joinedCovers,
   joinRoof,
   roofBaseOutline,
@@ -427,5 +428,137 @@ describe('the drawn area', () => {
     const whole = (r: Roof): Placed => ({ roof: r, bearing: B, join: null });
     expect(drawnArea(m)).toBeLessThan(drawnArea(whole(m.roof)));
     expect(drawnArea(w)).toBeLessThan(drawnArea(whole(w.roof)));
+  });
+});
+
+describe('a roof stopped at the wall under a higher roof runs on into it', () => {
+  // The wing's outline stops at the main block's south wall (y 300): its gable end is run on north
+  // into the main roof until the main roof is over it right across, and the join cuts it there.
+  const stopped = () => roof({ id: 'wing', outline: rect(180, 300, 300, 500), ridgeAngle: 90, pitch: 7, overhang: 18 });
+
+  it('a gable wing: the end runs on and the valleys close with no gap', () => {
+    const wing = stopped();
+    const ext = abuttingRoof(wing, B, [{ roof: main(), bearing: B }]);
+    expect(ext).not.toBe(wing);
+    // Only the north end moved, north; the planes (set by the sides) are the same.
+    const ys = ext.outline.map((p) => p.y).sort((a, b) => a - b);
+    expect(ys[0]).toBeLessThan(300);
+    expect(ys[ys.length - 1]).toBe(500);
+    expect(ext.outline.map((p) => p.x).sort((a, b) => a - b)).toEqual([180, 180, 300, 300]);
+    const placed = joinAll([{ roof: main() }, { roof: ext }]);
+    const { cut } = checkEnvelope(placed);
+    expect(cut).toBeGreaterThan(0);
+    checkSolids(placed);
+    const [m, w] = placed;
+    // As if drawn on to the main ridge: the wing ridge meets the main plane at y 230.
+    expect(drawn(w, { x: 241, y: 236 })).toBe(true);
+    expect(drawn(w, { x: 241, y: 222 })).toBe(false);
+    expect(drawn(m, { x: 241, y: 222 })).toBe(true);
+    expect(drawn(m, { x: 241, y: 280 })).toBe(false);
+    // No open triangle: over the main wall's outside face, under the wing's ridge, some roof is
+    // drawn up to the wing's top.
+    for (const x of [190, 220, 241, 260, 290]) {
+      const p = { x, y: 296 };
+      expect(placed.some((r) => drawn(r, p))).toBe(true);
+    }
+    // The valleys on the plan: the wing's west slope meets the main's south slope.
+    const lines = roofRidgeLines(w.roof, w.join);
+    expect(lines.some(([p, q]) => [p, q].every((v) => Math.abs((7 / 12) * (v.x - 180) - (300 - v.y) / 2) < 1e-6) && Math.abs(p.x - q.x) > 10)).toBe(true);
+    // No rake board crosses the run-on end: every board of the wing is south of the valleys.
+    for (const b of roofSolid(w.roof, B, w.join).boards) for (let i = 2; i < b.length; i += 3) expect(b[i]).toBeGreaterThan(229);
+  });
+
+  it('a shed whose high end stops at the wall: run on into the roof above it', () => {
+    // High at the main wall, down to the south, 3:12: its high end (106") above the main eave (96"),
+    // meeting the main's south slope at y 260.
+    const shed = roof({ id: 'shed', shape: 'shed', outline: rect(180, 300, 300, 420), ridgeAngle: 90, pitch: 3, overhang: 18 });
+    const ext = abuttingRoof(shed, B - 20, [{ roof: main(), bearing: B }]);
+    expect(Math.min(...ext.outline.map((p) => p.y))).toBeLessThan(300);
+    const placed = joinAll([{ roof: main() }, { roof: ext, bearing: B - 20 }]);
+    checkEnvelope(placed);
+    checkSolids(placed);
+    expect(drawn(placed[1], { x: 241, y: 264 })).toBe(true);
+    expect(drawn(placed[1], { x: 241, y: 256 })).toBe(false);
+  });
+
+  it('within the tolerance: an end 4" short of the wall runs on too; 30" short does not', () => {
+    const near = roof({ id: 'near', outline: rect(180, 304, 300, 500), ridgeAngle: 90, pitch: 7, overhang: 18 });
+    expect(abuttingRoof(near, B, [{ roof: main(), bearing: B }])).not.toBe(near);
+    const far = roof({ id: 'far', outline: rect(180, 330, 300, 500), ridgeAngle: 90, pitch: 7, overhang: 0 });
+    expect(abuttingRoof(far, B, [{ roof: main(), bearing: B }])).toBe(far);
+  });
+
+  it('not run on: a wing already drawn into the main roof, a lean-to under a higher eave, a wing against a gable end', () => {
+    const drawnIn = roof({ id: 'in', outline: rect(180, 150, 300, 500), ridgeAngle: 90, pitch: 7, overhang: 18 });
+    expect(abuttingRoof(drawnIn, B, [{ roof: main(), bearing: B }])).toBe(drawnIn);
+    // The upper storey's wall rises above the lean-to (its roof a storey up).
+    const shed = roof({ id: 'shed', shape: 'shed', outline: rect(100, 300, 380, 420), ridgeAngle: 90, pitch: 4, overhang: 18 });
+    expect(abuttingRoof(shed, B, [{ roof: main(), bearing: B + 108 }])).toBe(shed);
+    // Against the main block's east gable end (x 480): the main roof does not slope up away from it.
+    const east = roof({ id: 'east', outline: rect(480, 90, 700, 210), ridgeAngle: 0, pitch: 6, overhang: 18 });
+    expect(abuttingRoof(east, B, [{ roof: main(), bearing: B }])).toBe(east);
+    // A hip or flat roof is never run on.
+    const hip = roof({ id: 'hip', shape: 'hip', outline: rect(180, 300, 300, 500), ridgeAngle: 90, pitch: 7 });
+    expect(abuttingRoof(hip, B, [{ roof: main(), bearing: B }])).toBe(hip);
+  });
+
+  it('on a plan: in the views the main roof is in, and never against another building', () => {
+    const wing = { outline: rect(180, 300, 300, 500), ridgeAngle: 90, pitch: 7, overhang: 18, phase: 'new' } as const;
+    const { plan, ids } = planWith({ 1: [{ phase: 'demo' }, wing] });
+    const wingOf = (view: 'existing' | 'proposed' | 'all') => getLevelRoofs(plan, ids[1], view).own.find((r) => r.roof.id === `${ids[1]}-1`);
+    // A demolished main roof does not stand with the new wing: nothing to run into.
+    expect(wingOf('proposed')!.roof.outline).toEqual(wing.outline);
+    expect(wingOf('all')!.roof.outline).toEqual(wing.outline);
+    const kept = planWith({ 1: [{}, wing] });
+    const w = getLevelRoofs(kept.plan, kept.ids[1], 'proposed').own.find((r) => r.roof.id === `${kept.ids[1]}-1`)!;
+    expect(Math.min(...w.roof.outline.map((p) => p.y))).toBeLessThan(300);
+    expect(w.join).not.toBeNull();
+    // Stable between calls (memoized), so the meshes are not rebuilt.
+    expect(getLevelRoofs(kept.plan, kept.ids[1], 'proposed').own.find((r) => r.roof.id === `${kept.ids[1]}-1`)!.roof).toBe(w.roof);
+    // The same wing as another building: stays as drawn.
+    const other = createEmptyPlan('Wing', 'single');
+    const sid = other.structureOrder[0];
+    const gid = other.structures[sid].levelOrder[0];
+    const two: Plan = {
+      ...planWith({ 1: [{}] }).plan,
+      structures: { ...plan.structures, [sid]: { ...other.structures[sid], baseFloorElevation: 0 } },
+      structureOrder: [...plan.structureOrder, sid],
+      levels: { ...planWith({ 1: [{}] }).plan.levels, [gid]: { ...other.levels[gid], roofs: { g: { id: 'g', shape: 'gable', ...ROOF_BASE, ...wing, phase: 'existing' } as Roof } } },
+    };
+    expect(getLevelRoofs(two, gid, 'existing').own[0].roof.outline).toEqual(wing.outline);
+  });
+});
+
+describe('valley flashing', () => {
+  it('a strip on each roof along the valleys, closed, on the roof tops; none on a roof alone or at a wall cut', () => {
+    const wing = roof({ id: 'wing', outline: rect(180, 150, 300, 500), ridgeAngle: 90, pitch: 7, overhang: 18 });
+    const [m, w] = joinAll([{ roof: main() }, { roof: wing }]);
+    for (const r of [m, w]) {
+      const v = roofSolid(r.roof, r.bearing, r.join).valley;
+      expect(v.length).toBeGreaterThan(0);
+      expect(closed(v)).toBe(true);
+      // Every corner within the strip's width of a valley line and on (or a quarter inch over) the top.
+      for (let i = 0; i < v.length; i += 3) {
+        const p = { x: v[i], y: v[i + 2] };
+        const west = Math.abs((7 / 12) * (p.x - 180) - (300 - p.y) / 2) / Math.hypot(7 / 12, 0.5);
+        const east = Math.abs((7 / 12) * (300 - p.x) - (300 - p.y) / 2) / Math.hypot(7 / 12, 0.5);
+        expect(Math.min(west, east)).toBeLessThan(8.01);
+        const t = top(r, p);
+        expect(v[i + 1]).toBeGreaterThan(t - 1e-6);
+        expect(v[i + 1]).toBeLessThan(t + 0.25 + 1e-6);
+      }
+    }
+    expect(roofSolid(main(), B).valley).toHaveLength(0);
+    // A shed run into the wall of the storey above is cut at the wall's face: no valley there.
+    const shed = roof({ id: 'shed', shape: 'shed', outline: rect(100, 300, 380, 420), ridgeAngle: 90, pitch: 4, overhang: 18 });
+    const placed = joinAll([{ roof: main(), bearing: B + 108 }, { roof: shed }]);
+    expect(roofSolid(shed, B, placed[1].join).valley).toHaveLength(0);
+  });
+
+  it('an L-shaped hip has flashing along its valley', () => {
+    const ell = roof({ shape: 'hip', outline: [{ x: 0, y: 0 }, { x: 480, y: 0 }, { x: 480, y: 240 }, { x: 240, y: 240 }, { x: 240, y: 480 }, { x: 0, y: 480 }] });
+    const v = roofSolid(ell, B).valley;
+    expect(v.length).toBeGreaterThan(0);
+    expect(closed(v)).toBe(true);
   });
 });

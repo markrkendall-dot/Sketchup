@@ -560,6 +560,22 @@ export const PLAN_RULES = `.wall-exterior {
   stroke-dasharray: 5 3;
 }
 
+/* A backsplash: a thin line along its face, its thickness off the wall. */
+.backsplash {
+  fill: none;
+  stroke: #6b6760;
+  stroke-width: 0.6;
+}
+
+.backsplash.phase-new {
+  stroke: var(--new-edge);
+}
+
+.backsplash.phase-demo {
+  stroke: var(--demo);
+  stroke-dasharray: 5 3;
+}
+
 /* Image underlay ----------------------------------------------------------------------------- */
 
 .underlay-image {

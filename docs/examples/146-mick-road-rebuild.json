@@ -5489,6 +5489,7 @@
           "depth": 32,
           "height": 20,
           "frontColor": "#f1efe8",
+          "tubShower": "head",
           "phase": "new",
           "id": "s-c1"
         },

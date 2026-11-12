@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { backsplashPieces } from '../derive/backsplash';
-import { cornerOutline, counterRects, counterRuns, fixtureBoxes, fixtureSymbol, type CaseBox } from '../derive/casework';
+import { backsplashPieces, backsplashPlanLines } from '../derive/backsplash';
+import { cornerOutline, counterRects, counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, fixtureSymbol, GLASS_CASE, type CaseBox } from '../derive/casework';
 import { getFootprints } from '../derive/footprint';
 import { buildCounterGeometry, buildFixtureParts, clearMeshCache, getLevelMeshes, triangleCount } from '../derive/meshes';
 import { abutLinesOf, cornerSnap, type FaceHit } from '../editor2d/tools/fixtureTool';
@@ -63,6 +63,26 @@ describe('corner units', () => {
     // A right-hand one is the mirror image.
     const right = fixtureBoxes(fixture('cornerBase', { corner: 'right' }));
     expect(right.map((b) => -b.s1).sort()).toEqual(boxes.map((b) => b.s0).sort());
+  });
+
+  it('turned 45 degrees: one counter over both legs, joined to its neighbours at 45 degrees where they touch', () => {
+    // At 45 degrees the legs' rectangles are turned too; they are one slab, as at a quarter turn.
+    const at45 = fixture('cornerBase', { id: 'k', origin: { x: 100, y: 100 }, direction: 45, corner: 'right' });
+    const alone = counterRuns([at45]);
+    expect(alone).toHaveLength(1);
+    expect(area(alone[0].outline)).toBeCloseTo(area(counterRuns([{ ...at45, direction: 90 }])[0].outline), 4);
+    expect(alone[0].outline.length).toBe(6);
+    // A 24" base on the same wall beside its back leg's free end (its frame's +s side), and one at
+    // 135 degrees beside the side leg's front: one slab over all three.
+    const fr = fixtureFrame(at45);
+    const beside = fixture('base', { id: 'm', origin: fixturePoint(fr, -18 - 12, 0), direction: 45, width: 24 });
+    const joined = counterRuns([at45, beside]);
+    expect(joined).toHaveLength(1);
+    expect(joined[0].fixtureIds).toEqual(['k', 'm']);
+    expect(area(joined[0].outline)).toBeCloseTo(area(alone[0].outline) + 24 * 25, 3);
+    // One at an odd angle to them is not joined: each keeps its own (the corner unit still one).
+    const odd = fixture('base', { id: 'n', origin: fixturePoint(fr, 18 + 12, 0), direction: 60, width: 24 });
+    expect(counterRuns([at45, odd]).length).toBe(2);
   });
 
   it('draws an L with its two inner faces as fronts, the wall corner dashed', () => {
@@ -198,6 +218,36 @@ describe('pulls and drawer banks', () => {
     expect(of(boxes, 'front')).toHaveLength(8);
     expect(of(fixtureBoxes(fixture('cornerWall', { glassFront: true })), 'glass')).toHaveLength(2);
   });
+
+  it('behind glass doors the carcass is open with shelves inside, in the cabinet colour', () => {
+    const plain = of(fixtureBoxes(fixture('wall')), 'carcass');
+    expect(plain).toHaveLength(1);
+    const f = fixture('wall', { glassFront: true });
+    const carcass = of(fixtureBoxes(f), 'carcass');
+    // A back, two sides, a top, a bottom and two shelves (30" high).
+    expect(carcass).toHaveLength(7);
+    const inner = carcass.filter((b) => b.y0 > f.elevation + 0.5 && b.y1 < f.elevation + f.height - 0.5);
+    expect(inner).toHaveLength(2);
+    for (const sh of inner) {
+      expect(sh.y1 - sh.y0).toBeCloseTo(GLASS_CASE.shelf, 9);
+      expect(sh.d1).toBeLessThan(f.depth - 0.75);
+    }
+    // Nothing solid fills the cabinet: a point in the middle is in no box.
+    const mid = { s: 0, d: f.depth / 2, y: f.elevation + f.height / 2 + 1 };
+    expect(carcass.some((b) => b.s0 < mid.s && mid.s < b.s1 && b.d0 < mid.d && mid.d < b.d1 && b.y0 < mid.y && mid.y < b.y1)).toBe(false);
+    // A 42" cabinet has three shelves.
+    expect(of(fixtureBoxes(fixture('wall', { glassFront: true, height: 42 })), 'carcass')).toHaveLength(8);
+    // A corner unit: each leg open with its shelves, inside its footprint.
+    const c = fixture('cornerWall', { glassFront: true });
+    const cc = of(fixtureBoxes(c), 'carcass');
+    expect(cc.length).toBeGreaterThan(10);
+    for (const b of fixtureBoxes(c)) {
+      expect(b.s0).toBeGreaterThanOrEqual(-c.width / 2 - 1e-9);
+      expect(b.s1).toBeLessThanOrEqual(c.width / 2 + 1e-9);
+      expect(b.d0).toBeGreaterThanOrEqual(-1e-9);
+      expect(b.d1).toBeLessThanOrEqual(c.depth + 1e-9);
+    }
+  });
 });
 
 describe('open shelves', () => {
@@ -323,6 +373,79 @@ describe('backsplashes', () => {
     expect(heights).toContainEqual([6, 36, 54]);
     expect(heights).toContainEqual([24, 36, 42]);
     expect(heights.filter((h) => h[0] === 6)).toHaveLength(2);
+  });
+
+  it('up to the wall cabinets: under each wall cabinet, hood or microwave its bottom, the set height where nothing hangs', () => {
+    // A 36" base on the north wall (x 38.25..74.25): an 18" wall cabinet over its west half with its
+    // bottom at 56", nothing over the east half.
+    add(northBase());
+    add(fixture('wall', { id: 'u', origin: { x: F + 36 + 9, y: F }, direction: NORTH, width: 18, elevation: 56 }));
+    store().updateFinishes(lid, { backsplash: 'toWall' });
+    const [p] = pieces();
+    const cols = p.boxes.map((b) => [Math.round((b.s1 - b.s0) * 100) / 100, b.y0, b.y1]).sort((a, b) => a[2] - b[2]);
+    expect(cols).toEqual([
+      [18, 36, 54],
+      [18, 36, 56],
+    ]);
+    // A hood lower than the set height wins over it; a cabinet hung below the counter is ignored.
+    store().updateFixture(lid, 'u', { elevation: 50 });
+    expect(Math.min(...pieces()[0].boxes.map((b) => b.y1))).toBe(50);
+    store().updateFixture(lid, 'u', { elevation: 30 });
+    expect(pieces()[0].boxes.map((b) => b.y1)).toEqual([54, 54]);
+    // Other settings do not follow the cabinets.
+    store().updateFixture(lid, 'u', { elevation: 56 });
+    store().updateFinishes(lid, { backsplash: 'upstand' });
+    expect(new Set(pieces()[0].boxes.map((b) => b.y1))).toEqual(new Set([40]));
+  });
+
+  it('up to the wall cabinets: a window still cuts it', () => {
+    add(northBase());
+    add(fixture('wall', { id: 'u', origin: { x: F + 36 + 9, y: F }, direction: NORTH, width: 18, elevation: 58 }));
+    const wallId = Object.values(level().walls).find((w) => level().nodes[w.a].y === 0 && level().nodes[w.b].y === 0)!.id;
+    // A window under the cabinet's east neighbour half, sill 42.
+    store().addOpening(lid, { wallId, type: 'window', offset: 56.25 + 12, width: 12, height: 30, sill: 42, phase: 'existing' });
+    store().updateFinishes(lid, { backsplash: 'toWall' });
+    const hs = pieces()[0].boxes.map((b) => [Math.round(b.s0 * 100) / 100, b.y0, b.y1]);
+    expect(hs.some((h) => h[2] === 42)).toBe(true);
+    expect(hs.some((h) => h[2] === 58)).toBe(true);
+  });
+
+  it('an inside corner where only one wall has a backsplash: the end runs into the corner, no gap', () => {
+    // A base in the corner on the north wall whose back has none of its own piece at the corner (a
+    // door in the north wall there, from the floor up), its end on the west wall: the end runs right
+    // into the corner. With the back's piece standing there, it stops at its face as before.
+    add(northBase({ id: 'b', origin: { x: F + 18, y: F } }));
+    store().updateFinishes(lid, { backsplash: 'toWall' });
+    // The piece on the west wall's face (facing +x).
+    const end = () => {
+      const p = pieces().find((q) => Math.abs(q.direction) < 1e-6 || Math.abs(q.direction - 360) < 1e-6)!;
+      return { len: Math.max(...p.boxes.map((b) => b.s1)) - Math.min(...p.boxes.map((b) => b.s0)) };
+    };
+    expect(end().len).toBeCloseTo(24 + 1 - 0.375, 6);
+    const wallId = Object.values(level().walls).find((w) => level().nodes[w.a].y === 0 && level().nodes[w.b].y === 0)!.id;
+    store().addOpening(lid, { wallId, type: 'door', offset: 2.25 + 6, width: 12, height: 80, sill: 0, phase: 'existing' });
+    expect(end().len).toBeCloseTo(24 + 1, 6);
+  });
+
+  it('on the plan: a line along each piece, its thickness off the wall face, once per stretch', () => {
+    add(northBase());
+    const wallId = Object.values(level().walls).find((w) => level().nodes[w.a].y === 0 && level().nodes[w.b].y === 0)!.id;
+    store().addOpening(lid, { wallId, type: 'window', offset: 56.25, width: 24, height: 36, sill: 42, phase: 'existing' });
+    store().updateFinishes(lid, { backsplash: 'toWall' });
+    const [line] = backsplashPlanLines(pieces());
+    expect(line.fixtureId).toBe('b-north');
+    // Three stretches (beside, under and beside the window), each at y 2.25 + 3/8.
+    expect(line.segs).toHaveLength(3);
+    for (const [p, q] of line.segs) {
+      expect(p.y).toBeCloseTo(2.625, 6);
+      expect(q.y).toBeCloseTo(2.625, 6);
+    }
+    const xs = line.segs.flatMap(([p, q]) => [p.x, q.x]);
+    expect(Math.min(...xs)).toBeCloseTo(38.25, 6);
+    expect(Math.max(...xs)).toBeCloseTo(74.25, 6);
+    // None where there is no backsplash in the view.
+    store().updateFinishes(lid, { backsplash: 'none' });
+    expect(backsplashPlanLines(pieces())).toEqual([]);
   });
 
   it('behind a range between base runs, taking its neighbours\' setting', () => {

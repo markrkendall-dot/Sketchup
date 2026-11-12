@@ -11,7 +11,7 @@ import { CERAMIC_WHITE, isBath } from '../model/bath';
 import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, FOUNDATION_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { BacksplashFinish, Column, CounterMaterial, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { backsplashMaterial, ceilingMaterial, chimneyPartMaterial, fixturePartMaterial, isGlassPart, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { backsplashMaterial, ceilingMaterial, chimneyPartMaterial, fixturePartMaterial, isGlassPart, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, flashingMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 import { firstStructure, structureOf } from '../model/structures';
@@ -243,6 +243,11 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         const t = mesh('Rafters', r.rafters, material(boardMaterialName('rafter', r.phase, r.boardColor), rafterMaterial(r.phase, r.boardColor)));
         if (r.phase === 'demo') t.renderOrder = 1;
         group.add(t);
+      }
+      if (r.flashing) {
+        const v = mesh('Valley flashing', r.flashing, material(`flashing_${r.phase}_${r.color.slice(1)}`, flashingMaterial(r.phase, r.color)));
+        if (r.phase === 'demo') v.renderOrder = 1;
+        group.add(v);
       }
     }
     // Decks: the boards, the framing with its posts, the railing.

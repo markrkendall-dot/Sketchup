@@ -264,6 +264,14 @@ export function rafterMaterial(phase: Phase, color: string = TRIM_COLOR): MeshSt
 }
 
 /**
+ * Valley flashing: sheet in the roof's colour a little darker, so it reads as a strip of the roof
+ * (demolished: red, new: pulled toward green, like trim).
+ */
+export function flashingMaterial(phase: Phase, roofColor: string): MeshStandardMaterial {
+  return trimLike('flashing', `#${new Color(roofColor).multiplyScalar(0.8).getHexString()}`, phase);
+}
+
+/**
  * A deck's parts in its colour: the boards and the railing as is, the framing and posts 20% darker
  * (demolished: red, new: pulled toward green, like trim).
  */

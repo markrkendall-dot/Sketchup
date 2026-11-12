@@ -619,7 +619,16 @@ export interface RoofSolid {
    * roof's top surface, closed together. Kept apart from the slab (meshes.ts merges it for drawing).
    */
   ridge: number[];
+  /**
+   * Valley flashing of a joined roof: a VALLEY_FLASHING_WIDTH strip on its top along each valley
+   * where it meets another roof (or the other arm of an L hip), VALLEY_FLASHING_THICKNESS thick.
+   */
+  valley: number[];
 }
+
+/** Valley flashing: a metal strip this wide (in plan) on each roof's side of a valley, this thick. */
+export const VALLEY_FLASHING_WIDTH = 8;
+export const VALLEY_FLASHING_THICKNESS = 0.25;
 
 interface EdgeSeg {
   p: Vec2;
@@ -655,6 +664,7 @@ export function roofSolid(roof: Roof, bearingHeight: number, join?: readonly Joi
   let segs: EdgeSeg[] = [];
   const capped = isMetalRoof(roof.finish) && (roof.shape === 'gable' || roof.shape === 'hip');
   let ridge: number[] = [];
+  const valley: number[] = [];
   const j = join ?? (hipArms(roof) ? joinRoof(roof, bearingHeight, []) : null);
   if (!j) {
     const regions = roofRegions(roof, bearingHeight, over);
@@ -674,6 +684,47 @@ export function roofSolid(roof: Roof, bearingHeight: number, join?: readonly Joi
     // closed solid where it meets another piece or a cut (DESIGN.md "Roofs that meet").
     const pieces = keptPieces(j);
     segs = emitPieces(pieces, 0, T, slab).filter((e) => onPolygonEdge(e.p, e.q, over));
+    // Valley flashing, a strip into the piece on its top along each valley: an edge where another of
+    // its pieces lies beyond, lower on this side (the valley of an L hip), or a cut edge (nothing of
+    // this roof beyond, not on the outline) on a line where this top meets another roof's.
+    for (const pc of pieces) {
+      const ring = pc.poly;
+      for (let k = 0; k < ring.length; k++) {
+        const p = ring[k];
+        const q = ring[(k + 1) % ring.length];
+        if (dist(p, q) < 1 || onPolygonEdge(p, q, over)) continue;
+        const d = normalize(sub(q, p));
+        const m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+        const inward = { x: -d.y, y: d.x };
+        const outPt = add(m, scale(inward, -1e-4));
+        const across = pieces.find((o) => o !== pc && insideOrOn(outPt, o.poly));
+        // A valley: both slopes rise away from the line (a crease, not a slope running along it).
+        const rises = (g: Vec2) => dot(g, inward) > 0.05 * Math.hypot(pc.plane.gx, pc.plane.gy, g.x, g.y);
+        const ownUp = dot({ x: pc.plane.gx, y: pc.plane.gy }, inward) > 0.05 * Math.hypot(pc.plane.gx, pc.plane.gy);
+        let isValley: boolean;
+        if (across) {
+          const inPt = add(m, scale(inward, 1));
+          isValley = ownUp && !coplanar(across.plane, pc.plane) && planeAt(pc.plane, inPt) > planeAt(across.plane, inPt) + 1e-9 && rises({ x: -across.plane.gx, y: -across.plane.gy });
+        } else {
+          isValley =
+            ownUp &&
+            !!pc.valleys?.some(({ n, c, other }) => {
+              const len = Math.hypot(n.x, n.y);
+              return Math.abs(dot(n, p) - c) / len < 1e-4 && Math.abs(dot(n, q) - c) / len < 1e-4 && rises({ x: -other.x, y: -other.y });
+            });
+        }
+        if (!isValley) continue;
+        // The strip, clipped to the pieces of this plane (it may run on across a neighbouring piece).
+        const band = [p, q, add(q, scale(inward, VALLEY_FLASHING_WIDTH)), add(p, scale(inward, VALLEY_FLASHING_WIDTH))];
+        const z = (x: Vec2) => planeAt(pc.plane, x) + T;
+        for (const other of pieces) {
+          if (other !== pc && !coplanar(other.plane, pc.plane)) continue;
+          const strip = clipConvex(band, other.poly);
+          if (strip.length < 3 || Math.abs(polygonSignedArea(strip)) < 1e-6) continue;
+          slopedPrismPositions(strip, z, (x) => z(x) + VALLEY_FLASHING_THICKNESS, {}, valley);
+        }
+      }
+    }
     if (capped) {
       // The cap runs along the lines where two drawn pieces of different slopes meet in a ridge or a
       // hip (not a valley, and not between two arms of an L-shaped hip lying in one plane).
@@ -698,7 +749,7 @@ export function roofSolid(roof: Roof, bearingHeight: number, join?: readonly Joi
   }
   const boards: number[][] = [];
   const rafters: number[][] = [];
-  if (segs.length === 0) return { slab, boards, rafters, ridge };
+  if (segs.length === 0) return { slab, boards, rafters, ridge, valley };
 
   // Put the boundary stretches in ring order: by outline edge, then along it.
   let ordered: { s: EdgeSeg; edge: OutlineEdge }[] = [];
@@ -779,7 +830,7 @@ export function roofSolid(roof: Roof, bearingHeight: number, join?: readonly Joi
     const quad = [p0, q0, add(q0, scale(n, t)), add(p0, scale(n, t))];
     boards.push(slopedPrismPositions(quad, (x) => ztop(x) - F, ztop));
   });
-  return { slab, boards, rafters, ridge };
+  return { slab, boards, rafters, ridge, valley };
 }
 
 /**
@@ -911,12 +962,19 @@ export interface JoinRegion {
   poly: Vec2[];
   cuts: Vec2[][];
   planes: RoofPlane[];
+  /**
+   * The lines n . p = c where this top meets another roof's (or the other L arm's) top at the same
+   * height, with the other's gradient: a cut edge on one of them where both slopes rise away from it
+   * is a valley (valley flashing), not a cut at a wall's face or where a slope runs along the line.
+   */
+  valleys?: { n: Vec2; c: number; other: Vec2 }[];
 }
 
 interface Piece {
   plane: RoofPlane;
   poly: Vec2[];
   planes?: RoofPlane[];
+  valleys?: { n: Vec2; c: number; other: Vec2 }[];
 }
 
 /**
@@ -946,6 +1004,7 @@ export function joinRoof(roof: Roof, bearing: number, others: readonly JoinOther
     for (const o of others) for (const os of roofSections(o.roof, o.bearing)) rivals.push({ sec: os, T: o.roof.thickness, same: false, wins: o.wins });
     for (const r of sec.regions) {
       const cuts: Vec2[][] = [];
+      const valleys: { n: Vec2; c: number; other: Vec2 }[] = [];
       const push = (poly: Vec2[]) => {
         if (poly.length >= 3 && Math.abs(polygonSignedArea(poly)) > AREA_EPS) cuts.push(cleanPositive(poly));
       };
@@ -964,6 +1023,7 @@ export function joinRoof(roof: Roof, bearing: number, others: readonly JoinOther
           } else {
             x = clipHalfPlane(x, n, c);
             if (x.length < 3) continue;
+            valleys.push({ n, c, other: { x: b.gx, y: b.gy } });
           }
           if (q.same) {
             push(x);
@@ -981,10 +1041,106 @@ export function joinRoof(roof: Roof, bearing: number, others: readonly JoinOther
         }
       }
       if (cuts.length) any = true;
-      out.push({ plane: a, poly: r.poly, cuts, planes: sec.planes });
+      out.push({ plane: a, poly: r.poly, cuts, planes: sec.planes, valleys });
     }
   });
   return any ? out : null;
+}
+
+/** How far a roof's end may stop short of the wall under a higher roof and still run on into it. */
+export const ABUT_TOLERANCE = 6;
+
+/**
+ * A roof whose end stops at the wall of a higher roof that slopes up away from it (a wing's gable
+ * end, or a shed's high end, against the eave wall of the main block), with that end run on into the
+ * other roof until the roof is under it right across, so the join (joinRoof) cuts it at the valleys
+ * instead of leaving an open triangle under the other's eave (DESIGN.md "Roofs that meet"). The end
+ * abuts when the line `overhang + ABUT_TOLERANCE` beyond it lies inside the other's bearing outline;
+ * it is not run on where the other roof is already over the end (a wall rising above it: a lean-to
+ * under a higher eave, a wing against a taller storey), where the other's slope does not rise away
+ * from it (a gable end wall), nor where the roof would come out above the other again. `others` are
+ * in this roof's level-local frame. Returns the roof itself when nothing is run on, else a copy with
+ * the end's corners moved (its planes are the same: the ends of a gable or the high end of a shed do
+ * not set them).
+ */
+export function abuttingRoof(roof: Roof, bearing: number, others: readonly { roof: Roof; bearing: number }[]): Roof {
+  if (!others.length || !(roof.pitch > 0) || (roof.shape !== 'gable' && roof.shape !== 'shed')) return roof;
+  const f = roofFrame(roof);
+  const planes = roofPlanes(roof, bearing);
+  const T = roof.thickness;
+  const ov = Math.max(0, roof.overhang);
+  const at = (u: number, v: number) => add(scale(f.u, u), scale(f.v, v));
+  const myTop = (p: Vec2) => planesHeightAt(planes, p) + T;
+  // The ends: a gable's two ends across the ridge, a shed's high end (it slopes down along u).
+  const ends = roof.shape === 'gable' ? [{ s: 1, u0: f.umax }, { s: -1, u0: f.umin }] : [{ s: -1, u0: f.umin }];
+  let outline: Vec2[] | null = null;
+  const STEP = 1;
+  const N = 16;
+  const vs: number[] = [];
+  for (let i = 0; i <= N; i++) vs.push(f.vmin - ov + ((f.vmax - f.vmin + 2 * ov) * i) / N);
+  for (const { s, u0 } of ends) {
+    // The end must be a whole side of the outline, square across the ridge.
+    const onEnd = roof.outline.map((p, i) => (Math.abs(dot(p, f.u) - u0) < 1e-6 ? i : -1)).filter((i) => i >= 0);
+    const span = onEnd.map((i) => dot(roof.outline[i], f.v));
+    if (onEnd.length < 2 || Math.min(...span) > f.vmin + 1e-6 || Math.max(...span) < f.vmax - 1e-6) continue;
+    const vmid = (f.vmin + f.vmax) / 2;
+    let best = 0;
+    for (const o of others) {
+      const base = roofBaseOutline(o.roof);
+      if (base.length < 3 || !pointInPolygon(at(u0 + s * (ov + ABUT_TOLERANCE), vmid), base)) continue;
+      const top = (p: Vec2) => {
+        const h = roofHeightAt(o.roof, o.bearing, p);
+        return h === null ? null : h + o.roof.thickness;
+      };
+      // Buried at an end position: the other's top at or over this one's right across the width.
+      const buried = (u: number) =>
+        vs.every((v) => {
+          const t = top(at(u, v));
+          return t !== null && t >= myTop(at(u, v)) - 1e-6;
+        });
+      // Already under it (or a wall rising above): nothing to run on.
+      if (buried(u0 + s * ov)) continue;
+      // The other's slope must rise away from this end where they meet.
+      const pin = at(u0 + s * ov, vmid);
+      const t0 = top(pin);
+      const t1 = top(add(pin, scale(f.u, s * STEP)));
+      if (t0 === null || t1 === null || !(t1 - t0 > 1e-6)) continue;
+      let d = 0;
+      let found = false;
+      const reach = 2 * Math.max(f.umax - f.umin, f.vmax - f.vmin) + 2000;
+      for (d = STEP; d <= reach; d += STEP) {
+        const t = top(at(u0 + s * (d + ov), vmid));
+        if (t === null) break;
+        if (buried(u0 + s * (d + ov))) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) continue;
+      // Once under the other roof it stays under it out to the run-on end (it does not come out above
+      // the far slope), across the whole width.
+      let stays = true;
+      for (const v of vs) {
+        let under = false;
+        for (let e = 0; e <= d + ov + 1e-9 && stays; e += STEP) {
+          const p = at(u0 + s * e, v);
+          const t = top(p);
+          const b = t !== null && t >= myTop(p) - 1e-6;
+          if (under && !b) stays = false;
+          under = under || b;
+        }
+        if (!stays) break;
+      }
+      if (!stays) continue;
+      if (best === 0 || d < best) best = d;
+    }
+    if (best > 0) {
+      const next: Vec2[] = outline ?? roof.outline.map((p) => ({ x: p.x, y: p.y }));
+      for (const i of onEnd) next[i] = add(roof.outline[i], scale(f.u, s * best));
+      outline = next;
+    }
+  }
+  return outline ? { ...roof, outline } : roof;
 }
 
 /**
@@ -993,9 +1149,19 @@ export function joinRoof(roof: Roof, bearing: number, others: readonly JoinOther
  */
 function keptPieces(join: readonly JoinRegion[]): Piece[] {
   const out: Piece[] = [];
-  for (const r of join) for (const poly of r.cuts.length ? convexMinusAll(r.poly, r.cuts) : [cleanPositive(r.poly)]) out.push({ plane: r.plane, poly, planes: r.planes });
+  for (const r of join) for (const poly of r.cuts.length ? convexMinusAll(r.poly, r.cuts) : [cleanPositive(r.poly)]) out.push({ plane: r.plane, poly, planes: r.planes, valleys: r.valleys });
   const rings = withTJunctions(out.map((pc) => pc.poly));
   return out.map((pc, i) => ({ ...pc, poly: rings[i] }));
+}
+
+/**
+ * Where a roof is drawn, as convex pieces each with its plane (the underside there): the pieces kept
+ * of a joined roof (or an L hip), else its regions.
+ */
+export function roofDrawnPieces(roof: Roof, bearing: number, join?: readonly JoinRegion[] | null): { plane: RoofPlane; poly: Vec2[] }[] {
+  const j = join ?? (hipArms(roof) ? joinRoof(roof, bearing, []) : null);
+  if (j) return keptPieces(j).map((pc) => ({ plane: pc.plane, poly: pc.poly }));
+  return roofSections(roof, bearing).flatMap((sec) => sec.regions.map((r) => ({ plane: r.plane, poly: r.poly })));
 }
 
 /** Two planes that are one (an L-shaped hip's arms share their outer slopes). */

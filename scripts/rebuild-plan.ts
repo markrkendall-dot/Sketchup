@@ -564,8 +564,10 @@ function rebuild(ids: ExistingIds): void {
   fix(fId, { kind: 'box', label: 'Rods and shelves', origin: { x: (CLOSET.x0 + CLOSET.x1) / 2, y: F.suite.bathSouth + HP }, direction: 90, width: CLOSET.x1 - CLOSET.x0, depth: 24, height: 84, frontColor: PINE_FLOOR });
   fix(fId, { kind: 'box', label: 'Shelves', origin: { x: (CLOSET.x0 + CLOSET.x1) / 2, y: F.suite.bedNorth - HP }, direction: 270, width: CLOSET.x1 - CLOSET.x0, depth: 12, height: 84, frontColor: PINE_FLOOR });
   // Upstairs: the bath's tub-shower across its north end, the WC on the west wall and a 24" vanity
-  // on the south wall clear of the door; 18" shelves in the linen closet.
-  fix(sId, { kind: 'bathtub', origin: { x: (IN.x0 + S.bathEast - HP) / 2, y: IN.y0 }, direction: 90, width: 60, depth: 32, height: 20, frontColor: WHITE });
+  // on the south wall clear of the door; 18" shelves in the linen closet. The shower over the tub is
+  // its head and riser at the tap end only: nothing says what closes its front (screen, doors or a
+  // curtain).
+  fix(sId, { kind: 'bathtub', origin: { x: (IN.x0 + S.bathEast - HP) / 2, y: IN.y0 }, direction: 90, width: 60, depth: 32, height: 20, frontColor: WHITE, tubShower: 'head' });
   fix(sId, { ...WC, origin: { x: IN.x0, y: 62 }, direction: 0 });
   fix(sId, { kind: 'sink', origin: { x: 30, y: S.hallSouth - HP }, direction: 270, width: 24, depth: 20, height: 31.5 });
   fix(sId, { kind: 'box', label: 'Shelves', origin: { x: IN.x1, y: (IN.y0 + S.hallSouth - HP) / 2 }, direction: 180, width: S.hallSouth - HP - IN.y0, depth: 18, height: 84, frontColor: PINE_FLOOR });

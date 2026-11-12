@@ -169,6 +169,14 @@ export interface Room {
    */
   ceilingFinish?: CeilingFinish;
   ceilingColor?: string;
+  /**
+   * The ceiling's shape (DESIGN.md "Ceilings"): absent, flat as above; `roof`, on the underside of
+   * the roofs of its level drawn over the room (a cathedral ceiling), flat at `ceilingOverride`
+   * where no roof is over it. Ignored under the floor of a level above.
+   */
+  ceilingShape?: 'roof';
+  /** A ceiling that follows the roof: flat at this height where the roof is higher (a collar tie). */
+  ceilingFlatTop?: Inches;
 }
 
 export interface Stairs {
@@ -328,6 +336,8 @@ export type FixtureKind =
  * The form of a bath fixture (model/bath.ts VARIANTS): a bathtub in an alcove or freestanding, a
  * shower on a tray or curbless, a basin on a pedestal or hung on the wall.
  */
+/** A shower over a tub (Fixture.tubShower). */
+export type TubShower = 'head' | 'screen' | 'doors' | 'curtain';
 export type BathVariant = 'alcove' | 'freestanding' | 'tray' | 'curbless' | 'pedestal' | 'wallHung';
 /** Cabinet door and drawer fronts: flat slabs, or a frame round a recessed panel. */
 export type FrontStyle = 'slab' | 'panel';
@@ -422,6 +432,12 @@ export interface Fixture {
    * left and right as you stand in the shower facing out. Absent: none.
    */
   glass?: { front?: boolean; left?: boolean; right?: boolean };
+  /**
+   * Bathtubs only (an alcove tub): a shower over it (model/bath.ts TUB_SHOWERS): a head and riser on
+   * the tap end alone (`head`), or with a fixed glass screen, sliding glass doors, or a curtain rail
+   * along the front. Absent: a tub with no shower.
+   */
+  tubShower?: TubShower;
   /**
    * Counter kinds (base, corner base, island, sink, dishwasher, vanity): the counter's material,
    * colour and thickness. A run of touching counter fixtures is one top: it takes each setting from

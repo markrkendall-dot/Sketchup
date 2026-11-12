@@ -609,6 +609,28 @@ each other meet in a valley over the wall between them. Roofs of different build
 other, and a demolished and a new roof never stand together, so they never trim each other either
 (in All both show whole).
 
+A roof stopped at the wall of a higher one (`roofs.ts abuttingRoof`, `roofJoin.ts abutOf`): before
+the joins, each gable roof's two ends and each shed's high end are tested against the other roofs of
+the building in the view (as stored, not run on themselves). The end must be a whole side of the
+outline square across the ridge, and the point `overhang + 6"` beyond its middle must be inside the
+other's bearing outline (the end at the wall, or up to 6" short of it once the overhang is counted,
+as the examples draw them 18" short with an 18" overhang). It is left alone when the other roof's top
+is already at or over this roof's top right across the overhang's end (a wall rising above it: a
+lean-to under a higher eave, a wing against a taller storey, or a wing already drawn into the main
+block), or when the other's top does not rise away from the end there (a gable end wall). Otherwise
+the end's corners move out in 1" steps until the other's top is at or over this roof's top right
+across the run-on overhang's end (17 samples across the width with the overhang), and the run on is
+kept only if, along every sample line, once under the other roof it stays under it (it would not come
+out above the far slope); the shortest run over the roofs it abuts is used. The planes do not change
+(a gable's ends and a shed's high end do not set them). The copy (memoized on the roof object and
+the roofs it was tested against) stands for the roof in the joins, the walls, the 3D and the plan's
+ridge and valley lines; the plan still draws the stored outline and overhang. The part run on is all
+under the other roof, so the ordinary join cuts it at the valleys and its rake boards stop there: no
+board across that end. Roofs of other buildings, other options, or a demolished roof with a new one,
+are never tested (as for the joins). No setting turns it off: neither example has an end it applies
+to (their wing, foyer and suite roofs end against gable ends and taller storeys), so both look as
+before.
+
 The geometry: each roof's planes over convex pieces of its overhang outline (`roofSections`; Hertel
 Mehlhorn merging of the ear-clipping triangles for a non-convex outline). For each region and each
 region of another roof, the cut is the intersection clipped by the half-plane where this top is lower
@@ -618,7 +640,16 @@ pieces with the corners of their neighbours inserted on their sides (no T-juncti
 prism from its plane up `thickness`, with a side face only on a stretch no other piece lies beyond,
 so a trimmed roof is still watertight (where two cuts meet at one point, as valleys meeting at a
 ridge, a vertical edge is shared four ways). Boards go on the stretches of the overhang outline that
-remain, joined back into runs; a board stops square at a cut. Rafter tails are cut like the slab.
+remain, joined back into runs; a board stops square at a cut. The roofing (corrugated, seam,
+shingle) is a texture mapped per face from plan position (`addRoofUVs`), so the pattern on each
+trimmed piece runs right up to the valley line, mitred with the other slope's: no geometry to cut.
+Valley flashing (`RoofSolid.valley`, its own `flashing` geometry, in the roof's colour 20% darker
+(`flashingMaterial`), exported as `Valley flashing`): `joinRoof` records for each region the lines where its top meets a rival's at one
+height (`JoinRegion.valleys`); a piece edge not on the outline is a valley when nothing of the roof
+lies beyond it and it lies on one of those lines (not a cut at a wall's face), or when another piece
+of the roof lies beyond it in a different plane that is lower on this side (an L hip's valley). Each
+gets a strip `VALLEY_FLASHING_WIDTH` (8") into the piece, clipped to it, on the top surface and 1/4"
+thick, so the two sides make a V. A roof drawn whole has none. Rafter tails are cut like the slab.
 The ridge cap runs along the lines where two drawn pieces of different slopes meet in a ridge or hip
 (not a valley, nor between two coplanar arms of an L hip). UVs are per face as before. A roof with
 nothing cut (and not an L hip) is built exactly as before. Joins are memoized per roof object and
@@ -683,9 +714,14 @@ Demolishing part of an exterior wall in a view leaves the room it closed unclose
 no outline there and the room no area. The floor is still there: in Proposed (and an option's view)
 the Existing view's slab is kept where the view's slab outlines do not reach (`LevelMeshes.keptFloor`,
 same material, exported as `Floor`), and each room labelled in the Existing view that is still shown
-but labels no area in the view keeps its floor finish (its proposed one) over its existing outline,
-less the areas of the view's rooms. The room's label and area do not show in that view (it is not a
-closed room there); its walls' finishes go with the walls; its ceiling is not kept.
+but labels no area in the view is an open room (`openRooms.ts openRooms`, memoized on the two views'
+face sets): its existing net outline less the areas of the view's rooms, in convex pieces (slivers
+under 1" wide dropped), with their area and a label point (its anchor when inside, else the pole of
+the largest piece). It keeps its floor finish (its proposed one) and its ceiling (as a closed room's,
+flat or following the roof) over those pieces. It is still an orphan of the view's face set, but the
+plan draws it in the plain label style at its label point, with the kept area and "open to outside"
+(not the orphan warning), and the room panel shows that area as its net area with a note. Its walls'
+finishes go with the walls.
 
 ## Decks (`derive/decks.ts`, `tools/deckTool.ts`)
 
@@ -1162,7 +1198,12 @@ draws as before: laminate 1 1/2", no backsplash, no pulls.
   inner face (the side one built facing +d and turned, `swapSD`). `cornerOutline` is its L;
   `counterRects` gives a corner base two counter rectangles that meet without overlapping (the back
   leg with the front overhang, the side leg from there to the front with none at its end), which
-  `counterRuns` unites with its neighbours like any other rectangles. The tool (`cornerSnap`) puts a
+  `counterRuns` unites with its neighbours like any other rectangles. `counterRuns` unites a group of
+  touching fixtures that are all square to the first one (their turns differ by quarter turns, at
+  any angle): turned by the first's angle mod 90 into an axis-aligned frame, coordinates snapped to
+  1e-6", `rectilinearUnion`, turned back; a group whose union is not one outer ring (boxes that meet
+  at an angle grouped fixtures that do not touch), or with one at an odd angle, falls back to a
+  slab per fixture, a corner unit's two legs still united in its own frame. The tool (`cornerSnap`) puts a
   corner unit pushed near a face's end into that corner and sets `corner`; `abutLinesOf` gives it a
   second abutting line, its end on the other wall, so that run slides up to it.
 - **Counter material** (`counterMaterial`, `counterColor`, `counterThickness` on counter kinds and
@@ -1181,10 +1222,19 @@ draws as before: laminate 1 1/2", no backsplash, no pulls.
   within 1", facing the same way, the faces as the tool snaps to them) gives an interval along that
   face, from the counter top up 4", `backsplashHeight` (18") or the wall's height. A range takes
   its own setting, else that of a counter fixture it touches. Per face, backs are placed before
-  ends and no interval overlaps one already placed, and an end stops 3/8" (or 3/4") short of an
-  inside corner, so no two pieces share a face (no z-fighting) and the corner is covered once. Each
-  piece is cut round the visible openings in its wall (`displayCenter`, sill to head): under a
-  window it runs to the sill, beside it full height. An island never lies on a face; vanities are
+  ends and no interval overlaps one already placed. An end reaching (within 1") the end of its face
+  runs to it; at each of its ends, if a back's piece on another face stands there (a back whose
+  interval reaches the point on that face's line, not cut away there by an opening over the whole
+  height), the end stops its thickness short of it, so no two pieces share a face (no z-fighting) and
+  the corner is covered once; with none there it runs into the corner (no gap). "Up to the wall
+  cabinets" (`toWall`): the wall cabinets, corner wall cabinets, hoods and microwaves whose back or
+  end lies on the face (as above) give intervals with their bottoms; the piece is split at their
+  ends and each part runs up to the lowest bottom over it (if above the counter top), else the set
+  height, never above the wall. Each piece is cut round the visible openings in its wall
+  (`displayCenter`, sill to head): under a window it runs to the sill, beside it full height. On
+  the plan (`backsplashPlanLines`, `PlanLayers.tsx BacksplashLayer`, over the fixtures, class `backsplash`) each piece is
+  a thin line along its face at its thickness off the wall, one segment per stretch along the face,
+  in the views it stands in. An island never lies on a face; vanities are
   not candidates. Tile 3/8" (`subwayPixels`: 3" x 6" running bond, grout relief), slab 3/4" in the
   counter material and its colour (the counter's unless set). `getLevelMeshes` returns
   `backsplashes` (absent when none), recomputed when the level's fixtures, finishes, walls,
@@ -1198,14 +1248,17 @@ draws as before: laminate 1 1/2", no backsplash, no pulls.
   the front face. The fixture cache keys on `fixtureBoxKey` (front style, pulls, counter thickness).
 - **Drawer bank** (`drawers`, 2 to 6, base only): one column (two from 42"), the top drawer 6"
   from three drawers up, the rest sharing the height. **Glass doors** (`glassFront`, wall and corner
-  wall): the panel front's frame round a 1/8" pane (part `glass`, the shower glass material).
+  wall): the panel front's frame round a 1/8" pane (part `glass`, the shower glass material), and
+  the carcass behind it open (`hollowCarcass`): a back, sides, top and bottom 3/4" thick and two
+  shelves (three from 36" inside) 3/4" thick, stopping 1/2" short of the doors, evenly spaced, all
+  part `carcass` (the cabinet colour); a corner wall unit's two legs each so, the corner square
+  solid.
 - **Open shelves** (kind `shelf`, 36 x 10 x 17 1/2 at 54; `shelves`, `shelfThickness`):
   `shelfLayoutOf` spaces the boards evenly from 4" above a hung shelf's bottom (its block brackets,
   part `kick`, fill that) or from the floor between two end panels for a standing one. Wood and
   colour as a cabinet's. Dashed on the plan when hung, with SHELF.
 
-Not done: cabinet door swings in plan, a blind corner cabinet, shelves inside glass-front cabinets,
-the backsplash on the plan, appliance details beyond a few boxes, copy and mirror of a run (M14). Interior wall and floor finishes (M13) are in "Interior finishes".
+Not done: cabinet door swings in plan, a blind corner cabinet, appliance details beyond a few boxes, copy and mirror of a run (M14). Interior wall and floor finishes (M13) are in "Interior finishes".
 
 ## Furniture (`model/furniture.ts`, `derive/furniture.ts`, `view3d/proceduralTextures.ts`)
 
@@ -1291,6 +1344,21 @@ them when the kind changes. The Cabinet tool places a shower with a glass front 
 colour is `frontColor` (absent: white china, `CERAMIC_WHITE`); a vanity's `frontColor` is its cabinet fronts' and
 its basins stay white (`bathBodyColorOf`).
 
+A shower over a tub (`Fixture.tubShower`: `head | screen | doors | curtain`, optional, no schema bump; checked
+with the kitchen's optional fields, `KITCHEN_FIELDS.tubShower`, so the loader drops a bad value or one on another
+kind, and the store refuses it): only an alcove tub draws it (`tubShowerOf`). A 3/4" riser from over the valve up
+the tap end (s < 0) to a head at `SHOWER.head` (80") on a short arm; `screen` a fixed glass panel 30" long
+(`TUB_SHOWER.screen`) at the tap end of the front on a chrome channel on the rim, 56" over the rim; `doors` two glass
+panels sliding past each other, each a little over half the length, in a chrome track, top rail and end jambs, with
+a pull on each; `curtain` a 1" chrome rod along the front at 76". All inside the footprint. On the plan
+(`bathSymbol`) a circle for the head at the tap end, and the screen's panel, the doors' two offset panels or the
+rail's line along the front.
+
+The alcove tub's body is one closed, consistently wound surface with its normals agreeing with its faces at any
+turn (tested). The darker areas seen in a basin in 3D are cast shadows of the alcove's walls and the rim (and, in
+the rebuild's bath, of the window's frame and muntins on the light falling into it), checked at several sun
+angles with the roofs on and off; nothing in the geometry or the shadow bias makes a streak.
+
 Stock sizes (`FIXTURE_DEFAULTS`): tub 60 x 30 x 20 (to the rim), shower 36 x 36 x 78 (the glass's height; the
 head is at 80" whatever it), glass panel 30 x 1/2 x 78, toilet 20 x 28 x 30 (to the tank's top), vanity 36 x 21
 x 32 1/2 (counter at 34), basin 22 x 18 x 34, washer and dryer 27 x 30 x 38, water heater 22 x 22 x 60. A
@@ -1335,7 +1403,23 @@ painted boards, knotty pine).
 `getLevelMeshes` gives `ceilings`: per labelled room with one, its net polygon at its ceiling height
 (`ceilingOverride`, else the wall height; under a floor above never higher than the wall height) less
 `CEILING_DROP` (1/16"), one surface facing down, less the holes through the floor above (the level's stairs that
-cut it and the floor openings of the level above). It is flat: under a sloped roof it does not follow the roof.
+cut it and the floor openings of the level above).
+
+A ceiling that follows the roof (`Room.ceilingShape: 'roof'`, `Room.ceilingFlatTop`; optional, no schema bump; on
+load an unknown shape is dropped, and a flat top that is not positive or has no shape): only for a room not under
+the floor above whose label point has a roof of its level drawn over it (`ceilings.ts canFollowRoof`, the panel's
+`roomCanFollowRoof`; otherwise it is flat as before). `slopedCeilingPieces` cuts the room's net polygon (in convex
+pieces) by each drawn piece of the level's roofs (`roofs.ts roofDrawnPieces`: a joined roof's kept pieces, else its
+regions), each part parallel to that piece's plane (the underside) and lower by the rise across the level's thickest
+exterior wall, so that at an eave wall's inside face it meets the wall's top (the plate at its outside face) with no
+gap (where two drawn pieces overlap, the first met), split by the flat top into a sloped part and a flat part at
+that height; the rest of the room is flat at its ceiling height.
+`buildSlopedCeilingGeometry` draws them less `CEILING_DROP`, facing down, normals square to each plane, UVs as a
+flat ceiling's. Such a ceiling is painted unless the room or level sets a finish (`ceilingLookOf` is asked as
+under a floor). Exterior walls already rise to the roof, and their room faces carry the room's finish up there; an
+interior wall beside such a room gets a roof profile too (`wallRoofProfile`, capped with `capProfile` at the
+highest flat top when every such room beside it has one), so it meets the ceiling and its dressed face goes up
+with it.
 Being FrontSide and facing down, it is culled from above, so it never hides a room in a look-down view; it casts
 no shadow. The 3D view draws ceilings with the roofs on and in walk mode (the 3D bar's Roofs checkbox off lifts
 them off with the roofs), the per-level checkboxes as before. Its material (`ceilingMaterial`) adds a little of

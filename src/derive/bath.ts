@@ -1,4 +1,4 @@
-import { glassOf, isBath, SHOWER, TOILET, TUB, VANITY_BASIN, variantOf } from '../model/bath';
+import { glassOf, isBath, SHOWER, TOILET, TUB, TUB_SHOWER, tubShowerOf, VANITY_BASIN, variantOf } from '../model/bath';
 import { counterThicknessOf, counterTopOf } from '../model/casework';
 import type { Fixture, LevelFinishes, Vec2 } from '../model/types';
 import { fixtureFrame, fixturePoint, vanityBasinsLocal } from './casework';
@@ -113,6 +113,54 @@ function bathtub(b: Builder, x: Dims): void {
   b.log('chrome', P(-x.hw, x.D / 2, x.y1 + 5), P(-x.hw + 6, x.D / 2, x.y1 + 5), 1.25);
   b.log('chrome', P(-x.hw, x.D / 2, x.y1 + 16), P(-x.hw + 0.5, x.D / 2, x.y1 + 16), 6);
   b.log('chrome', P(-x.hw + 0.5, x.D / 2, x.y1 + 16), P(-x.hw + 3, x.D / 2, x.y1 + 16), 1);
+  tubShower(b, x);
+}
+
+/**
+ * A shower over an alcove tub (Fixture.tubShower): a riser up the tap end from the valve to the head
+ * at SHOWER.head, the head on a short arm; and a fixed glass screen on the front at the tap end,
+ * sliding glass doors (two overlapping panels in a chrome frame) across the front, or a chrome
+ * curtain rail along the front.
+ */
+function tubShower(b: Builder, x: Dims): void {
+  const kind = tubShowerOf(x.f);
+  if (!kind) return;
+  const head = x.y0 + SHOWER.head;
+  if (head < x.y1 + 18) return;
+  const ds = x.D / 2;
+  // The riser from the valve, up the end wall; the arm and head over the tub.
+  b.log('chrome', P(-x.hw + 1, ds, x.y1 + 19), P(-x.hw + 1, ds, head + 2), 0.75);
+  b.log('chrome', P(-x.hw + 1, ds, head + 2), P(-x.hw + 5, ds, head), 0.75);
+  b.log('chrome', P(-x.hw + 4.5, ds, head), P(-x.hw + 5.5, ds, head), Math.min(5, x.D / 3));
+  const g = SHOWER.glass;
+  const top = Math.min(x.y1 + TUB_SHOWER.glass, x.y0 + SHOWER.head + 2);
+  if (kind === 'screen') {
+    // A fixed panel at the tap end of the front, on a short chrome channel on the rim.
+    const s1 = Math.min(-x.hw + TUB_SHOWER.screen, x.hw);
+    b.box('chrome', -x.hw, s1, x.D - g - 0.5, x.D, x.y1, x.y1 + 0.75);
+    b.box('glass', -x.hw, s1, x.D - g - 0.25, x.D - 0.25, x.y1 + 0.75, top);
+  } else if (kind === 'doors') {
+    // Two panels sliding past each other in a frame: a track on the rim, a rail at the top, a jamb
+    // at each end; each panel a little over half the width, one behind the other.
+    const t = 0.75;
+    const d0 = x.D - 2 * g - 1.25;
+    b.box('chrome', -x.hw, x.hw, d0, x.D, x.y1, x.y1 + t);
+    b.box('chrome', -x.hw, x.hw, d0, x.D, top - t, top);
+    b.box('chrome', -x.hw, -x.hw + t, d0, x.D, x.y1 + t, top - t);
+    b.box('chrome', x.hw - t, x.hw, d0, x.D, x.y1 + t, top - t);
+    const mid = 2;
+    b.box('glass', -x.hw + t, mid, d0 + 0.25, d0 + 0.25 + g, x.y1 + t, top - t);
+    b.box('glass', -mid, x.hw - t, x.D - 0.25 - g, x.D - 0.25, x.y1 + t, top - t);
+    // A pull on each.
+    if (x.hw > 10) {
+      b.box('chrome', mid - 3, mid - 2.25, d0 + 0.25 + g, d0 + 0.75 + g, x.y1 + 26, x.y1 + 36);
+      b.box('chrome', -mid + 2.25, -mid + 3, x.D - 0.25 - g - 0.5, x.D - 0.25 - g, x.y1 + 26, x.y1 + 36);
+    }
+  } else if (kind === 'curtain') {
+    // A rod from end wall to end wall over the front edge.
+    const rail = Math.max(x.y1 + 30, x.y0 + TUB_SHOWER.rail);
+    b.log('chrome', P(-x.hw, x.D - 1, rail), P(x.hw, x.D - 1, rail), 1);
+  }
 }
 
 /** The base of a shower: a tray's top, or a curbless floor's. */
@@ -340,6 +388,18 @@ export function bathSymbol(f: Fixture): FurnitureSymbol {
         const t = Math.min(TUB.wall, D / 6, hw / 6);
         ring(roundedRect(-hw + t, hw - t * 1.6, t, D - t, Math.min(6, D / 4), 4));
         out.circles.push({ at: pt(-hw + t + 4, D / 2), r: 1 });
+        // A shower over it: the head at the tap end; the screen, doors or curtain rail on the front.
+        const sh = tubShowerOf(f);
+        if (sh) {
+          out.circles.push({ at: pt(-hw + 5, D / 2), r: Math.min(2.5, D / 6) });
+          const k = 1;
+          if (sh === 'screen') out.rects.push([pt(-hw, D - k), pt(Math.min(-hw + TUB_SHOWER.screen, hw), D - k), pt(Math.min(-hw + TUB_SHOWER.screen, hw), D), pt(-hw, D)]);
+          if (sh === 'doors') {
+            out.rects.push([pt(-hw, D - 2 * k - 0.5), pt(2, D - 2 * k - 0.5), pt(2, D - k - 0.5), pt(-hw, D - k - 0.5)]);
+            out.rects.push([pt(-2, D - k), pt(hw, D - k), pt(hw, D), pt(-2, D)]);
+          }
+          if (sh === 'curtain') line(-hw, D - 1, hw, D - 1);
+        }
       }
       break;
     case 'shower': {

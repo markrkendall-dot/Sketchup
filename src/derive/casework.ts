@@ -187,6 +187,34 @@ function front(out: CaseBox[], style: FrontStyle, part: CasePart, s0: number, s1
 /** A glass door's pane (the shower glass, model/bath.ts), in its frame. */
 const GLASS_PANE = 0.125;
 
+/** Behind glass doors: the carcass's panels and its shelves, this thick; shelves stop this short of the doors. */
+export const GLASS_CASE = { panel: 0.75, shelf: 0.75, setback: 0.5 } as const;
+
+/**
+ * A carcass open at its front (d1), seen through glass doors: a back, two sides, a top and a bottom,
+ * GLASS_CASE.panel thick, and two shelves inside (three from 36" inside), evenly spaced, all in the
+ * cabinet's colour.
+ */
+function hollowCarcass(out: CaseBox[], s0: number, s1: number, d0: number, d1: number, y0: number, y1: number): void {
+  const p = GLASS_CASE.panel;
+  if (s1 - s0 < 4 * p || d1 - d0 < 3 * p || y1 - y0 < 6 * p) {
+    pushBox(out, box('carcass', s0, s1, d0, d1, y0, y1));
+    return;
+  }
+  pushBox(out, box('carcass', s0, s1, d0, d0 + p, y0, y1)); // back
+  pushBox(out, box('carcass', s0, s0 + p, d0 + p, d1, y0, y1)); // sides
+  pushBox(out, box('carcass', s1 - p, s1, d0 + p, d1, y0, y1));
+  pushBox(out, box('carcass', s0 + p, s1 - p, d0 + p, d1, y1 - p, y1)); // top
+  pushBox(out, box('carcass', s0 + p, s1 - p, d0 + p, d1, y0, y0 + p)); // bottom
+  const inside = y1 - y0 - 2 * p;
+  const n = inside >= 36 ? 3 : 2;
+  const gap = (inside - n * GLASS_CASE.shelf) / (n + 1);
+  for (let i = 1; i <= n; i++) {
+    const y = y0 + p + i * gap + (i - 1) * GLASS_CASE.shelf;
+    pushBox(out, box('carcass', s0 + p, s1 - p, d0 + p, d1 - GLASS_CASE.setback, y, y + GLASS_CASE.shelf));
+  }
+}
+
 /**
  * A pull on a front whose face is at `dFront`: a knob centred on (a, y), or a bar pull of length
  * `len` along y (`vertical`, on a door) or along s (a drawer), on two posts.
@@ -262,7 +290,9 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
   if (f.kind === 'shelf') return shelfBoxes(f);
 
   const cabinet = (drawers: boolean, where: 'top' | 'bottom' | 'middle') => {
-    pushBox(out, box('carcass', -h, h, 0, D - FRONT.thickness, kickTop, y1));
+    // Behind glass doors the carcass is open, with shelves (hollowCarcass).
+    if (f.kind === 'wall' && f.glassFront) hollowCarcass(out, -h, h, 0, D - FRONT.thickness, kickTop, y1);
+    else pushBox(out, box('carcass', -h, h, 0, D - FRONT.thickness, kickTop, y1));
     if (kickTop > y0) pushBox(out, box('kick', -h, h, TOE_KICK.setback, D - FRONT.thickness, y0, kickTop));
     const top = y1 - FRONT.reveal;
     const bottom = kickTop + FRONT.reveal;
@@ -398,8 +428,18 @@ function cornerBoxes(f: Fixture, style: FrontStyle, pulls: HandleStyle, kickTop:
   const inner = -h + L; // the side leg's inner face (s)
   const glass = f.kind === 'cornerWall' && !!f.glassFront;
   const where = f.kind === 'cornerWall' ? 'bottom' : 'top';
-  pushBox(out, box('carcass', -h, h, 0, L - t, kickTop, y1)); // the back leg
-  pushBox(out, box('carcass', -h, inner - t, L - t, D, kickTop, y1)); // the side leg
+  if (glass) {
+    // Open behind the glass, with shelves: the back leg from the inside corner to its end, the side
+    // leg from the back leg to the front (built across, then turned), the corner square solid.
+    pushBox(out, box('carcass', -h, inner, 0, L - t, kickTop, y1));
+    hollowCarcass(out, inner, h, 0, L - t, kickTop, y1);
+    const side: CaseBox[] = [];
+    hollowCarcass(side, L - t, D, -h, inner - t, kickTop, y1);
+    out.push(...side.map(swapSD));
+  } else {
+    pushBox(out, box('carcass', -h, h, 0, L - t, kickTop, y1)); // the back leg
+    pushBox(out, box('carcass', -h, inner - t, L - t, D, kickTop, y1)); // the side leg
+  }
   pushBox(out, box('carcass', inner - t, inner, L - t, L, kickTop, y1)); // the inside corner, behind both doors
   if (kickTop > y0) {
     pushBox(out, box('kick', -h, h, TOE_KICK.setback, L - t, y0, kickTop));
@@ -518,7 +558,6 @@ const bbox = (poly: readonly Vec2[]) => ({
   maxY: Math.max(...poly.map((p) => p.y)),
 });
 
-const isAxisAligned = (f: Pick<Fixture, 'direction'>): boolean => Math.abs(normalizeDegrees(f.direction) % 90) < 1e-9;
 
 /** Drop the middle vertex of every straight run (and duplicates) of a ring. */
 export function simplifyRing(ring: readonly Vec2[]): Vec2[] {
@@ -670,22 +709,45 @@ export function counterRuns(fixtures: readonly Fixture[], finishes?: LevelFinish
     });
   };
   const specOf = (members: Rect[]) => counterSpecOf([...members].map((m) => m.fixture).sort((p, q) => (p.id < q.id ? -1 : p.id > q.id ? 1 : 0)), finishes);
+  // Members all square to one another (turned by quarter turns from the first, at any angle, as
+  // a run along a wall at 45 degrees with a corner unit at its end) are joined in that first
+  // member's frame: turned square, united, turned back. Null when they do not make one slab.
+  const united = (members: Rect[]): { outline: Vec2[]; holes: Vec2[][] } | null => {
+    const theta = ((normalizeDegrees(members[0].fixture.direction) % 90) + 90) % 90;
+    const square = members.every((m) => {
+      const r = (((normalizeDegrees(m.fixture.direction) - theta) % 90) + 90) % 90;
+      return r < 1e-9 || 90 - r < 1e-9;
+    });
+    if (!square) return null;
+    const a = (theta * Math.PI) / 180;
+    const turn = (p: Vec2, sgn: number): Vec2 => ({ x: p.x * Math.cos(a) + sgn * p.y * Math.sin(a), y: -sgn * p.x * Math.sin(a) + p.y * Math.cos(a) });
+    // Turned square, snapped to 1e-6" so shared edges are shared exactly.
+    const snap = (v: number) => Math.round(v * 1e6) / 1e6;
+    const toSquare = (poly: readonly Vec2[]) => (theta < 1e-9 ? [...poly] : poly.map((p) => turn(p, 1)).map((p) => ({ x: snap(p.x), y: snap(p.y) })));
+    const back = (ring: Vec2[]) => (theta < 1e-9 ? ring : ring.map((p) => turn(p, -1)));
+    const rings = rectilinearUnion(
+      members.flatMap((m) => m.polys.map(toSquare)),
+      members.flatMap((m) => m.basins.map(toSquare)),
+    ).map(back);
+    // Boxes that meet at an angle can group members that do not touch: then they are not one slab.
+    if (!rings.length || rings.filter((r) => polygonSignedArea(r) > 0).length !== 1) return null;
+    // Connected members give one outer ring (the largest); the rest are holes.
+    const sorted = [...rings].sort((p, q) => Math.abs(polygonSignedArea(q)) - Math.abs(polygonSignedArea(p)));
+    return { outline: sorted[0], holes: sorted.slice(1) };
+  };
   for (const members of groups.values()) {
     const spec = specOf(members);
-    if ((members.length > 1 || members[0].polys.length > 1) && members.every((m) => isAxisAligned(m.fixture))) {
-      const rings = rectilinearUnion(
-        members.flatMap((m) => m.polys),
-        members.flatMap((m) => m.basins),
-      );
-      if (rings.length) {
-        // Connected members give one outer ring (the largest); the rest are holes.
-        const sorted = [...rings].sort((p, q) => Math.abs(polygonSignedArea(q)) - Math.abs(polygonSignedArea(p)));
-        slab(members, sorted[0], sorted.slice(1), spec);
-        continue;
-      }
+    const one = members.length > 1 || members[0].polys.length > 1 ? united(members) : null;
+    if (one) {
+      slab(members, one.outline, one.holes, spec);
+      continue;
     }
-    // A corner unit turned off the quarter turns carries one slab per leg.
-    for (const m of members) for (const [i, poly] of m.polys.entries()) slab([m], poly, i === 0 ? m.basins : [], specOf([m]));
+    // Fixtures at angles to one another carry a slab each (a corner unit one over both legs).
+    for (const m of members) {
+      const own = m.polys.length > 1 ? united([m]) : null;
+      if (own) slab([m], own.outline, own.holes, specOf([m]));
+      else for (const [i, poly] of m.polys.entries()) slab([m], poly, i === 0 ? m.basins : [], specOf([m]));
+    }
   }
   return runs.sort((p, q) => (p.fixtureIds[0] < q.fixtureIds[0] ? -1 : p.fixtureIds[0] > q.fixtureIds[0] ? 1 : 0));
 }

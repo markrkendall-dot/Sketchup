@@ -2,7 +2,7 @@ import { stackFloorTops } from '../model/plan';
 import { structureOf } from '../model/structures';
 import type { Id, Plan, Roof, ViewMode } from '../model/types';
 import { isVisible, phasesCoexist } from './phase';
-import { joinRoof, roofBearing, roofOutlineWithOverhang, type JoinOther, type JoinRegion, type RoofOnLevel } from './roofs';
+import { abuttingRoof, ABUT_TOLERANCE, joinRoof, roofBearing, roofOutlineWithOverhang, type JoinOther, type JoinRegion, type RoofOnLevel } from './roofs';
 
 // Roofs that meet (DESIGN.md "Roofs that meet"): each roof of a building trimmed against the other
 // roofs of the same building shown in the view mode, on any of its levels (roofs.ts joinRoof). The
@@ -38,7 +38,7 @@ interface JoinEntry {
 const joinCache = new WeakMap<Roof, JoinEntry>();
 
 /** Two grown outlines' boxes overlap (with a small pad). */
-function boxesOverlap(p: Roof, q: Roof): boolean {
+function boxesOverlap(p: Roof, q: Roof, pad = 0): boolean {
   const box = (r: Roof) => {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const v of roofOutlineWithOverhang(r)) {
@@ -48,7 +48,7 @@ function boxesOverlap(p: Roof, q: Roof): boolean {
   };
   const a = box(p);
   const b = box(q);
-  return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  return a.x0 < b.x1 + pad && b.x0 < a.x1 + pad && a.y0 < b.y1 + pad && b.y0 < a.y1 + pad;
 }
 
 /** The building's roofs shown in the view, placed. */
@@ -66,6 +66,30 @@ function placedRoofs(plan: Plan, levelId: Id, viewMode: ViewMode): Placed[] {
     }
   });
   return out;
+}
+
+interface AbutEntry {
+  others: readonly Placed[];
+  floor: number;
+  bearing: number;
+  roof: Roof;
+}
+
+const abutCache = new WeakMap<Roof, AbutEntry>();
+
+/**
+ * The roof as drawn: its end run on into a higher roof of the building whose wall it stops at
+ * (roofs.ts abuttingRoof), else the roof itself. Memoized on the roof object and what it can meet.
+ */
+function abutOf(me: Placed, all: readonly Placed[]): Roof {
+  const others = all.filter((o) => o !== me && phasesCoexist(me.roof.phase, o.roof.phase) && boxesOverlap(me.roof, o.roof, ABUT_TOLERANCE));
+  const hit = abutCache.get(me.roof);
+  if (hit && hit.floor === me.floor && hit.bearing === me.bearing && hit.others.length === others.length && hit.others.every((o, i) => o.roof === others[i].roof && o.floor === others[i].floor && o.bearing === others[i].bearing)) {
+    return hit.roof;
+  }
+  const roof = abuttingRoof(me.roof, me.bearing, others.map((o) => ({ roof: o.roof, bearing: o.floor + o.bearing - me.floor })));
+  abutCache.set(me.roof, { others, floor: me.floor, bearing: me.bearing, roof });
+  return roof;
 }
 
 /** A roof joined to the others it can meet (memoized on the roof object and what it meets). */
@@ -92,7 +116,9 @@ function joinOf(me: Placed, all: readonly Placed[]): JoinRegion[] | null {
  * every roof of the building in the level's frame (for the walls, roofs.ts wallRoofProfile caps).
  */
 export function getLevelRoofs(plan: Plan, levelId: Id, viewMode: ViewMode): LevelRoofs {
-  const all = placedRoofs(plan, levelId, viewMode);
+  const placed = placedRoofs(plan, levelId, viewMode);
+  // Ends run on into a higher roof first (against the roofs as stored), then every roof joined.
+  const all = placed.map((p) => ({ ...p, roof: abutOf(p, placed) }));
   const here = all.find((p) => p.levelId === levelId)?.floor ?? floorOf(plan, levelId);
   const building: RoofOnLevel[] = all.map((p) => ({ roof: p.roof, bearing: p.floor + p.bearing - here, join: joinOf(p, all) }));
   const own = building.filter((_, i) => all[i].levelId === levelId);
@@ -105,9 +131,12 @@ function floorOf(plan: Plan, levelId: Id): number {
   return stackFloorTops(s, plan.levels)[s.levelOrder.indexOf(levelId)] ?? 0;
 }
 
-/** The joins of one level's roofs by roof id (for the 2D plan's valley lines). */
-export function getLevelRoofJoins(plan: Plan, levelId: Id, viewMode: ViewMode): Map<Id, readonly JoinRegion[] | null> {
-  const out = new Map<Id, readonly JoinRegion[] | null>();
-  for (const r of getLevelRoofs(plan, levelId, viewMode).own) out.set(r.roof.id, r.join ?? null);
+/**
+ * One level's roofs as drawn by roof id (for the 2D plan's ridge and valley lines): the roof (with an
+ * end run on into a higher roof, abuttingRoof) and its join.
+ */
+export function getLevelRoofJoins(plan: Plan, levelId: Id, viewMode: ViewMode): Map<Id, { roof: Roof; join: readonly JoinRegion[] | null }> {
+  const out = new Map<Id, { roof: Roof; join: readonly JoinRegion[] | null }>();
+  for (const r of getLevelRoofs(plan, levelId, viewMode).own) out.set(r.roof.id, { roof: r.roof, join: r.join ?? null });
   return out;
 }
