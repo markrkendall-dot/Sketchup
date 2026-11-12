@@ -1,6 +1,6 @@
 import { glassOf, isBath, SHOWER, TOILET, TUB, VANITY_BASIN, variantOf } from '../model/bath';
-import { counterTopOf } from '../model/casework';
-import type { Fixture, Vec2 } from '../model/types';
+import { counterThicknessOf, counterTopOf } from '../model/casework';
+import type { Fixture, LevelFinishes, Vec2 } from '../model/types';
 import { fixtureFrame, fixturePoint, vanityBasinsLocal } from './casework';
 import type { FurnitureSymbol, Local3, Solid } from './furniture';
 
@@ -76,6 +76,8 @@ interface Dims {
   y0: number;
   y1: number;
   f: Fixture;
+  /** The level's casework defaults (a vanity's counter thickness). */
+  finishes?: LevelFinishes;
 }
 
 function bathtub(b: Builder, x: Dims): void {
@@ -198,7 +200,7 @@ function toilet(b: Builder, x: Dims): void {
 function vanity(b: Builder, x: Dims): void {
   // The cabinet is casework (derive/casework.ts fixtureBoxes); here the undermount basins under the
   // counter's holes and a tap behind each.
-  const top = counterTopOf(x.f);
+  const top = counterTopOf(x.f, counterThicknessOf(x.f, x.finishes));
   for (const r of vanityBasinsLocal(x.f)) {
     const bottom = top - VANITY_BASIN.deep;
     const w = VANITY_BASIN.wall;
@@ -272,10 +274,10 @@ function waterHeater(b: Builder, x: Dims): void {
 }
 
 /** The solids of a bath or laundry fixture in its own frame (empty for any other kind). */
-export function bathSolids(f: Fixture): BathSolid[] {
+export function bathSolids(f: Fixture, finishes?: LevelFinishes): BathSolid[] {
   if (!isBath(f.kind)) return [];
   const b = new Builder();
-  const x: Dims = { hw: f.width / 2, D: f.depth, y0: f.elevation, y1: f.elevation + f.height, f };
+  const x: Dims = { hw: f.width / 2, D: f.depth, y0: f.elevation, y1: f.elevation + f.height, f, finishes };
   switch (f.kind) {
     case 'bathtub':
       bathtub(b, x);

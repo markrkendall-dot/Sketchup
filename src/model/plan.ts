@@ -6,7 +6,7 @@ import { MAX_STAIRS_BELOW, stairsRisersOk } from '../derive/stairs';
 import { cross, dist, projectPointToSegment, segmentIntersection, sub } from './geometry';
 import { BAND_FINISHES, CEILING_FINISHES, FLOOR_FINISHES, GLAZINGS, isHexColor, MAX_LITES, MAX_SASHES, ROOF_EAVES, ROOF_FINISHES, ROOM_WALL_FINISHES, SURFACE_MATERIALS, WALL_FINISHES } from './finish';
 import { clampOpeningOffset, OPENING_DEFAULTS } from './openings';
-import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
+import { FIXTURE_KINDS, FRONT_STYLES, KITCHEN_FIELD_KEYS, KITCHEN_FINISH_FIELDS, KITCHEN_FINISH_KEYS, kitchenFieldProblem, validKitchenFields, type KitchenField } from './casework';
 import { isFabricId, isFurniturePiece, isWoodId } from './furniture';
 import { isVariantOf } from './bath';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
@@ -726,8 +726,9 @@ const FENCE_KEYS = ['id', 'points', 'height', 'rails', 'postSpacing', 'phase', '
 const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
 const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
-const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass'] as const;
-const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle', 'cabinetWood', 'ceilingFinish', 'ceilingColor'] as const;
+// The kitchen's optional fields (model/casework.ts KITCHEN_FIELDS) are checked by validKitchenFields.
+const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS] as const;
+const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle', 'cabinetWood', 'ceilingFinish', 'ceilingColor', ...KITCHEN_FINISH_KEYS] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'color'] as const;
 const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase'] as const;
 const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
@@ -1239,7 +1240,7 @@ const isOverhang = (v: unknown): v is NonNullable<Fixture['counterOverhang']> =>
  * store).
  */
 export function fixtureProblem(
-  f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang' | 'piece' | 'wood' | 'fabric' | 'builtIn' | 'variant' | 'glass'>,
+  f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang' | 'piece' | 'wood' | 'fabric' | 'builtIn' | 'variant' | 'glass'> & Partial<Pick<Fixture, KitchenField>>,
 ): string | null {
   if (typeof f.kind !== 'string' || !FIXTURE_KINDS.includes(f.kind)) return `unknown kind ${String(f.kind)}`;
   if (f.kind === 'furniture' && !isFurniturePiece(f.piece)) return `furniture needs a known piece (${String(f.piece)})`;
@@ -1257,7 +1258,7 @@ export function fixtureProblem(
   if (f.counterOverhang !== undefined && !isOverhang(f.counterOverhang)) return 'the counter overhang needs four distances';
   if (f.variant !== undefined && !isVariantOf(f.kind, f.variant)) return `a ${f.kind} has no form ${String(f.variant)}`;
   if (f.glass !== undefined && (f.kind !== 'shower' || !isGlassSides(f.glass))) return f.kind !== 'shower' ? 'only a shower has glass sides' : 'glass sides must be true or false';
-  return null;
+  return FIXTURE_KINDS.includes(f.kind) ? kitchenFieldProblem(f) : null;
 }
 
 /** Fixtures read field by field: one with an unusable kind, size or position is dropped (with a warning); bad optional fields are dropped one by one. */
@@ -1298,6 +1299,10 @@ function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
     // Bath fixtures: a known form for the kind, a shower's glass sides (only the true ones kept).
     put(fixture, 'variant', isVariantOf(base.kind, f.variant) ? f.variant : undefined);
     put(fixture, 'glass', base.kind === 'shower' && isGlassSides(f.glass) ? glassSidesOf(f.glass) : undefined);
+    // The kitchen's fields: each kept when its kind takes it and it is valid (an unknown counter
+    // material, a drawer bank of 9, a backsplash on an island are dropped alone).
+    const kitchen = validKitchenFields(f, base.kind);
+    for (const k of KITCHEN_FIELD_KEYS) put(fixture, k, kitchen[k]);
     out[fid] = fixture as unknown as Fixture;
   }
   return out;
@@ -1313,6 +1318,10 @@ function migrateFinishes(raw: unknown): LevelFinishes | undefined {
   put(out, 'cabinetWood', isWoodId(raw.cabinetWood) ? raw.cabinetWood : undefined);
   put(out, 'ceilingFinish', isCeilingFinish(raw.ceilingFinish) ? raw.ceilingFinish : undefined);
   put(out, 'ceilingColor', isHexColor(raw.ceilingColor) ? raw.ceilingColor.toLowerCase() : undefined);
+  for (const k of KITCHEN_FINISH_KEYS) {
+    const v = raw[k];
+    put(out, k, KITCHEN_FINISH_FIELDS[k](v) ? (typeof v === 'string' && isHexColor(v) ? v.toLowerCase() : v) : undefined);
+  }
   return Object.keys(out).length ? (out as unknown as LevelFinishes) : undefined;
 }
 

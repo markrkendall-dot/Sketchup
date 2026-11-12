@@ -1,7 +1,17 @@
 import {
   BASIN,
+  cornerLegOf,
   counterOverhangOf,
+  counterSpecOf,
+  counterThicknessOf,
   counterTopOf,
+  handlesOf,
+  HANDLE,
+  isCorner,
+  shelfLayoutOf,
+  SHELF,
+  takesHandles,
+  type CounterSpec,
   FIXTURE_PLAN_LABEL,
   FRONT,
   frontStyleOf,
@@ -15,7 +25,7 @@ import {
 import { add, cross, dot, polygonSignedArea, scale, sub } from '../model/geometry';
 import { furniturePlanLabel } from '../model/furniture';
 import { isBath, VANITY_BASIN } from '../model/bath';
-import type { Fixture, FrontStyle, Id, LevelFinishes, Vec2 } from '../model/types';
+import type { Fixture, FrontStyle, HandleStyle, Id, LevelFinishes, Vec2 } from '../model/types';
 import { directionVector, normalizeDegrees } from './stairs';
 
 // Casework geometry (DESIGN.md "Casework"). Pure: no three, no React. A fixture is a plan
@@ -113,7 +123,7 @@ export function basinOutlines(f: Pick<Fixture, 'kind' | 'origin' | 'direction' |
 // Boxes: a fixture as axis-aligned boxes in its own frame, one material part each.
 
 /** What a box is made of (view3d/materials.ts picks the material). */
-export type CasePart = 'carcass' | 'front' | 'kick' | 'appliance' | 'basin';
+export type CasePart = 'carcass' | 'front' | 'kick' | 'appliance' | 'basin' | 'handle' | 'glass';
 
 export interface CaseBox {
   part: CasePart;
@@ -141,12 +151,12 @@ function pushBox(out: CaseBox[], b: CaseBox | null): void {
 export const doorCount = (width: number): number => Math.max(1, Math.round(width / FRONT.doorWidth));
 
 /** The lateral spans of `n` fronts across [-w/2, w/2] with a reveal between them and at the ends. */
-export function frontSpans(width: number, n: number): [number, number][] {
+export function frontSpans(width: number, n: number, from = -width / 2): [number, number][] {
   const inner = width - FRONT.reveal * (n + 1);
   const each = inner / n;
   const out: [number, number][] = [];
   for (let i = 0; i < n; i++) {
-    const s0 = -width / 2 + FRONT.reveal + i * (each + FRONT.reveal);
+    const s0 = from + FRONT.reveal + i * (each + FRONT.reveal);
     out.push([s0, s0 + each]);
   }
   return out;
@@ -155,13 +165,13 @@ export function frontSpans(width: number, n: number): [number, number][] {
 /**
  * One door or drawer front over the lateral span [s0, s1] and the height [y0, y1], at the front
  * face `dFront` (the boxes end at d = dFront). A slab is one box; a panel front is four frame
- * boards round a recessed panel.
+ * boards round a recessed panel; a glass front is the frame round a pane of glass.
  */
-function front(out: CaseBox[], style: FrontStyle, part: CasePart, s0: number, s1: number, y0: number, y1: number, dFront: number): void {
+function front(out: CaseBox[], style: FrontStyle, part: CasePart, s0: number, s1: number, y0: number, y1: number, dFront: number, glass = false): void {
   const d0 = dFront - FRONT.thickness;
   const w = s1 - s0;
   const h = y1 - y0;
-  if (style === 'slab' || w < 2 * PANEL.frame + 1 || h < 2 * PANEL.frame + 1) {
+  if ((style === 'slab' && !glass) || w < 2 * PANEL.frame + 1 || h < 2 * PANEL.frame + 1) {
     pushBox(out, box(part, s0, s1, d0, dFront, y0, y1));
     return;
   }
@@ -170,15 +180,72 @@ function front(out: CaseBox[], style: FrontStyle, part: CasePart, s0: number, s1
   pushBox(out, box(part, s1 - f, s1, d0, dFront, y0, y1)); // right stile
   pushBox(out, box(part, s0 + f, s1 - f, d0, dFront, y1 - f, y1)); // top rail
   pushBox(out, box(part, s0 + f, s1 - f, d0, dFront, y0, y0 + f)); // bottom rail
-  pushBox(out, box(part, s0 + f, s1 - f, d0, dFront - PANEL.recess, y0 + f, y1 - f)); // recessed panel
+  if (glass) pushBox(out, box('glass', s0 + f, s1 - f, dFront - PANEL.recess - GLASS_PANE, dFront - PANEL.recess, y0 + f, y1 - f));
+  else pushBox(out, box(part, s0 + f, s1 - f, d0, dFront - PANEL.recess, y0 + f, y1 - f)); // recessed panel
 }
+
+/** A glass door's pane (the shower glass, model/bath.ts), in its frame. */
+const GLASS_PANE = 0.125;
+
+/**
+ * A pull on a front whose face is at `dFront`: a knob centred on (a, y), or a bar pull of length
+ * `len` along y (`vertical`, on a door) or along s (a drawer), on two posts.
+ */
+function pull(out: CaseBox[], style: HandleStyle, a: number, y: number, dFront: number, vertical: boolean, len: number): void {
+  if (style === 'none') return;
+  if (style === 'knob') {
+    const k = HANDLE.knob / 2;
+    pushBox(out, box('handle', a - k, a + k, dFront, dFront + HANDLE.knobProud, y - k, y + k));
+    return;
+  }
+  const p = HANDLE.post / 2;
+  const b = HANDLE.bar / 2;
+  const half = len / 2;
+  const bar0 = dFront + HANDLE.barProud - HANDLE.bar;
+  for (const e of [-half + p, half - p]) {
+    if (vertical) pushBox(out, box('handle', a - p, a + p, dFront, bar0, y + e - p, y + e + p));
+    else pushBox(out, box('handle', a + e - p, a + e + p, dFront, bar0, y - p, y + p));
+  }
+  if (vertical) pushBox(out, box('handle', a - b, a + b, bar0, dFront + HANDLE.barProud, y - half, y + half));
+  else pushBox(out, box('handle', a - half, a + half, bar0, dFront + HANDLE.barProud, y - b, y + b));
+}
+
+/** A bar pull's length on a door this high, or across a drawer this wide. */
+const doorBar = (h: number): number => Math.max(2, Math.min(6, h - 2 * HANDLE.from));
+const drawerBar = (w: number): number => Math.max(2, Math.min(8, w * 0.4, w - 2));
+
+/**
+ * A door's pull: on the stile at the edge away from its hinge (doors left of the middle open from
+ * their right edge, doors right of it from their left, a lone door from its right), near the top of
+ * a door under a counter, near the bottom of one hung above it, at about 40" on a tall cabinet.
+ */
+function doorPull(out: CaseBox[], style: HandleStyle, s0: number, s1: number, y0: number, y1: number, dFront: number, where: 'top' | 'bottom' | 'middle', edge?: 'left' | 'right'): void {
+  if (style === 'none') return;
+  const c = (s0 + s1) / 2;
+  const side = edge ?? (c > 1e-6 ? 'left' : 'right');
+  const a = side === 'left' ? s0 + HANDLE.inset : s1 - HANDLE.inset;
+  const len = doorBar(y1 - y0);
+  const reach = style === 'knob' ? HANDLE.from : HANDLE.from - 1 + len / 2;
+  const y = where === 'top' ? y1 - reach : where === 'bottom' ? y0 + reach : Math.min(y1 - reach, Math.max(y0 + reach, 40));
+  pull(out, style, a, y, dFront, true, len);
+}
+
+/** A drawer front's pull, centred on it. */
+const drawerPull = (out: CaseBox[], style: HandleStyle, s0: number, s1: number, y0: number, y1: number, dFront: number): void =>
+  pull(out, style, (s0 + s1) / 2, (y0 + y1) / 2, dFront, false, drawerBar(s1 - s0));
+
+/** The fronts' style, a cabinet's pulls, what a fixture's boxes depend on besides the fixture (meshes.ts caches on it). */
+export const fixtureBoxKey = (f: Fixture, finishes?: LevelFinishes): string =>
+  `${frontStyleOf(f, finishes)}|${takesHandles(f.kind) ? handlesOf(f, finishes) : 'none'}|${hasCounter(f.kind) ? counterThicknessOf(f, finishes) : ''}`;
 
 /**
  * The boxes of a fixture in its own frame. Cabinets: a carcass behind the fronts, a toe kick under
  * a floor-standing one, `doorCount` fronts with reveals (base, island and sink cabinets get a 6"
- * drawer front across the top of each door). Appliances are steel boxes with a few details (a
- * range's cooktop and backguard, a fridge's door reveal, an oven's panels). A sink is a base
- * cabinet with an open basin let into the counter.
+ * drawer front across the top of each door; a base with `drawers` is a drawer bank), pulls when it
+ * has them, glass doors on a wall cabinet with `glassFront`. Corner units are L-shaped
+ * (cornerBoxes), open shelves boards on brackets (shelfBoxes). Appliances are steel boxes with a few
+ * details (a range's cooktop and backguard, a fridge's door reveal, an oven's panels). A sink is a
+ * base cabinet with an open basin let into the counter.
  */
 export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
   const out: CaseBox[] = [];
@@ -188,19 +255,47 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
   const y0 = f.elevation;
   const y1 = f.elevation + f.height;
   const style = frontStyleOf(f, finishes);
+  const pulls = takesHandles(f.kind) ? handlesOf(f, finishes) : 'none';
   const standing = f.elevation < 1e-9;
   const kickTop = standing && f.height > TOE_KICK.height * 2 ? y0 + TOE_KICK.height : y0;
+  if (f.kind === 'cornerBase' || f.kind === 'cornerWall') return cornerBoxes(f, style, pulls, kickTop);
+  if (f.kind === 'shelf') return shelfBoxes(f);
 
-  const cabinet = (drawers: boolean) => {
+  const cabinet = (drawers: boolean, where: 'top' | 'bottom' | 'middle') => {
     pushBox(out, box('carcass', -h, h, 0, D - FRONT.thickness, kickTop, y1));
     if (kickTop > y0) pushBox(out, box('kick', -h, h, TOE_KICK.setback, D - FRONT.thickness, y0, kickTop));
+    const top = y1 - FRONT.reveal;
+    const bottom = kickTop + FRONT.reveal;
+    const bank = f.kind === 'base' && f.drawers !== undefined ? f.drawers : 0;
+    if (bank >= 2 && top - bottom > bank * 3) {
+      // A drawer bank: one column (two from 42" wide), the top drawer 6" when there are three or
+      // more, the rest sharing the height.
+      const cols = Math.max(1, Math.round(w / 36));
+      const inner = top - bottom - FRONT.reveal * (bank - 1);
+      const first = bank >= 3 ? Math.min(FRONT.drawer, inner / bank) : inner / bank;
+      const rest = bank >= 3 ? (inner - first) / (bank - 1) : first;
+      for (const [s0, s1] of frontSpans(w, cols)) {
+        let y = top;
+        for (let i = 0; i < bank; i++) {
+          const hh = i === 0 ? first : rest;
+          front(out, style, 'front', s0, s1, y - hh, y, D);
+          drawerPull(out, pulls, s0, s1, y - hh, y, D);
+          y -= hh + FRONT.reveal;
+        }
+      }
+      return;
+    }
+    const glass = !!f.glassFront && f.kind === 'wall';
     for (const [s0, s1] of frontSpans(w, doorCount(w))) {
-      const top = y1 - FRONT.reveal;
-      const bottom = kickTop + FRONT.reveal;
       if (drawers && top - bottom > FRONT.drawer * 2) {
         front(out, style, 'front', s0, s1, top - FRONT.drawer, top, D);
+        drawerPull(out, pulls, s0, s1, top - FRONT.drawer, top, D);
         front(out, style, 'front', s0, s1, bottom, top - FRONT.drawer - FRONT.reveal, D);
-      } else front(out, style, 'front', s0, s1, bottom, top, D);
+        doorPull(out, pulls, s0, s1, bottom, top - FRONT.drawer - FRONT.reveal, D, where);
+      } else {
+        front(out, style, 'front', s0, s1, bottom, top, D, glass);
+        doorPull(out, pulls, s0, s1, bottom, top, D, where);
+      }
     }
   };
 
@@ -209,16 +304,18 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
     case 'island':
     case 'vanity':
       // A vanity's basins and taps are bath solids (derive/bath.ts), under the counter's holes.
-      cabinet(true);
+      cabinet(true, 'top');
       break;
     case 'wall':
+      cabinet(false, 'bottom');
+      break;
     case 'tall':
-      cabinet(false);
+      cabinet(false, 'middle');
       break;
     case 'sink': {
-      cabinet(true);
+      cabinet(true, 'top');
       const b = basinLocal(f);
-      const top = counterTopOf(f);
+      const top = counterTopOf(f, counterThicknessOf(f, finishes));
       const bottom = Math.max(kickTop + 1, top - BASIN.deep);
       const t = BASIN.wall;
       pushBox(out, box('basin', b.s0, b.s1, b.d0, b.d1, bottom, bottom + t)); // bowl bottom
@@ -278,6 +375,120 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
   return out;
 }
 
+/** A box with its lateral and depth axes swapped: a front built facing +d, turned to face +s. */
+const swapSD = (b: CaseBox): CaseBox => ({ ...b, s0: b.d0, s1: b.d1, d0: b.s0, d1: b.s1 });
+/** A box mirrored across the fixture's middle (s to -s). */
+const mirrorS = (b: CaseBox): CaseBox => ({ ...b, s0: -b.s1, s1: -b.s0 });
+
+/**
+ * An L-shaped corner unit (DESIGN.md "Casework"), built with its corner at the left end and
+ * mirrored for a right one: a leg L deep along the back wall the full width, and a leg L wide along
+ * the other wall the full depth. Its two inner faces each carry a door (a pie-cut pair, the pull on
+ * the back leg's door by the inside corner); a base unit stands on a toe kick, a wall unit can have
+ * glass doors.
+ */
+function cornerBoxes(f: Fixture, style: FrontStyle, pulls: HandleStyle, kickTop: number): CaseBox[] {
+  const out: CaseBox[] = [];
+  const h = f.width / 2;
+  const D = f.depth;
+  const y0 = f.elevation;
+  const y1 = f.elevation + f.height;
+  const L = cornerLegOf(f);
+  const t = FRONT.thickness;
+  const inner = -h + L; // the side leg's inner face (s)
+  const glass = f.kind === 'cornerWall' && !!f.glassFront;
+  const where = f.kind === 'cornerWall' ? 'bottom' : 'top';
+  pushBox(out, box('carcass', -h, h, 0, L - t, kickTop, y1)); // the back leg
+  pushBox(out, box('carcass', -h, inner - t, L - t, D, kickTop, y1)); // the side leg
+  pushBox(out, box('carcass', inner - t, inner, L - t, L, kickTop, y1)); // the inside corner, behind both doors
+  if (kickTop > y0) {
+    pushBox(out, box('kick', -h, h, TOE_KICK.setback, L - t, y0, kickTop));
+    pushBox(out, box('kick', -h + TOE_KICK.setback, inner - t, L - t, D, y0, kickTop));
+  }
+  const bottom = kickTop + FRONT.reveal;
+  const top = y1 - FRONT.reveal;
+  // The back leg's door, from the inside corner to the right end, its pull by the corner.
+  const [a0, a1] = [inner + FRONT.reveal, h - FRONT.reveal];
+  front(out, style, 'front', a0, a1, bottom, top, L, glass);
+  doorPull(out, pulls, a0, a1, bottom, top, L, where, 'left');
+  // The side leg's door, facing +s, from the inside corner to the front.
+  const side: CaseBox[] = [];
+  front(side, style, 'front', L + FRONT.reveal, D - FRONT.reveal, bottom, top, inner, glass);
+  out.push(...side.map(swapSD));
+  return f.corner === 'right' ? out.map(mirrorS) : out;
+}
+
+/**
+ * Open shelves: `shelves` boards spaced evenly from the bottom to the top. Hung on a wall (a bottom
+ * above the floor), each board sits on two block brackets near its ends; standing on the floor, the
+ * boards run between two end panels.
+ */
+function shelfBoxes(f: Fixture): CaseBox[] {
+  const out: CaseBox[] = [];
+  const h = f.width / 2;
+  const D = f.depth;
+  const { count, thickness, first, spacing } = shelfLayoutOf(f);
+  const standing = f.elevation < 1e-9;
+  const end = standing ? Math.min(0.75, h / 4) : 0;
+  if (standing) {
+    pushBox(out, box('carcass', -h, -h + end, 0, D, f.elevation, f.elevation + f.height));
+    pushBox(out, box('carcass', h - end, h, 0, D, f.elevation, f.elevation + f.height));
+  }
+  const inset = Math.min(6, f.width / 6);
+  for (let i = 0; i < count; i++) {
+    const yb = f.elevation + first + i * spacing;
+    pushBox(out, box('carcass', -h + end, h - end, 0, D, yb, yb + thickness));
+    if (standing) continue;
+    const b = SHELF.bracket / 2;
+    const drop = Math.min(SHELF.bracketDrop, i > 0 ? spacing - thickness : first);
+    for (const s of [-h + inset, h - inset]) pushBox(out, box('kick', s - b, s + b, 0, D * 0.7, yb - drop, yb));
+  }
+  return out;
+}
+
+/**
+ * The plan footprint of a corner unit, an L: from the back-left corner round (back-left,
+ * front-left, the side leg's front, the inside corner, the back leg's front at the right end,
+ * back-right), mirrored for a right-hand one.
+ */
+export function cornerOutline(f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'corner'>): Vec2[] {
+  const fr = fixtureFrame(f);
+  const h = f.width / 2;
+  const L = cornerLegOf(f);
+  const m = f.corner === 'right' ? -1 : 1;
+  const pts: [number, number][] = [
+    [-h, 0],
+    [-h, f.depth],
+    [-h + L, f.depth],
+    [-h + L, L],
+    [h, L],
+    [h, 0],
+  ];
+  const ring = pts.map(([s, d]) => fixturePoint(fr, m * s, d));
+  return m < 0 ? ring.reverse() : ring;
+}
+
+/**
+ * The rectangles of a fixture's counter: its outline grown by the overhang; a corner base's two
+ * legs (the back leg the full width, the side leg from the back leg's front to the unit's front),
+ * the overhang's front on both inner faces.
+ */
+export function counterRects(f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'counterOverhang' | 'corner'>): Vec2[][] {
+  if (f.kind !== 'cornerBase') return [counterOutline(f)];
+  const over = counterOverhangOf(f);
+  const fr = fixtureFrame(f);
+  const h = f.width / 2;
+  const L = cornerLegOf(f);
+  const m = f.corner === 'right' ? -1 : 1;
+  // In the left-hand frame: the corner end's overhang is the wall side's ("left" there).
+  const [cornerSide, freeSide] = m > 0 ? [over.left, over.right] : [over.right, over.left];
+  const rect = (s0: number, s1: number, d0: number, d1: number) => {
+    const [a, b] = m > 0 ? [s0, s1] : [-s1, -s0];
+    return [fixturePoint(fr, a, d0), fixturePoint(fr, a, d1), fixturePoint(fr, b, d1), fixturePoint(fr, b, d0)];
+  };
+  return [rect(-h - cornerSide, h + freeSide, -over.back, L + over.front), rect(-h - cornerSide, -h + L + over.front, L + over.front, f.depth)];
+}
+
 // ---------------------------------------------------------------------------------------------
 // Counter runs: one slab per group of touching counter fixtures.
 
@@ -290,9 +501,11 @@ export interface CounterRun {
   /** Level-local bottom and top of the slab. */
   y0: number;
   y1: number;
+  /** Its material, colour and thickness (model/casework.ts counterSpecOf: the first fixture's that sets each, else the level's). */
+  spec: CounterSpec;
 }
 
-type Rect = { fixture: Fixture; poly: Vec2[]; basins: Vec2[][]; minX: number; minY: number; maxX: number; maxY: number };
+type Rect = { fixture: Fixture; polys: Vec2[][]; basins: Vec2[][]; minX: number; minY: number; maxX: number; maxY: number };
 
 const EPS = 1e-6;
 /** Rectangles closer than this touch (fixtures placed by the tool abut exactly). */
@@ -419,12 +632,12 @@ export function rectilinearUnion(rects: readonly (readonly Vec2[])[], holes: rea
  * fixture carries its own slab. A slab spans from the top of its highest cabinet up
  * COUNTER_THICKNESS.
  */
-export function counterRuns(fixtures: readonly Fixture[]): CounterRun[] {
+export function counterRuns(fixtures: readonly Fixture[], finishes?: LevelFinishes): CounterRun[] {
   const rects: Rect[] = fixtures
     .filter((f) => hasCounter(f.kind))
     .map((f) => {
-      const poly = counterOutline(f);
-      return { fixture: f, poly, basins: basinOutlines(f), ...bbox(poly) };
+      const polys = counterRects(f);
+      return { fixture: f, polys, basins: basinOutlines(f), ...bbox(polys.flat()) };
     });
   // Union-find over touching rectangles.
   const parent = rects.map((_, i) => i);
@@ -445,30 +658,34 @@ export function counterRuns(fixtures: readonly Fixture[]): CounterRun[] {
     else groups.set(g, [r]);
   });
   const runs: CounterRun[] = [];
-  const slab = (members: Rect[], outline: Vec2[], holes: Vec2[][]) => {
+  const slab = (members: Rect[], outline: Vec2[], holes: Vec2[][], spec: CounterSpec) => {
     const top = Math.max(...members.map((m) => m.fixture.elevation + m.fixture.height));
     runs.push({
       fixtureIds: members.map((m) => m.fixture.id).sort(),
       outline: polygonSignedArea(outline) < 0 ? [...outline].reverse() : outline,
       holes,
       y0: top,
-      y1: counterTopOf({ elevation: top, height: 0 }),
+      y1: top + spec.thickness,
+      spec,
     });
   };
+  const specOf = (members: Rect[]) => counterSpecOf([...members].map((m) => m.fixture).sort((p, q) => (p.id < q.id ? -1 : p.id > q.id ? 1 : 0)), finishes);
   for (const members of groups.values()) {
-    if (members.length > 1 && members.every((m) => isAxisAligned(m.fixture))) {
+    const spec = specOf(members);
+    if ((members.length > 1 || members[0].polys.length > 1) && members.every((m) => isAxisAligned(m.fixture))) {
       const rings = rectilinearUnion(
-        members.map((m) => m.poly),
+        members.flatMap((m) => m.polys),
         members.flatMap((m) => m.basins),
       );
       if (rings.length) {
         // Connected members give one outer ring (the largest); the rest are holes.
         const sorted = [...rings].sort((p, q) => Math.abs(polygonSignedArea(q)) - Math.abs(polygonSignedArea(p)));
-        slab(members, sorted[0], sorted.slice(1));
+        slab(members, sorted[0], sorted.slice(1), spec);
         continue;
       }
     }
-    for (const m of members) slab([m], m.poly, m.basins);
+    // A corner unit turned off the quarter turns carries one slab per leg.
+    for (const m of members) for (const [i, poly] of m.polys.entries()) slab([m], poly, i === 0 ? m.basins : [], specOf([m]));
   }
   return runs.sort((p, q) => (p.fixtureIds[0] < q.fixtureIds[0] ? -1 : p.fixtureIds[0] > q.fixtureIds[0] ? 1 : 0));
 }
@@ -480,8 +697,10 @@ type Seg = [Vec2, Vec2];
 
 export interface FixtureSymbol {
   outline: Vec2[];
-  /** The front edge, drawn heavier. */
+  /** The front edge, drawn heavier (a corner unit's back leg front). */
   front: Seg;
+  /** Every front edge (a corner unit has two: its inner faces). */
+  fronts: Seg[];
   /** Short lines on the front edge where the door fronts meet. */
   ticks: Seg[];
   /** Drawn dashed: the fixture hangs above the counter. */
@@ -499,10 +718,23 @@ export interface FixtureSymbol {
 /** The fixture's plan symbol: outline, a heavier front edge, door ticks, an appliance word, burners or the basin. */
 export function fixtureSymbol(f: Fixture): FixtureSymbol {
   const fr = fixtureFrame(f);
-  const outline = fixtureOutline(f);
+  const corner = isCorner(f.kind);
+  const outline = corner ? cornerOutline(f) : fixtureOutline(f);
   const h = f.width / 2;
   const ticks: Seg[] = [];
-  if (isCabinet(f.kind) && f.kind !== 'island') {
+  let fronts: Seg[] = [[outline[1], outline[2]]];
+  if (corner) {
+    // The two inner faces are its fronts; a short diagonal from the inside corner marks the pie-cut doors.
+    const L = cornerLegOf(f);
+    const m = f.corner === 'right' ? -1 : 1;
+    const inside = fixturePoint(fr, m * (-h + L), L);
+    fronts = [
+      [fixturePoint(fr, m * (-h + L), f.depth), inside],
+      [inside, fixturePoint(fr, m * h, L)],
+    ];
+    const tick = Math.min(4, L / 3);
+    ticks.push([inside, fixturePoint(fr, m * (-h + L - tick), L - tick)]);
+  } else if (isCabinet(f.kind) && f.kind !== 'island') {
     const n = doorCount(f.width);
     const tick = Math.min(4, f.depth / 3);
     for (let i = 1; i < n; i++) {
@@ -532,12 +764,14 @@ export function fixtureSymbol(f: Fixture): FixtureSymbol {
   const own = f.kind === 'range' || f.kind === 'sink' || (isBath(f.kind) && !FIXTURE_PLAN_LABEL[f.kind]);
   return {
     outline,
-    front: [outline[1], outline[2]],
+    front: corner ? fronts[1] : [outline[1], outline[2]],
+    fronts,
     ticks,
-    dashed: isOverhead(f.kind),
+    // An open shelf standing on the floor is drawn solid.
+    dashed: f.kind === 'shelf' ? f.elevation > 0 : isOverhead(f.kind),
     // Furniture: a big piece's name ("Queen bed"), else its label or nothing (derive/furniture.ts draws its detail).
     label: f.kind === 'furniture' ? furniturePlanLabel(f) : own ? (f.label?.trim() || null) : word,
-    labelAt: fixturePoint(fr, 0, f.depth / 2),
+    labelAt: corner ? fixturePoint(fr, (f.corner === 'right' ? -1 : 1) * (-h + cornerLegOf(f) / 2), cornerLegOf(f) / 2) : fixturePoint(fr, 0, f.depth / 2),
     labelAngle,
     burners,
     basin: f.kind === 'sink' ? basinOutline(f) : null,
@@ -546,5 +780,5 @@ export function fixtureSymbol(f: Fixture): FixtureSymbol {
 
 /** Plan bounds contributors: the fixture's outline, grown by its counter overhang when it has one. */
 export function fixtureExtent(f: Fixture): Vec2[] {
-  return hasCounter(f.kind) ? counterOutline(f) : fixtureOutline(f);
+  return hasCounter(f.kind) ? counterRects(f).flat() : isCorner(f.kind) ? cornerOutline(f) : fixtureOutline(f);
 }

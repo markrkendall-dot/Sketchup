@@ -959,7 +959,7 @@ Kitchen cabinets, counters, appliances and sinks (M12), so a kitchen can be laid
 and seen in 3D with the same phases as everything else. A `Fixture` is a plan rectangle in its own
 frame: `origin` is the middle of its back edge, `direction` the way its front faces, `width` along
 the back, `depth` back to front, `height`, and `elevation` of its bottom above the floor top (0 on
-the floor; 54 for a wall cabinet, 66 for a hood). Kinds: `base`, `wall`, `tall`, `island`, `sink`
+the floor; 54 for a wall cabinet, 66 for a hood). Kinds: `base`, `cornerBase`, `wall`, `cornerWall`, `shelf`, `tall`, `island`, `sink`
 (a base cabinet with a basin), `range`, `fridge`, `dishwasher`, `wallOven`, `hood`, `microwave` and a
 labelled `box`. `FIXTURE_DEFAULTS` holds the stock size of each (base 36 x 24 x 34.5, wall 30 x 12
 x 30 at 54, range 30 x 25 x 36, fridge 36 x 30 x 70, ...). The level's `finishes` carry the defaults
@@ -1043,9 +1043,63 @@ panel, the casework defaults.
 `cabinet` (`cabinet_<hex>` in another colour), `kick`, `appliance`, `basin`, `counter`
 (`counter_<hex>`), each plus `_new` / `_demo` for other phases.
 
-Not done: cabinet door swings in plan, backsplashes, open shelves, corner cabinets (an L corner is
-two cabinets whose counter is mitred), appliance details beyond a few boxes, copy and mirror of a run
-(M14). Interior wall and floor finishes (M13) are in "Interior finishes".
+**Kitchen detail** (no schema bump: like `counterOverhang` and the bath fields, three new kinds and
+optional fields; `KITCHEN_FIELDS` in `model/casework.ts` says which kinds take each field and what a
+valid value is, `migrateFixtures` and `migrateFinishes` keep the valid ones and drop each bad one,
+`fixtureProblem` refuses them, `cleanFixture` drops those a new kind does not take). Every default
+draws as before: laminate 1 1/2", no backsplash, no pulls.
+
+- **Corner units** (`cornerBase` 36 x 36, `cornerWall` 24 x 24 at 54): an L-shaped cabinet, not a
+  blind corner, because it fits the box-and-fronts derivation: `cornerBoxes` builds a back leg the
+  full width (`cornerLegOf`: 24", a wall unit's 12") and a side leg the full depth at the `corner`
+  end (left unless set; a right one is the mirror), a filler at the inside corner, a door on each
+  inner face (the side one built facing +d and turned, `swapSD`). `cornerOutline` is its L;
+  `counterRects` gives a corner base two counter rectangles that meet without overlapping (the back
+  leg with the front overhang, the side leg from there to the front with none at its end), which
+  `counterRuns` unites with its neighbours like any other rectangles. The tool (`cornerSnap`) puts a
+  corner unit pushed near a face's end into that corner and sets `corner`; `abutLinesOf` gives it a
+  second abutting line, its end on the other wall, so that run slides up to it.
+- **Counter material** (`counterMaterial`, `counterColor`, `counterThickness` on counter kinds and
+  the level): `counterSpecOf` takes each from the first fixture of the run (id order) that sets it,
+  else the level, else laminate in the counter colour (butcher block: `BUTCHER_BLOCK_COLOR`), 1 1/2".
+  The panel sets them on the whole run (`updateFixtures`, one undo step). `CounterRun.spec` carries
+  it; the slab is that thick, the sink's and a vanity's basins follow the thickness
+  (`counterThicknessOf`). Textured tops get plan UVs (strips along the run's longer side); laminate
+  none, so its export is unchanged. Textures (`proceduralTextures.ts`): butcher block is
+  `woodPixels(..., 'block')` (hickory figure in 1 1/2" strips with staggered butt joints and glue
+  lines), stone `stonePixels` (speckled: clouded with two-octave dark and light grains; veined:
+  periodic warped veins).
+- **Backsplash** (`derive/backsplash.ts backsplashPieces`; `backsplash`, `backsplashFinish`,
+  `backsplashColor`, `backsplashHeight` on base, corner base, sink, dishwasher and range, and the
+  level): each side of such a fixture (its back, or an end) lying on a visible wall face (both ends
+  within 1", facing the same way, the faces as the tool snaps to them) gives an interval along that
+  face, from the counter top up 4", `backsplashHeight` (18") or the wall's height. A range takes
+  its own setting, else that of a counter fixture it touches. Per face, backs are placed before
+  ends and no interval overlaps one already placed, and an end stops 3/8" (or 3/4") short of an
+  inside corner, so no two pieces share a face (no z-fighting) and the corner is covered once. Each
+  piece is cut round the visible openings in its wall (`displayCenter`, sill to head): under a
+  window it runs to the sill, beside it full height. An island never lies on a face; vanities are
+  not candidates. Tile 3/8" (`subwayPixels`: 3" x 6" running bond, grout relief), slab 3/4" in the
+  counter material and its colour (the counter's unless set). `getLevelMeshes` returns
+  `backsplashes` (absent when none), recomputed when the level's fixtures, finishes, walls,
+  openings or the footprints change; export meshes `Backsplash`, materials `backsplash_tile_<hex>`
+  or `backsplash_counter_...`.
+- **Pulls** (`handles`, `handleFinish` on cabinets and the level; part `handle`, `handleMaterial`:
+  steel, black, brass): `doorPull` on the stile away from the hinge (doors left of the middle open
+  from their right edge, the rest from their left, a lone door from its right), near the top under
+  a counter, near the bottom hung above it, about 40" on a tall cabinet; `drawerPull` centred. A
+  knob is a 1 1/4" cube 1" proud, a bar pull a 3/8" bar on two posts 1 1/4" proud, both standing on
+  the front face. The fixture cache keys on `fixtureBoxKey` (front style, pulls, counter thickness).
+- **Drawer bank** (`drawers`, 2 to 6, base only): one column (two from 42"), the top drawer 6"
+  from three drawers up, the rest sharing the height. **Glass doors** (`glassFront`, wall and corner
+  wall): the panel front's frame round a 1/8" pane (part `glass`, the shower glass material).
+- **Open shelves** (kind `shelf`, 36 x 10 x 17 1/2 at 54; `shelves`, `shelfThickness`):
+  `shelfLayoutOf` spaces the boards evenly from 4" above a hung shelf's bottom (its block brackets,
+  part `kick`, fill that) or from the floor between two end panels for a standing one. Wood and
+  colour as a cabinet's. Dashed on the plan when hung, with SHELF.
+
+Not done: cabinet door swings in plan, a blind corner cabinet, shelves inside glass-front cabinets,
+the backsplash on the plan, appliance details beyond a few boxes, copy and mirror of a run (M14). Interior wall and floor finishes (M13) are in "Interior finishes".
 
 ## Furniture (`model/furniture.ts`, `derive/furniture.ts`, `view3d/proceduralTextures.ts`)
 

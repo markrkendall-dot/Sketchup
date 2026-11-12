@@ -41,6 +41,7 @@ import { useUiStore } from './uiStore';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
 import { isWoodId } from '../model/furniture';
 import { isVariantOf } from '../model/bath';
+import { KITCHEN_FIELD_KEYS, KITCHEN_FIELDS, KITCHEN_FINISH_FIELDS, KITCHEN_FINISH_KEYS, type KitchenFinishField } from '../model/casework';
 
 export interface AddWallOptions {
   kind: WallKind;
@@ -119,7 +120,7 @@ export type JoistZonePatch = Partial<Omit<JoistZone, 'id'>>;
 export type FixturePatch = Partial<Omit<Fixture, 'id'>>;
 export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
 /** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
-const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn', 'variant', 'glass']);
+const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS]);
 export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness'>>;
 /** A level's casework defaults; undefined clears a field. */
@@ -282,6 +283,8 @@ export interface PlanState {
    * take undefined to clear them.
    */
   updateFixture: (levelId: Id, id: Id, patch: FixturePatch) => void;
+  /** The same patch on several fixtures (a counter run's top, its backsplash), as one undo step. */
+  updateFixtures: (levelId: Id, ids: Id[], patch: FixturePatch) => void;
   deleteFixtures: (levelId: Id, ids: Id[]) => void;
   /** Move fixtures to new back-edge positions in one set (a drag of the selection). */
   moveFixtures: (levelId: Id, positions: Record<Id, Vec2>) => void;
@@ -568,12 +571,48 @@ function cleanFixture(f: Fixture): Fixture {
   if (out.variant !== undefined && !isVariantOf(f.kind, out.variant)) delete out.variant;
   if (f.kind !== 'shower' || !f.glass) delete out.glass;
   else out.glass = glassSidesOf(f.glass);
-  for (const k of ['label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass'] as const) if (out[k] === undefined) delete out[k];
+  // The kitchen's fields only on the kinds that take them (a base turned into a wall cabinet loses
+  // its counter and its drawer bank); colours lower-cased, a glass front only when true.
+  for (const k of KITCHEN_FIELD_KEYS) {
+    const v = out[k];
+    if (v === undefined) continue;
+    if (!KITCHEN_FIELDS[k].kinds(f.kind) || (k === 'glassFront' && v !== true)) delete out[k];
+    else if (typeof v === 'string' && v.startsWith('#')) (out as unknown as Record<string, unknown>)[k] = v.toLowerCase();
+  }
+  for (const k of ['label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS] as const) if (out[k] === undefined) delete out[k];
   return out;
 }
 
 const sameOverhang = (p: Fixture['counterOverhang'], q: Fixture['counterOverhang']): boolean =>
   p === q || (!!p && !!q && p.front === q.front && p.back === q.back && p.left === q.left && p.right === q.right);
+
+/**
+ * Apply a patch to one fixture of a level (a draft): refused (false) when the fixture is missing,
+ * the result is not a usable fixture, or nothing changes. Undefined clears an optional field.
+ */
+function patchFixture(level: Level, id: Id, patch: FixturePatch): boolean {
+  const f = level.fixtures[id];
+  if (!f) return false;
+  // A form the (new) kind does not come in is refused; a kind change drops the old form (cleanFixture).
+  if (patch.variant !== undefined && !isVariantOf(patch.kind ?? f.kind, patch.variant)) return false;
+  const next = cleanFixture({ ...f, ...patch, id });
+  if (fixtureProblem(next)) return false;
+  const keys = Object.keys(patch) as (keyof FixturePatch)[];
+  const same = (k: keyof FixturePatch) =>
+    k === 'origin' ? next.origin.x === f.origin.x && next.origin.y === f.origin.y : k === 'counterOverhang' ? sameOverhang(next.counterOverhang, f.counterOverhang) : next[k] === f[k];
+  // Fields the cleaning dropped (a piece and a fabric when the kind is no longer furniture, the
+  // kitchen fields a new kind does not take).
+  const dropped = (['piece', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS] as const).filter((k) => next[k] === undefined && f[k] !== undefined);
+  if (keys.every(same) && dropped.length === 0) return false;
+  for (const k of keys) {
+    if (same(k)) continue;
+    if (next[k] === undefined) {
+      if (OPTIONAL_FIXTURE_KEYS.has(k)) delete f[k];
+    } else (f as unknown as Record<string, unknown>)[k] = next[k];
+  }
+  for (const k of dropped) delete f[k];
+  return true;
+}
 
 /** A column's stored form: position copied, rotation in [0, 360), colour lower-cased, unset options left out. */
 function cleanColumn(c: Column): Column {
@@ -1338,26 +1377,13 @@ export const usePlanStore = create<PlanState>()(
           return id;
         },
 
-        updateFixture: (levelId, id, patch) =>
+        updateFixture: (levelId, id, patch) => editLevel(levelId, (level) => (patchFixture(level, id, patch) ? undefined : false)),
+
+        updateFixtures: (levelId, ids, patch) =>
           editLevel(levelId, (level) => {
-            const f = level.fixtures[id];
-            if (!f) return false;
-            // A form the (new) kind does not come in is refused; a kind change drops the old form (cleanFixture).
-            if (patch.variant !== undefined && !isVariantOf(patch.kind ?? f.kind, patch.variant)) return false;
-            const next = cleanFixture({ ...f, ...patch, id });
-            if (fixtureProblem(next)) return false;
-            const keys = Object.keys(patch) as (keyof FixturePatch)[];
-            const same = (k: keyof FixturePatch) =>
-              k === 'origin' ? next.origin.x === f.origin.x && next.origin.y === f.origin.y : k === 'counterOverhang' ? sameOverhang(next.counterOverhang, f.counterOverhang) : next[k] === f[k];
-            if (keys.every(same)) return false;
-            for (const k of keys) {
-              if (same(k)) continue;
-              if (next[k] === undefined) {
-                if (OPTIONAL_FIXTURE_KEYS.has(k)) delete f[k];
-              } else (f as unknown as Record<string, unknown>)[k] = next[k];
-            }
-            // Fields the cleaning dropped (a piece and a fabric when the kind is no longer furniture).
-            for (const k of ['piece', 'fabric', 'builtIn', 'variant', 'glass'] as const) if (next[k] === undefined) delete f[k];
+            let changed = false;
+            for (const id of ids) if (patchFixture(level, id, patch)) changed = true;
+            if (!changed) return false;
           }),
 
         deleteFixtures: (levelId, ids) =>
@@ -1399,8 +1425,9 @@ export const usePlanStore = create<PlanState>()(
             const cur: LevelFinishes = { ...(level.finishes ?? {}) };
             let changed = false;
             for (const [k, v] of Object.entries(patch) as [keyof LevelFinishes, LevelFinishes[keyof LevelFinishes] | undefined][]) {
-              const value = typeof v === 'string' && (k === 'cabinetColor' || k === 'counterColor' || k === 'ceilingColor') ? v.toLowerCase() : v;
+              const value = typeof v === 'string' && (k === 'cabinetColor' || k === 'counterColor' || k === 'ceilingColor' || k === 'backsplashColor') ? v.toLowerCase() : v;
               if (k === 'cabinetWood' && value !== undefined && !isWoodId(value)) continue;
+              if ((KITCHEN_FINISH_KEYS as readonly string[]).includes(k) && value !== undefined && !KITCHEN_FINISH_FIELDS[k as KitchenFinishField](value)) continue;
               if (cur[k] === value) continue;
               if (value === undefined) delete cur[k];
               else (cur as Record<string, unknown>)[k] = value;

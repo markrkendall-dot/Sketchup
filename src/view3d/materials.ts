@@ -2,12 +2,12 @@ import { logEndColor, MEMBER_COLOR } from '../model/structure';
 import { Color, DoubleSide, FrontSide, MeshPhysicalMaterial, MeshStandardMaterial, type Texture } from 'three';
 import type { FixtureMesh, FixturePart } from '../derive/meshes';
 import { CANE_COLOR, FABRICS, IRON_COLOR, LINEN_COLOR, SHADE_COLOR, WOODS } from '../model/furniture';
-import type { FabricId, WoodId } from '../model/types';
-import { fabricTextures, paintTextures, pineFloorTextures, woodTextures, type FabricTexture } from './proceduralTextures';
+import type { BacksplashFinish, CounterMaterial, FabricId, HandleFinish, WoodId } from '../model/types';
+import { butcherBlockTextures, fabricTextures, paintTextures, pineFloorTextures, stoneTextures, subwayTextures, woodTextures, type FabricTexture } from './proceduralTextures';
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
 import { CERAMIC_WHITE, CHROME_COLOR, SHOWER_GLASS_COLOR } from '../model/bath';
-import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, KICK_COLOR } from '../model/casework';
+import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, HANDLE_COLOR, KICK_COLOR } from '../model/casework';
 import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DECK_COLOR, DEFAULT_WEATHERING, defaultWallColor, FENCE_COLOR, RAILING_COLOR, SURFACE_COLOR, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, SurfaceMaterial, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture, surfaceTexture } from './groundTexture';
@@ -552,12 +552,66 @@ export function caseworkMaterial(part: FixturePart, phase: Phase, color: string 
   return m;
 }
 
-export function counterMaterial(phase: Phase, color: string = DEFAULT_COUNTER_COLOR): MeshStandardMaterial {
-  const key = `counter|${phase}|${color}`;
+/**
+ * A counter top (DESIGN.md "Casework"): laminate is the plain colour with a slight sheen (as every
+ * counter was before materials); butcher block carries its strips (proceduralTextures.ts
+ * butcherBlockTextures) under a white tint, oiled (roughness 0.6); stone its speckled or veined
+ * texture, polished (roughness 0.3, a granite; 0.25 a marble). Demolished: translucent red; new: the
+ * colour pulled toward green (a texture's new-work variant). The flat colour is kept in
+ * `userData.flatColor` for the export.
+ */
+export function counterMaterial(phase: Phase, color: string = DEFAULT_COUNTER_COLOR, material: CounterMaterial = 'laminate'): MeshStandardMaterial {
+  const key = material === 'laminate' ? `counter|${phase}|${color}` : `counter|${phase}|${color}|${material}`;
   let m = partMaterials.get(key);
   if (!m) {
     m = phase === 'demo' ? make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 }) : make(phase === 'new' ? pullGreen(color) : color);
-    if (phase !== 'demo') m.roughness = 0.45;
+    if (phase !== 'demo') {
+      m.roughness = material === 'laminate' ? 0.45 : material === 'butcherBlock' ? 0.6 : material === 'stoneSpeckled' ? 0.3 : 0.25;
+      const variant = phase === 'new' ? 'new' : 'plain';
+      if (material === 'butcherBlock') texture(m, () => butcherBlockTextures(color, variant));
+      else if (material !== 'laminate') {
+        m.flatShading = false;
+        texture(m, () => stoneTextures(material === 'stoneSpeckled' ? 'speckled' : 'veined', color, variant));
+      }
+      if (material !== 'laminate') m.userData.flatColor = phase === 'new' ? pullGreen(color) : color;
+    }
+    partMaterials.set(key, m);
+  }
+  return m;
+}
+
+/**
+ * A backsplash: tile is glazed subway tile in its colour (proceduralTextures.ts subwayTextures,
+ * with its grout's relief), a little glossy; a slab is the counter's material in its colour.
+ */
+export function backsplashMaterial(phase: Phase, finish: BacksplashFinish, color: string, material: CounterMaterial): MeshStandardMaterial {
+  if (finish === 'slab') return counterMaterial(phase, color, material);
+  const key = `backsplash|${phase}|${color}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    m = phase === 'demo' ? make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 }) : make(phase === 'new' ? pullGreen(color) : color);
+    if (phase !== 'demo') {
+      m.roughness = 0.35;
+      texture(m, () => subwayTextures(color, phase === 'new' ? 'new' : 'plain'));
+      m.userData.flatColor = phase === 'new' ? pullGreen(color) : color;
+    }
+    partMaterials.set(key, m);
+  }
+  return m;
+}
+
+/** Cabinet pulls: brushed steel, black or brass metal; demolished red. */
+export function handleMaterial(phase: Phase, finish: HandleFinish = 'steel'): MeshStandardMaterial {
+  const key = `handle|${phase}|${finish}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      const base = HANDLE_COLOR[finish];
+      m = make(phase === 'new' ? pullGreen(base) : base);
+      m.metalness = finish === 'black' ? 0.4 : 0.75;
+      m.roughness = finish === 'black' ? 0.5 : 0.3;
+    }
     partMaterials.set(key, m);
   }
   return m;
@@ -651,8 +705,9 @@ export function fenceMaterial(part: 'body' | 'end', phase: Phase, color: string 
 }
 
 /** The material of one part of a fixture mesh: a furniture piece's (furnitureMaterial) or casework's (caseworkMaterial, in its wood when it has one). */
-export function fixturePartMaterial(f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor'>, part: FixturePart): MeshStandardMaterial {
+export function fixturePartMaterial(f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor' | 'handleFinish'>, part: FixturePart): MeshStandardMaterial {
   if (f.furniture) return furnitureMaterial(part, f.phase, f.furniture.wood, f.furniture.fabric);
+  if (part === 'handle') return handleMaterial(f.phase, f.handleFinish);
   if (part === 'body' || part === 'chrome' || part === 'glass' || part === 'dark') return bathMaterial(part, f.phase, f.bodyColor);
   return caseworkMaterial(part, f.phase, f.frontColor, f.wood);
 }

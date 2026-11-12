@@ -262,9 +262,10 @@ Once the walls are in, these make the 3D model look like the house.
 
 ## Kitchens: cabinets, counters and appliances
 
-Press `C`. The properties panel shows the kind the next click places (base cabinet, wall cabinet,
-tall cabinet, island, sink, range, fridge, dishwasher, wall oven, hood, microwave, the bath and laundry fixtures below, or a labelled
-box); pick one there. Then:
+Press `C`. The properties panel shows the kind the next click places (base cabinet, corner base
+cabinet, wall cabinet, corner wall cabinet, open shelf, tall cabinet, island, sink, range, fridge,
+dishwasher, wall oven, hood, microwave, the bath and laundry fixtures below, or a labelled box);
+pick one there. Then:
 
 - **Point along a wall.** The cabinet follows the cursor with its back on the nearest wall face and
   its front facing into the room. Click to place it at its stock size (a base cabinet is 36" wide,
@@ -274,18 +275,45 @@ box); pick one there. Then:
   clears what you typed.
 - **Hold Shift** to place away from the walls (an island; the cursor is then its middle) and press
   Tab to turn it.
-- **Counters** are drawn by themselves: one top over each run of touching base cabinets, the sink
-  and the dishwasher, 1" past their fronts, mitred where a run turns a corner, cut out at the sink.
-  An island has a counter 1" all round. The counter is 1 1/2" thick on top of the cabinets.
+- **Corner cabinets** make an inside corner one unit: an L-shaped cabinet 36" along each wall
+  (legs 24" deep) or, for the wall cabinets, 24" each way (legs 12" deep), with a pie-cut pair of
+  doors on its two inner faces. Point near the end of a wall and it goes into the corner; its
+  panel's "Corner" says which end is in the corner. The run on each wall slides up to it, and the
+  counter runs through it as one L-shaped top.
+- **Open shelves** are placed like a wall cabinet: two 1 1/2" boards 12" apart on brackets, the
+  lower at 58" (the brackets from 54"). Select one to set the number of boards, their spacing and
+  thickness, the depth, and a wood or colour. Set its bottom to 0 and it stands on the floor
+  between two end panels.
+- **Counters** are drawn by themselves: one top over each run of touching base cabinets, corner
+  units, the sink and the dishwasher, 1" past their fronts, mitred where a run turns a corner, cut
+  out at the sink. An island has a counter 1" all round. The counter is 1 1/2" thick on top of the
+  cabinets unless you set another thickness.
+- **Counter materials**: laminate (a plain colour, as before), butcher block (wood strips), or
+  stone, speckled (granite) or veined (marble), in the counter colour (a butcher block without a
+  colour is maple). The Level panel sets the material, colour and thickness for the level; a
+  cabinet's panel sets them for its whole run (every cabinet under that top), and the island's for
+  the island. A vanity's top follows the same settings.
+- **Backsplash**: none (the default), a 4" upstand, up to the wall cabinets (18" above the counter,
+  or the height you set) or to the ceiling; tile (3" x 6" subway tile) or a slab of the counter's
+  material; and a colour. Set it in the Level panel, or for one run in a cabinet's panel. It is
+  drawn on the wall behind base runs and a range (a range takes the setting of the run beside it),
+  and on a wall at the end of a run; it stops at windows and doors (under a window it runs up to
+  the sill). An island, or a cabinet that is not against a wall, has none; nor does a vanity.
+- **Pulls**: none (the default), knobs or bar pulls, in brushed steel, black or brass; level
+  default, or per cabinet. Door pulls sit on the stile away from the hinge, near the top of a base
+  door, near the bottom of a wall door, at about 40" on a tall cabinet; drawer pulls are centred.
+- **Fronts layout** (base cabinets): doors under a drawer (the default) or a drawer bank of 2 to 6
+  drawers. **Glass doors** (wall and corner wall cabinets): framed glass.
 - **Select a cabinet** (`S`, click it) to change its kind, width, depth, height, bottom, facing,
-  phase, label, fronts (slab or framed panel), front colour and counter overhangs; drag it to move
-  it, Shift+click to select several and move them together. Delete removes it. The Level panel sets
-  the cabinet colour, counter colour and front style every cabinet on the level uses unless it has
-  its own.
+  phase, label, fronts (slab or framed panel), front colour, pulls, counter and backsplash and
+  counter overhangs; drag it to move it, Shift+click to select several and move them together.
+  Delete removes it. The Level panel sets the cabinet colour, counter colour and material, front
+  style, backsplash and pulls every cabinet on the level uses unless it has its own.
 - On the plan, cabinets are outlined with a heavier front edge and a tick where two doors meet;
-  wall cabinets, hoods and microwaves are dashed; appliances carry a word (REF, RANGE, DW, OVEN); a
-  range shows its burners and a sink its basin. In 3D they are painted boxes with doors, drawer
-  fronts and toe kicks, steel appliances, and the counter in its colour.
+  wall cabinets, hoods, microwaves and hung shelves are dashed; a corner unit is an L with a tick
+  at its inside corner; appliances carry a word (REF, RANGE, DW, OVEN, SHELF); a range shows its
+  burners and a sink its basin. In 3D they are painted boxes with doors, drawer fronts, pulls and
+  toe kicks, steel appliances, the counter in its material and the backsplash on the wall.
 
 Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the old cabinets
 *demolish*, and the Existing, Proposed and All views show each state.
@@ -1351,10 +1379,13 @@ bedrooms); change them in each room's panel.
   sloped ceilings (a ceiling is flat, at one height), crown and baseboards, furniture outside (below a level's floor), and text or dimension notes
   you place yourself. A wood stove is a labelled box, and so are a shower's tiled bench and the vents. A retaining wall is a
   wall on the lowest level; its free end shows as an open wall end.
-- **Cabinets** are boxes with simple fronts: no door swings on the plan, no backsplash, open
-  shelves or corner cabinets (an inside corner is two cabinets whose counter is mitred), and a
+- **Cabinets** are boxes with simple fronts: no door swings on the plan, a glass door shows the
+  painted carcass behind it (no inside shelves), the corner unit is an L (no blind corner), and a
   counter is only joined across cabinets turned by a quarter turn (a cabinet at 45° carries its
-  own).
+  own; a corner unit at 45° carries one top per leg). A backsplash on a wall's inside corner
+  leaves a 3/8" gap when only one of the two walls has one; it is not drawn on the plan; "up to
+  the wall cabinets" is a height above the counter (18"), not the cabinets' own bottoms; "to the
+  ceiling" goes to the wall's height.
 - **Walk mode has no collision**: you can walk through walls and the ground.
 - The terrain is the triangulated surface through your grade points: straight between neighbouring
   points, level between points at one height, and level beyond the outermost ones. Under the lowest level's

@@ -383,7 +383,7 @@ function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number
  * the real symbol, with its kind and width on a pill (green while the width is typed).
  */
 function FixtureGhost({ preview, v, denom }: { preview: FixturePreview; v: Viewport; denom: number }) {
-  const ghost: Fixture = { id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: FIXTURE_DEFAULTS[preview.kind].height, elevation: 0, phase: 'existing', ...(preview.piece ? { piece: preview.piece } : {}), ...(preview.glass ? { glass: preview.glass } : {}) };
+  const ghost: Fixture = { id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: FIXTURE_DEFAULTS[preview.kind].height, elevation: 0, phase: 'existing', ...(preview.piece ? { piece: preview.piece } : {}), ...(preview.glass ? { glass: preview.glass } : {}), ...(preview.corner ? { corner: preview.corner } : {}) };
   const sym = fixtureSymbol(ghost);
   const detail = fixtureDetail(ghost);
   const front = worldToScreen(v, midpoint(sym.front[0], sym.front[1]));

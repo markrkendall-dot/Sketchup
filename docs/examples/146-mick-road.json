@@ -2306,6 +2306,7 @@
           "depth": 24,
           "height": 34.5,
           "elevation": 0,
+          "drawers": 4,
           "phase": "demo",
           "id": "f-c5"
         },
@@ -2362,6 +2363,7 @@
           "depth": 24,
           "height": 34.5,
           "elevation": 0,
+          "drawers": 2,
           "phase": "demo",
           "id": "f-c9"
         },
@@ -2685,7 +2687,7 @@
           "id": "f-c31"
         },
         "f-c32": {
-          "kind": "box",
+          "kind": "shelf",
           "label": "Open shelves",
           "width": 48,
           "depth": 12,
@@ -2701,7 +2703,7 @@
           "id": "f-c32"
         },
         "f-c33": {
-          "kind": "box",
+          "kind": "shelf",
           "label": "Open shelves",
           "width": 48,
           "depth": 12,
@@ -4555,6 +4557,7 @@
       "finishes": {
         "cabinetColor": "#c4884e",
         "counterColor": "#e2dccb",
+        "counterMaterial": "laminate",
         "frontStyle": "slab"
       },
       "framing": {

@@ -6,12 +6,12 @@ import type { FixtureMesh, FixturePart } from '../derive/meshes';
 import type { FillPart } from '../derive/openings3d';
 import { getDeckMeshes, getFenceMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, getSiteMeshes, getSurfaceMeshes, getTerrainGeometry, openingPartColor } from '../derive/meshes';
 import type { ChimneyPart } from '../derive/site';
-import { counterColorOf, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
+import { DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
 import { CERAMIC_WHITE, isBath } from '../model/bath';
 import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
-import type { Column, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
+import type { BacksplashFinish, Column, CounterMaterial, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
-import { ceilingMaterial, chimneyPartMaterial, fixturePartMaterial, isGlassPart, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
+import { backsplashMaterial, ceilingMaterial, chimneyPartMaterial, fixturePartMaterial, isGlassPart, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 import { firstStructure, structureOf } from '../model/structures';
@@ -79,13 +79,15 @@ const chimneyPartMaterialName = (part: ChimneyPart, phase: Phase) => (part === '
  * `furniture_<part>_<wood or fabric>` (`furniture_wood_hickory`, `furniture_fabric_buffaloRed`,
  * `furniture_linen`), then `_<phase>`.
  */
-const fixtureMaterialName = (f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor'>, part: FixturePart) => {
+const fixtureMaterialName = (f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor' | 'handleFinish'>, part: FixturePart) => {
   const phase = f.phase;
   let base: string;
   if (f.furniture) {
     base = phase === 'demo' && part !== 'wood' ? 'furniture' : part === 'wood' ? `furniture_wood_${f.furniture.wood}` : part === 'fabric' ? `furniture_fabric_${f.furniture.fabric}` : `furniture_${part}`;
   } else if (part === 'body') {
     base = phase !== 'demo' && f.bodyColor && f.bodyColor !== CERAMIC_WHITE ? `bath_body_${f.bodyColor.slice(1)}` : 'bath_body';
+  } else if (part === 'handle') {
+    base = phase === 'demo' ? 'handle' : `handle_${f.handleFinish ?? 'steel'}`;
   } else if (part === 'chrome' || part === 'glass' || part === 'dark') {
     base = part === 'dark' ? 'kick' : `bath_${part}`;
   } else if (part === 'carcass' || part === 'front') {
@@ -93,10 +95,14 @@ const fixtureMaterialName = (f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood
   } else base = part;
   return phase === 'existing' ? base : `${base}_${phase}`;
 };
-const counterMaterialName = (phase: Phase, color: string) => {
-  const base = phase !== 'demo' && color !== DEFAULT_COUNTER_COLOR ? `counter_${color.slice(1)}` : 'counter';
+const counterMaterialName = (phase: Phase, color: string, material: CounterMaterial = 'laminate') => {
+  const kind = material === 'laminate' ? 'counter' : `counter_${material}`;
+  const base = phase !== 'demo' && color !== DEFAULT_COUNTER_COLOR ? `${kind}_${color.slice(1)}` : kind;
   return phase === 'existing' ? base : `${base}_${phase}`;
 };
+/** `backsplash_tile_<hex>`, or a slab's counter name with `backsplash_` in front; then `_<phase>`. */
+const backsplashMaterialName = (phase: Phase, finish: BacksplashFinish, color: string, material: CounterMaterial) =>
+  finish === 'slab' ? `backsplash_${counterMaterialName(phase, color, material)}` : `backsplash_tile_${color.slice(1)}${phase === 'existing' ? '' : `_${phase}`}`;
 /** `Cabinet (base)`, `Appliance (range)`, `Sink`, `Box`, `Furniture (bed)`. */
 const fixtureMeshName = (kind: FixtureKind, piece?: string) =>
   kind === 'furniture'
@@ -292,10 +298,14 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
         group.add(m);
       }
     }
-    const counterColor = counterColorOf(level.finishes);
     for (const c of meshes.counters) {
-      const m = mesh('Counter', c.geometry, material(counterMaterialName(c.phase, counterColor), counterMaterial(c.phase, counterColor)));
+      const m = mesh('Counter', c.geometry, material(counterMaterialName(c.phase, c.color, c.material), counterMaterial(c.phase, c.color, c.material)));
       if (c.phase === 'demo') m.renderOrder = 1;
+      group.add(m);
+    }
+    for (const b of meshes.backsplashes ?? []) {
+      const m = mesh('Backsplash', b.geometry, material(backsplashMaterialName(b.phase, b.finish, b.color, b.material), backsplashMaterial(b.phase, b.finish, b.color, b.material)));
+      if (b.phase === 'demo') m.renderOrder = 1;
       group.add(m);
     }
     root.add(group);

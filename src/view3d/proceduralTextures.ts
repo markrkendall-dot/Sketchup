@@ -144,10 +144,15 @@ interface Board {
  * has its own tone, a flat-sawn ring figure (cathedrals) warped by noise, latewood lines, fine
  * fibres and a few knots that bend the rings round them; pine is held under PINE_MAX_WARMTH.
  */
-export function woodPixels(grain: WoodSpec['grain'], color: string, layout: 'floor' | 'plank' = 'plank', seed = 7): Pixels {
+export function woodPixels(grain: WoodSpec['grain'], color: string, layout: 'floor' | 'plank' | 'block' = 'plank', seed = 7): Pixels {
   const look = LOOKS[grain];
-  const rand = seeded(seed * 977 + (layout === 'floor' ? 1 : 2));
-  const rows = layout === 'floor' ? widePineBoards() : Array.from({ length: 6 }, (_, k) => ({ x0: rand() * TILE_INCHES, y0: k * 8, x1: 0, y1: (k + 1) * 8 })).map((b) => ({ ...b, x1: b.x0 + TILE_INCHES }));
+  const rand = seeded(seed * 977 + (layout === 'floor' ? 1 : layout === 'block' ? 3 : 2));
+  const rows =
+    layout === 'floor'
+      ? widePineBoards()
+      : layout === 'block'
+        ? butcherBlockStrips(rand)
+        : Array.from({ length: 6 }, (_, k) => ({ x0: rand() * TILE_INCHES, y0: k * 8, x1: 0, y1: (k + 1) * 8 })).map((b) => ({ ...b, x1: b.x0 + TILE_INCHES }));
   const boards: Board[] = rows.map((b, i) => {
     const knots: Board['knots'] = [];
     let n = 0;
@@ -213,6 +218,21 @@ export function woodPixels(grain: WoodSpec['grain'], color: string, layout: 'flo
       if (height) height[py * N + px] += lateLine * 0.02;
     }
   }
+  if (layout === 'block') {
+    // Glue lines between the strips and at their butt joints: fine and only a little darker.
+    const col = (x: number) => ((Math.round(x * PX_PER_INCH) % N) + N) % N;
+    const rowPx = (y: number) => (((N - Math.round(y * PX_PER_INCH)) % N) + N) % N;
+    const darken = (x: number, y: number) => {
+      const i = (y * N + x) * 4;
+      rgba[i] *= 0.82;
+      rgba[i + 1] *= 0.82;
+      rgba[i + 2] *= 0.82;
+    };
+    for (const b of boards) {
+      for (let x = 0; x < N; x++) darken(x, rowPx(b.y1));
+      for (let y = rowPx(b.y1) + 1; y < rowPx(b.y1) + Math.round((b.y1 - b.y0) * PX_PER_INCH); y++) darken(col(b.x0), y % N);
+    }
+  }
   if (layout === 'floor') {
     // Dark joints along each row and at each board's end, and the grey heads of the cut nails.
     const darken = (x: number, y: number, t: number) => {
@@ -237,6 +257,118 @@ export function woodPixels(grain: WoodSpec['grain'], color: string, layout: 'flo
           rgba[i * 4 + 2] = 88;
         }
       }
+    }
+  }
+  return { rgba, height };
+}
+
+/** A butcher block's strips across the tile: 1 1/2" wide, in random lengths of 10" to 30" (butt joints staggered). */
+export const BLOCK_STRIP = 1.5;
+function butcherBlockStrips(rand: () => number): { x0: number; x1: number; y0: number; y1: number }[] {
+  const out: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  const rows = Math.round(TILE_INCHES / BLOCK_STRIP);
+  for (let k = 0; k < rows; k++) {
+    const start = rand() * TILE_INCHES;
+    let x = start;
+    while (x < start + TILE_INCHES - 1e-6) {
+      const len = Math.min(10 + rand() * 20, start + TILE_INCHES - x);
+      out.push({ x0: x, x1: x + len, y0: k * BLOCK_STRIP, y1: (k + 1) * BLOCK_STRIP });
+      x += len;
+    }
+  }
+  // The lookup wants each board's start inside the tile (it wraps a later X by one period).
+  return out.map((b) => (b.x0 >= TILE_INCHES ? { ...b, x0: b.x0 - TILE_INCHES, x1: b.x1 - TILE_INCHES } : b));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Stone and tile (counters and backsplashes, DESIGN.md "Casework")
+
+/**
+ * A polished stone counter over one tile, no relief. `speckled` (granite): the colour clouded a
+ * little, with dense dark and light grains. `veined` (marble): the colour paler and clouded, with
+ * thin grey veins that wander across it (periodic, so the tile repeats without a seam).
+ */
+export function stonePixels(kind: 'speckled' | 'veined', color: string): Pixels {
+  const [r, g, b] = hexToRgb(color);
+  const rgba = new Uint8ClampedArray(N * N * 4);
+  const P = TILE_INCHES;
+  for (let py = 0; py < N; py++) {
+    for (let px = 0; px < N; px++) {
+      const X = inchX(px);
+      const Y = inchY(py);
+      const cloud = fbm(X / 6, Y / 6, P / 6, P / 6, 71, 3) - 0.5;
+      let rgb: [number, number, number];
+      if (kind === 'speckled') {
+        const k = 1 + cloud * 0.16;
+        // Two octaves each, so the grains are irregular rather than the lattice's soft squares.
+        const grain = fbm(X * 3, Y * 3, P * 3, P * 3, 73, 2);
+        const fleck = fbm(X * 4, Y * 4, P * 4, P * 4, 79, 2);
+        rgb = [r * k, g * k, b * k];
+        if (grain > 0.66) rgb = rgb.map((c) => c * 0.55) as [number, number, number];
+        else if (fleck > 0.7) rgb = rgb.map((c) => Math.min(255, c * 1.25 + 10)) as [number, number, number];
+        else if (grain < 0.32) rgb = rgb.map((c) => c * 0.86) as [number, number, number];
+      } else {
+        const k = 1 + cloud * 0.08;
+        // Two families of veins, each a level set of a warped periodic field (whole periods across the tile).
+        const warp = (fbm(X / 10, Y / 10, P / 10, P / 10, 83, 3) - 0.5) * 3.2;
+        const a = Math.abs(Math.sin(((X + Y * 0.5) / P) * Math.PI * 2 + warp * 2.2));
+        const bb = Math.abs(Math.sin(((X * 0.5 - Y) / P) * Math.PI * 4 + warp * 1.5));
+        const vein = Math.max(1 - Math.min(1, a / 0.05), 0.55 * (1 - Math.min(1, bb / 0.03)));
+        const shade = 1 - vein * 0.42;
+        rgb = [r * k * shade, g * k * shade, b * k * (shade + vein * 0.04)];
+      }
+      const i = (py * N + px) * 4;
+      rgba[i] = rgb[0];
+      rgba[i + 1] = rgb[1];
+      rgba[i + 2] = rgb[2];
+      rgba[i + 3] = 255;
+    }
+  }
+  return { rgba, height: null };
+}
+
+/** Subway tile: 3" x 6", laid in running bond, with 1/8" grout. */
+export const SUBWAY = { width: 6, height: 3, grout: 0.15 } as const;
+/** The grout between tiles: a light warm grey. */
+export const GROUT_COLOR = '#c9c4ba';
+
+/**
+ * Glazed subway tile over one tile (8 across, 16 courses), each a little different in tone, a soft
+ * shade at its edges where the glaze rolls over, and recessed grout lines (the height field).
+ */
+export function subwayPixels(color: string): Pixels {
+  const [r, g, b] = hexToRgb(color);
+  const [gr, gg, gb] = hexToRgb(GROUT_COLOR);
+  const rgba = new Uint8ClampedArray(N * N * 4);
+  const height = new Float32Array(N * N);
+  const half = SUBWAY.grout / 2;
+  for (let py = 0; py < N; py++) {
+    const Y = inchY(py);
+    const row = Math.floor(Y / SUBWAY.height);
+    const fy = Y - row * SUBWAY.height;
+    const shift = row % 2 === 0 ? 0 : SUBWAY.width / 2;
+    for (let px = 0; px < N; px++) {
+      const X = inchX(px);
+      const xs = X + shift;
+      const col = Math.floor(xs / SUBWAY.width);
+      const fx = xs - col * SUBWAY.width;
+      const edge = Math.min(fx, SUBWAY.width - fx, fy, SUBWAY.height - fy);
+      const i = (py * N + px) * 4;
+      if (edge < half) {
+        rgba[i] = gr;
+        rgba[i + 1] = gg;
+        rgba[i + 2] = gb;
+        height[py * N + px] = -0.06;
+      } else {
+        const tone = 0.97 + 0.06 * periodicNoise(col * 1.7 + 0.5, row * 1.3 + 0.5, (TILE_INCHES / SUBWAY.width) * 1.7, (TILE_INCHES / SUBWAY.height) * 1.3, 91);
+        const roll = Math.min(1, (edge - half) / 0.25);
+        const k = tone * (0.9 + 0.1 * roll);
+        rgba[i] = r * k;
+        rgba[i + 1] = g * k;
+        rgba[i + 2] = b * k;
+        height[py * N + px] = -0.03 * (1 - roll);
+      }
+      rgba[i + 3] = 255;
     }
   }
   return { rgba, height };
@@ -515,6 +647,19 @@ export function pineFloorTextures(color: string, variant: TextureVariant = 'plai
 
 export function fabricTextures(id: FabricTexture, variant: TextureVariant = 'plain'): SidingTextures | null {
   return texturesFromPixels(`fabric|${id}`, () => fabricPixels(id), variant);
+}
+
+/** A butcher block counter's strips in a colour (hickory's figure: strip to strip tone and streaks). */
+export function butcherBlockTextures(color: string, variant: TextureVariant = 'plain'): SidingTextures | null {
+  return texturesFromPixels(`block|${color}`, () => woodPixels('hickory', color, 'block'), variant);
+}
+
+export function stoneTextures(kind: 'speckled' | 'veined', color: string, variant: TextureVariant = 'plain'): SidingTextures | null {
+  return texturesFromPixels(`stone-${kind}|${color}`, () => stonePixels(kind, color), variant);
+}
+
+export function subwayTextures(color: string, variant: TextureVariant = 'plain'): SidingTextures | null {
+  return texturesFromPixels(`subway|${color}`, () => subwayPixels(color), variant, PX_PER_INCH, 'subway');
 }
 
 export function paintTextures(color: string, variant: TextureVariant = 'plain'): SidingTextures | null {

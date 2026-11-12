@@ -453,7 +453,7 @@ export function FixtureGlyph({ sym, k, className, id, detail }: { sym: FixtureSy
   return (
     <g className={`${className}${sym.dashed ? ' fixture-overhead' : ''}`} data-fixture-id={id}>
       <path className="fixture-body" d={polyPath(sym.outline)} vectorEffect="non-scaling-stroke" />
-      <path className="fixture-front" d={segPath([sym.front])} vectorEffect="non-scaling-stroke" />
+      <path className="fixture-front" d={segPath(sym.fronts)} vectorEffect="non-scaling-stroke" />
       {detail && (detail.lines.length > 0 || detail.rects.length > 0) && (
         <path className="fixture-detail" d={segPath(detail.lines) + detail.rects.map(polyPath).join('')} vectorEffect="non-scaling-stroke" />
       )}

@@ -283,9 +283,11 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(east.x).toBeCloseTo(192, 0);
     expect(north.y).toBeCloseTo(7, 0);
     // The Utility (inside x 318..456, y 195..308): wall cabinets on its north and west walls, open
-    // shelves under its south and east windows, a blue mini fridge; nothing reaches past its faces.
+    // shelves (standing open shelves, the shelf kind) under its south and east windows, a blue mini
+    // fridge; nothing reaches past its faces.
     const inUtility = existing.filter((x) => fixtureOutline(x).every((p) => p.x >= 318 - 1e-6 && p.x <= 456 + 1e-6 && p.y >= 195 - 1e-6 && p.y <= 308 + 1e-6));
-    expect(inUtility.map((x) => (x.kind === 'box' ? x.label : x.kind)).sort()).toEqual(['Mini fridge', 'Open shelves', 'Open shelves', 'wall', 'wall', 'wall', 'wall', 'wall']);
+    expect(inUtility.map((x) => (x.kind === 'box' ? x.label : x.kind)).sort()).toEqual(['Mini fridge', 'shelf', 'shelf', 'wall', 'wall', 'wall', 'wall', 'wall']);
+    expect(inUtility.filter((x) => x.kind === 'shelf').every((x) => x.label === 'Open shelves' && x.elevation === 0 && x.height === 29)).toBe(true);
     // The rooms' interior finishes from the photos (the Utility's from MK): the Kitchen's blue check
     // and beige tile, the Living's cream boards and the front room's cream paint over a red-brown
     // board floor, the Bath's green over a 40" pine wainscot on parquet, the Utility's pine on wood.

@@ -1,9 +1,10 @@
 import { BufferGeometry, Float32BufferAttribute, Matrix4, Quaternion, ShapeUtils, Uint32BufferAttribute, Vector2, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonSignedArea, scale, sub } from '../model/geometry';
-import type { CeilingFinish, Column, FabricId, Fence, Fixture, FixtureKind, FloorFinish, FurniturePiece, WoodId, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
-import { counterRuns, fixtureBoxes, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
-import { frontColorOf, frontStyleOf, hasCounter, isCabinet } from '../model/casework';
+import type { BacksplashFinish, CeilingFinish, Column, CounterMaterial, FabricId, HandleFinish, Fence, Fixture, FixtureKind, FloorFinish, FurniturePiece, WoodId, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
+import { counterRuns, fixtureBoxes, fixtureBoxKey, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
+import { backsplashPieces, type BacksplashPiece } from './backsplash';
+import { frontColorOf, handleFinishOf, hasCounter, isCabinet, takesHandles } from '../model/casework';
 import { FURNITURE, pieceFabricOf, pieceWoodOf } from '../model/furniture';
 import { furnitureSolids, stickCorners, type FurniturePart, type GrainAxis, type Local3, type Solid } from './furniture';
 import { bathSolids, type BathPart } from './bath';
@@ -1085,7 +1086,7 @@ export function buildFixtureParts(f: Fixture, finishes?: LevelFinishes): Fixture
     put(b.part, addFrameUVs(prism(poly, b.y0, b.y1), fr, longestAxis(b)));
   }
   // Bath and laundry fixtures (a vanity's basins and taps over its cabinet boxes).
-  for (const sol of bathSolids(f)) put(sol.part, furnitureSolidGeometry(fr, sol));
+  for (const sol of bathSolids(f, finishes)) put(sol.part, furnitureSolidGeometry(fr, sol));
   return [...byPart].map(([part, gs]) => ({ part, geometry: mergeAll(gs) })).filter((p) => triangleCount(p.geometry) > 0);
 }
 
@@ -1247,7 +1248,25 @@ export function buildFurnitureParts(f: Fixture): FixtureMesh['parts'] {
 
 /** A counter run (counterRuns) as one slab with its basin holes. */
 export function buildCounterGeometry(run: CounterRun): BufferGeometry {
-  return prism(run.outline, run.y0, run.y1, run.holes);
+  const g = prism(run.outline, run.y0, run.y1, run.holes);
+  // A laminate top is a plain colour; wood and stone carry a texture, laid in plan inches with a
+  // butcher block's strips along the run's longer side.
+  if (run.spec.material === 'laminate') return g;
+  const xs = run.outline.map((p) => p.x);
+  const ys = run.outline.map((p) => p.y);
+  const alongX = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+  return addFrameUVs(g, { origin: { x: 0, y: 0 }, u: { x: 1, y: 0 }, v: { x: 0, y: 1 } }, alongX ? 'd' : 's');
+}
+
+/** A backsplash piece (derive/backsplash.ts) as boxes on its wall face, with UVs along the wall and up it. */
+export function buildBacksplashGeometry(piece: BacksplashPiece): BufferGeometry {
+  const fr = fixtureFrame(piece);
+  return mergeAll(
+    piece.boxes.map((b) => {
+      const poly = [fixturePoint(fr, b.s0, b.d0), fixturePoint(fr, b.s1, b.d0), fixturePoint(fr, b.s1, b.d1), fixturePoint(fr, b.s0, b.d1)];
+      return addFrameUVs(prism(poly, b.y0, b.y1), fr, 's');
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1263,6 +1282,8 @@ export interface FixtureMesh {
   wood?: WoodId;
   /** A bath or laundry fixture's body colour after the default (model/bath.ts bathBodyColorOf): china, enamel, a tray. */
   bodyColor?: string;
+  /** A cabinet's pulls' finish after the level's default (when it has pulls). */
+  handleFinish?: HandleFinish;
   /** A furniture piece's piece, wood and fabric after the catalogue's defaults. */
   furniture?: { piece: FurniturePiece; wood: WoodId; fabric: FabricId; floorLayer: boolean; builtIn: boolean };
   /** One merged geometry per material part, level-local like the walls. */
@@ -1276,6 +1297,22 @@ export interface CounterMesh {
   /** Demolished when every cabinet under it is, new when any is, else existing. */
   phase: Phase;
   fixtureIds: Id[];
+  /** Its material and colour (model/casework.ts counterSpecOf). */
+  material: CounterMaterial;
+  color: string;
+}
+
+/** A backsplash on the wall behind a fixture (derive/backsplash.ts). */
+export interface BacksplashMesh {
+  /** The fixture it is behind, and its piece's place (a fixture can have a piece on each of two walls). */
+  id: string;
+  fixtureId: Id;
+  geometry: BufferGeometry;
+  phase: Phase;
+  finish: BacksplashFinish;
+  color: string;
+  /** A slab's material (the counter's). */
+  material: CounterMaterial;
 }
 
 export interface WallMesh {
@@ -1688,6 +1725,8 @@ export interface LevelMeshes {
   fixtures: FixtureMesh[];
   /** The counter slabs over them, one per run of touching counter fixtures. */
   counters: CounterMesh[];
+  /** The backsplashes on the walls behind the base runs (absent: none). */
+  backsplashes?: BacksplashMesh[];
 }
 
 interface FixtureEntry {
@@ -1698,9 +1737,17 @@ interface FixtureEntry {
 }
 
 interface CounterEntry {
-  /** The visible counter fixtures the runs were built from, in order. */
+  /** The visible counter fixtures the runs were built from, in order, and the level's defaults then. */
   fixtures: Fixture[];
+  finishes: LevelFinishes | undefined;
   counters: CounterMesh[];
+}
+
+interface BacksplashEntry {
+  /** What the pieces were worked out from. */
+  level: Pick<Level, 'fixtures' | 'finishes' | 'walls' | 'openings' | 'wallHeight'>;
+  fps: ReadonlyMap<Id, Footprint>;
+  backsplashes: BacksplashMesh[];
 }
 
 interface WallEntry {
@@ -1802,6 +1849,7 @@ const roofCache = new Map<string, Map<Id, RoofEntry>>();
 const openingCache = new Map<string, Map<Id, OpeningEntry>>();
 const fixtureCache = new Map<string, Map<Id, FixtureEntry>>();
 const counterCache = new Map<string, CounterEntry>();
+const backsplashCache = new Map<string, BacksplashEntry>();
 const levelCache = new Map<string, LevelEntry>();
 /** Decks: their geometry per deck while its layout object is the same, and the last result per level. */
 interface DeckEntry {
@@ -1913,6 +1961,11 @@ function pruneCaches(plan: Plan): void {
     if (alive(key)) continue;
     for (const c of e.counters) c.geometry.dispose();
     counterCache.delete(key);
+  }
+  for (const [key, e] of backsplashCache) {
+    if (alive(key)) continue;
+    for (const b of e.backsplashes) b.geometry.dispose();
+    backsplashCache.delete(key);
   }
   for (const key of levelCache.keys()) if (!alive(key)) levelCache.delete(key);
   for (const [key, m] of deckCache) {
@@ -2338,16 +2391,17 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   for (const f of Object.values(level.fixtures ?? {})) {
     if (!isVisible(f.phase, viewMode)) continue;
     if (hasCounter(f.kind)) counterFixtures.push(f);
-    const style = frontStyleOf(f, finishes);
+    const style = fixtureBoxKey(f, finishes);
     const old = prevFixtures?.get(f.id);
     const entry: FixtureEntry = old && old.fixture === f && old.style === style ? old : { fixture: f, style, parts: buildFixtureParts(f, finishes) };
     nextFixtures.set(f.id, entry);
     if (!entry.parts.length) continue;
     const mesh: FixtureMesh = { id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts };
     if (isBath(f.kind)) mesh.bodyColor = bathBodyColorOf(f);
+    if (takesHandles(f.kind)) mesh.handleFinish = handleFinishOf(f, finishes);
     if (f.kind === 'furniture' && f.piece) mesh.furniture = { piece: f.piece, wood: pieceWoodOf(f), fabric: pieceFabricOf(f), floorLayer: !!FURNITURE[f.piece].floorLayer, builtIn: !!f.builtIn };
-    else if (isCabinet(f.kind) || f.kind === 'wallOven' || f.kind === 'box') {
-      const wood = f.wood ?? (isCabinet(f.kind) ? finishes?.cabinetWood : undefined);
+    else if (isCabinet(f.kind) || f.kind === 'wallOven' || f.kind === 'box' || f.kind === 'shelf') {
+      const wood = f.wood ?? (isCabinet(f.kind) || f.kind === 'shelf' ? finishes?.cabinetWood : undefined);
       if (wood) mesh.wood = wood;
     }
     fixtureMeshes.push(mesh);
@@ -2356,21 +2410,39 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   fixtureCache.set(key, nextFixtures);
   const prevCounters = counterCache.get(key);
   let counters: CounterMesh[];
-  if (prevCounters && prevCounters.fixtures.length === counterFixtures.length && prevCounters.fixtures.every((f, i) => f === counterFixtures[i])) {
+  if (prevCounters && prevCounters.finishes === finishes && prevCounters.fixtures.length === counterFixtures.length && prevCounters.fixtures.every((f, i) => f === counterFixtures[i])) {
     counters = prevCounters.counters;
   } else {
     if (prevCounters) for (const c of prevCounters.counters) c.geometry.dispose();
     const byId = new Map(counterFixtures.map((f) => [f.id, f]));
-    counters = counterRuns(counterFixtures).map((run) => ({
+    counters = counterRuns(counterFixtures, finishes).map((run) => ({
       id: run.fixtureIds.join('+'),
       geometry: buildCounterGeometry(run),
       phase: sp(counterPhase(run.fixtureIds.map((id) => byId.get(id)!))),
       fixtureIds: run.fixtureIds,
+      material: run.spec.material,
+      color: run.spec.color,
     }));
-    counterCache.set(key, { fixtures: counterFixtures, counters });
+    counterCache.set(key, { fixtures: counterFixtures, finishes, counters });
+  }
+  // Backsplashes: worked out again when the fixtures, the defaults, the walls or their openings change.
+  const prevSplash = backsplashCache.get(key);
+  let backsplashes: BacksplashMesh[];
+  const ps = prevSplash?.level;
+  if (prevSplash && ps && ps.fixtures === level.fixtures && ps.finishes === level.finishes && ps.walls === level.walls && ps.openings === level.openings && ps.wallHeight === level.wallHeight && prevSplash.fps === fps) {
+    backsplashes = prevSplash.backsplashes;
+  } else {
+    if (prevSplash) for (const b of prevSplash.backsplashes) b.geometry.dispose();
+    const seen = new Map<Id, number>();
+    backsplashes = backsplashPieces(level, fps, viewMode, (f) => isVisible(f.phase, viewMode)).map((piece) => {
+      const n = seen.get(piece.fixtureId) ?? 0;
+      seen.set(piece.fixtureId, n + 1);
+      return { id: `${piece.fixtureId}:${n}`, fixtureId: piece.fixtureId, geometry: buildBacksplashGeometry(piece), phase: sp(piece.phase), finish: piece.finish, color: piece.color, material: piece.material };
+    });
+    backsplashCache.set(key, { level: { fixtures: level.fixtures, finishes: level.finishes, walls: level.walls, openings: level.openings, wallHeight: level.wallHeight }, fps, backsplashes });
   }
 
-  const result: LevelMeshes = { walls, floorFinishes, ceilings, stairs, staircases, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(floor.geometry ? { floor: floor.geometry } : {}) };
+  const result: LevelMeshes = { walls, floorFinishes, ceilings, stairs, staircases, roofs, openings: openingMeshes, fixtures: fixtureMeshes, counters, ...(backsplashes.length ? { backsplashes } : {}), ...(floor.geometry ? { floor: floor.geometry } : {}) };
   levelCache.set(key, { level, belowStairs, ftf, above: aboveLevel, below, look: plan.proposedLook, result });
   return result;
 }
@@ -2390,6 +2462,8 @@ export function clearMeshCache(): void {
   staircaseCache.clear();
   for (const m of fixtureCache.values()) for (const e of m.values()) for (const p of e.parts) p.geometry.dispose();
   for (const e of counterCache.values()) for (const c of e.counters) c.geometry.dispose();
+  for (const e of backsplashCache.values()) for (const b of e.backsplashes) b.geometry.dispose();
+  backsplashCache.clear();
   for (const m of deckCache.values()) for (const e of m.values()) disposeDeckEntry(e);
   deckCache.clear();
   deckResult.clear();

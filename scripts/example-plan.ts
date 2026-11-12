@@ -415,7 +415,7 @@ export function buildExistingHouse(name: string): ExistingIds {
 
   // ---- Fixtures as they are (photos 13 to 22; sizes are estimates). The Kitchen, inside x 173..311,
   // y 102..308: knotty pine plank fronts, a light laminate counter.
-  store().updateFinishes(fId, { cabinetColor: PINE, counterColor: LAMINATE, frontStyle: 'slab' });
+  store().updateFinishes(fId, { cabinetColor: PINE, counterColor: LAMINATE, counterMaterial: 'laminate', frontStyle: 'slab' });
   const casework: Id[] = [];
   const existingFixture = (f: Omit<NewFixture, 'phase'>) => casework.push(fixture(fId, { ...f, phase: PHASE }));
   const BASE = { depth: 24, height: 34.5, elevation: 0 };
@@ -429,7 +429,7 @@ export function buildExistingHouse(name: string): ExistingIds {
   existingFixture({ kind: 'base', origin: { x: 215, y: k.north }, direction: SOUTHWARD, width: 24, ...BASE });
   existingFixture({ kind: 'range', origin: { x: 242, y: k.north }, direction: SOUTHWARD, width: 30, depth: 25, height: 36, elevation: 0 });
   existingFixture({ kind: 'hood', origin: { x: 242, y: k.north }, direction: SOUTHWARD, width: 30, depth: 18, height: 6, elevation: 60 });
-  existingFixture({ kind: 'base', origin: { x: 264.5, y: k.north }, direction: SOUTHWARD, width: 15, ...BASE });
+  existingFixture({ kind: 'base', origin: { x: 264.5, y: k.north }, direction: SOUTHWARD, width: 15, ...BASE, drawers: 4 });
   // The north-east corner: one 30" base set at 45 degrees (photos 13 and 15), its back corners on the
   // two walls' faces, so it faces south-west.
   const diag = 30 / Math.SQRT2 / 2;
@@ -438,7 +438,7 @@ export function buildExistingHouse(name: string): ExistingIds {
   // a two-drawer base, then a gap before the Utility door's casing (y 244).
   existingFixture({ kind: 'sink', origin: { x: k.east, y: KITCHEN_WINDOW_Y }, direction: WESTWARD, width: 36, ...BASE });
   existingFixture({ kind: 'dishwasher', origin: { x: k.east, y: KITCHEN_WINDOW_Y + 30 }, direction: WESTWARD, width: 24, ...BASE });
-  existingFixture({ kind: 'base', origin: { x: k.east, y: KITCHEN_WINDOW_Y + 54 }, direction: WESTWARD, width: 24, ...BASE });
+  existingFixture({ kind: 'base', origin: { x: k.east, y: KITCHEN_WINDOW_Y + 54 }, direction: WESTWARD, width: 24, ...BASE, drawers: 2 });
   // Wall cabinets to the crown (54" to 96"): over the fridge (raised), either side of the hood and a
   // short one over it, one at 45 degrees across the corner, one north of the window and two south of
   // it, ending before the door (photos 13 and 15).
@@ -483,7 +483,9 @@ export function buildExistingHouse(name: string): ExistingIds {
   const u = { west: 318, east: 456, north: 195, south: 308 };
   for (const x of [351, 393, 435]) existingFixture({ kind: 'wall', origin: { x, y: u.north }, direction: SOUTHWARD, width: 42, depth: 12, height: 30, elevation: 54 });
   for (const y of [207, 231]) existingFixture({ kind: 'wall', origin: { x: u.west, y }, direction: 0, width: 24, depth: 12, height: 30, elevation: 54 });
-  const shelves = { kind: 'box' as const, label: 'Open shelves', width: 48, depth: 12, height: 29, elevation: 0, frontColor: PINE };
+  // Open shelves (the shelf kind, standing on the floor: end panels and boards; the number of boards
+  // is the default two, not known).
+  const shelves = { kind: 'shelf' as const, label: 'Open shelves', width: 48, depth: 12, height: 29, elevation: 0, frontColor: PINE };
   existingFixture({ ...shelves, origin: { x: (WING.x0 + WING.x1) / 2, y: u.south }, direction: 270 });
   existingFixture({ ...shelves, origin: { x: u.east, y: (WING.y0 + WING.y1) / 2 }, direction: WESTWARD });
   existingFixture({ kind: 'box', label: 'Mini fridge', origin: { x: 434, y: u.south }, direction: 270, width: 20, depth: 20, height: 34, elevation: 0, frontColor: FRIDGE_BLUE });

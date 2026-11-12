@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { issuesFor, type IssueTarget } from '../derive/checks';
 import { stairChains } from '../derive/stairChain';
+import { counterRuns } from '../derive/casework';
 import { staircaseFieldProblem, staircaseStyleOf } from '../model/stairStyle';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getFootprints } from '../derive/footprint';
@@ -22,6 +23,29 @@ import { BED_SIZE_IDS, BED_SIZES, bedOverall, bedSizeOf, FABRIC_IDS, FABRICS, FU
 import { COLUMN_KIND_NAME, SURFACE_MATERIAL_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
 import {
+  BACKSPLASH,
+  BACKSPLASH_FINISH_LABEL,
+  BACKSPLASH_FINISHES,
+  BACKSPLASH_LABEL,
+  BACKSPLASHES,
+  backsplashSpecOf,
+  COUNTER_MATERIAL_LABEL,
+  COUNTER_MATERIALS,
+  COUNTER_THICKNESS,
+  counterSpecOf,
+  counterThicknessOf,
+  DRAWER_BANK,
+  HANDLE_FINISH_LABEL,
+  HANDLE_FINISHES,
+  HANDLE_STYLE_LABEL,
+  HANDLE_STYLES,
+  handleFinishOf,
+  handlesOf,
+  isCorner,
+  SHELF,
+  shelfLayoutOf,
+  takesBacksplash,
+  takesHandles,
   counterColorOf,
   counterOverhangOf,
   counterTopOf,
@@ -50,7 +74,7 @@ import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FEN
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
 import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
-import type { BathVariant, Beam, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore, type Selection } from '../store/uiStore';
@@ -1781,7 +1805,7 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
           heightChoices
             ? `Usual: ${heightChoices.map((h) => formatLength(h, denom)).join(', ')}.`
             : hasCounter(fixture.kind)
-              ? `The counter top sits at ${formatLength(counterTopOf(fixture), denom)}.`
+              ? `The counter top sits at ${formatLength(counterTopOf(fixture, counterThicknessOf(fixture, level.finishes)), denom)}.`
               : BATH_HEIGHT_HINT[fixture.kind]
         }
       />
@@ -1807,9 +1831,9 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
           }}
         />
       </div>
-      {isCabinet(fixture.kind) || fixture.kind === 'wallOven' ? (
+      {isCabinet(fixture.kind) || fixture.kind === 'wallOven' || fixture.kind === 'shelf' ? (
         <>
-          <SelectField label="Fronts" value={style} options={frontStyleOptions} onChange={(s) => set({ frontStyle: s })} />
+          {fixture.kind !== 'shelf' && <SelectField label="Fronts" value={style} options={frontStyleOptions} onChange={(s) => set({ frontStyle: s })} />}
           <SelectField
             label="Wood"
             value={(fixture.wood ?? '') as WoodId | ''}
@@ -1826,9 +1850,10 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
         </>
       ) : null}
       {isBath(fixture.kind) && <BathOptions level={level} fixture={fixture} />}
+      <KitchenOptions level={level} fixture={fixture} />
       {hasCounter(fixture.kind) && (
         <>
-          <ReadOnly label="Counter top">{formatLength(counterTopOf(fixture), denom)}</ReadOnly>
+          <ReadOnly label="Counter top">{formatLength(counterTopOf(fixture, counterThicknessOf(fixture, level.finishes)), denom)}</ReadOnly>
           {(['front', 'back', 'left', 'right'] as const).map((side) => (
             <LengthField
               key={side}
@@ -1841,6 +1866,161 @@ function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
         </>
       )}
       <p className="panel-note">Drag with the select tool to move. Touching counter cabinets share one counter top.</p>
+    </>
+  );
+}
+
+/** '' in a kitchen picker is "the level's" (or the run's) default. */
+const levelChoice = <T extends string>(labels: Record<T, string>, list: readonly T[], own: string) => [{ value: '' as T | '', label: own }, ...list.map((v) => ({ value: v as T | '', label: labels[v] }))];
+const drawerOptions = [
+  { value: '', label: 'Doors under a drawer' },
+  ...Array.from({ length: DRAWER_BANK.max - DRAWER_BANK.min + 1 }, (_, i) => ({ value: String(DRAWER_BANK.min + i), label: `Drawer bank: ${DRAWER_BANK.min + i} drawers` })),
+];
+
+/**
+ * A cabinet's pulls, a base's drawer bank, a wall cabinet's glass doors, a corner unit's corner end,
+ * an open shelf's boards; and for a counter fixture its run's counter top and backsplash (set on
+ * every fixture of the run, DESIGN.md "Casework").
+ */
+function KitchenOptions({ level, fixture }: { level: Level; fixture: Fixture }) {
+  const updateFixture = usePlanStore((s) => s.updateFixture);
+  const updateFixtures = usePlanStore((s) => s.updateFixtures);
+  const viewMode = useUiStore((s) => s.viewMode);
+  const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
+  const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
+  const f = level.finishes;
+  // The counter run this fixture is in (its own id alone when it has no counter or touches none).
+  const run = useMemo(() => {
+    if (!hasCounter(fixture.kind)) return [fixture.id];
+    const shown = Object.values(level.fixtures ?? {}).filter((x) => isVisible(x.phase, viewMode));
+    return counterRuns(shown, f).find((r) => r.fixtureIds.includes(fixture.id))?.fixtureIds ?? [fixture.id];
+  }, [level.fixtures, f, fixture.id, fixture.kind, viewMode]);
+  const members = run.map((id) => level.fixtures[id]).filter((x): x is Fixture => !!x);
+  const setRun = (patch: Partial<Fixture>) => updateFixtures(level.id, run, patch);
+  const counter = counterSpecOf(members, f);
+  const splash = backsplashSpecOf(members, f);
+  const first = <K extends keyof Fixture>(k: K): Fixture[K] | undefined => members.find((m) => m[k] !== undefined)?.[k];
+  const runWord = run.length > 1 ? ` (the ${run.length} fixtures of this run)` : '';
+  const shelf = fixture.kind === 'shelf' ? shelfLayoutOf(fixture) : null;
+  return (
+    <>
+      {takesHandles(fixture.kind) && (
+        <>
+          <SelectField
+            label="Pulls"
+            value={(fixture.handles ?? '') as HandleStyle | ''}
+            options={levelChoice(HANDLE_STYLE_LABEL, HANDLE_STYLES, `Level's (${HANDLE_STYLE_LABEL[handlesOf({}, f)]})`)}
+            onChange={(v) => set({ handles: v || undefined })}
+          />
+          {handlesOf(fixture, f) !== 'none' && (
+            <SelectField
+              label="Pull finish"
+              value={(fixture.handleFinish ?? '') as HandleFinish | ''}
+              options={levelChoice(HANDLE_FINISH_LABEL, HANDLE_FINISHES, `Level's (${HANDLE_FINISH_LABEL[handleFinishOf({}, f)]})`)}
+              onChange={(v) => set({ handleFinish: v || undefined })}
+            />
+          )}
+        </>
+      )}
+      {fixture.kind === 'base' && <SelectField label="Fronts layout" value={fixture.drawers ? String(fixture.drawers) : ''} options={drawerOptions} onChange={(v) => set({ drawers: v ? Number(v) : undefined })} />}
+      {(fixture.kind === 'wall' || fixture.kind === 'cornerWall') && (
+        <label className="check-row">
+          <input
+            type="checkbox"
+            aria-label="Glass doors"
+            checked={!!fixture.glassFront}
+            onChange={(e) => {
+              set({ glassFront: e.target.checked ? true : undefined });
+              releaseFocus(e.currentTarget);
+            }}
+          />
+          Glass doors
+        </label>
+      )}
+      {isCorner(fixture.kind) && (
+        <SelectField
+          label="Corner"
+          value={fixture.corner ?? 'left'}
+          options={[
+            { value: 'left', label: 'At its left end' },
+            { value: 'right', label: 'At its right end' },
+          ]}
+          onChange={(v) => set({ corner: v === 'right' ? 'right' : undefined })}
+        />
+      )}
+      {shelf && (
+        <>
+          <NumberField label="Shelves" value={shelf.count} check={(v) => (Number.isInteger(v) && v >= 1 && v <= SHELF.maxCount ? null : `1 to ${SHELF.maxCount}`)} onCommit={(v) => set({ shelves: v })} />
+          {shelf.count > 1 && (
+            <LengthField
+              label="Spacing"
+              value={shelf.spacing}
+              onCommit={(v) => void (v !== null && set({ height: shelf.first + shelf.thickness + v * (shelf.count - 1) }))}
+              hint="Board to board; sets the height."
+            />
+          )}
+          <LengthField label="Thickness" value={shelf.thickness} onCommit={(v) => void (v !== null && set({ shelfThickness: v === SHELF.thickness ? undefined : v }))} />
+        </>
+      )}
+      {hasCounter(fixture.kind) && (
+        <>
+          <SelectField
+            label="Counter"
+            value={(first('counterMaterial') ?? '') as CounterMaterial | ''}
+            options={levelChoice(COUNTER_MATERIAL_LABEL, COUNTER_MATERIALS, `Level's (${COUNTER_MATERIAL_LABEL[f?.counterMaterial ?? 'laminate']})`)}
+            onChange={(v) => setRun({ counterMaterial: v || undefined })}
+          />
+          <ColorField
+            label="Counter colour"
+            value={counter.color}
+            onCommit={(c) => setRun({ counterColor: c })}
+            onReset={first('counterColor') ? () => setRun({ counterColor: undefined }) : undefined}
+            hint={first('counterColor') ? undefined : "The level's."}
+          />
+          <LengthField
+            label="Counter thickness"
+            value={counter.thickness}
+            onCommit={(v) => void (v !== null && setRun({ counterThickness: v === (f?.counterThickness ?? COUNTER_THICKNESS) ? undefined : v }))}
+            hint={`The top${runWord}.`}
+          />
+        </>
+      )}
+      {takesBacksplash(fixture.kind) && (
+        <>
+          <SelectField
+            label="Backsplash"
+            value={(first('backsplash') ?? '') as Backsplash | ''}
+            options={levelChoice(BACKSPLASH_LABEL, BACKSPLASHES, `Level's (${BACKSPLASH_LABEL[f?.backsplash ?? 'none']})`)}
+            onChange={(v) => setRun({ backsplash: v || undefined })}
+          />
+          {splash.backsplash !== 'none' && (
+            <>
+              <SelectField
+                label="Backsplash finish"
+                value={(first('backsplashFinish') ?? '') as BacksplashFinish | ''}
+                options={levelChoice(BACKSPLASH_FINISH_LABEL, BACKSPLASH_FINISHES, `Level's (${BACKSPLASH_FINISH_LABEL[f?.backsplashFinish ?? 'tile']})`)}
+                onChange={(v) => setRun({ backsplashFinish: v || undefined })}
+              />
+              <ColorField
+                label="Backsplash colour"
+                value={splash.color ?? counter.color}
+                onCommit={(c) => setRun({ backsplashColor: c })}
+                onReset={first('backsplashColor') ? () => setRun({ backsplashColor: undefined }) : undefined}
+                hint={splash.finish === 'slab' && !splash.color ? "The counter's." : undefined}
+              />
+              {splash.backsplash === 'toWall' && (
+                <LengthField
+                  label="Backsplash height"
+                  value={splash.height}
+                  onCommit={(v) => void (v !== null && setRun({ backsplashHeight: v === (f?.backsplashHeight ?? BACKSPLASH.toWall) ? undefined : v }))}
+                  hint={`Above the counter (${formatLength(BACKSPLASH.toWall, denom)} reaches wall cabinets at 54").`}
+                />
+              )}
+            </>
+          )}
+          <p className="panel-note">On the wall behind{runWord || ' it'}, cut round windows and doors; none on an island or away from the walls.</p>
+        </>
+      )}
     </>
   );
 }
@@ -1950,6 +2130,36 @@ function CaseworkDefaults({ level }: { level: Level }) {
       />
       <SelectField label="Cabinet fronts" value={(f?.frontStyle ?? 'slab') as FrontStyle} options={frontStyleOptions} onChange={(s) => updateFinishes(level.id, { frontStyle: s })} />
       <SelectField label="Cabinet wood" value={(f?.cabinetWood ?? '') as WoodId | ''} options={woodOptions('Painted')} onChange={(w) => updateFinishes(level.id, { cabinetWood: w || undefined })} />
+      <SelectField label="Counters" value={(f?.counterMaterial ?? 'laminate') as CounterMaterial} options={COUNTER_MATERIALS.map((m) => ({ value: m, label: COUNTER_MATERIAL_LABEL[m] }))} onChange={(m) => updateFinishes(level.id, { counterMaterial: m === 'laminate' ? undefined : m })} />
+      <LengthField
+        label="Counter thickness"
+        value={f?.counterThickness ?? COUNTER_THICKNESS}
+        onCommit={(v) => void (v !== null && updateFinishes(level.id, { counterThickness: v === COUNTER_THICKNESS ? undefined : v }))}
+      />
+      <SelectField label="Backsplash" value={(f?.backsplash ?? 'none') as Backsplash} options={BACKSPLASHES.map((b) => ({ value: b, label: BACKSPLASH_LABEL[b] }))} onChange={(b) => updateFinishes(level.id, { backsplash: b === 'none' ? undefined : b })} />
+      {f?.backsplash && f.backsplash !== 'none' && (
+        <>
+          <SelectField label="Backsplash finish" value={(f.backsplashFinish ?? 'tile') as BacksplashFinish} options={BACKSPLASH_FINISHES.map((b) => ({ value: b, label: BACKSPLASH_FINISH_LABEL[b] }))} onChange={(b) => updateFinishes(level.id, { backsplashFinish: b === 'tile' ? undefined : b })} />
+          <ColorField
+            label="Backsplash colour"
+            value={backsplashSpecOf([], f).color ?? counterColorOf(f)}
+            onCommit={(c) => updateFinishes(level.id, { backsplashColor: c })}
+            onReset={f.backsplashColor ? () => updateFinishes(level.id, { backsplashColor: undefined }) : undefined}
+          />
+          {f.backsplash === 'toWall' && (
+            <LengthField
+              label="Backsplash height"
+              value={f.backsplashHeight ?? BACKSPLASH.toWall}
+              onCommit={(v) => void (v !== null && updateFinishes(level.id, { backsplashHeight: v === BACKSPLASH.toWall ? undefined : v }))}
+              hint="Above the counter."
+            />
+          )}
+        </>
+      )}
+      <SelectField label="Pulls" value={(f?.handles ?? 'none') as HandleStyle} options={HANDLE_STYLES.map((h) => ({ value: h, label: HANDLE_STYLE_LABEL[h] }))} onChange={(h) => updateFinishes(level.id, { handles: h === 'none' ? undefined : h })} />
+      {f?.handles && f.handles !== 'none' && (
+        <SelectField label="Pull finish" value={(f.handleFinish ?? 'steel') as HandleFinish} options={HANDLE_FINISHES.map((h) => ({ value: h, label: HANDLE_FINISH_LABEL[h] }))} onChange={(h) => updateFinishes(level.id, { handleFinish: h === 'steel' ? undefined : h })} />
+      )}
       <ReadOnly label="Fixtures">{count}</ReadOnly>
     </>
   );

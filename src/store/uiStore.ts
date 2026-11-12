@@ -109,6 +109,8 @@ export interface FixturePreview {
   fabric?: FabricId;
   /** A shower's glass sides (the Cabinet tool places a shower with a glass front). */
   glass?: Fixture['glass'];
+  /** A corner unit's corner end (the tool turns it to the corner it is pushed into). */
+  corner?: Fixture['corner'];
   /** Middle of the back edge. */
   origin: Vec2;
   direction: number;

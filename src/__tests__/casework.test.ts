@@ -53,7 +53,7 @@ describe('fixture frame and outline', () => {
       expect(d.width).toBeGreaterThan(0);
       expect(d.height).toBeGreaterThan(0);
     }
-    expect(FIXTURE_KINDS.filter(hasCounter)).toEqual(['base', 'island', 'sink', 'dishwasher', 'vanity']);
+    expect(FIXTURE_KINDS.filter(hasCounter)).toEqual(['base', 'cornerBase', 'island', 'sink', 'dishwasher', 'vanity']);
     expect(FIXTURE_DEFAULTS.wall.elevation).toBe(54);
     expect(FIXTURE_DEFAULTS.hood.elevation).toBe(66);
   });

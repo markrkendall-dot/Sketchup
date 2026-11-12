@@ -269,7 +269,10 @@ export interface Roof {
  */
 export type FixtureKind =
   | 'base'
+  | 'cornerBase'
   | 'wall'
+  | 'cornerWall'
+  | 'shelf'
   | 'tall'
   | 'island'
   | 'range'
@@ -297,6 +300,21 @@ export type FixtureKind =
 export type BathVariant = 'alcove' | 'freestanding' | 'tray' | 'curbless' | 'pedestal' | 'wallHung';
 /** Cabinet door and drawer fronts: flat slabs, or a frame round a recessed panel. */
 export type FrontStyle = 'slab' | 'panel';
+/**
+ * What a counter top is made of (model/casework.ts COUNTER_MATERIALS): laminate or another solid
+ * colour (the plain colour), wood butcher block, or stone, speckled (granite) or veined (marble).
+ */
+export type CounterMaterial = 'laminate' | 'butcherBlock' | 'stoneSpeckled' | 'stoneVeined';
+/**
+ * How high the backsplash on the wall behind a base run goes: none, a 4" upstand, up to the wall
+ * cabinets (`backsplashHeight` above the counter, 18" unless set) or to the ceiling.
+ */
+export type Backsplash = 'none' | 'upstand' | 'toWall' | 'full';
+/** A backsplash in tile (3" x 6" subway tile) or a slab of the counter's material. */
+export type BacksplashFinish = 'tile' | 'slab';
+/** Door and drawer pulls: none, a knob, a bar pull. */
+export type HandleStyle = 'none' | 'knob' | 'bar';
+export type HandleFinish = 'steel' | 'black' | 'brass';
 /** What a piece of furniture is (DESIGN.md "Furniture"; model/furniture.ts FURNITURE). */
 export type FurniturePiece =
   | 'bed'
@@ -371,6 +389,40 @@ export interface Fixture {
    * left and right as you stand in the shower facing out. Absent: none.
    */
   glass?: { front?: boolean; left?: boolean; right?: boolean };
+  /**
+   * Counter kinds (base, corner base, island, sink, dishwasher, vanity): the counter's material,
+   * colour and thickness. A run of touching counter fixtures is one top: it takes each setting from
+   * the first of its fixtures (in id order) that has one, else the level's (LevelFinishes); the
+   * panel sets them on the whole run.
+   */
+  counterMaterial?: CounterMaterial;
+  counterColor?: string;
+  counterThickness?: Inches;
+  /**
+   * Base runs against a wall (base, corner base, sink, dishwasher) and a range: the backsplash on
+   * the wall behind it (and on a wall at its end), its finish, colour and the height of a `toWall`
+   * one above the counter. Absent: the level's, else none.
+   */
+  backsplash?: Backsplash;
+  backsplashFinish?: BacksplashFinish;
+  backsplashColor?: string;
+  backsplashHeight?: Inches;
+  /** Cabinets: the pulls on their doors and drawers and their finish. Absent: the level's, else none. */
+  handles?: HandleStyle;
+  handleFinish?: HandleFinish;
+  /** Base cabinets: a drawer bank of this many drawers (2 to 6) in place of a door under a drawer. */
+  drawers?: number;
+  /** Wall and corner wall cabinets: glass doors in a frame. */
+  glassFront?: boolean;
+  /**
+   * Corner cabinets: the end that is in the corner (on the other wall), left or right as you face
+   * the front. Absent: left.
+   */
+  corner?: 'left' | 'right';
+  /** Open shelves: how many boards (1 to 12; absent 2), spaced evenly up the height. */
+  shelves?: number;
+  /** Open shelves: each board's thickness (absent 1 1/2"). */
+  shelfThickness?: Inches;
 }
 
 /** Per-level defaults for casework (DESIGN.md "Casework"); every field optional. */
@@ -380,6 +432,15 @@ export interface LevelFinishes {
   frontStyle?: FrontStyle;
   /** Cabinets in a catalogue wood rather than painted. */
   cabinetWood?: WoodId;
+  /** Counters, backsplashes and pulls (Fixture's fields of the same names): absent laminate 1 1/2", no backsplash, no pulls. */
+  counterMaterial?: CounterMaterial;
+  counterThickness?: Inches;
+  backsplash?: Backsplash;
+  backsplashFinish?: BacksplashFinish;
+  backsplashColor?: string;
+  backsplashHeight?: Inches;
+  handles?: HandleStyle;
+  handleFinish?: HandleFinish;
   /** The ceiling of the level's rooms that set none (DESIGN.md "Ceilings"). */
   ceilingFinish?: CeilingFinish;
   ceilingColor?: string;

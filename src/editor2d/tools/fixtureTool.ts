@@ -1,8 +1,8 @@
-import { fixtureFrame, fixtureLocal } from '../../derive/casework';
+import { fixtureFrame, fixtureLocal, fixturePoint } from '../../derive/casework';
 import { getFootprints, type Footprint } from '../../derive/footprint';
 import { isVisible } from '../../derive/phase';
 import { normalizeDegrees } from '../../derive/stairs';
-import { FIXTURE_DEFAULTS, FIXTURE_LABEL, type FixtureSize } from '../../model/casework';
+import { FIXTURE_DEFAULTS, FIXTURE_LABEL, isCorner, type FixtureSize } from '../../model/casework';
 import { FURNITURE, furnitureDefaults, furnitureNameOf } from '../../model/furniture';
 import { BATH_STOCK_EXTRA } from '../../model/bath';
 import { add, dot, projectPointToSegment, scale, sub } from '../../model/geometry';
@@ -83,28 +83,59 @@ export function abutOnLine(level: Level, viewMode: ViewMode, face: FaceHit, poin
   let bestS = s;
   let bestD = reach;
   let abuts: Id | null = null;
-  for (const f of Object.values(level.fixtures ?? {})) {
-    if (!isVisible(f.phase, viewMode)) continue;
-    if (Math.abs(normalizeDegrees(f.direction - face.direction)) > 1e-6 && Math.abs(normalizeDegrees(f.direction - face.direction) - 360) > 1e-6) continue;
-    // Its back must lie on this face line (within half an inch across it).
-    const { d } = fixtureLocal({ origin: face.faceStart, direction: face.direction }, f.origin);
-    if (Math.abs(d) > 0.5) continue;
-    const c = dot(sub(f.origin, face.faceStart), t);
-    const h = f.width / 2;
-    // Our left end to its right end, or our right end to its left end.
-    const candidates: [number, number][] = [
-      [Math.abs(s - hw - (c + h)), c + h + hw],
-      [Math.abs(s + hw - (c - h)), c - h - hw],
-    ];
-    for (const [dist, at] of candidates) {
-      if (dist < bestD) {
-        bestD = dist;
-        bestS = at;
-        abuts = f.id;
+  for (const fx of Object.values(level.fixtures ?? {})) {
+    if (!isVisible(fx.phase, viewMode)) continue;
+    for (const f of abutLinesOf(fx)) {
+      if (Math.abs(normalizeDegrees(f.direction - face.direction)) > 1e-6 && Math.abs(normalizeDegrees(f.direction - face.direction) - 360) > 1e-6) continue;
+      // Its back must lie on this face line (within half an inch across it).
+      const { d } = fixtureLocal({ origin: face.faceStart, direction: face.direction }, f.origin);
+      if (Math.abs(d) > 0.5) continue;
+      const c = dot(sub(f.origin, face.faceStart), t);
+      const h = f.width / 2;
+      // Our left end to its right end, or our right end to its left end.
+      const candidates: [number, number][] = [
+        [Math.abs(s - hw - (c + h)), c + h + hw],
+        [Math.abs(s + hw - (c - h)), c - h - hw],
+      ];
+      for (const [dist, at] of candidates) {
+        if (dist < bestD) {
+          bestD = dist;
+          bestS = at;
+          abuts = fx.id;
+        }
       }
     }
   }
   return { point: add(face.faceStart, scale(t, bestS)), abuts };
+}
+
+/**
+ * The lines a fixture offers to abut along, each as a back's middle, a facing and a width: its own
+ * back, and a corner unit's end against the other wall too (so the run on that wall abuts its front
+ * end).
+ */
+export function abutLinesOf(f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'corner'>): { origin: Vec2; direction: number; width: number }[] {
+  const own = { origin: f.origin, direction: f.direction, width: f.width };
+  if (!isCorner(f.kind)) return [own];
+  const fr = fixtureFrame(f);
+  const sgn = f.corner === 'right' ? 1 : -1;
+  return [own, { origin: fixturePoint(fr, (sgn * f.width) / 2, f.depth / 2), direction: angleOf(scale(fr.v, -sgn)), width: f.depth }];
+}
+
+/**
+ * A corner unit pushed toward an end of the face (its middle within its width of it) goes into the
+ * corner there: its middle half its width from the end, its corner end on that side. Null when it
+ * is not near an end.
+ */
+export function cornerSnap(face: FaceHit, point: Vec2, width: number): { point: Vec2; corner: 'left' | 'right' } | null {
+  const t = face.tangent;
+  const s = dot(sub(point, face.faceStart), t);
+  const v = fixtureFrame({ origin: point, direction: face.direction }).v;
+  // Walking along t, the fixture's right (+v) is ahead when v and t agree: its left end is at the face's start.
+  const leftAtStart = dot(v, t) > 0;
+  if (s < width && s <= face.faceLength - s) return { point: add(face.faceStart, scale(t, width / 2)), corner: leftAtStart ? 'left' : 'right' };
+  if (face.faceLength - s < width) return { point: add(face.faceStart, scale(t, face.faceLength - width / 2)), corner: leftAtStart ? 'right' : 'left' };
+  return null;
 }
 
 /** The width the buffer asks for, or null when it is empty or unreadable. */
@@ -162,8 +193,9 @@ function preview(ctx: ToolContext, e: ToolPointerEvent | null, specOf: SpecOf): 
   let pv: FixturePreview;
   const face = toWall ? nearestFace(level, ui.viewMode, cursor, FACE_SNAP_PX / k) : null;
   if (face) {
-    const { point, abuts } = abutOnLine(level, ui.viewMode, face, face.point, width, ABUT_PX / k);
-    pv = { kind, ...own, origin: point, direction: face.direction, width, depth: def.depth, wallId: face.wallId, abuts, typed: typed !== null };
+    const into = isCorner(kind) ? cornerSnap(face, face.point, width) : null;
+    const { point, abuts } = into ? { point: into.point, abuts: null } : abutOnLine(level, ui.viewMode, face, face.point, width, ABUT_PX / k);
+    pv = { kind, ...own, ...(into ? { corner: into.corner } : {}), origin: point, direction: face.direction, width, depth: def.depth, wallId: face.wallId, abuts, typed: typed !== null };
     ui.patchDraft({ cursor, snap: { point, kind: 'face-edge', wallId: face.wallId, guides: [] }, fixturePreview: pv });
   } else {
     const snap = ctx.snap(cursor, { shift: false });
@@ -196,6 +228,7 @@ function place(ctx: ToolContext, e: ToolPointerEvent | null, specOf: SpecOf): vo
     elevation: def.elevation,
     phase: ui.drawPhase,
     ...spec.extra,
+    ...(pv.corner === 'right' ? { corner: 'right' as const } : {}),
   };
   const id = ctx.actions.addFixture(ctx.levelId, fixture);
   if (!id) {
@@ -204,7 +237,7 @@ function place(ctx: ToolContext, e: ToolPointerEvent | null, specOf: SpecOf): vo
   }
   ui.setSelection({ ...EMPTY_SELECTION, fixtures: [id] });
   const denom = ctx.plan().settings.precisionDenominator;
-  const where = pv.wallId ? (pv.abuts ? ' against the wall, beside the last one' : ' against the wall') : '';
+  const where = pv.wallId ? (pv.abuts ? ' against the wall, beside the last one' : pv.corner ? ' in the corner' : ' against the wall') : '';
   ui.patchDraft({
     lengthBuffer: '',
     error: false,

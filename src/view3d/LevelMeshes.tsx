@@ -4,8 +4,7 @@ import { getDeckMeshes, getFloorOpeningMeshes, getLevelMeshes, getMemberMeshes, 
 import type { Id } from '../model/types';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
-import { counterColorOf } from '../model/casework';
-import { ceilingMaterial, counterMaterial, fixturePartMaterial, isGlassPart, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+import { backsplashMaterial, ceilingMaterial, counterMaterial, fixturePartMaterial, isGlassPart, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -32,7 +31,6 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   // And beams and posts (a post runs up to the beam over it).
   const members = usePlanStore((s) => getMemberMeshes(s.plan, levelId, viewMode));
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[levelId]?.floorTop ?? 0);
-  const counterColor = usePlanStore((s) => counterColorOf(s.plan.levels[levelId]?.finishes));
   return (
     <group position={[0, floorTop, 0]} name={`level:${levelId}`}>
       {meshes.floor && <mesh name="floor" geometry={meshes.floor} material={floorMaterial} castShadow receiveShadow dispose={null} />}
@@ -240,9 +238,21 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           key={c.id}
           name={`counter:${c.id}`}
           geometry={c.geometry}
-          material={counterMaterial(c.phase, counterColor)}
+          material={counterMaterial(c.phase, c.color, c.material)}
           renderOrder={c.phase === 'demo' ? 1 : 0}
           castShadow={c.phase !== 'demo'}
+          receiveShadow
+          dispose={null}
+        />
+      ))}
+      {meshes.backsplashes?.map((b) => (
+        <mesh
+          key={b.id}
+          name={`backsplash:${b.id}`}
+          geometry={b.geometry}
+          material={backsplashMaterial(b.phase, b.finish, b.color, b.material)}
+          renderOrder={b.phase === 'demo' ? 1 : 0}
+          castShadow={b.phase !== 'demo'}
           receiveShadow
           dispose={null}
         />
