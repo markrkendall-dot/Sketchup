@@ -1,5 +1,6 @@
 import { boundsOf, clipHalfPlane, cross, dist, lerp, pointInPolygon, polygonSignedArea, projectPointToSegment, sub, type Bounds } from '../model/geometry';
 import type { Column, Fence, Id, Plan, Site, SiteSurface, Vec2, ViewMode } from '../model/types';
+import { groundLevelId } from '../model/plan';
 import { getLevelElevations } from './levels';
 import { isVisible, phasesCoexist } from './phase';
 import { roofBearing, roofExtremes, roofHeightAt, triangulate } from './roofs';
@@ -727,7 +728,7 @@ export function columnDefaults(plan: Plan, kind: Column['kind'], at: Vec2, phase
     const top = (ridge ?? (last ? elev[last].ceiling : ground)) + d.aboveRidge;
     return { width: d.width, depth: d.depth, rotation: 0, base: ground - d.belowGrade, top };
   }
-  const first = plan.levelOrder[1] ?? plan.levelOrder[0];
+  const first = groundLevelId(plan);
   if (kind === 'pier') {
     const d = COLUMN_DEFAULTS.pier;
     const top = first ? elev[first].floorTop : ground + d.height;
@@ -751,9 +752,12 @@ export function defaultGradeElevation(plan: Plan): number {
   return id ? (getLevelElevations(plan)[id]?.floorTop ?? 0) : 0;
 }
 
-/** The level the site view shows as a ghost: the first floor (the level above the lowest), or the lowest if only one. */
-export function siteGhostLevelId(plan: { readonly levelOrder: readonly Id[] }): Id | undefined {
-  return plan.levelOrder[1] ?? plan.levelOrder[0];
+/**
+ * The level the site view shows as a ghost: the ground floor (model/plan.ts groundLevelId): the
+ * first floor over a basement, else the lowest. Without `baseFloorElevation`, the level above the lowest.
+ */
+export function siteGhostLevelId(plan: { readonly levelOrder: readonly Id[]; readonly baseFloorElevation?: number }): Id | undefined {
+  return groundLevelId(plan);
 }
 
 /** Columns the view mode shows. */

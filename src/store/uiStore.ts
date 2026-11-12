@@ -742,3 +742,17 @@ export function clearNoticeOnEdit(plan: object, prevPlan: object): void {
 
 export const useViewport = () => useUiStore((s) => s.viewport);
 export const useViewportScale = () => useUiStore((s) => s.viewport.k);
+
+/**
+ * Called when the plan's levels change (main.tsx): forget the 3D checkboxes, a waiting wall-move
+ * question and a walk on levels that are gone (a deleted level, New, Open).
+ */
+export function forgetGoneLevels(plan: { readonly levels: Readonly<Record<Id, unknown>> }): void {
+  const s = useUiStore.getState();
+  const patch: Partial<UiState> = {};
+  const hidden = s.hidden3dLevels.filter((id) => id in plan.levels);
+  if (hidden.length !== s.hidden3dLevels.length) patch.hidden3dLevels = hidden;
+  if (s.wallMovePrompt && !(s.wallMovePrompt.levelId in plan.levels)) patch.wallMovePrompt = null;
+  if (s.walkLevelId && !(s.walkLevelId in plan.levels)) Object.assign(patch, { cameraMode: 'orbit', walkLevelId: null, walkLocked: false });
+  if (Object.keys(patch).length) useUiStore.setState(patch);
+}

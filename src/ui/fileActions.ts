@@ -5,7 +5,7 @@ import { cancelActiveTool } from '../editor2d/tools';
 import { fitLevel, initialViewport } from '../editor2d/viewport';
 import { autosaveFailureReason, downloadPlan, planFileName, readPlanFile, type Autosave } from '../io/file';
 import { library, writeLastPlanId } from '../io/library';
-import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
+import { createEmptyPlan, defaultLevelId, migrate, type PlanTemplate } from '../model/plan';
 import type { Plan } from '../model/types';
 import { clearHistory, getPlan, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
@@ -122,9 +122,12 @@ export async function openProperty(id: string): Promise<boolean> {
   }
 }
 
-/** Start a new, empty property; the current one stays in the library. */
-export async function newPlan(): Promise<void> {
-  const plan = await storeAndOpen(createEmptyPlan());
+/**
+ * Start a new, empty property from a template (model/plan.ts createEmptyPlan; the default is a
+ * basement and two floors) with a name (blank: "Untitled plan"); the current one stays in the library.
+ */
+export async function newPlan(template: PlanTemplate = 'basementTwoStorey', name?: string): Promise<void> {
+  const plan = await storeAndOpen(createEmptyPlan(name?.trim() || undefined, template));
   showNotice(`Started a new property, ${plan.name}. The one before is under Properties.`);
 }
 

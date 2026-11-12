@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { library, type LibraryEntry } from '../io/library';
+import { PLAN_TEMPLATES, type PlanTemplate } from '../model/plan';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { deleteProperty, duplicateProperty, exportProperty, flushAutosave, newPlan, openPlanFile, openProperty, renameProperty } from './fileActions';
@@ -29,6 +30,8 @@ export function PropertiesDialog() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+  /** The New form: a name and a template (model/plan.ts PLAN_TEMPLATES), open while not null. */
+  const [creating, setCreating] = useState<{ name: string; template: PlanTemplate } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -45,6 +48,7 @@ export function PropertiesDialog() {
   useEffect(() => {
     if (!open) {
       setRenaming(null);
+      setCreating(null);
       return;
     }
     ref.current?.focus();
@@ -97,8 +101,13 @@ export function PropertiesDialog() {
         <div className="help-head">
           <h2 id="library-title">Properties</h2>
           <div className="library-head-actions">
-            <button disabled={busy} onClick={() => void run(newPlan, true)} title="Start a new, empty property; this one stays in the list">
-              New
+            <button
+              disabled={busy}
+              aria-expanded={creating !== null}
+              onClick={() => setCreating(creating ? null : { name: '', template: 'basementTwoStorey' })}
+              title="Start a new, empty property from a template; this one stays in the list"
+            >
+              New...
             </button>
             <button disabled={busy} onClick={() => fileRef.current?.click()} title="Add a plan file (.json) to the list and open it">
               Import JSON
@@ -109,6 +118,49 @@ export function PropertiesDialog() {
           </div>
         </div>
         <p className="help-note library-note">Kept in this browser only. Export a property to keep a copy somewhere safe.</p>
+        {creating && (
+          <form
+            className="library-new"
+            aria-label="New property"
+            onSubmit={(ev) => {
+              ev.preventDefault();
+              const { template, name } = creating;
+              setCreating(null);
+              void run(() => newPlan(template, name), true);
+            }}
+            onKeyDown={(ev) => {
+              if (ev.key === 'Escape') {
+                ev.stopPropagation();
+                setCreating(null);
+              }
+            }}
+          >
+            <label className="library-new-name">
+              Name
+              <input autoFocus value={creating.name} placeholder="Untitled plan" onChange={(ev) => setCreating({ ...creating, name: ev.target.value })} />
+            </label>
+            <fieldset className="library-templates">
+              <legend>Levels to start with (add, delete and reorder them later in the level bar)</legend>
+              {PLAN_TEMPLATES.map((t) => (
+                <label key={t.id} className={creating.template === t.id ? 'library-template chosen' : 'library-template'}>
+                  <input type="radio" name="template" value={t.id} checked={creating.template === t.id} onChange={() => setCreating({ ...creating, template: t.id })} />
+                  <span>
+                    <strong>{t.label}</strong>
+                    <small>{t.hint}</small>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+            <div className="library-head-actions">
+              <button type="submit" className="primary" disabled={busy}>
+                Create and open
+              </button>
+              <button type="button" onClick={() => setCreating(null)}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
         {error && <p className="library-error">{error}</p>}
         {entries === null && !error ? (
           <p className="help-note">Loading...</p>

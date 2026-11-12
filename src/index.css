@@ -1706,3 +1706,86 @@ button.primary:hover:not(:disabled) {
 .library-actions button.library-delete:not(:disabled) {
   color: var(--danger);
 }
+
+/* Properties dialog: the New form (a name and a template). */
+.library-new {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.library-new-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.library-new-name input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.library-templates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.library-templates legend {
+  padding: 0 0 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.library-template {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.library-template.chosen {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.library-template span {
+  display: flex;
+  flex-direction: column;
+}
+
+.library-template small {
+  color: var(--muted);
+}
+
+/* Level bar: add, move and delete levels. */
+.level-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.level-actions button {
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.level-actions button.level-delete:not(:disabled) {
+  color: var(--danger);
+}

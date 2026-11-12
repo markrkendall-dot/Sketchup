@@ -219,6 +219,41 @@ i spans `floorTop[i] - floorThickness[i] .. floorTop[i]`.
 Records keyed by id, edited through immer, so untouched entities keep object identity. All memoization
 in `derive/` depends on that.
 
+### Levels (`model/levelOps.ts`, store `addLevel` / `deleteLevel` / `moveLevel`, `ui/LevelBar.tsx`)
+
+`createEmptyPlan(name, template)` makes the levels of a template: `basementTwoStorey` (the default
+and what every plan had before: Basement 96"/4", First and Second Floor 96"/12", base -100),
+`twoStorey` (First Floor on a 4" slab at 0, Second Floor 96"/12"), `single` (one Ground Floor,
+96"/4" at 0) and `outbuilding` (one level, 84"/4" at 0). `groundLevelId` is the level above the
+lowest when `baseFloorElevation < 0` (a basement), else the lowest: the editor opens on it and the
+site view ghosts it.
+
+Nothing in a level points at another level by id: what crosses levels (a flight climbing to the
+floor above and cutting it, floor openings over the level below, walls running up through the slab
+above, the slab stopping at the walls below, deck edges against any level's walls, the ghost of the
+level below, a beam's depth from the floor above) is derived from the neighbours in `levelOrder` each
+time, and the caches key on the neighbour objects, so adding, deleting or moving a level needs no
+rewriting of references. What depends on a level's *place* is fixed by `fitLevelsToOrder` after each
+edit, the rules `migrate` applies on load: a negative flight `base` and a post `footing` only on the
+lowest level, and a flight's set `rise` (then `base`) is dropped when it no longer fits under the
+floor above. The store returns what it changed and the level bar says it.
+
+- `addLevel(position)`: `'top'`, `'bottom'`, `{above: id}` or `{below: id}`. Wall height from the
+  level under it (over it at the bottom); floor thickness that of the floor it takes the place of
+  (the level above it's; on top the level below's, or 12" over the lowest level's slab). At the
+  bottom it takes the old lowest level's floor thickness and `baseFloorElevation` drops by its wall
+  height plus the old lowest's floor thickness, so no existing level moves; elsewhere the levels
+  above it rise by its storey.
+- `deleteLevel(id)`: refused for the last level. Everything on the level goes with it (nothing
+  outside it refers to it). Deleting the lowest sets `baseFloorElevation` to the next level's floor
+  top, so the rest stay; deleting another brings the levels above it down.
+- `moveLevel(id, 'up' | 'down')`: swaps it in `levelOrder`; `baseFloorElevation` stays the floor top
+  of whichever level is now lowest.
+
+Each is one undo step. In the UI (main.tsx), when the active level is gone the nearest level below
+it (else above) becomes active; site mode follows a new lowest level; the 3D checkboxes, a waiting
+wall-move question and a walk on a gone level are forgotten (`forgetGoneLevels`).
+
 ## Walls are a graph
 
 Walls reference shared nodes. Invariant enforced by `normalize()` after every structural edit:

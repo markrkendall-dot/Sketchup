@@ -2,6 +2,7 @@ import { create, useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { current } from 'immer';
 import { temporal } from 'zundo';
+import { addLevelTo, deleteLevelFrom, moveLevelIn, type LevelEdit, type LevelPosition } from '../model/levelOps';
 import { dist } from '../model/geometry';
 import { coreInterval, draftFootprints } from '../derive/openings';
 import { clampOpeningHeight, clampOpeningOffset, openingFitsHeight, wallHeightOf } from '../model/openings';
@@ -346,6 +347,19 @@ export interface PlanState {
   updateProposedLook: (patch: Partial<ProposedLook>) => void;
   renameLevel: (levelId: Id, name: string) => void;
   updateLevel: (levelId: Id, patch: LevelPatch) => void;
+  /**
+   * Add an empty level above the top, below the bottom, or just above or below a level
+   * (model/levelOps.ts addLevelTo: heights from the neighbour; one added at the bottom leaves the
+   * other levels' elevations as they were). One undo step. Null when the position names no level.
+   */
+  addLevel: (position: LevelPosition, name?: string) => LevelEdit | null;
+  /**
+   * Delete a level and everything on it (model/levelOps.ts deleteLevelFrom). Refused (null) for the
+   * last level. One undo step.
+   */
+  deleteLevel: (levelId: Id) => LevelEdit | null;
+  /** Swap a level with the one above or below it (model/levelOps.ts moveLevelIn). One undo step. */
+  moveLevel: (levelId: Id, direction: 'up' | 'down') => LevelEdit | null;
   setBaseFloorElevation: (elevation: number) => void;
   /** Put an image under a level, replacing any there, or remove it (undefined). One undo step. */
   setUnderlay: (levelId: Id, underlay: Underlay | undefined) => void;
@@ -1707,6 +1721,33 @@ export const usePlanStore = create<PlanState>()(
             Object.assign(level, patch);
             if (lowered) clampOpeningHeights(level);
           }),
+
+        addLevel: (position, name) => {
+          let out: LevelEdit | null = null;
+          set((s) => {
+            out = addLevelTo(s.plan, position, name);
+            if (out) touch(s.plan);
+          });
+          return out;
+        },
+
+        deleteLevel: (levelId) => {
+          let out: LevelEdit | null = null;
+          set((s) => {
+            out = deleteLevelFrom(s.plan, levelId);
+            if (out) touch(s.plan);
+          });
+          return out;
+        },
+
+        moveLevel: (levelId, direction) => {
+          let out: LevelEdit | null = null;
+          set((s) => {
+            out = moveLevelIn(s.plan, levelId, direction);
+            if (out) touch(s.plan);
+          });
+          return out;
+        },
 
         setBaseFloorElevation: (elevation) =>
           set((s) => {

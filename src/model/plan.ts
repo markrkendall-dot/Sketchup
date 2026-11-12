@@ -51,28 +51,84 @@ export function createLevel(name: string, wallHeight: number, floorThickness: nu
 /** The site of a new plan (and of files from before schema version 2). */
 export const defaultSite = (): Site => ({ northAngle: 0, gradePoints: {}, columns: {}, surfaces: {}, fences: {} });
 
-export function createEmptyPlan(name = 'Untitled plan'): Plan {
-  const levels = [
-    createLevel('Basement', 96, 4),
-    createLevel('First Floor', 96, 12),
-    createLevel('Second Floor', 96, 12),
-  ];
+/** The levels a new plan starts with (createEmptyPlan). */
+export type PlanTemplate = 'single' | 'twoStorey' | 'basementTwoStorey' | 'outbuilding';
+
+/** The templates as the New dialog lists them. */
+export const PLAN_TEMPLATES: readonly { id: PlanTemplate; label: string; hint: string }[] = [
+  { id: 'basementTwoStorey', label: 'Basement and two floors', hint: 'Basement on a 4" slab, First and Second Floor framed, 96" walls' },
+  { id: 'twoStorey', label: 'Two floors', hint: 'First Floor on a 4" slab at grade, Second Floor framed, 96" walls' },
+  { id: 'single', label: 'One storey', hint: 'One floor on a 4" slab at grade, 96" walls' },
+  { id: 'outbuilding', label: 'Garage or shed', hint: 'One level on a 4" slab at grade, 84" walls' },
+];
+
+/** Each template's levels, bottom to top ([name, wall height, floor thickness]), and the lowest floor top. */
+const TEMPLATE_LEVELS: Record<PlanTemplate, { levels: [string, number, number][]; base: number }> = {
+  basementTwoStorey: {
+    levels: [
+      ['Basement', 96, 4],
+      ['First Floor', 96, 12],
+      ['Second Floor', 96, 12],
+    ],
+    base: -100,
+  },
+  twoStorey: {
+    levels: [
+      ['First Floor', 96, 4],
+      ['Second Floor', 96, 12],
+    ],
+    base: 0,
+  },
+  single: { levels: [['Ground Floor', 96, 4]], base: 0 },
+  outbuilding: { levels: [['Ground Floor', 84, 4]], base: 0 },
+};
+
+export const isPlanTemplate = (v: unknown): v is PlanTemplate => typeof v === 'string' && v in TEMPLATE_LEVELS;
+
+/**
+ * A new plan with a template's levels (DESIGN.md "Levels"). The default, a basement and two floors,
+ * is what every plan started with before templates.
+ */
+export function createEmptyPlan(name = 'Untitled plan', template: PlanTemplate = 'basementTwoStorey'): Plan {
+  const t = TEMPLATE_LEVELS[template];
+  const levels = t.levels.map(([n, h, f]) => createLevel(n, h, f));
   return {
     schemaVersion: SCHEMA_VERSION,
     id: newId(),
     name,
     levelOrder: levels.map((l) => l.id),
     levels: Object.fromEntries(levels.map((l) => [l.id, l])),
-    baseFloorElevation: -100,
+    baseFloorElevation: t.base,
     settings: { ...DEFAULT_SETTINGS },
     site: defaultSite(),
     modifiedAt: new Date().toISOString(),
   };
 }
 
-/** The level the editor opens on: First Floor (levelOrder[1]) when present. */
+/**
+ * The ground floor: the level above the lowest when the lowest is below grade (a basement:
+ * baseFloorElevation under 0, or not given), else the lowest. Always a level of a non-empty plan.
+ */
+export function groundLevelId(plan: { readonly levelOrder: readonly Id[]; readonly baseFloorElevation?: number }): Id | undefined {
+  const basement = plan.baseFloorElevation === undefined || plan.baseFloorElevation < 0;
+  return (basement ? plan.levelOrder[1] : undefined) ?? plan.levelOrder[0];
+}
+
+/** The level the editor opens on: the ground floor (groundLevelId), First Floor in a plan with a basement. */
 export function defaultLevelId(plan: Plan): Id {
-  return plan.levelOrder[1] ?? plan.levelOrder[0];
+  return groundLevelId(plan) ?? plan.levelOrder[0];
+}
+
+/**
+ * The level to show when `goneId` is no longer in `plan`: the nearest level below it in `prevOrder`
+ * that is still there, else the nearest above, else undefined.
+ */
+export function neighbourLevelId(prevOrder: readonly Id[], plan: Plan, goneId: Id): Id | undefined {
+  const i = prevOrder.indexOf(goneId);
+  if (i < 0) return undefined;
+  for (let j = i - 1; j >= 0; j--) if (plan.levels[prevOrder[j]]) return prevOrder[j];
+  for (let j = i + 1; j < prevOrder.length; j++) if (plan.levels[prevOrder[j]]) return prevOrder[j];
+  return undefined;
 }
 
 /** Floor-top elevation of each level, bottom to top (see DESIGN.md elevation rule). */

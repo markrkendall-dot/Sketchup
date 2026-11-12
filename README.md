@@ -11,8 +11,9 @@ runs in your browser; nothing is uploaded.
 
 What it draws:
 
-- **Walls, openings, rooms, stairs** on any number of levels (Basement, First Floor and Second
-  Floor to start), with the three levels stacked in 3D and a faint ghost of the level below.
+- **Walls, openings, rooms, stairs** on any number of levels, stacked in 3D, with a faint ghost of
+  the level below. A new property starts from a template (a basement and two floors, two floors,
+  one storey, or a garage or shed); the level bar adds, deletes and reorders levels.
 - **Roofs** (gable, shed, hip, flat) with overhangs, fascia and rake boards or open eaves with
   rafter tails; walls under a roof rise to meet it, so a gable end is a triangle.
 - **Decks** on posts down to the ground, with railings that open where a flight of stairs arrives.
@@ -71,6 +72,18 @@ the same way.
 ## Drawing an existing house
 
 Before you start, measure on paper. Then follow these steps in order.
+
+0. **Start a property with the levels the house has.** **All properties > New...** asks for a name and
+   a template: a basement and two floors (what the toolbar's **New** makes), two floors at grade,
+   one storey on a slab, or a garage or shed (one level, 84" walls). The buttons under the level
+   tabs change it later, on the active level: **Add above** and **Add below** add an empty level
+   (its wall height from the level beside it; one added under the lowest leaves the others at their
+   heights, so the lowest floor top goes down), **Move up** and **Move down** swap it with its
+   neighbour, and **Delete level** deletes it with everything on it (it asks first when the level
+   has anything on it; a plan keeps at least one level). Undo reverts each. Only the lowest
+   level's flights may start below its floor and only its posts stand on footings, so a level
+   that stops being the lowest loses those, and a flight whose set climb no longer fits under the
+   floor above climbs to it again; the status bar says what changed.
 
 1. **Measure the outside perimeter first.** Go around the house with the tape and write down
    every run of exterior wall, corner to corner, in order. If you can only get inside, measure

@@ -42,7 +42,7 @@ import {
 import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model/underlay';
 import { dist, pointInPolygon, polygonSignedArea } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
-import { columnProblem, fenceProblem, MAX_DECK_ELEVATION, MAX_FENCE_RAILS, MAX_ROOF_PITCH, MIN_FENCE_SPACING, wallLength } from '../model/plan';
+import { columnProblem, fenceProblem, groundLevelId, MAX_DECK_ELEVATION, MAX_FENCE_RAILS, MAX_ROOF_PITCH, MIN_FENCE_SPACING, wallLength } from '../model/plan';
 import { boundsOf } from '../model/geometry';
 import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
@@ -2426,7 +2426,7 @@ function GradePointProps({ point }: { point: GradePoint }) {
   const updateGradePoint = usePlanStore((s) => s.updateGradePoint);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const firstTop = usePlanStore((s) => {
-    const id = s.plan.levelOrder[1] ?? s.plan.levelOrder[0];
+    const id = groundLevelId(s.plan);
     return id ? getLevelElevations(s.plan)[id]?.floorTop : undefined;
   });
   return (

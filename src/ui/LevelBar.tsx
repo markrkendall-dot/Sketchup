@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getLevelElevations } from '../derive/levels';
-import { enterSiteMode, switchLevel } from '../editor2d/tools';
+import { cancelActiveTool, enterSiteMode, switchLevel } from '../editor2d/tools';
+import { levelContentCount, type LevelEdit, type LevelPosition } from '../model/levelOps';
 import type { Id } from '../model/types';
 import { formatLength } from '../model/units';
 import { getPlan, usePlanStore } from '../store/planStore';
@@ -114,6 +115,76 @@ function copyWallsFromBelow(activeId: Id, belowId: Id): void {
   }
 }
 
+/** Say in the status bar what a level edit had to change elsewhere (model/levelOps.ts fitLevelsToOrder). */
+function reportAdjusted(edit: LevelEdit | null, done: string): void {
+  if (!edit) return;
+  const extra = edit.adjusted.length ? ` ${edit.adjusted.join('; ')}.` : '';
+  useUiStore.getState().setNotice({ text: `${done}.${extra}`, error: false });
+}
+
+function addLevel(position: LevelPosition): void {
+  cancelActiveTool();
+  const edit = usePlanStore.getState().addLevel(position);
+  if (!edit) return;
+  switchLevel(edit.id);
+  reportAdjusted(edit, `Added ${getPlan().levels[edit.id]?.name ?? 'a level'} (double-click its tab to rename it)`);
+}
+
+function deleteLevel(levelId: Id): void {
+  const plan = getPlan();
+  const level = plan.levels[levelId];
+  if (!level || plan.levelOrder.length < 2) return;
+  const n = levelContentCount(plan, levelId);
+  if (n > 0 && !window.confirm(`Delete ${level.name} and the ${n} ${n === 1 ? 'thing' : 'things'} drawn on it? (Undo brings it back.)`)) return;
+  cancelActiveTool();
+  reportAdjusted(usePlanStore.getState().deleteLevel(levelId), `Deleted ${level.name}`);
+}
+
+function moveLevel(levelId: Id, direction: 'up' | 'down'): void {
+  cancelActiveTool();
+  const name = getPlan().levels[levelId]?.name ?? 'the level';
+  reportAdjusted(usePlanStore.getState().moveLevel(levelId, direction), `Moved ${name} ${direction}`);
+}
+
+/** Add, move and delete levels: they work on the active level (not in site mode). */
+function LevelActions({ activeId, index, count }: { activeId: Id; index: number; count: number }) {
+  const siteMode = useUiStore((s) => s.siteMode);
+  const name = usePlanStore((s) => s.plan.levels[activeId]?.name ?? '');
+  const off = siteMode || index < 0;
+  const act = (fn: () => void) => () => {
+    fn();
+    focusCanvas();
+  };
+  return (
+    <div className="level-actions" role="group" aria-label="Level actions">
+      <button disabled={off} title={off ? 'Pick a level first' : `Add an empty level just above ${name}`} onClick={act(() => addLevel({ above: activeId }))}>
+        Add above
+      </button>
+      <button
+        disabled={off}
+        title={off ? 'Pick a level first' : index === 0 ? `Add an empty level under ${name}; the levels above keep their heights` : `Add an empty level just below ${name}`}
+        onClick={act(() => addLevel({ below: activeId }))}
+      >
+        Add below
+      </button>
+      <button disabled={off || index >= count - 1} title={`Move ${name} up past the level above it`} onClick={act(() => moveLevel(activeId, 'up'))}>
+        Move up
+      </button>
+      <button disabled={off || index <= 0} title={`Move ${name} down past the level below it`} onClick={act(() => moveLevel(activeId, 'down'))}>
+        Move down
+      </button>
+      <button
+        className="level-delete"
+        disabled={off || count < 2}
+        title={count < 2 ? 'A plan keeps at least one level' : `Delete ${name} and everything on it`}
+        onClick={act(() => deleteLevel(activeId))}
+      >
+        Delete level
+      </button>
+    </div>
+  );
+}
+
 export function LevelBar() {
   const order = usePlanStore((s) => s.plan.levelOrder);
   const activeId = useUiStore((s) => s.activeLevelId);
@@ -139,6 +210,7 @@ export function LevelBar() {
           ))}
         <SiteTab />
       </div>
+      <LevelActions activeId={activeId} index={index} count={order.length} />
       <label className="level-option" title={belowName ? `Draw ${belowName} faintly under this level` : 'No level below'}>
         <input type="checkbox" checked={showBelow} disabled={!belowId} onChange={toggleShowBelow} />
         Show level below

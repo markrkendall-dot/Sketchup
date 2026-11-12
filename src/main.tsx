@@ -10,10 +10,10 @@ import { fallbackElevation, groundAt, planTerrain, terrainHeightAt } from './der
 import { pruneSelection } from './editor2d/tools';
 import { startAutosave } from './io/file';
 import { library, startupPlan, writeLastPlanId } from './io/library';
-import { defaultLevelId } from './model/plan';
+import { defaultLevelId, neighbourLevelId } from './model/plan';
 import type { Plan } from './model/types';
 import { clearHistory, usePlanStore } from './store/planStore';
-import { clearNoticeOnEdit, useUiStore } from './store/uiStore';
+import { clearNoticeOnEdit, forgetGoneLevels, useUiStore } from './store/uiStore';
 import { startChecks } from './ui/checks';
 import { setAutosave, showNotice } from './ui/fileActions';
 import './index.css';
@@ -70,7 +70,9 @@ async function boot(): Promise<void> {
   // Drop selected ids that undo removed or a phase change hid.
   usePlanStore.subscribe((s, prev) => {
     const ui = useUiStore.getState();
-    if (!s.plan.levels[ui.activeLevelId]) ui.setActiveLevel(defaultLevelId(s.plan));
+    // A deleted level (or one undo took away) hands over to its neighbour in the stack.
+    if (!s.plan.levels[ui.activeLevelId]) ui.setActiveLevel(neighbourLevelId(prev.plan.levelOrder, s.plan, ui.activeLevelId) ?? defaultLevelId(s.plan));
+    else if (ui.siteMode && s.plan.levelOrder[0] !== ui.activeLevelId) ui.enterSiteMode(s.plan.levelOrder[0]);
     else if (s.plan !== prev.plan) pruneSelection();
     // Levels went away (New, Open): forget what the derive caches kept per level id, and a walk
     // start picked on a level that is gone.
@@ -78,6 +80,7 @@ async function boot(): Promise<void> {
       pruneDerivedCaches(s.plan);
       const from = useUiStore.getState().walkFrom;
       if (from && !s.plan.levels[from.levelId]) useUiStore.getState().setWalkFrom(null);
+      forgetGoneLevels(s.plan);
     }
     // Any edit clears the status bar's notice (REVIEW-2 C3).
     clearNoticeOnEdit(s.plan, prev.plan);
