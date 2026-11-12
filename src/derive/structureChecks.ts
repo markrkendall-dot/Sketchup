@@ -30,6 +30,7 @@ import { roofOutlineWithOverhang } from './roofs';
 import { getFaces } from './rooms';
 import { floorToFloor, stairsHoleOutline } from './stairs';
 import { isParallel, joistVector, wallBearings, wallSegment, type Segment } from './structure';
+import { levelAboveId, structuresOf } from '../model/structures';
 
 const VIEW = 'proposed';
 const TOL = 0.01;
@@ -104,7 +105,9 @@ export function structureIssues(plan: Plan): Issue[] {
     return null;
   };
 
-  plan.levelOrder.forEach((levelId, li) => {
+  // The stack being checked: trace() walks down it by index.
+  let order: readonly Id[] = [];
+  for (const st of structuresOf(plan)) (order = st.levelOrder).forEach((levelId, li) => {
     const level = plan.levels[levelId];
     if (!level) return;
     const depth = joistDepth(plan, levelId);
@@ -118,7 +121,7 @@ export function structureIssues(plan: Plan): Issue[] {
     }
     for (const m of Object.values(level.members ?? {})) if (m.kind === 'beam' && !isTimber(m) && isVisible(m.phase, VIEW)) supports.push({ a: m.a, b: m.b });
     // What a wall taken out carried that stays: the floor above it, or a roof kept over it.
-    const aboveId = plan.levelOrder[li + 1];
+    const aboveId = order[li + 1];
     const aboveFaces = aboveId && plan.levels[aboveId] ? getFaces(plan.levels[aboveId], VIEW).outerFaces : [];
     const keptRoofs = Object.values(level.roofs ?? {}).filter((r) => r.phase === 'existing').map(roofOutlineWithOverhang);
     const loaded = (q: Vec2) => aboveFaces.some((f) => pointInPolygon(q, f)) || keptRoofs.some((r) => pointInPolygon(q, r));
@@ -192,7 +195,7 @@ export function structureIssues(plan: Plan): Issue[] {
 
     // ---- Headers: new floor openings and holes cut in a floor, new openings in bearing walls.
     if (li > 0) {
-      const below = plan.levelOrder[li - 1];
+      const below = order[li - 1];
       const belowLevel = plan.levels[below];
       for (const fo of Object.values(level.floorOpenings ?? {})) {
         if (fo.phase !== 'new') continue;
@@ -200,7 +203,7 @@ export function structureIssues(plan: Plan): Issue[] {
         headers(below, belowLevel, fo.outline, supported, { floorOpenings: [fo.id] }, 'floor opening');
       }
     }
-    const above = plan.levelOrder[li + 1];
+    const above = order[li + 1];
     if (above) {
       const ftf = floorToFloor(plan, levelId);
       for (const s of Object.values(level.stairs)) {
@@ -247,7 +250,7 @@ export function structureIssues(plan: Plan): Issue[] {
       const mid = scale(add(a, b), 0.5);
       if ([0.1, 0.5, 0.9].every((t) => carriers.some((s) => carries(s, add(a, scale(d, t * len)), d, depth)))) return;
       const kind = len > CODE.headerHanger.value ? 'a doubled header on joist hangers' : len > CODE.headerDouble.value ? 'a doubled header' : 'a header';
-      const levelId = holeLevelId ?? plan.levelOrder[plan.levelOrder.indexOf(framingId) + 1];
+      const levelId = holeLevelId ?? levelAboveId(plan, framingId) ?? framingId;
       push('structure.opening-header', 'headerDouble', 'info', levelId, mid, target, `HDR: the ${what}'s ${compassName(edgeOutward(outline, i), north)} edge cuts ${fmt(len)} of joists: ${kind}, and trimmers at its ends.`, undefined, `|${i}`);
     });
   }
@@ -272,7 +275,7 @@ export function structureIssues(plan: Plan): Issue[] {
       const key = `${lj}|${sup.kind}|${sup.kind === 'wall' ? sup.wall.id : sup.kind === 'post' ? sup.post.id : sup.beam.id}|${Math.round(q.x * 4)}|${Math.round(q.y * 4)}`;
       if (seen.has(key)) return;
       seen.add(key);
-      const lid = plan.levelOrder[lj];
+      const lid = order[lj];
       if (sup.kind === 'beam') {
         // The load splits to the beam's ends, each on what carries it on this level.
         for (const e of [sup.beam.a, sup.beam.b]) {
@@ -287,7 +290,7 @@ export function structureIssues(plan: Plan): Issue[] {
           add1({ id: issueId('structure.footing', lid, { members: [sup.post.id] }), code: 'structure.footing', severity: 'error', category: 'structure', levelId: lid, at: sup.post.at, message: `A post carrying ${name} stands on the slab with no footing under it.`, ref: codeRef('footing'), target: { members: [sup.post.id] } });
         return; // a wall on the lowest level stands on its footing
       }
-      const belowId = plan.levelOrder[lj - 1];
+      const belowId = order[lj - 1];
       const below = plan.levels[belowId];
       const s2 = supportAt(belowId, q);
       if (s2) {

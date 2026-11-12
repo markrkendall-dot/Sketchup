@@ -4,9 +4,10 @@ import { PLAN_RULES, PLAN_STYLES, PLAN_VARS } from '../editor2d/planStyles';
 import { EXPORT_MARGIN, EXPORT_PX_PER_INCH, levelDrawingBounds, planExport, planFrame, planSvg, pngSize, PNG_SCALE, SCALE_NOTE } from '../io/exportPlan';
 import { migrate } from '../model/plan';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
+import { firstStructure } from '../model/structures';
 
 const plan = migrate(example);
-const first = plan.levelOrder[1];
+const first = firstStructure(plan).levelOrder[1];
 
 describe('plan export scale and frame (REVIEW-2 B4)', () => {
   it('draws 1/4" = 1\'-0" at 96 dpi: a foot of plan is 24 px, an inch 2 px; the PNG doubles it', () => {

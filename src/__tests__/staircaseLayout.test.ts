@@ -10,6 +10,7 @@ import { pointInPolygon } from '../model/geometry';
 import { createEmptyPlan, migrate } from '../model/plan';
 import type { Plan, Vec2 } from '../model/types';
 import { clearHistory, usePlanStore, type NewStairs } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
@@ -24,8 +25,8 @@ const solidAt = (solids: readonly StairSolid[], p: Vec2, z: number) => solids.so
 
 describe("the starter's Grand stair", () => {
   const starter = migrate(example as unknown) as Plan;
-  const f = starter.levelOrder[1];
-  const s = starter.levelOrder[2];
+  const f = firstStructure(starter).levelOrder[1];
+  const s = firstStructure(starter).levelOrder[2];
   const [scId] = Object.keys(starter.levels[f].staircases);
   const layout = getStaircaseLayout(starter, f, scId, 'proposed')!;
 
@@ -113,8 +114,8 @@ describe('a staircase against the code', () => {
     clearHistory();
     clearStaircaseLayouts();
     clearMeshCache();
-    [, f] = plan().levelOrder;
-    const s2 = plan().levelOrder[2];
+    [, f] = firstStructure(plan()).levelOrder;
+    const s2 = firstStructure(plan()).levelOrder[2];
     for (const lid of [f, s2]) {
       const c = rect(0, 0, 240, 240);
       for (let i = 0; i < 4; i++) store().addWall(lid, c[i], c[(i + 1) % 4], { kind: 'exterior', thickness: 6, phase: 'existing' });

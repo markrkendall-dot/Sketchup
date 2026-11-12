@@ -72,7 +72,7 @@ function OrbitView() {
     if (!controls || !(camera instanceof PerspectiveCamera)) return;
     const ui = useUiStore.getState();
     const plan = getPlan();
-    const box = planBox(plan, visible3dLevels(plan.levelOrder, ui));
+    const box = planBox(plan, visible3dLevels(plan, ui));
     const center = new Vector3(
       (box.min[0] + box.max[0]) / 2,
       (box.min[1] + box.max[1]) / 2,
@@ -143,7 +143,7 @@ function ElevationView({ face }: { face: ElevationFace }) {
     const ui = useUiStore.getState();
     const plan = getPlan();
     const { size } = get();
-    const f = elevationFit(planBox(plan, visible3dLevels(plan.levelOrder, ui)), face, size);
+    const f = elevationFit(planBox(plan, visible3dLevels(plan, ui)), face, size);
     camera.position.set(...f.position);
     camera.zoom = f.zoom;
     camera.updateProjectionMatrix();

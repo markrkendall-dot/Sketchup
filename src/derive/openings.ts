@@ -234,8 +234,8 @@ export function forgetOpeningLevels(alive: ReadonlySet<Id>): void {
 export const openingLevelCount = (): number => previousByLevel.size;
 
 /** Forget per-level-id derive state of levels that are not in `plan` any more. */
-export function pruneDerivedCaches(plan: Pick<Plan, 'levelOrder'>): void {
-  const alive = new Set(plan.levelOrder);
+export function pruneDerivedCaches(plan: Pick<Plan, 'levels'>): void {
+  const alive = new Set(Object.keys(plan.levels));
   forgetFootprintLevels(alive);
   forgetOpeningLevels(alive);
 }

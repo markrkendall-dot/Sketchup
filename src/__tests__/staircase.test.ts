@@ -5,6 +5,8 @@ import { staircaseProblem, staircaseStyleOf, STAIR_STYLE_DEFAULTS } from '../mod
 import type { Id, Level } from '../model/types';
 import { clearHistory, undo, usePlanStore, type NewStairs } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
+import { firstStructure } from '../model/structures';
+import { legacyDoc } from './legacy';
 
 const store = () => usePlanStore.getState();
 const ui = () => useUiStore.getState();
@@ -100,11 +102,11 @@ describe('staircase store actions', () => {
 describe('staircases in the file', () => {
   it('schema 6 adds staircases to every level; a v5 file gains empty records', () => {
     expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(6);
-    const v5 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 5 }));
+    const v5 = legacyDoc(createEmptyPlan(), 5);
     for (const l of Object.values(v5.levels) as Record<string, unknown>[]) delete l.staircases;
     expect(MIGRATIONS[5](v5).schemaVersion).toBe(6);
     const loaded = migrate(v5);
-    for (const id of loaded.levelOrder) expect(loaded.levels[id].staircases).toEqual({});
+    for (const id of firstStructure(loaded).levelOrder) expect(loaded.levels[id].staircases).toEqual({});
   });
 
   it('keeps a good staircase, drops a bad field with a warning, forgets dangling ids, drops an empty one, and round-trips', () => {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyPlan, defaultLevelId, DEFAULT_SETTINGS, migrate, MIGRATIONS, normalizeLevel, SCHEMA_VERSION } from '../model/plan';
+import { firstStructure } from '../model/structures';
 import type { Plan } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 
@@ -130,7 +131,7 @@ describe('migrate from schemaVersion 0', () => {
     file.levels = [(V0_FILE.levels as Record<string, unknown>).ground];
     delete file.levelOrder;
     const plan = migrate(file);
-    expect(plan.levelOrder).toEqual(['ground']);
+    expect(firstStructure(plan).levelOrder).toEqual(['ground']);
     expect(Object.keys(plan.levels.ground.walls)).toHaveLength(4);
   });
 
@@ -182,8 +183,8 @@ describe('migrate a current file', () => {
       locked: true,
     });
     s.updateSettings({ defaultInteriorThickness: 5.5 });
-    s.copyWallsFromLevel(lid, store().plan.levelOrder[2]);
-    const top = store().plan.levelOrder[2];
+    s.copyWallsFromLevel(lid, firstStructure(store().plan).levelOrder[2]);
+    const top = firstStructure(store().plan).levelOrder[2];
     s.addRoof(top, {
       shape: 'gable',
       outline: [
@@ -268,11 +269,11 @@ describe('migrate a current file', () => {
     expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
     expect(Object.values(plan.levels).reduce((n, l) => n + Object.keys(l.roofs).length, 0)).toBe(2);
     // The optional opening fields (sashes, glazing, door leaves) are part of the round trip.
-    const openings = Object.values(plan.levels[plan.levelOrder[1]].openings);
+    const openings = Object.values(plan.levels[firstStructure(plan).levelOrder[1]].openings);
     expect(openings.find((o) => o.type === 'door')).toMatchObject({ halfLite: true, leafColor: '#2f4a3a', sashes: 2 });
     expect(openings.find((o) => o.type === 'window')).toMatchObject({ sashes: 3, fixedCenter: true, glazing: 'screen' });
     // So are the roof's eave and appearance fields.
-    const gable = Object.values(plan.levels[plan.levelOrder[2]].roofs)[0];
+    const gable = Object.values(plan.levels[firstStructure(plan).levelOrder[2]].roofs)[0];
     expect(gable).toMatchObject({ eave: 'open', rafter: { depth: 5.5, spacing: 24 }, boardColor: '#5a3a35', weathering: 0.6 });
     // And the chimney's colour and cap, last in the column like the file has them.
     expect(Object.keys(plan.site.columns.c1).slice(-2)).toEqual(['color', 'cap']);
@@ -296,7 +297,7 @@ describe('migrate a current file', () => {
   it('drops unknown fields at every level of a current file', () => {
     const clean = JSON.stringify(richPlan());
     const plan = JSON.parse(clean);
-    const lid = plan.levelOrder[1];
+    const lid = firstStructure(plan).levelOrder[1];
     plan.extra = 1;
     plan.settings.extra = 1;
     plan.levels[lid].extra = 1;
@@ -316,7 +317,7 @@ describe('migrate a current file', () => {
 
   it('keeps valid stairs base, rise and risers and room phases byte for byte, drops broken ones', () => {
     const plan = richPlan();
-    const lid = plan.levelOrder[1];
+    const lid = firstStructure(plan).levelOrder[1];
     const level = plan.levels[lid];
     level.stairs.landing = { id: 'landing', origin: { x: 25, y: 43 }, direction: 270, width: 36, run: 36, phase: 'new', cutsFloorAbove: false, rise: 14, risers: 1 };
     level.stairs.main = { id: 'main', origin: { x: 43, y: 25 }, direction: 0, width: 36, run: 126, phase: 'new', cutsFloorAbove: true, base: 14, rise: 94 };

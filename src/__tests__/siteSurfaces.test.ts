@@ -25,6 +25,7 @@ import type { Fence, Plan, Site, SiteSurface, Vec2 } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, selectionSize, useUiStore } from '../store/uiStore';
 import { bindingFor } from '../ui/keymap';
+import { legacyDoc } from './legacy';
 
 const store = () => usePlanStore.getState();
 const plan = (): Plan => store().plan;
@@ -61,8 +62,8 @@ beforeEach(() => {
 
 describe('schema 8: surfaces and fences in the file', () => {
   it('MIGRATIONS[7] adds empty surfaces and fences to the site', () => {
-    expect(SCHEMA_VERSION).toBe(8);
-    const v7 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 7 }));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(8);
+    const v7 = legacyDoc(createEmptyPlan(), 7);
     delete v7.site.surfaces;
     delete v7.site.fences;
     const up = MIGRATIONS[7](v7);
@@ -70,7 +71,7 @@ describe('schema 8: surfaces and fences in the file', () => {
     expect((up.site as Site).surfaces).toEqual({});
     expect((up.site as Site).fences).toEqual({});
     const loaded = migrate(v7);
-    expect(loaded.schemaVersion).toBe(8);
+    expect(loaded.schemaVersion).toBe(SCHEMA_VERSION);
     expect(loaded.site.surfaces).toEqual({});
     expect(loaded.site.fences).toEqual({});
   });

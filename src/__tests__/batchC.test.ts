@@ -15,6 +15,7 @@ import { getFootprints } from '../derive/footprint';
 import { migrate } from '../model/plan';
 import example from '../../docs/examples/146-mick-road.json';
 import { bindingFor } from '../ui/keymap';
+import { firstStructure } from '../model/structures';
 
 const plan = () => usePlanStore.getState();
 const ui = () => useUiStore.getState();
@@ -49,7 +50,7 @@ beforeEach(() => {
   plan().setPlan(createEmptyPlan());
   clearHistory();
   lower = defaultLevelId(plan().plan);
-  upper = plan().plan.levelOrder[plan().plan.levelOrder.indexOf(lower) + 1];
+  upper = firstStructure(plan().plan).levelOrder[firstStructure(plan().plan).levelOrder.indexOf(lower) + 1];
   ui().setOrthoLock(true);
   ui().setMeasureTo('center');
   ui().setViewport({ tx: 0, ty: 0, k: 1 });
@@ -245,7 +246,7 @@ describe('REVIEW-2 C2: small-room clutter', () => {
 
   it('the plan drawing wraps the Kitchen name and drops the closet walls\' dimensions', () => {
     const p = migrate(example);
-    const [, f, s2] = p.levelOrder;
+    const [, f, s2] = firstStructure(p).levelOrder;
     const first = planSvg(p, f, 'all');
     expect(first).toMatch(/<tspan[^>]*>Kitchen \(17&#x27;2&quot;<\/tspan><tspan[^>]*>adjusted: re-measure\)<\/tspan>/);
     const second = planSvg(p, s2, 'all');

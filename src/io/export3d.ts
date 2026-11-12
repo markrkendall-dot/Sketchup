@@ -13,6 +13,7 @@ import type { UiState } from '../store/uiStore';
 import { chimneyPartMaterial, fixturePartMaterial, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
+import { firstStructure, structureOf } from '../model/structures';
 
 // 3D export (DESIGN.md "Persistence and export"). The export scene is built from the derived
 // geometry (derive/meshes.ts), never from the live r3f scene, which also holds lights, the grid
@@ -105,7 +106,8 @@ const fixtureMeshName = (kind: FixtureKind, piece?: string) =>
 
 /**
  * A fresh scene of what the 3D view shows: a root group named after the plan, scaled to metres,
- * with one group per visible level at its floor-top elevation holding `Wall <n> (<kind>, <phase>)`,
+ * with one group per visible level at its floor-top elevation (and its structure's origin and turn;
+ * a level of a structure other than the first is named `<structure>: <level>`) holding `Wall <n> (<kind>, <phase>)`,
  * `Floor`, `Stairs`, `Beam`, `Post` and `Footing` (a round log's end discs: `Log end`, material `member_end_<phase>`), `Roof` (with its `Fascia` boards and, under open eaves, its `Rafters`, materials
  * `fascia_<phase>` and `rafter_<phase>`, plus `_<hex>` in a board colour other than tan), `Deck`, `Deck framing` (with the
  * posts) and `Deck railing` (materials `deck_<phase>` and `deck_frame_<phase>`, plus `_<hex>` in a colour other than
@@ -148,7 +150,8 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     return m;
   };
 
-  for (const id of visible3dLevels(plan.levelOrder, levelVisibility)) {
+  const main = firstStructure(plan);
+  for (const id of visible3dLevels(plan, levelVisibility)) {
     const level = plan.levels[id];
     const meshes = getLevelMeshes(plan, id, viewMode);
     const decks = getDeckMeshes(plan, id, viewMode);
@@ -156,8 +159,11 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     const members = getMemberMeshes(plan, id, viewMode);
     if (!level || (!members.length &&!meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.staircases.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length)) continue;
     const group = new Group();
-    group.name = level.name;
-    group.position.set(0, elev[id]?.floorTop ?? 0, 0);
+    // A level of another structure stands at its structure's place and turn, named after it too.
+    const st = structureOf(plan, id);
+    group.name = st && st !== main ? `${st.name}: ${level.name}` : level.name;
+    group.position.set(st?.origin.x ?? 0, elev[id]?.floorTop ?? 0, st?.origin.y ?? 0);
+    if (st?.rotation) group.rotation.y = (-st.rotation * Math.PI) / 180;
     if (meshes.floor) group.add(mesh('Floor', meshes.floor, material('floor', floorMaterial)));
     const roomName = (id: string) => level.rooms[id]?.name ?? 'room';
     for (const f of meshes.floorFinishes) {

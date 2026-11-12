@@ -3,6 +3,8 @@ import { immer } from 'zustand/middleware/immer';
 import { current } from 'immer';
 import { temporal } from 'zundo';
 import { addLevelTo, deleteLevelFrom, moveLevelIn, type LevelEdit, type LevelPosition } from '../model/levelOps';
+import { addStructureTo, deleteStructureFrom, structurePatchProblem, type NewStructure, type StructurePatch } from '../model/structureOps';
+import { allLevelIds, isLowestLevel, normalizeDegrees as normalizeAngle } from '../model/structures';
 import { dist } from '../model/geometry';
 import { coreInterval, draftFootprints } from '../derive/openings';
 import { clampOpeningHeight, clampOpeningOffset, openingFitsHeight, wallHeightOf } from '../model/openings';
@@ -348,11 +350,12 @@ export interface PlanState {
   renameLevel: (levelId: Id, name: string) => void;
   updateLevel: (levelId: Id, patch: LevelPatch) => void;
   /**
-   * Add an empty level above the top, below the bottom, or just above or below a level
+   * Add an empty level to a structure (`structureId`, else the main one, or the structure of the
+   * level the position names): above the top, below the bottom, or just above or below a level
    * (model/levelOps.ts addLevelTo: heights from the neighbour; one added at the bottom leaves the
    * other levels' elevations as they were). One undo step. Null when the position names no level.
    */
-  addLevel: (position: LevelPosition, name?: string) => LevelEdit | null;
+  addLevel: (position: LevelPosition, name?: string, structureId?: Id) => LevelEdit | null;
   /**
    * Delete a level and everything on it (model/levelOps.ts deleteLevelFrom). Refused (null) for the
    * last level. One undo step.
@@ -360,7 +363,21 @@ export interface PlanState {
   deleteLevel: (levelId: Id) => LevelEdit | null;
   /** Swap a level with the one above or below it (model/levelOps.ts moveLevelIn). One undo step. */
   moveLevel: (levelId: Id, direction: 'up' | 'down') => LevelEdit | null;
-  setBaseFloorElevation: (elevation: number) => void;
+  /** The floor top of a structure's lowest level (the main structure when none is named). One undo step. */
+  setBaseFloorElevation: (elevation: number, structureId?: Id) => void;
+  /**
+   * Add a structure (model/structureOps.ts addStructureTo): a garage or shed with its starter box,
+   * placed clear of the others unless an origin is given. Returns its id. One undo step.
+   */
+  addStructure: (input: NewStructure) => Id;
+  /** Delete a structure and its levels. Refused (false) for the last structure. One undo step. */
+  deleteStructure: (id: Id) => boolean;
+  renameStructure: (id: Id, name: string) => void;
+  /**
+   * Move, turn, re-kind or raise a structure (its origin, rotation, kind or lowest floor top).
+   * Refused (false) for a value that is not a number or an empty name. One undo step.
+   */
+  updateStructure: (id: Id, patch: StructurePatch) => boolean;
   /** Put an image under a level, replacing any there, or remove it (undefined). One undo step. */
   setUnderlay: (levelId: Id, underlay: Underlay | undefined) => void;
   /**
@@ -1013,7 +1030,7 @@ export const usePlanStore = create<PlanState>()(
         addStairs: (levelId, input) => {
           let id: Id | null = null;
           editLevel(levelId, (level, plan) => {
-            if (!validStairs(input) || stairsHeightProblem(input, floorToFloor(plan, levelId), plan.levelOrder[0] === levelId)) return false;
+            if (!validStairs(input) || stairsHeightProblem(input, floorToFloor(plan, levelId), isLowestLevel(plan, levelId))) return false;
             const stairs: Stairs = {
               ...input,
               id: input.id ?? newId(),
@@ -1039,7 +1056,7 @@ export const usePlanStore = create<PlanState>()(
             if (!validStairs(next, { width: patch.width !== undefined, run: patch.run !== undefined || 'risers' in patch })) return false;
             // Heights are checked when they change, so an older flight can still move or change phase
             // after the level's height changed under it.
-            if (STAIRS_HEIGHT_KEYS.some((k) => k in patch) && stairsHeightProblem(next, floorToFloor(plan, levelId), plan.levelOrder[0] === levelId)) return false;
+            if (STAIRS_HEIGHT_KEYS.some((k) => k in patch) && stairsHeightProblem(next, floorToFloor(plan, levelId), isLowestLevel(plan, levelId))) return false;
             if (patch.origin) st.origin = { x: patch.origin.x, y: patch.origin.y };
             if (patch.direction !== undefined) st.direction = normalizeDegrees(patch.direction);
             if (patch.width !== undefined) st.width = patch.width;
@@ -1238,7 +1255,7 @@ export const usePlanStore = create<PlanState>()(
           let id: Id | null = null;
           editLevel(levelId, (level, plan) => {
             const m = cleanMember({ ...input, id: input.id ?? newId() } as Member);
-            if (memberProblem(m, plan.levelOrder[0] === levelId)) return false;
+            if (memberProblem(m, isLowestLevel(plan, levelId))) return false;
             level.members[m.id] = m;
             id = m.id;
           });
@@ -1252,7 +1269,7 @@ export const usePlanStore = create<PlanState>()(
             const merged = { ...m, ...patch, id, kind: m.kind } as Member;
             for (const k of ['label', 'footing', 'za', 'zb', 'base', 'top', 'color', 'profile'] as const) if (k in patch && (patch as Record<string, unknown>)[k] === undefined) delete (merged as unknown as Record<string, unknown>)[k];
             const next = cleanMember(merged);
-            if (memberProblem(next, plan.levelOrder[0] === levelId)) return false;
+            if (memberProblem(next, isLowestLevel(plan, levelId))) return false;
             if (JSON.stringify(next) === JSON.stringify(m)) return false;
             level.members[id] = next;
           }),
@@ -1722,10 +1739,10 @@ export const usePlanStore = create<PlanState>()(
             if (lowered) clampOpeningHeights(level);
           }),
 
-        addLevel: (position, name) => {
+        addLevel: (position, name, structureId) => {
           let out: LevelEdit | null = null;
           set((s) => {
-            out = addLevelTo(s.plan, position, name);
+            out = addLevelTo(s.plan, position, name, structureId);
             if (out) touch(s.plan);
           });
           return out;
@@ -1749,12 +1766,66 @@ export const usePlanStore = create<PlanState>()(
           return out;
         },
 
-        setBaseFloorElevation: (elevation) =>
+        setBaseFloorElevation: (elevation, structureId) =>
           set((s) => {
-            if (!Number.isFinite(elevation)) return;
-            s.plan.baseFloorElevation = elevation;
+            const st = s.plan.structures[structureId ?? s.plan.structureOrder[0]];
+            if (!st || !Number.isFinite(elevation) || st.baseFloorElevation === elevation) return;
+            st.baseFloorElevation = elevation;
             touch(s.plan);
           }),
+
+        addStructure: (input) => {
+          let id = '';
+          set((s) => {
+            id = addStructureTo(s.plan, input).id;
+            touch(s.plan);
+          });
+          return id;
+        },
+
+        deleteStructure: (id) => {
+          let ok = false;
+          set((s) => {
+            ok = deleteStructureFrom(s.plan, id);
+            if (ok) touch(s.plan);
+          });
+          return ok;
+        },
+
+        renameStructure: (id, name) => void get().updateStructure(id, { name }),
+
+        updateStructure: (id, patch) => {
+          if (structurePatchProblem(patch)) return false;
+          let ok = false;
+          set((s) => {
+            const st = s.plan.structures[id];
+            if (!st) return;
+            let changed = false;
+            if (patch.name !== undefined && patch.name !== st.name) {
+              st.name = patch.name;
+              changed = true;
+            }
+            if (patch.kind !== undefined && patch.kind !== st.kind) {
+              st.kind = patch.kind;
+              changed = true;
+            }
+            if (patch.origin && (patch.origin.x !== st.origin.x || patch.origin.y !== st.origin.y)) {
+              st.origin = { x: patch.origin.x, y: patch.origin.y };
+              changed = true;
+            }
+            if (patch.rotation !== undefined && normalizeAngle(patch.rotation) !== st.rotation) {
+              st.rotation = normalizeAngle(patch.rotation);
+              changed = true;
+            }
+            if (patch.baseFloorElevation !== undefined && patch.baseFloorElevation !== st.baseFloorElevation) {
+              st.baseFloorElevation = patch.baseFloorElevation;
+              changed = true;
+            }
+            ok = true;
+            if (changed) touch(s.plan);
+          });
+          return ok;
+        },
 
         setUnderlay: (levelId, underlay) =>
           editLevel(levelId, (level) => {
@@ -1822,7 +1893,7 @@ function stepHistory(kind: 'undo' | 'redo'): void {
   const after = getPlan();
   if (after !== before) {
     const ui = useUiStore.getState();
-    const changed = after.levelOrder.filter((id) => before.levels[id] !== after.levels[id]);
+    const changed = allLevelIds(after).filter((id) => before.levels[id] !== after.levels[id]);
     if (changed.length > 0 && !changed.includes(ui.activeLevelId)) {
       const id = changed[0];
       ui.setActiveLevel(id);

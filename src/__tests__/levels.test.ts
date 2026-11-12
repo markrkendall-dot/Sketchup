@@ -5,11 +5,12 @@ import { snapPoint } from '../editor2d/snap';
 import { hitTest } from '../editor2d/tools/selectTool';
 import { createEmptyPlan } from '../model/plan';
 import type { Level, Opening, Phase, ViewMode, Wall } from '../model/types';
+import { firstStructure } from '../model/structures';
 
 describe('getLevelElevations', () => {
   it('follows the DESIGN.md elevation rule for the default plan', () => {
     const plan = createEmptyPlan();
-    const [b, f, s] = plan.levelOrder;
+    const [b, f, s] = firstStructure(plan).levelOrder;
     const e = getLevelElevations(plan);
     // Basement: floor top at baseFloorElevation; 4" slab.
     expect(e[b]).toEqual({ floorTop: -100, ceiling: -4, slabBottom: -104 });
@@ -20,8 +21,8 @@ describe('getLevelElevations', () => {
 
   it('propagates wall heights, floor thicknesses and the base elevation', () => {
     const plan = createEmptyPlan();
-    const [b, f, s] = plan.levelOrder;
-    plan.baseFloorElevation = 0;
+    const [b, f, s] = firstStructure(plan).levelOrder;
+    firstStructure(plan).baseFloorElevation = 0;
     plan.levels[b].wallHeight = 90;
     plan.levels[f].wallHeight = 108;
     plan.levels[s].floorThickness = 14;
@@ -37,9 +38,9 @@ describe('getLevelElevations', () => {
 
   it('handles a single level', () => {
     const plan = createEmptyPlan();
-    plan.levelOrder = [plan.levelOrder[0]];
+    firstStructure(plan).levelOrder = [firstStructure(plan).levelOrder[0]];
     const e = getLevelElevations(plan);
-    expect(Object.keys(e)).toEqual(plan.levelOrder);
+    expect(Object.keys(e)).toEqual(firstStructure(plan).levelOrder);
   });
 });
 

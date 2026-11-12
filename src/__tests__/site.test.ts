@@ -58,6 +58,7 @@ import { planBox } from '../view3d/bounds';
 import { chimneyPartMaterial, columnMaterial, openingMaterial } from '../view3d/materials';
 import { BRICK_COURSE, BRICK_LENGTH, brickFaces, brickHeight, brickTextures, MORTAR_JOINT, PX_PER_INCH, RELIEF, TEXTURE_PX } from '../view3d/textures';
 import { active3dLevel, visible3dLevels } from '../view3d/visibility';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const plan = (): Plan => store().plan;
@@ -107,7 +108,7 @@ function house() {
   };
   const roofId = store().addRoof(first, roof)!;
   clearHistory();
-  return { first, roofId, basement: plan().levelOrder[0], roof };
+  return { first, roofId, basement: firstStructure(plan()).levelOrder[0], roof };
 }
 
 const GABLE_RIDGE_ABS = 8 + 96 + 153 * (8 / 12); // underside at the ridge, absolute: 206
@@ -403,7 +404,7 @@ describe('terrain memo and geometry', () => {
   it('the fallback is the bottom of the lowest slab; bounds cover nodes, roofs, columns and grade points', () => {
     const { first } = house();
     expect(fallbackElevation(plan())).toBe(-104);
-    store().updateLevel(plan().levelOrder[0], { floorThickness: 8 });
+    store().updateLevel(firstStructure(plan()).levelOrder[0], { floorThickness: 8 });
     expect(fallbackElevation(plan())).toBe(-108);
     expect(siteBounds(plan())).toEqual({ minX: -3.25, minY: -3.25, maxX: 314.75, maxY: 302.75 });
     store().addGradePoint({ at: { x: -50, y: 400 }, elevation: 0 });
@@ -542,7 +543,7 @@ describe('columns', () => {
 
   it('chimney without roofs reaches 48" above the top level ceiling', () => {
     const d = columnDefaults(plan(), 'chimney', { x: 0, y: 0 });
-    const top = plan().levelOrder.map((id) => id).pop()!;
+    const top = firstStructure(plan()).levelOrder.map((id) => id).pop()!;
     // Empty plan: flat ground at the basement slab bottom (-104); Second Floor ceiling 8 + 96 + 12 + 96 = 212.
     expect(d.base).toBe(-104 - 12);
     expect(d.top).toBe(212 + 48);
@@ -749,15 +750,26 @@ describe('view mode applies to roofs and columns', () => {
   });
 
   it('in site mode "only active and below" counts from the first floor, the level the site view shows (REVIEW-2 A4)', () => {
-    const order = plan().levelOrder;
+    const p = plan();
+    const order = firstStructure(p).levelOrder;
     const base = { hidden3dLevels: [], only3dActiveAndBelow: true, activeLevelId: order[0] };
-    expect(visible3dLevels(order, base)).toEqual([order[0]]);
-    expect(visible3dLevels(order, { ...base, siteMode: true })).toEqual([order[0], order[1]]);
-    expect(active3dLevel(order, { activeLevelId: order[0], siteMode: true })).toBe(order[1]);
-    expect(active3dLevel(order, { activeLevelId: order[0], siteMode: false })).toBe(order[0]);
+    expect(visible3dLevels(p, base)).toEqual([order[0]]);
+    expect(visible3dLevels(p, { ...base, siteMode: true })).toEqual([order[0], order[1]]);
+    expect(active3dLevel(p, { activeLevelId: order[0], siteMode: true })).toBe(order[1]);
+    expect(active3dLevel(p, { activeLevelId: order[0], siteMode: false })).toBe(order[0]);
     // Without the option every checked level shows; a single-level plan uses that level.
-    expect(visible3dLevels(order, { ...base, only3dActiveAndBelow: false, siteMode: true })).toEqual(order);
-    expect(active3dLevel([order[0]], { activeLevelId: order[0], siteMode: true })).toBe(order[0]);
+    expect(visible3dLevels(p, { ...base, only3dActiveAndBelow: false, siteMode: true })).toEqual(order);
+    const single = createEmptyPlan('S', 'single');
+    const only = firstStructure(single).levelOrder[0];
+    expect(active3dLevel(single, { activeLevelId: only, siteMode: true })).toBe(only);
+  });
+
+  it('in site mode the 3D view takes the ground floor rule, not "the level above the lowest" (no basement: the lowest)', () => {
+    const p = createEmptyPlan('T', 'twoStorey');
+    const [first, second] = firstStructure(p).levelOrder;
+    expect(active3dLevel(p, { activeLevelId: first, siteMode: true })).toBe(first);
+    expect(visible3dLevels(p, { hidden3dLevels: [], only3dActiveAndBelow: true, activeLevelId: first, siteMode: true })).toEqual([first]);
+    expect(second).toBeDefined();
   });
 });
 
@@ -1100,7 +1112,7 @@ describe('site mode and the site tools', () => {
   };
 
   it('the Site tab opens site mode on the lowest level; any level leaves it', () => {
-    const [lowest, , top] = plan().levelOrder;
+    const [lowest, , top] = firstStructure(plan()).levelOrder;
     ui().setActiveLevel(top);
     enterSiteMode();
     expect(ui().siteMode).toBe(true);
@@ -1145,7 +1157,7 @@ describe('site mode and the site tools', () => {
     expect(ui().activeTool).toBe('gradePoint');
     switchTool('column');
     expect(ui().activeTool).toBe('column');
-    switchLevel(plan().levelOrder[1]);
+    switchLevel(firstStructure(plan()).levelOrder[1]);
     expect(ui().activeTool).toBe('select'); // the site tool does not follow us out
     switchTool('gradePoint');
     expect(ui().activeTool).toBe('select');
@@ -1288,7 +1300,7 @@ describe('the ground under the house (REVIEW-2 A3)', () => {
   function basementPlan(): { basement: string; first: string } {
     store().setPlan(createEmptyPlan('Basement test'));
     clearHistory();
-    const [basement, first] = plan().levelOrder;
+    const [basement, first] = firstStructure(plan()).levelOrder;
     const o = { kind: 'exterior' as const, thickness: 8, phase: 'existing' as const };
     const pts = [
       { x: 10, y: 13 },
@@ -1362,8 +1374,8 @@ describe('the ground under the house (REVIEW-2 A3)', () => {
     store().addGradePoint({ at: { x: -50, y: -50 }, elevation: -10 });
     store().addGradePoint({ at: { x: 400, y: 300 }, elevation: -60 });
     const cut = terrainCut(plan(), 'all')!;
-    expect(cut.floorUnder).toBe(fallbackElevation(plan()) - TERRAIN_UNDER_SLAB);
-    expect(cut.floorUnder).toBe(-106);
+    expect(cut.floorUnder).toEqual(cut.footprints().map(() => fallbackElevation(plan()) - TERRAIN_UNDER_SLAB));
+    expect(cut.floorUnder[0]).toBe(-106);
     expect(cut.footprints()).toEqual(slabOutlines(getFaces(plan().levels[basement], 'all'), true));
     const g1 = planTerrain(plan());
     expect(surfaceAt(g1, { x: 130, y: 100 })).toBeCloseTo(-106, 6);
@@ -1391,7 +1403,7 @@ describe('the ground under the house (REVIEW-2 A3)', () => {
   it("the example's basement is empty of ground: every grid point inside its footprint is under the slab", () => {
     const ex = migrate(example);
     const grid = planTerrain(ex, 'all');
-    const lowest = ex.levels[ex.levelOrder[0]];
+    const lowest = ex.levels[firstStructure(ex).levelOrder[0]];
     const outlines = slabOutlines(getFaces(lowest, 'all'), true);
     expect(outlines.length).toBeGreaterThan(0);
     const under = fallbackElevation(ex) - 2;

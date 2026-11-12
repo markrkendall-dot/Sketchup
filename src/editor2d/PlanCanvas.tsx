@@ -11,7 +11,8 @@ import { getPlan, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { Overlay } from './Overlay';
 import { ChecksLayer } from './ChecksLayer';
-import { GhostLevel, PlanLayers, SiteView } from './PlanLayers';
+import { GhostLevel, OtherStructures, PlanLayers, SiteView } from './PlanLayers';
+import { levelBelowId } from '../model/structures';
 import { dispatchPointer, type ToolPointerEvent } from './tools';
 import { fitLevel, initialViewport, screenToWorld, visibleBounds, zoomAt, type Size } from './viewport';
 
@@ -105,10 +106,7 @@ export function PlanCanvas() {
   const underlayMode = useUiStore((s) => s.underlayMode);
   const showBelow = useUiStore((s) => s.showLevelBelow);
   const siteMode = useUiStore((s) => s.siteMode);
-  const belowId = usePlanStore((s) => {
-    const i = s.plan.levelOrder.indexOf(levelId);
-    return i > 0 ? s.plan.levelOrder[i - 1] : null;
-  });
+  const belowId = usePlanStore((s) => levelBelowId(s.plan, levelId) ?? null);
 
   // Track size; set the initial viewport once the canvas has a size.
   useLayoutEffect(() => {
@@ -236,6 +234,7 @@ export function PlanCanvas() {
           <SiteView />
         ) : (
           <>
+            {levelId && <OtherStructures levelId={levelId} />}
             {showBelow && belowId && <GhostLevel levelId={belowId} />}
             {levelId && <PlanLayers levelId={levelId} />}
           </>

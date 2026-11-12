@@ -28,6 +28,7 @@ import { stairsTool } from './stairsTool';
 import { beamTool, joistZoneTool, postTool } from './structureTools';
 import { requestUnderlayImage, underlayTool } from './underlayTool';
 import { wallTool } from './wallTool';
+import { firstStructure, isIdentity, levelBelowId, structureOf } from '../../model/structures';
 
 export interface ToolPointerEvent {
   /** World point, inches. */
@@ -131,8 +132,8 @@ function ghostSources(below: Level, viewMode: ViewMode): GhostSnapSources {
 function ghostFor(plan: Plan, levelId: Id): GhostSnapSources | null {
   const ui = useUiStore.getState();
   if (!ui.showLevelBelow) return null;
-  const i = plan.levelOrder.indexOf(levelId);
-  const below = i > 0 ? plan.levels[plan.levelOrder[i - 1]] : undefined;
+  const belowId = levelBelowId(plan, levelId);
+  const below = belowId ? plan.levels[belowId] : undefined;
   return below ? ghostSources(below, ui.viewMode) : null;
 }
 
@@ -265,29 +266,49 @@ export function pruneSelection(): void {
  */
 export function switchLevel(levelId: Id): void {
   const ui = useUiStore.getState();
-  if ((ui.activeLevelId === levelId && !ui.siteMode) || !getPlan().levels[levelId]) return;
+  const plan = getPlan();
+  if ((ui.activeLevelId === levelId && !ui.siteMode) || !plan.levels[levelId]) return;
   cancelActiveTool();
+  // Another structure is drawn in its own coordinates (or the site's, from site mode): frame it.
+  const from = ui.siteMode ? undefined : structureOf(plan, ui.activeLevelId);
+  const to = structureOf(plan, levelId);
+  const refit = from !== to && !(!from && to && isIdentity(to) && to === firstStructure(plan));
   ui.setActiveLevel(levelId);
+  if (refit) fitActive();
   if (lastPointer) dispatchPointer('move', lastPointer);
 }
 
 /**
- * Open the Site pseudo-level: the lowest level becomes active (so the panel and store actions have
- * a level), the 2D view shows the first floor as a ghost under the site layer, and only select and
- * the site tools work. Entering it again does nothing.
+ * Open the Site pseudo-level: the main structure's lowest level becomes active (so the panel and
+ * store actions have a level), the 2D view shows every structure's ground floor as a ghost at its
+ * place on the site under the site layer, and only select and the site tools work. Entering it
+ * again does nothing.
  */
 export function enterSiteMode(): void {
   const ui = useUiStore.getState();
-  const id = getPlan().levelOrder[0];
+  const plan = getPlan();
+  const main = firstStructure(plan);
+  const id = main?.levelOrder[0];
   if (!id || ui.siteMode) return;
   cancelActiveTool();
+  const from = structureOf(plan, ui.activeLevelId);
   ui.enterSiteMode(id);
+  // The site is drawn in site coordinates: from a structure that is not at the site's origin, frame it.
+  if (from && !(from === main && isIdentity(main))) fitActive();
   if (lastPointer) dispatchPointer('move', lastPointer);
 }
 
-/** Select a level by its position from the bottom (0 = lowest). */
+/** Fit the 2D view to the active level, or the site in site mode (registered by ui/fileActions.ts, which owns zoomToFit). */
+let fitActive: () => void = () => {};
+export function setFitActive(fn: () => void): void {
+  fitActive = fn;
+}
+
+/** Select a level of the active structure by its position from the bottom (0 = lowest). */
 export function switchLevelByIndex(index: number): void {
-  const id = getPlan().levelOrder[index];
+  const ui = useUiStore.getState();
+  const plan = getPlan();
+  const id = (ui.siteMode ? firstStructure(plan) : (structureOf(plan, ui.activeLevelId) ?? firstStructure(plan)))?.levelOrder[index];
   if (id) switchLevel(id);
 }
 

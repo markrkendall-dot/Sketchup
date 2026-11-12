@@ -1,4 +1,5 @@
-import { floorTops } from '../model/plan';
+import { stackFloorTops } from '../model/plan';
+import { structuresOf } from '../model/structures';
 import type { Id, Plan } from '../model/types';
 
 export interface LevelElevation {
@@ -11,19 +12,22 @@ export interface LevelElevation {
 }
 
 /**
- * Elevations per level (DESIGN.md elevation rule): floorTop[0] = baseFloorElevation,
- * floorTop[i] = floorTop[i-1] + wallHeight[i-1] + floorThickness[i].
+ * Elevations per level of every structure (DESIGN.md elevation rule), within each structure's
+ * stack: floorTop[0] = its baseFloorElevation, floorTop[i] = floorTop[i-1] + wallHeight[i-1] +
+ * floorThickness[i]. Elevations are absolute: a structure's placement moves it in plan only.
  */
 export function getLevelElevations(plan: Plan): Record<Id, LevelElevation> {
-  const tops = floorTops(plan);
   const out: Record<Id, LevelElevation> = {};
-  plan.levelOrder.forEach((id, i) => {
-    const level = plan.levels[id];
-    out[id] = {
-      floorTop: tops[i],
-      ceiling: tops[i] + level.wallHeight,
-      slabBottom: tops[i] - level.floorThickness,
-    };
-  });
+  for (const s of structuresOf(plan)) {
+    const tops = stackFloorTops(s, plan.levels);
+    s.levelOrder.forEach((id, i) => {
+      const level = plan.levels[id];
+      out[id] = {
+        floorTop: tops[i],
+        ceiling: tops[i] + level.wallHeight,
+        slabBottom: tops[i] - level.floorThickness,
+      };
+    });
+  }
   return out;
 }

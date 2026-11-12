@@ -1,8 +1,10 @@
 // Plan-level commands shared by the toolbar buttons and the keyboard map: New, Open, Save, zoom to
 // fit, and the status bar notices they report with.
-import { siteGhostLevelId } from '../derive/site';
-import { cancelActiveTool } from '../editor2d/tools';
-import { fitLevel, initialViewport } from '../editor2d/viewport';
+import { cancelActiveTool, setFitActive } from '../editor2d/tools';
+import { fitLevel, fitToBounds, initialViewport } from '../editor2d/viewport';
+import { boundsOf } from '../model/geometry';
+import { structureSiteBounds } from '../model/structureOps';
+import { structuresOf } from '../model/structures';
 import { autosaveFailureReason, downloadPlan, planFileName, readPlanFile, type Autosave } from '../io/file';
 import { library, writeLastPlanId } from '../io/library';
 import { createEmptyPlan, defaultLevelId, migrate, type PlanTemplate } from '../model/plan';
@@ -39,14 +41,25 @@ export function noteDuplicateRoomName(levelId: string, name: string, exceptRoomI
   return text !== null;
 }
 
-/** Fit the active level (and its underlay, when shown) into the 2D view; in site mode the first floor under the site layer. */
+/** Fit the active level (and its underlay, when shown) into the 2D view; in site mode every structure on the site. */
 export function zoomToFit(): void {
   const ui = useUiStore.getState();
   const plan = getPlan();
-  const level = plan.levels[ui.siteMode ? (siteGhostLevelId(plan) ?? ui.activeLevelId) : ui.activeLevelId];
-  if (!level || ui.canvasSize.width === 0) return;
+  if (ui.canvasSize.width === 0) return;
+  if (ui.siteMode) {
+    const boxes = structuresOf(plan).flatMap((s) => {
+      const b = structureSiteBounds(plan, s);
+      return b ? [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }] : [];
+    });
+    const b = boundsOf(boxes);
+    ui.setViewport(b ? fitToBounds(b, ui.canvasSize) : initialViewport(ui.canvasSize));
+    return;
+  }
+  const level = plan.levels[ui.activeLevelId];
+  if (!level) return;
   ui.setViewport(fitLevel(level, ui.canvasSize, ui.showUnderlay) ?? initialViewport(ui.canvasSize));
 }
+setFitActive(zoomToFit);
 
 /**
  * Replace the whole plan (switching property) and clear the undo history: undoing back into

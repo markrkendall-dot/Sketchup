@@ -4,11 +4,12 @@ import { getLevelElevations } from '../derive/levels';
 import { migrate } from '../model/plan';
 import type { Plan, Vec2 } from '../model/types';
 import { levelAtFeet, surfaceAt, walkMove, walkWorld, type WalkState } from '../view3d/walk';
+import { firstStructure } from '../model/structures';
 
 const plan: Plan = migrate(example);
-const [, f, s] = plan.levelOrder;
+const [, f, s] = firstStructure(plan).levelOrder;
 const elev = getLevelElevations(plan);
-const levels = plan.levelOrder;
+const levels = firstStructure(plan).levelOrder;
 const world = walkWorld(plan, 'proposed', levels);
 
 /** Walk through the waypoints, 3" a frame (as at walking speed), from a start on the floor of `lid`. */

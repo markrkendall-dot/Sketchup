@@ -42,6 +42,7 @@ import {
 } from '../view3d/textures';
 import { openingMaterial, wallFlatColor } from '../view3d/materials';
 import { wallMaterial } from '../view3d/materials';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 
@@ -466,7 +467,7 @@ describe('opening fill meshes', () => {
   /** A closed 240" square on First Floor, with the given openings on the wall along y = 0. */
   function house(openings: Partial<Opening>[]): { plan: Plan; first: string } {
     const plan = createEmptyPlan();
-    const first = plan.levelOrder[1];
+    const first = firstStructure(plan).levelOrder[1];
     const l = plan.levels[first];
     const nodes = { a: [0, 0], b: [240, 0], c: [240, 240], d: [0, 240] } as const;
     for (const [id, [x, y]] of Object.entries(nodes)) l.nodes[id] = { id, x, y };
@@ -599,7 +600,7 @@ describe('wall finish and colour', () => {
   it('updateWalls sets the finish and colour of every named wall in one undo step, and clears them', () => {
     store().setPlan(createEmptyPlan());
     clearHistory();
-    const first = store().plan.levelOrder[1];
+    const first = firstStructure(store().plan).levelOrder[1];
     const ext = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;
     store().addWall(first, { x: 0, y: 0 }, { x: 240, y: 0 }, ext);
     store().addWall(first, { x: 240, y: 0 }, { x: 240, y: 240 }, ext);
@@ -620,7 +621,7 @@ describe('wall finish and colour', () => {
   it('a split wall keeps the finish and colour', () => {
     store().setPlan(createEmptyPlan());
     clearHistory();
-    const first = store().plan.levelOrder[1];
+    const first = firstStructure(store().plan).levelOrder[1];
     store().addWall(first, { x: 0, y: 0 }, { x: 240, y: 0 }, { kind: 'exterior', thickness: 6.5, phase: 'existing' });
     const id = Object.keys(store().plan.levels[first].walls)[0];
     store().updateWalls(first, [id], { finish: 'clapboard', color: '#336699' });
@@ -632,7 +633,7 @@ describe('wall finish and colour', () => {
 
   it('getLevelMeshes reports the resolved finish and colour', () => {
     const plan = createEmptyPlan();
-    const first = plan.levelOrder[1];
+    const first = firstStructure(plan).levelOrder[1];
     const l = plan.levels[first];
     l.nodes.p = { id: 'p', x: 0, y: 0 };
     l.nodes.q = { id: 'q', x: 240, y: 0 };
@@ -670,7 +671,7 @@ describe('wall finish and colour', () => {
 describe('migrate: optional appearance fields', () => {
   function file(wall: object, opening: object = {}, roof: object = {}): unknown {
     const plan = createEmptyPlan('Fin');
-    const first = plan.levelOrder[1];
+    const first = firstStructure(plan).levelOrder[1];
     const l = plan.levels[first];
     l.nodes.p = { id: 'p', x: 0, y: 0 };
     l.nodes.q = { id: 'q', x: 240, y: 0 };
@@ -694,7 +695,7 @@ describe('migrate: optional appearance fields', () => {
   }
   const readBack = (f: unknown) => {
     const plan = migrate(f);
-    const l = plan.levels[plan.levelOrder[1]];
+    const l = plan.levels[firstStructure(plan).levelOrder[1]];
     return { wall: l.walls.w, opening: l.openings.o, roof: l.roofs.r };
   };
 
@@ -752,7 +753,7 @@ describe('migrate: optional appearance fields', () => {
   });
 
   it('updateOpening sets the new fields and removes them when given undefined', () => {
-    const first = store().plan.levelOrder[1];
+    const first = firstStructure(store().plan).levelOrder[1];
     store().addWall(first, { x: 0, y: 0 }, { x: 240, y: 0 }, { kind: 'exterior', thickness: 6.5, phase: 'existing' });
     const wallId = Object.keys(store().plan.levels[first].walls)[0];
     const id = store().addOpening(first, { wallId, type: 'window', offset: 120, width: 72, height: 48, sill: 36, phase: 'existing' })!;
@@ -1059,14 +1060,14 @@ describe('fieldstone and half-log', () => {
 
   it('migrate keeps the two finishes', () => {
     const plan = createEmptyPlan();
-    const l = plan.levels[plan.levelOrder[1]];
+    const l = plan.levels[firstStructure(plan).levelOrder[1]];
     l.nodes.p = { id: 'p', x: 0, y: 0 };
     l.nodes.q = { id: 'q', x: 240, y: 0 };
     l.nodes.r = { id: 'r', x: 240, y: 120 };
     l.walls.s = { id: 's', a: 'p', b: 'q', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'stone' };
     l.walls.h = { id: 'h', a: 'q', b: 'r', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'halflog' };
     l.walls.v = { id: 'v', a: 'r', b: 'p', thickness: 8, kind: 'exterior', phase: 'existing', finish: 'riverstone' };
-    const back = migrate(JSON.parse(JSON.stringify(plan))).levels[plan.levelOrder[1]].walls;
+    const back = migrate(JSON.parse(JSON.stringify(plan))).levels[firstStructure(plan).levelOrder[1]].walls;
     expect([back.s.finish, back.h.finish, back.v.finish]).toEqual(['stone', 'halflog', 'riverstone']);
   });
 });

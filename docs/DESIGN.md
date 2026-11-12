@@ -202,24 +202,95 @@ export interface PlanSettings {
 // editor preferences, not plan data: they live in uiStore, persist in localStorage and never enter
 // undo. migrate() ignores them in older files.
 
-export interface Plan {
-  schemaVersion: 8; id: Id; name: string;
-  levelOrder: Id[];          // bottom to top
-  levels: Record<Id, Level>;
+// Schema 9: the buildings on the site (see "Structures").
+export interface Structure {
+  id: Id; name: string; kind: 'house' | 'garage' | 'shed' | 'other';
+  origin: Vec2;              // the site point its own 0,0 stands on
+  rotation: Degrees;         // clockwise on the plan, about its 0,0; [0, 360)
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
+  levelOrder: Id[];          // bottom to top
+}
+
+export interface Plan {
+  schemaVersion: 9; id: Id; name: string;
+  structures: Record<Id, Structure>;
+  structureOrder: Id[];      // the first is the main building
+  levels: Record<Id, Level>; // every structure's levels, each in exactly one levelOrder
   settings: PlanSettings; site: Site; modifiedAt: string;
   proposedLook?: ProposedLook; // the siding, roof and windows after the work (see "The proposed look")
 }
 ```
 
-Elevation rule: `floorTop[0] = baseFloorElevation`; `floorTop[i] = floorTop[i-1] + wallHeight[i-1] +
-floorThickness[i]`. Walls on level i span `floorTop[i] .. floorTop[i] + wallHeight`. The slab of level
+Elevation rule, within each structure's stack: `floorTop[0] = baseFloorElevation`; `floorTop[i] =
+floorTop[i-1] + wallHeight[i-1] + floorThickness[i]`. Elevations are absolute: a structure's placement
+moves it in plan only. Walls on level i span `floorTop[i] .. floorTop[i] + wallHeight`. The slab of level
 i spans `floorTop[i] - floorThickness[i] .. floorTop[i]`.
 
 Records keyed by id, edited through immer, so untouched entities keep object identity. All memoization
 in `derive/` depends on that.
 
+### Structures (`model/structures.ts`, `model/structureOps.ts`, store `addStructure` / `deleteStructure` / `renameStructure` / `updateStructure`)
+
+A plan holds one or more buildings (a house, a detached garage, a shed), each a `Structure` with its
+own stack of levels and its own `baseFloorElevation`. `Plan.levels` stays one record keyed by level
+id; every level is in exactly one structure's `levelOrder`. The site (grade points, columns, surfaces,
+fences, north) is shared and stays in site coordinates. There is no plan-level `levelOrder` or
+`baseFloorElevation` any more: one source of truth.
+
+- **Coordinates.** A level's geometry is local to its structure and never changes when the structure
+  moves. A site point is `origin + turn(local, rotation)` (`toSite`; `toLocal` is the inverse; turning
+  is clockwise on the y-down plan, the same as a column's or an underlay's rotation). The placement
+  is applied only where structures are composed: the 3D scene (one group per structure at
+  `(origin.x, 0, origin.y)`, turned `-rotation` about +Y), the terrain cut, `siteBounds`, `planBox`
+  (bounds, Fit, shadows, elevations), walk mode (its surfaces and obstacles are placed on the site;
+  their heights read the point back in the structure's coordinates), the glTF/OBJ export (each level
+  group at its structure's origin and turn, named `<structure>: <level>` for any but the first), the
+  ground under a deck post or beside a flight (`groundAtLevel`), and the 2D ghosts.
+- **Lookups.** `structureOf`, `stackOf`, `levelBelowId` / `levelAboveId`, `isLowestLevel`,
+  `allLevelIds` (every stack in structure order). Everything that used a level's neighbours in the
+  old `levelOrder` (floor-to-floor, slab holes, platform framing, stair and structure checks, deck
+  supports, the ghost of the level below) uses its own structure's stack, so nothing crosses
+  buildings. `floorTops(plan, structureId)` and `getLevelElevations` (all levels) follow the elevation
+  rule per stack; `groundLevelId(structure)` is a structure's ground floor (the level above the lowest
+  when that one's floor is below 0, else the lowest); `defaultLevelId` is the main structure's.
+- **Store.** `addStructure({kind, name?, origin?, rotation?, starter?, phase?})` takes its levels from
+  a `createEmptyPlan` template (`STRUCTURE_PRESETS`: house `single`; garage, shed and other the
+  `outbuilding` storey, 84" on a 4" slab) and, for a garage (24' x 24', a 192" x 80" passage for the
+  car door, a 6:12 gable) or a shed (12' x 10', a 36" door), a starter box of exterior walls on the
+  level, in the given phase; without an origin it goes `STRUCTURE_GAP` (10') right of the others'
+  site bounding box, level with its top (`clearOrigin`). `deleteStructure` takes its levels with it
+  and refuses the last structure; `renameStructure` and `updateStructure` (name, kind, origin,
+  rotation normalized to [0, 360), base floor elevation) refuse an empty name or a value that is not
+  a finite number. `setBaseFloorElevation(elevation, structureId?)` and `addLevel(position, name?,
+  structureId?)` name a structure (the main one by default; a position naming a level picks that
+  level's). Each is one undo step.
+- **UI.** The active structure is the active level's (`uiStore.activeStructureId`), a derivation
+  rather than a second field, so the two never disagree; site mode parks the active level on the
+  main structure's lowest level. The level bar has a building selector (`StructureBar`: pick, Add
+  building with a kind and name, Rename, Delete with a confirmation when it has content) over the
+  active structure's level tabs. The 2D editor draws the active structure in its own coordinates;
+  the others are drawn by `OtherStructures` with the level-below ghost style (their ground floor and
+  roofs) under an SVG transform from their coordinates into the active one's (`svgTransform`), with
+  no pointer events and no snap sources. Switching to a level of another structure fits the view to
+  it. Site mode draws every structure's ground floor and roofs at its site place; `siteSnap` snaps to
+  each one's face corners and edges in its own coordinates. The properties panel shows the
+  building's kind, position and rotation over the level fields. The 3D bar lists the levels under
+  each structure's name.
+- **Terrain and ground.** `terrainCut` gives one footprint per structure with a closed lowest level,
+  placed on the site, each with its own `floorUnder` (that structure's lowest slab bottom less 2");
+  `terrainGrid` takes the depths per footprint. Without grade points the flat ground is the main
+  structure's lowest slab bottom (`fallbackElevation`), so another building on a higher slab stands
+  above it until grade points say where the ground is.
+- **File.** Migration 8 to 9 wraps the old stack in one structure, id `house`, kind house, at 0,0,
+  unturned. `migrate` checks at least one structure, each listed once in `structureOrder` with a
+  non-empty `levelOrder`, every listed level present and in one stack only, and no structure missing
+  from the order; a level no structure lists is dropped (as one missing from `levelOrder` was);
+  a bad kind becomes `other`, a bad origin 0,0, a rotation is normalized. `structureProblem` checks
+  the same invariants on a plan in memory.
+
 ### Levels (`model/levelOps.ts`, store `addLevel` / `deleteLevel` / `moveLevel`, `ui/LevelBar.tsx`)
+
+Levels belong to a structure; everything below works within one structure's stack.
 
 `createEmptyPlan(name, template)` makes the levels of a template: `basementTwoStorey` (the default
 and what every plan had before: Basement 96"/4", First and Second Floor 96"/12", base -100),
@@ -787,9 +858,10 @@ trim (demolished translucent red, new pulled toward green). `SiteMeshes.tsx Site
 cast and receive shadows, a demolished one casts none.
 
 **Site mode** (`uiStore.siteMode`, the "Site" tab below the lowest level in the level bar): entering it
-makes the lowest level active (so the panel and store actions have a level), clears the selection and
-shows, in place of the level's layers (`PlanLayers.tsx SiteView`), the first floor (the level above the
-lowest, or the lowest if alone) as a ghost, every level's roofs as faint ghosts, and the site layer, bottom
+makes the main structure's lowest level active (so the panel and store actions have a level), clears the
+selection and shows, in site coordinates, in place of the level's layers (`PlanLayers.tsx SiteView`),
+each structure's ground floor (`groundLevelId`) as a ghost at its place, every level's roofs as faint
+ghosts, and the site layer, bottom
 to top: ground surfaces as filled outlines in their material's colour (gravel speckled with the
 `hp-gravel` pattern, the others flat, in the surface's own colour when it has one and its phase does not
 colour it), fences as a line with a dot at each post (`fencePostPoints`, at least 2.5 px across), columns
@@ -801,9 +873,13 @@ that hide them. Choosing any level (the lowest too) leaves site mode
 surface (A) and fence (Q) work (`SITE_TOOLS`); `switchTool` refuses the level tools and says "Choose a
 level to draw walls" in the status bar (the toolbar buttons stay clickable but dimmed and
 `aria-disabled`; E, A and Q do nothing outside it, and C is the cabinet tool there). In
-site mode the 3D view's "Only active level and below", the export and the walk start use the level
-the site view ghosts (the first floor) as the active level (`active3dLevel`), since the active level
-is parked at the lowest.
+site mode the 3D view's "Only active level and below", the export and the walk start use the main
+structure's ground floor (`groundLevelId`, the level the site view ghosts: the first floor over a
+basement, the lowest without one) as the active level (`active3dLevel`), since the active level is
+parked at the lowest. (Until schema 9 the 3D view took the level above the lowest whatever the base
+floor elevation, so a house with no basement showed its second floor in site mode.) "Only active
+level and below" keeps, in the other structures, the levels whose floor is not above the active
+level's.
 
 **Site tools** (`siteTools.ts`): `siteSnap` snaps to the first floor's wall-face corners and faces, nodes,
 midpoints and the grid. Grade point: a click stores the spot in `draft.gradePending`; the length buffer
@@ -1686,7 +1762,7 @@ wall's new footprint with the previous one by value and returns the previous obj
 `<WallMesh3D>` can `useMemo` on the footprint reference and rebuild only changed walls. Dispose old
 geometry in effect cleanup. That previous result (and the openings-by-wall one) is kept per level
 id, not per Level object, so `pruneDerivedCaches(plan)` drops the entries of levels that are gone;
-main.tsx calls it whenever `levelOrder` changes (New, Open). `getLevelMeshes` prunes its own
+main.tsx calls it whenever the structures change (New, Open, a level or structure added or deleted). `getLevelMeshes` prunes its own
 per-level-id caches, disposing geometry, on its next miss (so does `getDeckMeshes`, whose deck
 geometry is keyed by the deck's layout object; see "Decks").
 
@@ -1891,7 +1967,8 @@ missing `levelOrder` comes from the levels array, settings are filled; 1 -> 2: e
 empty `roofs` record and the plan a default `site`; 2 -> 3: every level gets an empty `fixtures`
 record; 3 -> 4: every level gets an empty `decks` record; 4 -> 5: every level gets an empty
 `floorOpenings` record; 5 -> 6: `staircases`; 6 -> 7: `joistZones` and `members`; 7 -> 8: the site gets
-empty `surfaces` and `fences` records; a broken surface or fence is dropped with a console warning naming
+empty `surfaces` and `fences` records; 8 -> 9: `levelOrder` and `baseFloorElevation` move into one
+structure, `house`, at the origin (see "Structures"); a broken surface or fence is dropped with a console warning naming
 it, a bad colour alone, a colour lower-cased). The upgraded document is
 then read into a Plan built from known fields only (`pick`: unknown keys dropped, known keys in the
 file's order so a current file round-trips byte for byte), with defaults for missing optional

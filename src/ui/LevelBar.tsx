@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { getLevelElevations } from '../derive/levels';
 import { cancelActiveTool, enterSiteMode, switchLevel } from '../editor2d/tools';
 import { levelContentCount, type LevelEdit, type LevelPosition } from '../model/levelOps';
-import type { Id } from '../model/types';
+import { groundLevelId } from '../model/plan';
+import { STRUCTURE_KIND_LABEL, STRUCTURE_KINDS, firstStructure, stackOf, structureOf } from '../model/structures';
+import { freshStructureName } from '../model/structureOps';
+import type { Id, StructureKind } from '../model/types';
 import { formatLength } from '../model/units';
 import { getPlan, usePlanStore } from '../store/planStore';
-import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
+import { activeStructureId, EMPTY_SELECTION, useUiStore } from '../store/uiStore';
 import { focusCanvas } from './focus';
 
 function LevelTab({ levelId, index }: { levelId: Id; index: number }) {
@@ -124,7 +127,7 @@ function reportAdjusted(edit: LevelEdit | null, done: string): void {
 
 function addLevel(position: LevelPosition): void {
   cancelActiveTool();
-  const edit = usePlanStore.getState().addLevel(position);
+  const edit = usePlanStore.getState().addLevel(position, undefined, structureOf(getPlan(), useUiStore.getState().activeLevelId)?.id);
   if (!edit) return;
   switchLevel(edit.id);
   reportAdjusted(edit, `Added ${getPlan().levels[edit.id]?.name ?? 'a level'} (double-click its tab to rename it)`);
@@ -133,7 +136,7 @@ function addLevel(position: LevelPosition): void {
 function deleteLevel(levelId: Id): void {
   const plan = getPlan();
   const level = plan.levels[levelId];
-  if (!level || plan.levelOrder.length < 2) return;
+  if (!level || stackOf(plan, levelId).length < 2) return;
   const n = levelContentCount(plan, levelId);
   if (n > 0 && !window.confirm(`Delete ${level.name} and the ${n} ${n === 1 ? 'thing' : 'things'} drawn on it? (Undo brings it back.)`)) return;
   cancelActiveTool();
@@ -176,7 +179,7 @@ function LevelActions({ activeId, index, count }: { activeId: Id; index: number;
       <button
         className="level-delete"
         disabled={off || count < 2}
-        title={count < 2 ? 'A plan keeps at least one level' : `Delete ${name} and everything on it`}
+        title={count < 2 ? 'A building keeps at least one level' : `Delete ${name} and everything on it`}
         onClick={act(() => deleteLevel(activeId))}
       >
         Delete level
@@ -185,8 +188,147 @@ function LevelActions({ activeId, index, count }: { activeId: Id; index: number;
   );
 }
 
+/** The structure being edited: the active level's (the main one in site mode, which parks there). */
+function useActiveStructureId(): Id | undefined {
+  const activeId = useUiStore((s) => s.activeLevelId);
+  return usePlanStore((s) => activeStructureId(s.plan, { activeLevelId: activeId }));
+}
+
+/** Open a structure: its ground floor becomes the active level. */
+function openStructure(id: Id): void {
+  const s = getPlan().structures[id];
+  const levelId = s && (groundLevelId(s) ?? s.levelOrder[0]);
+  if (levelId) switchLevel(levelId);
+}
+
+function deleteStructure(id: Id): void {
+  const plan = getPlan();
+  const s = plan.structures[id];
+  if (!s || plan.structureOrder.length < 2) return;
+  const n = s.levelOrder.reduce((k, lid) => k + levelContentCount(plan, lid), 0);
+  const levels = `${s.levelOrder.length} ${s.levelOrder.length === 1 ? 'level' : 'levels'}`;
+  if (n > 0 && !window.confirm(`Delete ${s.name}, its ${levels} and the ${n} ${n === 1 ? 'thing' : 'things'} drawn on them? (Undo brings it back.)`)) return;
+  cancelActiveTool();
+  // Leave the structure first, so the level bar does not hand over to a level that is going.
+  const ui = useUiStore.getState();
+  if (structureOf(plan, ui.activeLevelId)?.id === id) openStructure(plan.structureOrder.find((x) => x !== id)!);
+  if (usePlanStore.getState().deleteStructure(id)) useUiStore.getState().setNotice({ text: `Deleted ${s.name}`, error: false });
+}
+
+/**
+ * The buildings on the site (DESIGN.md "Structures"): pick the one to edit, add a garage, shed or
+ * other building beside the others, rename or delete it. Its levels are listed under it.
+ */
+function StructureBar() {
+  const ids = usePlanStore((s) => s.plan.structureOrder);
+  const names = usePlanStore((s) => s.plan.structureOrder.map((id) => s.plan.structures[id]?.name ?? '').join('\u0000')).split('\u0000');
+  const activeId = useActiveStructureId();
+  const activeName = usePlanStore((s) => (activeId ? s.plan.structures[activeId]?.name : '') ?? '');
+  const siteMode = useUiStore((s) => s.siteMode);
+  const [adding, setAdding] = useState<{ kind: StructureKind; name: string } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const commitRename = () => {
+    const v = renaming?.trim();
+    if (v && activeId && v !== activeName) usePlanStore.getState().renameStructure(activeId, v);
+    setRenaming(null);
+  };
+  const commitAdd = () => {
+    if (!adding) return;
+    cancelActiveTool();
+    const id = usePlanStore.getState().addStructure({ kind: adding.kind, name: adding.name.trim() || undefined, phase: useUiStore.getState().drawPhase });
+    setAdding(null);
+    openStructure(id);
+    const s = getPlan().structures[id];
+    if (s) useUiStore.getState().setNotice({ text: `Added ${s.name} beside the others: move or turn it in the properties panel (Building).`, error: false });
+  };
+  return (
+    <div className="structure-bar" role="group" aria-label="Buildings">
+      <div className="panel-title">Buildings</div>
+      {renaming !== null ? (
+        <input
+          autoFocus
+          className="structure-name"
+          aria-label="Building name"
+          value={renaming}
+          onChange={(e) => setRenaming(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitRename();
+            if (e.key === 'Escape') setRenaming(null);
+          }}
+        />
+      ) : (
+        <select
+          className="structure-select"
+          aria-label="Building to edit"
+          value={siteMode ? '' : (activeId ?? '')}
+          onChange={(e) => {
+            openStructure(e.target.value);
+            focusCanvas();
+          }}
+        >
+          {siteMode && <option value="">Site</option>}
+          {ids.map((id, i) => (
+            <option key={id} value={id}>
+              {names[i]}
+            </option>
+          ))}
+        </select>
+      )}
+      {adding ? (
+        <div className="structure-add">
+          <select aria-label="Kind of building" value={adding.kind} onChange={(e) => setAdding({ kind: e.target.value as StructureKind, name: '' })}>
+            {STRUCTURE_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {STRUCTURE_KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="New building name"
+            placeholder={freshStructureName(getPlan(), STRUCTURE_KIND_LABEL[adding.kind])}
+            value={adding.name}
+            onChange={(e) => setAdding({ ...adding, name: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitAdd();
+              if (e.key === 'Escape') setAdding(null);
+            }}
+          />
+          <div className="level-actions">
+            <button onClick={commitAdd} title="Add it beside the other buildings">
+              Add
+            </button>
+            <button onClick={() => setAdding(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="level-actions">
+          <button title="Add a garage, shed or other building to the site" onClick={() => setAdding({ kind: 'garage', name: '' })}>
+            Add building
+          </button>
+          <button disabled={siteMode || !activeId} title={`Rename ${activeName}`} onClick={() => setRenaming(activeName)}>
+            Rename
+          </button>
+          <button
+            className="level-delete"
+            disabled={siteMode || ids.length < 2 || !activeId}
+            title={ids.length < 2 ? 'A plan keeps at least one building' : `Delete ${activeName}, its levels and everything on them`}
+            onClick={() => {
+              if (activeId) deleteStructure(activeId);
+              focusCanvas();
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LevelBar() {
-  const order = usePlanStore((s) => s.plan.levelOrder);
+  const activeStructure = useActiveStructureId();
+  const order = usePlanStore((s) => (activeStructure && s.plan.structures[activeStructure]?.levelOrder) || firstStructure(s.plan).levelOrder);
   const activeId = useUiStore((s) => s.activeLevelId);
   const showBelow = useUiStore((s) => s.showLevelBelow);
   const toggleShowBelow = useUiStore((s) => s.toggleShowLevelBelow);
@@ -200,6 +342,7 @@ export function LevelBar() {
 
   return (
     <nav className="level-bar" aria-label="Levels">
+      <StructureBar />
       <div className="panel-title">Levels</div>
       <div className="level-tabs">
         {order

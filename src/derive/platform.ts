@@ -2,6 +2,7 @@ import { pointInPolygon, projectPointToSegment } from '../model/geometry';
 import type { Id, Level, Plan, Vec2, ViewMode } from '../model/types';
 import { isVisible } from './phase';
 import { getFaces } from './rooms';
+import { levelAboveId, levelBelowId } from '../model/structures';
 
 // Platform framing (DESIGN.md "Platform framing"): the exterior walls of a level run up through the
 // floor slab of the level above, so the siding is continuous from one storey to the next, and that
@@ -30,8 +31,8 @@ const cache = new WeakMap<Level, WeakMap<object, Map<ViewMode, ReadonlyMap<Id, n
  */
 export function wallExtensions(plan: Plan, levelId: Id, viewMode: ViewMode): ReadonlyMap<Id, number> {
   const level = plan.levels[levelId];
-  const idx = plan.levelOrder.indexOf(levelId);
-  const above = idx >= 0 ? plan.levels[plan.levelOrder[idx + 1]] : undefined;
+  const aboveId = levelAboveId(plan, levelId);
+  const above = aboveId ? plan.levels[aboveId] : undefined;
   if (!level || !above || !(above.floorThickness > 0)) return new Map();
   const faces = getFaces(above, viewMode);
   let byFaces = cache.get(level);
@@ -63,10 +64,10 @@ export function wallExtensions(plan: Plan, levelId: Id, viewMode: ViewMode): Rea
  */
 export function slabInsets(plan: Plan, levelId: Id, viewMode: ViewMode): number[][] | null {
   const level = plan.levels[levelId];
-  const idx = plan.levelOrder.indexOf(levelId);
-  const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
-  if (!level || !below) return null;
-  const ext = wallExtensions(plan, plan.levelOrder[idx - 1], viewMode);
+  const belowId = levelBelowId(plan, levelId);
+  const below = belowId ? plan.levels[belowId] : undefined;
+  if (!level || !below || !belowId) return null;
+  const ext = wallExtensions(plan, belowId, viewMode);
   if (ext.size === 0) return null;
   const carriers = [...ext.keys()].map((id) => {
     const w = below.walls[id];

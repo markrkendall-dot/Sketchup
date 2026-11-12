@@ -11,7 +11,7 @@ import { getLevelElevations } from '../derive/levels';
 import { shutterWidth, SILL_THICKNESS } from '../derive/openings3d';
 import { isOpeningVisible, isVisible } from '../derive/phase';
 import { roofBearing, roofExtremes, roofHeightAt } from '../derive/roofs';
-import { faceAt, getFaces } from '../derive/rooms';
+import { faceAt, getFaces, slabOutlines } from '../derive/rooms';
 import { columnOutline, fenceLayout, groundAt } from '../derive/site';
 import { flightSteps, floorToFloor, stairsBase, stairsRise } from '../derive/stairs';
 import { normalize, perpLeft, pointInPolygon, polygonSignedArea, sub } from '../model/geometry';
@@ -24,9 +24,10 @@ import { trimOf } from '../model/finish';
 import { migrate } from '../model/plan';
 import { FURNITURE, furnitureNameOf } from '../model/furniture';
 import type { Level, Opening, Phase, Plan, Vec2, ViewMode } from '../model/types';
+import { firstStructure } from '../model/structures';
 
 const plan: Plan = migrate(example);
-const visibility = { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: plan.levelOrder[1] };
+const visibility = { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: firstStructure(plan).levelOrder[1] };
 
 /** Plan area (square inches) of a slab geometry's top faces (level, at the floor top, y 0). */
 function slabTopArea(g: BufferGeometry): number {
@@ -53,10 +54,10 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the three levels and the estimate-flagging names', () => {
-    expect(plan.levelOrder.map((id) => plan.levels[id].name)).toEqual(['Basement', 'First Floor', 'Second Floor']);
+    expect(firstStructure(plan).levelOrder.map((id) => plan.levels[id].name)).toEqual(['Basement', 'First Floor', 'Second Floor']);
     expect(plan.name).toBe('146 Mick Road (starter, estimates flagged)');
-    expect(plan.baseFloorElevation).toBe(-100);
-    const [b, f, s] = plan.levelOrder.map((id) => plan.levels[id]);
+    expect(firstStructure(plan).baseFloorElevation).toBe(-100);
+    const [b, f, s] = firstStructure(plan).levelOrder.map((id) => plan.levels[id]);
     expect([b.wallHeight, b.floorThickness, f.wallHeight, f.floorThickness, s.wallHeight, s.floorThickness]).toEqual([90, 4, 96, 12, 96, 12]);
     // The labels of each view: the existing house in Existing, the proposed design in Proposed.
     const names = (id: string, vm: ViewMode) =>
@@ -64,7 +65,7 @@ describe('docs/examples/146-mick-road.json', () => {
         .filter((r) => isVisible(r.phase ?? 'existing', vm))
         .map((r) => r.name)
         .sort();
-    const [lb, lf, ls] = plan.levelOrder;
+    const [lb, lf, ls] = firstStructure(plan).levelOrder;
     expect(names(lb, 'existing')).toEqual(['Basement (unpartitioned, est.)', 'Utility (below)']);
     // The old entry hall is MK's front room; the stair strip is part of the Living (photos 16 to 20).
     expect(names(lf, 'existing')).toEqual(['Bath', 'Entry porch (est.)', 'Front room', 'Kitchen (17\'2" adjusted: re-measure)', 'Living', 'Utility']);
@@ -88,7 +89,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('counts the existing, demolished and new work', () => {
-    const levels = plan.levelOrder.map((id) => plan.levels[id]);
+    const levels = firstStructure(plan).levelOrder.map((id) => plan.levels[id]);
     const count = (items: { phase?: Phase }[]) => {
       const out: Record<Phase, number> = { existing: 0, demo: 0, new: 0 };
       for (const x of items) out[x.phase ?? 'existing']++;
@@ -155,14 +156,14 @@ describe('docs/examples/146-mick-road.json', () => {
     // front of it), the Living's west window (the stove's wall now) and the old bath's north
     // window (the pantry's shelves line that wall). Upstairs, the two east windows (the wing's shed
     // rises past their sills; transoms replace them) and the Bunk's door with its wall.
-    const f = plan.levels[plan.levelOrder[1]];
+    const f = plan.levels[firstStructure(plan).levelOrder[1]];
     expect(Object.values(f.rooms).filter((r) => r.phase === 'demo').map((r) => r.name).sort()).toEqual(['Bath', 'Entry porch (est.)', 'Front room', 'Utility']);
     // A demolished wall's openings are demolished with it.
     for (const o of Object.values(f.openings)) if (f.walls[o.wallId].phase === 'demo') expect(o.phase).toBe('demo');
   });
 
   it("the main block measures 26'6\" x 26'3\" on the outside faces", () => {
-    for (const id of plan.levelOrder) {
+    for (const id of firstStructure(plan).levelOrder) {
       const level = plan.levels[id];
       // The block's walls: the ones whose both ends are on the block's four corners' lines.
       const main = Object.values(level.walls).filter((w) => {
@@ -178,8 +179,8 @@ describe('docs/examples/146-mick-road.json', () => {
       // walls share the centerlines and stand 1/2" proud of the siding all round).
       expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(311, 6);
       expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(308, 6);
-      for (const w of main) expect(w.thickness).toBe(id === plan.levelOrder[0] ? 8 : 7);
-      if (id !== plan.levelOrder[0]) {
+      for (const w of main) expect(w.thickness).toBe(id === firstStructure(plan).levelOrder[0] ? 8 : 7);
+      if (id !== firstStructure(plan).levelOrder[0]) {
         expect(Math.max(...xs) - Math.min(...xs) + t).toBeCloseTo(318, 6);
         expect(Math.max(...ys) - Math.min(...ys) + t).toBeCloseTo(315, 6);
       }
@@ -205,7 +206,7 @@ describe('docs/examples/146-mick-road.json', () => {
   };
 
   it('has the measured First Floor partitions (5") and rooms', () => {
-    const level = plan.levels[plan.levelOrder[1]];
+    const level = plan.levels[firstStructure(plan).levelOrder[1]];
     const interior = Object.values(level.walls).filter((w) => w.kind === 'interior');
     expect(interior.length).toBeGreaterThanOrEqual(5);
     for (const w of interior) expect(w.thickness).toBe(5);
@@ -227,7 +228,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the measured Second Floor partitions (5") and rooms', () => {
-    const level = plan.levels[plan.levelOrder[2]];
+    const level = plan.levels[firstStructure(plan).levelOrder[2]];
     const interior = Object.values(level.walls).filter((w) => w.kind === 'interior');
     expect(interior.length).toBeGreaterThanOrEqual(8);
     for (const w of interior) expect(w.thickness).toBe(5);
@@ -241,7 +242,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('swings each Second Floor door into the room the plan names', () => {
-    const level = plan.levels[plan.levelOrder[2]];
+    const level = plan.levels[firstStructure(plan).levelOrder[2]];
     const set = getFaces(level, 'existing');
     const roomAtLeaf = (o: (typeof level.openings)[string]): string | undefined => {
       const w = level.walls[o.wallId];
@@ -267,7 +268,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the First Floor as the interior photos and MK show it', () => {
-    const f = plan.levels[plan.levelOrder[1]];
+    const f = plan.levels[firstStructure(plan).levelOrder[1]];
     const existing = Object.values(f.fixtures).filter((x) => x.phase === 'demo');
     // The Bath door: its south jamb about 1' from the Bath's south wall face (y 97), photos 20 and 22.
     const bathDoor = Object.values(f.openings).find((o) => o.type === 'door' && o.width === 30 && o.phase === 'demo')!;
@@ -333,7 +334,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the roofs, columns, windows, doors and terrain of the house', () => {
-    const allRoofs = plan.levelOrder.flatMap((id) => Object.values(plan.levels[id].roofs));
+    const allRoofs = firstStructure(plan).levelOrder.flatMap((id) => Object.values(plan.levels[id].roofs));
     const roofs = allRoofs.filter((r) => isVisible(r.phase, 'existing'));
     // Main gable, east wing gable, and the entry porch gable (one porch on the west face, photo 8).
     expect(roofs).toHaveLength(3);
@@ -348,7 +349,7 @@ describe('docs/examples/146-mick-road.json', () => {
     const columns = Object.values(plan.site.columns).filter((c) => isVisible(c.phase, 'existing'));
     expect(columns.map((c) => c.kind)).toEqual(['chimney']);
     expect(columns[0]).toMatchObject({ at: { x: 159, y: -10 }, width: 24, depth: 20, rotation: 0, color: '#5a3a35', cap: true });
-    const openings = plan.levelOrder.flatMap((id) => {
+    const openings = firstStructure(plan).levelOrder.flatMap((id) => {
       const level = plan.levels[id];
       return Object.values(level.openings).filter((o) => isOpeningVisible(o, level.walls[o.wallId], 'existing'));
     });
@@ -362,7 +363,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(openings.filter((o) => o.type === 'passage')).toHaveLength(4);
     // The porch: screens in its four bays and a screen door.
     expect(openings.filter((o) => o.glazing === 'screen').map((o) => `${o.type} ${o.width}`).sort()).toEqual(['door 36', 'window 18', 'window 18', 'window 44', 'window 44']);
-    expect(Object.values(plan.levels[plan.levelOrder[1]].rooms).some((r) => r.name === 'Entry porch (est.)')).toBe(true);
+    expect(Object.values(plan.levels[firstStructure(plan).levelOrder[1]].rooms).some((r) => r.name === 'Entry porch (est.)')).toBe(true);
     // 40 from the photos, MK and the site sketch (the retaining wall's line), 8 for the bank below
     // the walkout and the lower lawn (photos 24 to 27), and 1 for the lawn falling away from the
     // foyer's stoop.
@@ -393,7 +394,7 @@ describe('docs/examples/146-mick-road.json', () => {
       sashColor: '#1c1c1c',
       shutters: false,
     });
-    const f = plan.levelOrder[1];
+    const f = firstStructure(plan).levelOrder[1];
     const proposed = getLevelMeshes(plan, f, 'proposed');
     expect(new Set(proposed.walls.filter((w) => w.kind === 'exterior').map((w) => w.finish))).toEqual(new Set(['shake']));
     expect(new Set(proposed.roofs.map((r) => r.finish))).toEqual(new Set(['seam']));
@@ -405,7 +406,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('dresses the faces as the photos show them', () => {
-    const [b, f] = plan.levelOrder.map((id) => plan.levels[id]);
+    const [b, f] = firstStructure(plan).levelOrder.map((id) => plan.levels[id]);
     const at = (level: Level, o: Opening) => {
       const w = level.walls[o.wallId];
       const a = level.nodes[w.a];
@@ -445,7 +446,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it.each(['existing', 'proposed'] as const)('no two window or door surrounds (trim, sill, shutters) overlap on a face in the %s view', (vm) => {
-    for (const id of plan.levelOrder) {
+    for (const id of firstStructure(plan).levelOrder) {
       const level = plan.levels[id];
       const boxes = Object.values(level.openings)
         .filter((o) => o.type !== 'passage' && isOpeningVisible(o, level.walls[o.wallId], vm))
@@ -492,7 +493,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('infers the bearing walls: the y 99.5 wall taken out, the partition the beams land on', () => {
-    const [, fId, sId] = plan.levelOrder;
+    const [, fId, sId] = firstStructure(plan).levelOrder;
     const bearing = (view: 'existing' | 'proposed', lid: string) =>
       [...wallBearings(plan, view)[lid]]
         .filter(([id, b]) => b.bearing && plan.levels[lid].walls[id].kind === 'interior')
@@ -515,18 +516,18 @@ describe('docs/examples/146-mick-road.json', () => {
 
   it('has no open wall ends but the retaining wall\'s free west end (today\'s, or the new one\'s at the property line), and no orphan labels, in any view', () => {
     for (const vm of ['existing', 'proposed', 'all'] as const) {
-      for (const id of plan.levelOrder) {
+      for (const id of firstStructure(plan).levelOrder) {
         const level = plan.levels[id];
         const set = getFaces(level, vm);
         const ends = set.openEnds.map((n) => [level.nodes[n].x, level.nodes[n].y]);
-        expect(ends, `${level.name} ${vm}`).toEqual(id === plan.levelOrder[0] ? [vm === 'existing' ? [-388, 489] : [-984, 519]] : []);
+        expect(ends, `${level.name} ${vm}`).toEqual(id === firstStructure(plan).levelOrder[0] ? [vm === 'existing' ? [-388, 489] : [-984, 519]] : []);
         expect(set.orphanRoomIds, `${plan.levels[id].name} ${vm}`).toHaveLength(0);
       }
     }
   });
 
   it('has the rooms of the proposed design (face to face, east-west x north-south)', () => {
-    const [b, f, s] = plan.levelOrder.map((id) => plan.levels[id]);
+    const [b, f, s] = firstStructure(plan).levelOrder.map((id) => plan.levels[id]);
     expectSizes(
       f,
       {
@@ -560,8 +561,8 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the grand stair: a step up to a landing, then one straight run up the north wall, in a hall open through both floors', () => {
-    const [f, s] = [plan.levels[plan.levelOrder[1]], plan.levels[plan.levelOrder[2]]];
-    const ftf = floorToFloor(plan, plan.levelOrder[1]);
+    const [f, s] = [plan.levels[firstStructure(plan).levelOrder[1]], plan.levels[firstStructure(plan).levelOrder[2]]];
+    const ftf = floorToFloor(plan, firstStructure(plan).levelOrder[1]);
     expect(ftf).toBe(108);
     const flights = Object.values(f.stairs).filter((st) => st.phase === 'new');
     // 15 risers of 7.2": the bottom step (1), the landing (1), the run (12); the Second Floor's edge
@@ -619,7 +620,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it("has the master bedroom's deck: from the terrace's wall to the wing's east face, flush with the wall's top, no stair of its own", () => {
-    const [b, f] = plan.levelOrder;
+    const [b, f] = firstStructure(plan).levelOrder;
     const decks = Object.values(plan.levels[f].decks);
     expect(decks).toHaveLength(1);
     const [deck] = decks;
@@ -666,7 +667,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the roofs and posts of the proposed design', () => {
-    const f = plan.levels[plan.levelOrder[1]];
+    const f = plan.levels[firstStructure(plan).levelOrder[1]];
     const roofs = Object.values(f.roofs).filter((r) => r.phase === 'new');
     const box = (r: (typeof roofs)[number]) => {
       const xs = r.outline.map((p) => p.x);
@@ -690,7 +691,7 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(roofHeightAt(wing, wingBearing, { x: 318, y: 150 })).toBeCloseTo(96 + (145 * 5) / 12, 6);
     // Upstairs, the transoms that replace the two east windows sit with their sills at least 8"
     // over the shed's top at the wall, their heads under the ceiling; the old sills were under it.
-    const s = plan.levels[plan.levelOrder[2]];
+    const s = plan.levels[firstStructure(plan).levelOrder[2]];
     const up = f.wallHeight + s.floorThickness;
     const wingTop = roofHeightAt(wing, wingBearing, { x: 318, y: 150 })! + wing.thickness;
     const eastWall = (o: Opening) => {
@@ -720,7 +721,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the foyer moved north, the house door north of the beam post, the front door under the peak, a transom and a coat bench (MK, 15 and 16 Oct 2026)', () => {
-    const f = plan.levels[plan.levelOrder[1]];
+    const f = plan.levels[firstStructure(plan).levelOrder[1]];
     const at = (o: Opening) => {
       const w = f.walls[o.wallId];
       const a = f.nodes[w.a];
@@ -773,7 +774,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the Adirondack entry: an open log canopy on stone piers, and log posts, a plate and a river-stone knee wall on the screen porch', () => {
-    const f = plan.levels[plan.levelOrder[1]];
+    const f = plan.levels[firstStructure(plan).levelOrder[1]];
     const floorTop = getLevelElevations(plan)[f.id].floorTop;
     expect(floorTop).toBe(2);
     // Outdoors (the stove's hearth and surround stand on the Living's floor).
@@ -842,7 +843,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the structure the proposed design needs: joists, the balcony header, the kitchen beam, the opening beam, posts on footings', () => {
-    const [bId, fId, sId] = plan.levelOrder;
+    const [bId, fId, sId] = firstStructure(plan).levelOrder;
     // East-west over the basement (MK's markup), north-south above (unconfirmed over the First Floor).
     expect([bId, fId, sId].map((id) => plan.levels[id].framing)).toEqual([{ joists: 0 }, { joists: 90 }, { joists: 90 }]);
     // East-west zones under the wing's shed roof only: over the utility today, and north of it.
@@ -919,7 +920,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('swings each new door into the room the design names', () => {
-    const f = plan.levels[plan.levelOrder[1]];
+    const f = plan.levels[firstStructure(plan).levelOrder[1]];
     const set = getFaces(f, 'proposed');
     // Every new door but the master bedroom's sliding door (no swing; next test).
     const doors = Object.values(f.openings).filter((o) => o.type === 'door' && !o.sliding && o.phase === 'new');
@@ -963,7 +964,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it("has the master bedroom's sliding door and the master bath's north transom", () => {
-    const [b, f] = plan.levelOrder.map((id) => plan.levels[id]);
+    const [b, f] = firstStructure(plan).levelOrder.map((id) => plan.levels[id]);
     // The centre of an opening on its wall's centerline.
     const at = (lvl: Level, o: Opening) => {
       const w = lvl.walls[o.wallId];
@@ -988,7 +989,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('furnishes upstairs (MK, 15 Oct 2026): a queen bed in the east room with a desk in its alcove, two full beds in the west room', () => {
-    const s = plan.levels[plan.levelOrder[2]];
+    const s = plan.levels[firstStructure(plan).levelOrder[2]];
     const set = getFaces(s, 'proposed');
     const pieces = Object.values(s.fixtures).filter((x) => x.kind === 'furniture');
     const centre = (x: (typeof pieces)[number]) => {
@@ -1044,7 +1045,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the proposed kitchen: the range on the north wall, the refrigerator on the east wall, the island in the triangle, the table by the window, the pantry north of it and the powder room under the stair', () => {
-    const f = plan.levels[plan.levelOrder[1]];
+    const f = plan.levels[firstStructure(plan).levelOrder[1]];
     // The proposed kitchen's casework is new; today's fixtures (photos 13 to 22) are all demolished.
     expect(Object.values(f.fixtures).filter((x) => x.phase !== 'new').every((x) => x.phase === 'demo')).toBe(true);
     const allNew = Object.values(f.fixtures).filter((x) => x.phase === 'new');
@@ -1299,7 +1300,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the wood stove on the Living\'s west wall on a stainless flue up the screen porch and the gable that clears the roof by the 3-2-10 rule, and no chimney', () => {
-    const [f, s] = [plan.levels[plan.levelOrder[1]], plan.levels[plan.levelOrder[2]]];
+    const [f, s] = [plan.levels[firstStructure(plan).levelOrder[1]], plan.levels[firstStructure(plan).levelOrder[2]]];
     const named = (lvl: Level, label: string) => Object.values(lvl.fixtures).find((x) => x.label === label && x.phase === 'new')!;
     const bounds = (poly: Vec2[]) => {
       const xs = poly.map((p) => p.x);
@@ -1370,7 +1371,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('has the upstairs full bath across the north-east, a stall shower in its corner, and the laundry in the master bath', () => {
-    const [f, s] = [plan.levels[plan.levelOrder[1]], plan.levels[plan.levelOrder[2]]];
+    const [f, s] = [plan.levels[firstStructure(plan).levelOrder[1]], plan.levels[firstStructure(plan).levelOrder[2]]];
     const set = getFaces(s, 'proposed');
     const centre = (x: { origin: Vec2; direction: number; width: number; depth: number }) => {
       const o = fixtureOutline(x as Parameters<typeof fixtureOutline>[0]);
@@ -1422,7 +1423,7 @@ describe('docs/examples/146-mick-road.json', () => {
   });
 
   it('builds every level without throwing, and the export has the parts of the house', () => {
-    for (const id of plan.levelOrder) {
+    for (const id of firstStructure(plan).levelOrder) {
       const m = getLevelMeshes(plan, id, 'all');
       expect(m.walls.length).toBeGreaterThan(0);
       expect(m.floor).toBeDefined();
@@ -1439,7 +1440,31 @@ describe('docs/examples/146-mick-road.json', () => {
     expect(materials('Flue')).toEqual(['column_flue_new_26241f', 'column_flue_new', 'flue_stem_new', 'flue_hood_new']);
     const box = new Box3().setFromObject(root);
     // The chimney, the flue and the main ridge are the tallest things: well above the second floor.
-    expect(box.max.y / 0.0254).toBeGreaterThan(plan.baseFloorElevation + 2 * 96 + 100);
+    expect(box.max.y / 0.0254).toBeGreaterThan(firstStructure(plan).baseFloorElevation + 2 * 96 + 100);
     disposeExportScene(root);
+  });
+});
+
+describe('the garage (README "Still open": 24\' x 26\', 55\' west of the house, 3\' off the west line)', () => {
+  const p = migrate(example);
+  it('is a second structure: one level of new walls on a slab at -6, its outside faces x -948..-660, y 142..454', () => {
+    expect(p.structureOrder).toHaveLength(2);
+    const g = p.structures[p.structureOrder[1]];
+    expect(g).toMatchObject({ name: 'Garage', kind: 'garage', origin: { x: -948, y: 142 }, rotation: 0, baseFloorElevation: -6 });
+    expect(g.levelOrder).toHaveLength(1);
+    const level = p.levels[g.levelOrder[0]];
+    const walls = Object.values(level.walls);
+    expect(walls).toHaveLength(4);
+    expect(walls.every((w) => w.phase === 'new' && w.kind === 'exterior')).toBe(true);
+    // Not designed: no roof, door or window is drawn.
+    expect([Object.keys(level.roofs).length, Object.keys(level.openings).length]).toEqual([0, 0]);
+    const outer = slabOutlines(getFaces(level, 'all'), true).flatMap((ring) => ring.map((q) => ({ x: q.x + g.origin.x, y: q.y + g.origin.y })));
+    const xs = outer.map((q) => q.x);
+    const ys = outer.map((q) => q.y);
+    expect([Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]).toEqual([-948, -660, 142, 454]);
+    // Its south face is 5' north of the retaining wall's new straight piece (centerline 519, 10" thick).
+    expect(519 - 5 - Math.max(...ys)).toBe(60);
+    // The house is the v8 starter's stack, unchanged by the garage.
+    expect(firstStructure(p)).toMatchObject({ id: 'house', origin: { x: 0, y: 0 }, rotation: 0, baseFloorElevation: -100 });
   });
 });

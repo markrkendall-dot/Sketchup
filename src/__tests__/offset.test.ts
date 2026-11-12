@@ -8,6 +8,7 @@ import type { Id, Level, Vec2 } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
 import { runWallMove, wallSideNames } from '../ui/wallMove';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const ui = () => useUiStore.getState();
@@ -62,7 +63,7 @@ describe('offsetWalls: a partition (REVIEW-2 B1)', () => {
   it('moves the Kitchen/Living partition 6" toward Living: both rooms change by exactly 6"', () => {
     store().setPlan(migrate(example));
     clearHistory();
-    lid = store().plan.levelOrder[1];
+    lid = firstStructure(store().plan).levelOrder[1];
     const kitchen = roomSize('Kitchen');
     const living = roomSize('Living');
     expect([kitchen.width, living.width]).toEqual([138, 161]);
@@ -89,7 +90,7 @@ describe('offsetWalls: a partition (REVIEW-2 B1)', () => {
 
   it('reports the new net sizes of the rooms either side in the status bar', () => {
     store().setPlan(migrate(example));
-    lid = store().plan.levelOrder[1];
+    lid = firstStructure(store().plan).levelOrder[1];
     ui().setActiveLevel(lid);
     const partition = kitchenLiving();
     const problem = runWallMove(lid, partition, () => store().offsetWalls(lid, [partition], 6, 'left'), 'Moved the wall 6" toward Living');

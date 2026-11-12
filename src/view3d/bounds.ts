@@ -3,6 +3,7 @@ import { getLevelElevations } from '../derive/levels';
 import { roofBearing, roofExtremes, roofOutlineWithOverhang } from '../derive/roofs';
 import { chimneyPartBoxes, columnOutline, columnPeak, fallbackElevation, terrainHeightAt } from '../derive/site';
 import { getFaces } from '../derive/rooms';
+import { allLevelIds, structureOf, toSite } from '../model/structures';
 import type { Id, Level, Plan, Vec2 } from '../model/types';
 
 export interface Box3d {
@@ -34,10 +35,10 @@ function houseNodes(level: Level): Vec2[] {
  * overhangs and decks in plan, from the lowest slab bottom to the highest ceiling, roof top or deck
  * railing, the site's
  * columns (a capped chimney's cap, 2" proud, and its spark arrestor, 12" above the top, included),
- * and the terrain's height over the house area (never its 100' margin). An empty plan gives a 20'
- * box at the origin.
+ * and the terrain's height over the house area (never its 100' margin). Each level is placed with
+ * its structure (site coordinates). An empty plan gives a 20' box at the origin.
  */
-export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): Box3d {
+export function planBox(plan: Plan, levelIds: readonly Id[] = allLevelIds(plan)): Box3d {
   const elev = getLevelElevations(plan);
   let minX = Infinity;
   let minZ = Infinity;
@@ -48,17 +49,19 @@ export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): 
   for (const id of levelIds) {
     const level = plan.levels[id];
     const e = elev[id];
-    if (!level || !e) continue;
+    const st = structureOf(plan, id);
+    if (!level || !e || !st) continue;
+    const site = (p: Vec2) => toSite(st, p);
     minY = Math.min(minY, e.slabBottom);
     maxY = Math.max(maxY, e.ceiling);
-    for (const n of houseNodes(level)) {
+    for (const n of houseNodes(level).map(site)) {
       minX = Math.min(minX, n.x);
       maxX = Math.max(maxX, n.x);
       minZ = Math.min(minZ, n.y);
       maxZ = Math.max(maxZ, n.y);
     }
     for (const roof of Object.values(level.roofs ?? {})) {
-      for (const p of roofOutlineWithOverhang(roof)) {
+      for (const p of roofOutlineWithOverhang(roof).map(site)) {
         minX = Math.min(minX, p.x);
         maxX = Math.max(maxX, p.x);
         minZ = Math.min(minZ, p.y);
@@ -67,7 +70,7 @@ export function planBox(plan: Plan, levelIds: readonly Id[] = plan.levelOrder): 
       maxY = Math.max(maxY, e.floorTop + roofExtremes(roof, roofBearing(level.wallHeight, roof)).ridge + roof.thickness);
     }
     for (const deck of Object.values(level.decks ?? {})) {
-      for (const p of deck.outline) {
+      for (const p of deck.outline.map(site)) {
         minX = Math.min(minX, p.x);
         maxX = Math.max(maxX, p.x);
         minZ = Math.min(minZ, p.y);

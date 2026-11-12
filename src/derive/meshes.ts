@@ -23,6 +23,7 @@ import { boardColorOf, DEFAULT_SASH_COLOR, ROOF_COLOR, roofColorOf, ROOF_TILE, S
 import { profileAt, roofBearing, roofFrame, roofSolid, slopedPrismPositions, wallRoofProfile, type RoofOnLevel, type SlopedPrismOptions, type WallProfile } from './roofs';
 import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsPoint } from './stairs';
 import { getStaircaseLayout, heightAt, type StairPartGroup, type StairPartMat, type StairSolid, type StaircaseLayout } from './staircase';
+import { levelAboveId, levelBelowId } from '../model/structures';
 
 /** Moved to rooms.ts (the 2D editor uses it for "Fit to walls"); re-exported for the 3D code. */
 export { slabOutlines };
@@ -1920,10 +1921,11 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
   const sp = (p: Phase): Phase => shownPhase(p, viewMode);
   // The house after the work (types.ts ProposedLook): siding, roofs and windows, in Proposed only.
   const look = viewMode === 'proposed' ? plan.proposedLook : undefined;
-  const idx = plan.levelOrder.indexOf(levelId);
-  const below = idx > 0 ? plan.levels[plan.levelOrder[idx - 1]] : undefined;
+  const belowId = levelBelowId(plan, levelId);
+  const aboveId = levelAboveId(plan, levelId);
+  const below = belowId ? plan.levels[belowId] : undefined;
   const ftf = floorToFloor(plan, levelId);
-  const aboveLevel = idx >= 0 ? plan.levels[plan.levelOrder[idx + 1]] : undefined;
+  const aboveLevel = aboveId ? plan.levels[aboveId] : undefined;
   const hit = levelCache.get(key);
   if (hit && hit.level === level && hit.belowStairs === below?.stairs && hit.ftf === ftf && hit.above === aboveLevel && hit.below === below && hit.look === plan.proposedLook) return hit.result;
   pruneCaches(plan);

@@ -3,7 +3,7 @@ import { columnDefaults, defaultGradeElevation, distanceToFence, FENCE_DEFAULTS,
 import { isVisible } from '../../derive/phase';
 import { add, dist, sub } from '../../model/geometry';
 import { SURFACE_MATERIALS } from '../../model/finish';
-import type { Column, Id, Site, SurfaceMaterial, Vec2, ViewMode } from '../../model/types';
+import type { Column, Id, Site, Structure, SurfaceMaterial, Vec2, ViewMode } from '../../model/types';
 import { formatArea, formatLength, formatLengthCompact, tryParseLength } from '../../model/units';
 import { pauseHistory, resumeHistory } from '../../store/planStore';
 import { EMPTY_SELECTION, selectionSize, type Selection, type SnapResult } from '../../store/uiStore';
@@ -11,6 +11,7 @@ import { faceSnapSources, snapFaceCorner, snapFaceEdge, snapPoint } from '../sna
 import type { Tool, ToolContext, ToolPointerEvent } from './index';
 import { applyBufferKey } from './lengthBuffer';
 import { makeOutlineTool } from './outlineTool';
+import { isIdentity, structuresOf, toLocal, toSite } from '../../model/structures';
 
 // The site tools (DESIGN.md "Site and terrain"): grade point (E), column (C), ground surface (A),
 // fence (Q), and the select tool as it works in site mode. All of them work on plan.site, over the
@@ -80,14 +81,29 @@ export function hitSite(site: Site, p: Vec2, k: number, viewMode: ViewMode = 'al
 export function siteSnap(ctx: ToolContext, raw: Vec2): SnapResult {
   const plan = ctx.plan();
   const ui = ctx.ui();
-  const level = plan.levels[siteGhostLevelId(plan) ?? ctx.levelId] ?? ctx.level();
   const k = ui.viewport.k;
-  const src = faceSnapSources(getFootprints(level, ui.viewMode), level.walls);
-  const corner = snapFaceCorner(raw, src, k);
-  if (corner) return corner;
-  const std = snapPoint(raw, { level, k, snapGrid: plan.settings.snapGrid, orthoLock: false, shift: false, viewMode: ui.viewMode });
-  if (std.kind === 'node') return { ...std, nodeId: undefined, wallId: undefined };
-  return snapFaceEdge(raw, src, k) ?? { ...std, nodeId: undefined, wallId: undefined };
+  // Each structure's ghost is snapped in its own coordinates and the point brought back to the site.
+  const placed = (s: Structure, r: SnapResult): SnapResult =>
+    isIdentity(s) ? r : { ...r, point: toSite(s, r.point), guides: r.guides.map((g) => ({ from: toSite(s, g.from), to: toSite(s, g.to) })) };
+  const ghosts = structuresOf(plan).flatMap((s) => {
+    const level = plan.levels[siteGhostLevelId(s) ?? ''];
+    return level ? [{ s, level, src: faceSnapSources(getFootprints(level, ui.viewMode), level.walls) }] : [];
+  });
+  for (const g of ghosts) {
+    const corner = snapFaceCorner(toLocal(g.s, raw), g.src, k);
+    if (corner) return placed(g.s, corner);
+  }
+  const main = ghosts[0];
+  const level = main?.level ?? ctx.level();
+  const local = main ? toLocal(main.s, raw) : raw;
+  const std = snapPoint(local, { level, k, snapGrid: plan.settings.snapGrid, orthoLock: false, shift: false, viewMode: ui.viewMode });
+  const bare = { ...std, nodeId: undefined, wallId: undefined };
+  if (std.kind === 'node' && main) return placed(main.s, bare);
+  for (const g of ghosts) {
+    const edge = snapFaceEdge(toLocal(g.s, raw), g.src, k);
+    if (edge) return placed(g.s, edge);
+  }
+  return main ? placed(main.s, bare) : bare;
 }
 
 // ---------------------------------------------------------------------------------------------

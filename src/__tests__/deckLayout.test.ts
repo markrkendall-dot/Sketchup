@@ -9,6 +9,7 @@ import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan } from '../model/plan';
 import type { Vec2 } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
@@ -30,7 +31,7 @@ beforeEach(() => {
   store().setPlan(createEmptyPlan());
   clearHistory();
   clearDeckLayouts();
-  [b, f] = plan().levelOrder;
+  [b, f] = firstStructure(plan()).levelOrder;
   store().addWall(f, { x: -50, y: 0 }, { x: 200, y: 0 }, { kind: 'exterior', thickness: 6, phase: 'existing' });
   deckId = store().addDeck(f, { outline: OUTLINE, elevation: -6, railings: [false, true, true, true], phase: 'new' })!;
 });

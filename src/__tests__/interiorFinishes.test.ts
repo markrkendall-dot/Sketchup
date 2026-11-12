@@ -11,6 +11,7 @@ import type { Id, Vec2 } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import { CHECK_INCHES, checkTone, FLOOR_BOARD, floorBoards, interiorHeight, interiorTextures, JOIST_SPACING, PARQUET_BLOCK, PARQUET_SLATS, parquetSlats, TILE_INCHES, tileGrid, WIDE_PINE_BOARD, widePineBoards, widePineNails } from '../view3d/textures';
 import { floorFinishMaterial, interiorFlatColor, roomWallMaterial } from '../view3d/materials';
+import { firstStructure } from '../model/structures';
 
 // Interior finishes (DESIGN.md "Interior finishes"): a room dresses the long faces of the walls on
 // its side and its floor; nothing else changes.
@@ -29,7 +30,7 @@ beforeEach(() => {
  * 5" partition at x 120 into West and East rooms; West has a window in its south wall.
  */
 function boxRooms(): { lid: Id; west: Id; east: Id } {
-  const lid = store().plan.levelOrder[1];
+  const lid = firstStructure(store().plan).levelOrder[1];
   const c: Vec2[] = [
     { x: 0, y: 0 },
     { x: 240, y: 0 },

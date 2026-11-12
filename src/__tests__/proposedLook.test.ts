@@ -6,6 +6,7 @@ import { createEmptyPlan, migrate } from '../model/plan';
 import type { Id, ViewMode } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import { roofHeight, SEAM_HEIGHT, SEAM_PX, SEAM_SPACING, SHAKE_COURSES, SHAKE_WIDTH, shakeCourses, seamPositions, sidingHeight, TEXTURE_PX, TILE_INCHES } from '../view3d/textures';
+import { firstStructure } from '../model/structures';
 
 // The proposed look (types.ts ProposedLook): the siding, roof and windows after the work, shown in
 // the Proposed view only.
@@ -31,7 +32,7 @@ const LOOK = {
 
 /** A 20' x 15' box of shingled walls on the First Floor, one wall concrete block, a shuttered window, a metal roof. */
 function house(): { lid: Id; block: Id } {
-  const lid = store().plan.levelOrder[1];
+  const lid = firstStructure(store().plan).levelOrder[1];
   const c = [
     { x: 0, y: 0 },
     { x: 240, y: 0 },

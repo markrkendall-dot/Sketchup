@@ -43,6 +43,7 @@ import { formatPxScale, rotateAbout, scaleAbout, underlayCenter } from '../model
 import { dist, pointInPolygon, polygonSignedArea } from '../model/geometry';
 import { OPENING_DEFAULTS, OPENING_LABEL, openingFitsHeight, wallHeightOf, type OpeningType } from '../model/openings';
 import { columnProblem, fenceProblem, groundLevelId, MAX_DECK_ELEVATION, MAX_FENCE_RAILS, MAX_ROOF_PITCH, MIN_FENCE_SPACING, wallLength } from '../model/plan';
+import { firstStructure, isLowestLevel, levelAboveId, STRUCTURE_KIND_LABEL, STRUCTURE_KINDS, structureOf } from '../model/structures';
 import { boundsOf } from '../model/geometry';
 import { BAND_FINISHES, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DEFAULT_SASHES, DEFAULT_TRIM, defaultWallColor, defaultWallFinish, GLAZING_LABEL, glazingOf, GLAZINGS, isSlidingDoor, leafColorOf, leavesOf, litesOf, MAX_LEAVES, MAX_LITES, MAX_SASHES, normalizeHex, ROOF_COLOR, roofColorOf, sashesOf, SIDING_FINISHES, trimOf, WALL_FINISH_LABEL, WALL_FINISHES, wallColorOf, wallFinishOf } from '../model/finish';
 import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FENCE_COLOR, fenceColorOf, SURFACE_COLOR, surfaceColorOf, SURFACE_MATERIALS, DEFAULT_RAFTER, DEFAULT_WEATHERING, rafterOf, ROOF_EAVE_LABEL, ROOF_EAVES, roofEaveOf, TRIM_COLOR, weatheringOf } from '../model/finish';
@@ -1372,11 +1373,11 @@ function StairsProps({ level, stairs }: { level: Level; stairs: Stairs }) {
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const ftf = usePlanStore((s) => floorToFloor(s.plan, level.id));
   const aboveName = usePlanStore((s) => {
-    const i = s.plan.levelOrder.indexOf(level.id);
-    return s.plan.levels[s.plan.levelOrder[i + 1]]?.name ?? null;
+    const above = levelAboveId(s.plan, level.id);
+    return (above && s.plan.levels[above]?.name) ?? null;
   });
   // Only the lowest level's flights may start below the floor (outdoor steps down a slope).
-  const lowest = usePlanStore((s) => s.plan.levelOrder[0] === level.id);
+  const lowest = usePlanStore((s) => isLowestLevel(s.plan, level.id));
   const base = stairsBase(stairs);
   const climb = stairsRise(stairs, ftf);
   const { risers, rise } = flightSteps(stairs, ftf);
@@ -2186,7 +2187,7 @@ function MemberProps({ level, member }: { level: Level; member: Member }) {
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const plan = usePlanStore((s) => s.plan);
   const viewMode = useUiStore((s) => s.viewMode);
-  const lowest = plan.levelOrder[0] === level.id;
+  const lowest = isLowestLevel(plan, level.id);
   const set = (patch: MemberPatch) => updateMember(level.id, member.id, patch);
   const boxes = memberBoxes(plan, level.id, member, viewMode);
   const size = (key: 'width' | 'depth', label: string, hint: string) => (
@@ -2426,7 +2427,7 @@ function GradePointProps({ point }: { point: GradePoint }) {
   const updateGradePoint = usePlanStore((s) => s.updateGradePoint);
   const denom = usePlanStore((s) => s.plan.settings.precisionDenominator);
   const firstTop = usePlanStore((s) => {
-    const id = groundLevelId(s.plan);
+    const id = groundLevelId(firstStructure(s.plan));
     return id ? getLevelElevations(s.plan)[id]?.floorTop : undefined;
   });
   return (
@@ -3177,11 +3178,38 @@ function ProposedExterior() {
   );
 }
 
+const structureKindOptions = STRUCTURE_KINDS.map((k) => ({ value: k, label: STRUCTURE_KIND_LABEL[k] }));
+
+/**
+ * The building the level is in (DESIGN.md "Structures"): its kind, and where it stands on the site:
+ * the site point its own 0,0 sits on and its turn, clockwise. Shown over the level's fields.
+ */
+function StructureProps({ structureId }: { structureId: Id }) {
+  const update = usePlanStore((s) => s.updateStructure);
+  const name = usePlanStore((s) => s.plan.structures[structureId]?.name ?? '');
+  const kind = usePlanStore((s) => s.plan.structures[structureId]?.kind ?? 'other');
+  const x = usePlanStore((s) => s.plan.structures[structureId]?.origin.x ?? 0);
+  const y = usePlanStore((s) => s.plan.structures[structureId]?.origin.y ?? 0);
+  const rotation = usePlanStore((s) => s.plan.structures[structureId]?.rotation ?? 0);
+  const many = usePlanStore((s) => s.plan.structureOrder.length > 1);
+  return (
+    <>
+      <h3>Building: {name}</h3>
+      <SelectField label="Kind" value={kind} options={structureKindOptions} onChange={(v) => update(structureId, { kind: v })} />
+      <LengthField label="Position x" value={x} bound="any" onCommit={(v) => void (v !== null && update(structureId, { origin: { x: v, y } }))} hint="Where its own 0,0 sits on the site, to the right." />
+      <LengthField label="Position y" value={y} bound="any" onCommit={(v) => void (v !== null && update(structureId, { origin: { x, y: v } }))} hint="Down the site plan." />
+      <NumberField label="Rotation (degrees)" value={rotation} onCommit={(v) => update(structureId, { rotation: v })} hint="Clockwise on the site, about its 0,0." />
+      {many && <p className="panel-note">The other buildings show faintly where they stand; rename, add or delete buildings in the level bar.</p>}
+    </>
+  );
+}
+
 function LevelProps({ level }: { level: Level }) {
   const { updateLevel, setBaseFloorElevation, updateSettings } = usePlanStore.getState();
   const extThickness = usePlanStore((s) => s.plan.settings.defaultExteriorThickness);
   const intThickness = usePlanStore((s) => s.plan.settings.defaultInteriorThickness);
-  const base = usePlanStore((s) => s.plan.baseFloorElevation);
+  const structureId = usePlanStore((s) => structureOf(s.plan, level.id)?.id);
+  const base = usePlanStore((s) => structureOf(s.plan, level.id)?.baseFloorElevation ?? 0);
   // Select primitives: an object built in a selector would never compare equal.
   const floorTop = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.floorTop);
   const ceiling = usePlanStore((s) => getLevelElevations(s.plan)[level.id]?.ceiling);
@@ -3203,6 +3231,7 @@ function LevelProps({ level }: { level: Level }) {
   };
   return (
     <>
+      {structureId && <StructureProps key={structureId} structureId={structureId} />}
       <h3>Level</h3>
       <div className="field">
         <label htmlFor="level-name-input">Name</label>
@@ -3240,8 +3269,8 @@ function LevelProps({ level }: { level: Level }) {
         label="Base floor elevation"
         value={base}
         bound="any"
-        onCommit={(v) => void (v !== null && setBaseFloorElevation(v))}
-        hint="Floor top of the lowest level (plan setting)."
+        onCommit={(v) => void (v !== null && setBaseFloorElevation(v, structureId))}
+        hint="Floor top of this building's lowest level."
       />
       <LengthField
         label="New exterior walls"

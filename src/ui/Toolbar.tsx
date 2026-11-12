@@ -72,7 +72,7 @@ function ExportMenu() {
   const active = useUiStore((s) => s.activeLevelId);
   const siteMode = useUiStore((s) => s.siteMode);
   const layout = useUiStore((s) => s.layout);
-  const order = usePlanStore((s) => s.plan.levelOrder);
+  const plan = usePlanStore((s) => s.plan);
   const levels = usePlanStore((s) => s.plan.levels);
 
   useEffect(() => {
@@ -125,7 +125,7 @@ function ExportMenu() {
     }
   };
 
-  const shown = visible3dLevels(order, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode })
+  const shown = visible3dLevels(plan, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode })
     .map((id) => levels[id]?.name)
     .join(', ');
 

@@ -1789,3 +1789,30 @@ button.primary:hover:not(:disabled) {
 .level-actions button.level-delete:not(:disabled) {
   color: var(--danger);
 }
+
+/* Level bar: the buildings on the site (structure selector, add, rename, delete). */
+.structure-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.structure-bar select,
+.structure-bar input {
+  width: 100%;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 6px;
+}
+
+.structure-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.view3d-toolbar .view3d-structure {
+  font-weight: 600;
+}

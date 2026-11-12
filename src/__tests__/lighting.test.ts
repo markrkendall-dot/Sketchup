@@ -19,6 +19,7 @@ import {
   wallFlatColor,
   wallMaterial,
 } from '../view3d/materials';
+import { firstStructure } from '../model/structures';
 
 // Batch A of the realism plan (DESIGN.md "3D"): glass, the lawn, the export's colours-only rule and
 // the sun's shadow camera.
@@ -113,7 +114,7 @@ describe('export: colours only', () => {
   function sitePlan() {
     store().setPlan(createEmptyPlan('Lawn'));
     clearHistory();
-    const first = store().plan.levelOrder[1];
+    const first = firstStructure(store().plan).levelOrder[1];
     const corners = [
       { x: 0, y: 0 },
       { x: 240, y: 0 },
@@ -231,17 +232,23 @@ describe('sun shadow camera', () => {
 
   it('fits the starter house with a texel of about half an inch at 2048', () => {
     const plan = migrate(example);
-    const fit = sunShadowFit(planBox(plan), sunPosition(plan.site.northAngle));
+    const house = firstStructure(plan).levelOrder;
+    const fit = sunShadowFit(planBox(plan, house), sunPosition(plan.site.northAngle));
     // Just over 1/2" since the proposed entry canopy carried the foyer's roof 5' further west.
     expect((2 * fit.half) / 2048).toBeLessThan(0.52);
+    // With the garage, 55' west, the whole site's shadow map is coarser but still under an inch.
+    const all = sunShadowFit(planBox(plan), sunPosition(plan.site.northAngle));
+    expect((2 * all.half) / 2048).toBeLessThan(0.9);
   });
 });
 
 describe('planBox and free-standing walls', () => {
   it('a wall that closes no room (a retaining wall) does not widen the box', () => {
     const plan = migrate(example);
-    const box = planBox(plan);
+    const box = planBox(plan, firstStructure(plan).levelOrder);
     // The retaining wall runs to x -984; the house (with its porch roofs) starts near x -114.
     expect(box.min[0]).toBeGreaterThan(-200);
+    // The garage is a building: with it the box reaches its west wall's centerline (x -944.5), not the wall's end.
+    expect(planBox(plan).min[0]).toBeCloseTo(-944.5, 6);
   });
 });

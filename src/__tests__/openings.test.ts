@@ -4,6 +4,7 @@ import { clampOpeningOffset } from '../model/openings';
 import { createEmptyPlan, defaultLevelId, wallLength } from '../model/plan';
 import type { Level, Opening, Vec2 } from '../model/types';
 import { clearHistory, undo, usePlanStore, type NewOpening } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const opts = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;
 const store = () => usePlanStore.getState();
@@ -306,7 +307,7 @@ describe('wall kind, phase and copy', () => {
 
   it('copyWallsFromLevel copies nodes and walls but not openings, as one undo step', () => {
     const plan = store().plan;
-    const [, first, second] = plan.levelOrder;
+    const [, first, second] = firstStructure(plan).levelOrder;
     const rect: Vec2[] = [
       { x: 0, y: 0 },
       { x: 360, y: 0 },

@@ -19,6 +19,7 @@ import { getFootprints } from './footprint';
 import { isTimber } from '../model/structure';
 import { joistDepth, joistsAt } from './members';
 import { isVisible } from './phase';
+import { structuresOf } from '../model/structures';
 
 /** Joists spanning more than this without a wall would likely need it, inches (14'). */
 export const SPAN_LIMIT = 168;
@@ -158,13 +159,13 @@ export function wallBearings(plan: Plan, view: BearingView): WallBearings {
   if (hit) return hit;
   const out: WallBearings = {};
   const fmt = (v: number) => formatLength(v, plan.settings.precisionDenominator);
-  for (let i = plan.levelOrder.length - 1; i >= 0; i--) {
-    const levelId = plan.levelOrder[i];
+  for (const { levelOrder: order } of structuresOf(plan)) for (let i = order.length - 1; i >= 0; i--) {
+    const levelId = order[i];
     const level = plan.levels[levelId];
     const map = new Map<Id, WallBearing>();
     out[levelId] = map;
     if (!level) continue;
-    const aboveId = plan.levelOrder[i + 1];
+    const aboveId = order[i + 1];
     const above = aboveId ? plan.levels[aboveId] : undefined;
     const fps = getFootprints(level, view);
     const depth = joistDepth(plan, levelId);

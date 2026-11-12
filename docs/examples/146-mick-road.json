@@ -1,11 +1,42 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "plan-146-mick-road",
   "name": "146 Mick Road (starter, estimates flagged)",
-  "levelOrder": [
-    "level-b",
-    "level-f",
-    "level-s"
+  "structures": {
+    "house": {
+      "id": "house",
+      "name": "House",
+      "kind": "house",
+      "origin": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "baseFloorElevation": -100,
+      "levelOrder": [
+        "level-b",
+        "level-f",
+        "level-s"
+      ]
+    },
+    "structure-2": {
+      "id": "structure-2",
+      "name": "Garage",
+      "kind": "garage",
+      "origin": {
+        "x": -948,
+        "y": 142
+      },
+      "rotation": 0,
+      "baseFloorElevation": -6,
+      "levelOrder": [
+        "level-s2l1"
+      ]
+    }
+  },
+  "structureOrder": [
+    "house",
+    "structure-2"
   ],
   "levels": {
     "level-b": {
@@ -5829,9 +5860,90 @@
       "framing": {
         "joists": 90
       }
+    },
+    "level-s2l1": {
+      "id": "level-s2l1",
+      "name": "Garage",
+      "wallHeight": 84,
+      "floorThickness": 4,
+      "nodes": {
+        "s2l1-n1": {
+          "id": "s2l1-n1",
+          "x": 3.5,
+          "y": 3.5
+        },
+        "s2l1-n2": {
+          "id": "s2l1-n2",
+          "x": 284.5,
+          "y": 3.5
+        },
+        "s2l1-n3": {
+          "id": "s2l1-n3",
+          "x": 284.5,
+          "y": 308.5
+        },
+        "s2l1-n4": {
+          "id": "s2l1-n4",
+          "x": 3.5,
+          "y": 308.5
+        }
+      },
+      "walls": {
+        "s2l1-w1": {
+          "id": "s2l1-w1",
+          "a": "s2l1-n1",
+          "b": "s2l1-n2",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new"
+        },
+        "s2l1-w2": {
+          "id": "s2l1-w2",
+          "a": "s2l1-n2",
+          "b": "s2l1-n3",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new"
+        },
+        "s2l1-w3": {
+          "id": "s2l1-w3",
+          "a": "s2l1-n3",
+          "b": "s2l1-n4",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new"
+        },
+        "s2l1-w4": {
+          "id": "s2l1-w4",
+          "a": "s2l1-n4",
+          "b": "s2l1-n1",
+          "thickness": 7,
+          "kind": "exterior",
+          "phase": "new"
+        }
+      },
+      "openings": {},
+      "rooms": {
+        "s2l1-r1": {
+          "name": "Garage (proposed, not designed)",
+          "anchor": {
+            "x": 144,
+            "y": 156
+          },
+          "phase": "new",
+          "id": "s2l1-r1"
+        }
+      },
+      "stairs": {},
+      "roofs": {},
+      "fixtures": {},
+      "decks": {},
+      "floorOpenings": {},
+      "staircases": {},
+      "joistZones": {},
+      "members": {}
     }
   },
-  "baseFloorElevation": -100,
   "settings": {
     "snapGrid": 1,
     "displayGrid": 12,

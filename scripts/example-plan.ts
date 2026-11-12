@@ -14,6 +14,7 @@ import { columnDefaults, FENCE_DEFAULTS, groundAt } from '../src/derive/site';
 import { COLUMN_COLOR } from '../src/model/finish';
 import { dist } from '../src/model/geometry';
 import { createEmptyPlan } from '../src/model/plan';
+import { firstStructure } from '../src/model/structures';
 import { MEMBER_DEFAULTS } from '../src/model/structure';
 import type { Id, Phase, Plan, SiteSurface, Vec2 } from '../src/model/types';
 import { bedOverall } from '../src/model/furniture';
@@ -41,6 +42,7 @@ import {
   ENTRY_Y,
   FIELDSTONE,
   FINISH_COLOR,
+  GARAGE,
   fixture,
   FLOOR_RED_BROWN,
   FRIDGE_BLUE,
@@ -107,7 +109,7 @@ import {
  */
 export function buildExistingHouse(name: string): ExistingIds {
   store().setPlan(createEmptyPlan(name));
-  const [bId, fId, sId] = getPlan().levelOrder;
+  const [bId, fId, sId] = firstStructure(getPlan()).levelOrder;
   store().updateLevel(bId, { name: 'Basement', wallHeight: 90, floorThickness: 4 });
   store().updateLevel(fId, { name: 'First Floor', wallHeight: 96, floorThickness: 12 });
   store().updateLevel(sId, { name: 'Second Floor', wallHeight: 96, floorThickness: 12 });
@@ -1021,9 +1023,20 @@ function proposed(ids: ExistingIds): void {
 
   // ---- The retaining wall carried on west to the property line (MK, after the site sketch, photo
   // 10): from today's free end about 20' angled and 27' straight, the same poured concrete, its top at
-  // the terrace's level plus 2", 5' south of where the garage is to go (not drawn).
+  // the terrace's level plus 2", 5' south of the garage (drawn below as its own building).
   const retainingNew = drawWalls(bId, [{ x: RETAIN.west, y: RETAIN.bend.y }, ...RETAIN_NEW], 10, false, NEW);
   store().updateWalls(bId, retainingNew, { finish: 'plain', color: CONCRETE_COLOR, heightOverride: 96 });
+
+  // ---- The garage (README, "Still open"; GARAGE): its own building on the lawn west of the house,
+  // a 24' x 26' ring of new walls on its own slab at -6, drawn from its north-west outside corner
+  // (the structure's origin). Not designed yet: no roof, doors or windows are drawn.
+  const garageId = store().addStructure({ kind: 'garage', name: 'Garage', origin: { x: GARAGE.x0, y: GARAGE.y0 }, starter: false });
+  const gId = getPlan().structures[garageId].levelOrder[0];
+  store().setBaseFloorElevation(GARAGE.floor, garageId);
+  const gw = GARAGE.x1 - GARAGE.x0;
+  const gd = GARAGE.y1 - GARAGE.y0;
+  drawWalls(gId, [{ x: HALF, y: HALF }, { x: gw - HALF, y: HALF }, { x: gw - HALF, y: gd - HALF }, { x: HALF, y: gd - HALF }], T, true, NEW);
+  label(gId, 'Garage (proposed, not designed)', { x: gw / 2, y: gd / 2 }, NEW);
 
   // ---- 6. The deck off the master bedroom's sliding door (MK, 14 Oct 2026): about 8' deep, the
   // wing's width from the retaining wall's east face (x 319.5) to the wing's east face (x 463). Its

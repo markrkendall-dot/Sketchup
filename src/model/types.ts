@@ -589,13 +589,31 @@ export interface ProposedLook {
   shutters?: boolean;
 }
 
-export interface Plan {
-  schemaVersion: 8;
+/** What a structure is (DESIGN.md "Structures"): it names the starter it was made from and its icon in the selector. */
+export type StructureKind = 'house' | 'garage' | 'shed' | 'other';
+
+/**
+ * One building on the site (schema 9): its own stack of levels, bottom to top, standing at
+ * `origin` turned by `rotation`. Its levels' coordinates are local to it: a site point is
+ * origin + the local point turned `rotation` degrees clockwise on the plan (model/structures.ts toSite).
+ */
+export interface Structure {
   id: Id;
   name: string;
-  levelOrder: Id[]; // bottom to top
-  levels: Record<Id, Level>;
+  kind: StructureKind;
+  origin: Vec2;
+  rotation: Degrees;
   baseFloorElevation: Inches; // floor-top of levelOrder[0]; e.g. -100 for a basement
+  levelOrder: Id[]; // bottom to top
+}
+
+export interface Plan {
+  schemaVersion: 9;
+  id: Id;
+  name: string;
+  structures: Record<Id, Structure>;
+  structureOrder: Id[]; // the first is the main building (the house)
+  levels: Record<Id, Level>; // every structure's levels; each is in exactly one levelOrder
   settings: PlanSettings;
   site: Site;
   modifiedAt: string;

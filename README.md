@@ -14,6 +14,8 @@ What it draws:
 - **Walls, openings, rooms, stairs** on any number of levels, stacked in 3D, with a faint ghost of
   the level below. A new property starts from a template (a basement and two floors, two floors,
   one storey, or a garage or shed); the level bar adds, deletes and reorders levels.
+- **Several buildings on one site**: a house, a detached garage, a shed, each with its own levels,
+  floor elevation and wall heights, placed and turned on the site and shown together in 3D.
 - **Roofs** (gable, shed, hip, flat) with overhangs, fascia and rake boards or open eaves with
   rafter tails; walls under a roof rise to meet it, so a gable end is a triangle.
 - **Decks** on posts down to the ground, with railings that open where a flight of stairs arrives.
@@ -138,6 +140,34 @@ Before you start, measure on paper. Then follow these steps in order.
    ends of a wall whose length you know and type it, then lock the image and trace over it.
 
 Fix mistakes with Ctrl+Z (Cmd+Z on a Mac); every edit, including a whole drag, is one step.
+
+## A garage, shed or other outbuilding
+
+A detached garage or shed is a building of its own, not walls on a house level: it has its own
+levels, floor elevation, wall heights, rooms and roofs.
+
+1. In the level bar, under **Buildings**, press **Add building**, pick the kind (house, garage,
+   shed or outbuilding), give it a name if you like, and press **Add**. A garage starts as one 84"
+   storey on a 4" slab with a 24' x 24' box of walls, a 16' opening for the car door (a passage:
+   there is no overhead door type) and a 6:12 gable roof; a shed a 10' x 12' box with a 36" door;
+   an outbuilding an empty storey. It is put 10' to the right of the other buildings, in the
+   toolbar's **Draw as** phase.
+2. The building selector above the levels picks the building you edit; the level tabs, **Add
+   above**, **Add below**, the level keys `1` to `9` and the level options then work on its levels
+   only. **Rename** and **Delete** act on the selected building (it asks first when there is
+   anything on it; a plan keeps at least one building).
+3. With nothing selected, the properties panel starts with the building: its kind, **Position x**
+   and **Position y** (where its own 0,0 stands on the site) and **Rotation** (degrees, clockwise),
+   and the level fields under it, where **Base floor elevation** is this building's lowest floor
+   top. Set that to the ground there: a garage slab on a lawn at -6 has its floor at -6.
+4. Each building is drawn in its own coordinates, square on the screen. The others show faintly
+   where they stand on the site, with their roofs; they cannot be selected or snapped to from
+   another building. In site mode every building shows at its place, and the site tools snap to all
+   of them.
+
+Undo reverts each step. The 3D view, its Fit and elevations, the shadows, the ground (cut out under
+each building at its own slab), walk mode and the glTF and OBJ exports show every building; in an
+export, a level of a building other than the first is named `<building>: <level>`.
 
 ## Roofs, site and appearance
 
@@ -434,7 +464,7 @@ keyboard back to the plan.
 | `Enter` / `F2` | Rename the selected room |
 | `Arrows` (`Shift`) | Nudge the selected underlay 1" (1') |
 | `Shift` + arrows | Move the selected walls 1" across, the way the arrow points |
-| `1` `2` `3` | Levels, bottom to top |
+| `1` `2` `3` | Levels of the building being edited, bottom to top |
 | `V` | Cycle view: Existing, Proposed, All |
 | `O` / `G` | Ortho lock / grid |
 | `[` / `]` | Narrow window (under 900 px): show or hide the level bar / the properties panel |
@@ -963,8 +993,9 @@ where the built design differs from them):
 11. **Retaining wall carried west** (MK, after the site sketch): from today's free end about 20'
     angled and 27' straight to the west property line (x -984, 3' west of the planned garage), the
     same poured concrete, its top 2" over the lawn behind it. The garage itself (24' x 26', 55' west
-    of the house, 5' north of this wall) is not drawn. Walls that close no room, like this one, are
-    left out of what the 3D view frames and shadows, so the house keeps its size on screen.
+    of the house, 5' north of this wall) is its own building, **Garage** (see "Still open"). Walls
+    that close no room, like this one, are left out of what the 3D view frames and shadows; the
+    garage is a building, so the 3D view frames it with the house.
 12. **Floors** (MK, 15 Oct 2026): **6" pine, face-nailed** with old square cut nails, **Nordic
     natural**: pale and cool, its grain and knots showing, never amber or yellow. Pine yellows from
     ultraviolet light through an oil-based or amber-tinted finish; to keep it pale, use a clear,
@@ -1061,8 +1092,12 @@ the engineer, the trades and the tape measure):
 - The porch's size and roofline wait on MK's reference pictures (estimated 8' out; the foyer's
   gable and the porch's shed overlap with no valley, which the tool cannot draw).
 - The garage (24' x 26', 55' west of the house, 20' from the road, 3' off the west property line)
-  is not drawn; the retaining wall carried west sets its south side. To draw it: on the First
-  Floor, **Draw as: new**, the Box tool (`B`, `24' x 26'`, Enter).
+  is drawn as a second building, **Garage**: a ring of new 7" walls, outside faces x -948..-660
+  (24' east-west: 55' west of the house and 3' off the line agree) and y 142..454 (its south side
+  5' north of the retaining wall carried west, which sets it), on a slab at the lawn's -6. "20'
+  from the road" would put it 46" further north; which is right? Its wall height (the garage
+  preset's 84"), roof, doors and windows are not known and are not drawn: select **Garage** under
+  Buildings to draw them.
 
 **The engineer** (the tool draws and checks the load path; it sizes nothing)
 - Size the stair hall's header and the kitchen beam (both on y 99.5), drawn as **W8x15 steel**

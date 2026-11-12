@@ -6,6 +6,7 @@ import { wallBandOf } from '../model/finish';
 import { createEmptyPlan, migrate } from '../model/plan';
 import type { Id, Wall } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 // An exterior band (Wall.band): the outside face of a wall below a height in its own finish.
 
@@ -19,7 +20,7 @@ beforeEach(() => {
 
 /** A 20' x 15' box of 7" shingled walls on the First Floor; returns the level and the south wall (y = 180). */
 function house(): { lid: Id; south: Id; east: Id } {
-  const lid = store().plan.levelOrder[1];
+  const lid = firstStructure(store().plan).levelOrder[1];
   const c = [
     { x: 0, y: 0 },
     { x: 240, y: 0 },

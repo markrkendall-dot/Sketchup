@@ -7,6 +7,7 @@ import type { Vec2 } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { CHECKS_DELAY_MS, startChecks } from '../ui/checks';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
@@ -27,7 +28,7 @@ beforeEach(() => {
   store().setPlan(createEmptyPlan());
   clearHistory();
   clearFloorOpeningLayouts();
-  [b, f, s] = plan().levelOrder;
+  [b, f, s] = firstStructure(plan()).levelOrder;
   for (const lid of [f, s]) {
     const c = rect(0, 0, 240, 240);
     for (let i = 0; i < 4; i++) store().addWall(lid, c[i], c[(i + 1) % 4], { kind: 'exterior', thickness: 6, phase: 'existing' });

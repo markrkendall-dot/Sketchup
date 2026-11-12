@@ -3,6 +3,7 @@ import { createEmptyPlan } from '../model/plan';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import { bindingFor, comboOf, KEY_BINDINGS, KEY_GROUPS } from '../ui/keymap';
+import { firstStructure } from '../model/structures';
 
 const key = (k: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({
   key: k,
@@ -93,7 +94,7 @@ describe('KEY_BINDINGS', () => {
 
   it('runs tool, level and toggle bindings', () => {
     const ui = useUiStore.getState;
-    ui().setActiveLevel(usePlanStore.getState().plan.levelOrder[1]);
+    ui().setActiveLevel(firstStructure(usePlanStore.getState().plan).levelOrder[1]);
     bindingFor(key('b'))!.run!(new KeyboardEventLike('b') as unknown as KeyboardEvent);
     expect(ui().activeTool).toBe('rect');
     bindingFor(key('m'))!.run!(new KeyboardEventLike('m') as unknown as KeyboardEvent);
@@ -101,7 +102,7 @@ describe('KEY_BINDINGS', () => {
     bindingFor(key('s'))!.run!(new KeyboardEventLike('s') as unknown as KeyboardEvent);
     expect(ui().activeTool).toBe('select');
     bindingFor(key('1'))!.run!(new KeyboardEventLike('1') as unknown as KeyboardEvent);
-    expect(ui().activeLevelId).toBe(usePlanStore.getState().plan.levelOrder[0]);
+    expect(ui().activeLevelId).toBe(firstStructure(usePlanStore.getState().plan).levelOrder[0]);
     const before = ui().nextWallKind;
     bindingFor(key('x'))!.run!(new KeyboardEventLike('x') as unknown as KeyboardEvent);
     expect(ui().nextWallKind).not.toBe(before);

@@ -3,6 +3,8 @@ import { createEmptyPlan, migrate, MIGRATIONS, SCHEMA_VERSION } from '../model/p
 import { joistWords, memberProblem, normalizeJoists } from '../model/structure';
 import type { Id } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
+import { legacyDoc } from './legacy';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
@@ -11,7 +13,7 @@ let f: Id;
 beforeEach(() => {
   store().setPlan(createEmptyPlan());
   clearHistory();
-  [b, f] = plan().levelOrder;
+  [b, f] = firstStructure(plan()).levelOrder;
 });
 
 describe('structure model', () => {
@@ -81,14 +83,14 @@ describe('structure store actions', () => {
 describe('structure in the file', () => {
   it('schema 7 adds joist zones and members to every level', () => {
     expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(7);
-    const v6 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 6 }));
+    const v6 = legacyDoc(createEmptyPlan(), 6);
     for (const l of Object.values(v6.levels) as Record<string, unknown>[]) {
       delete l.joistZones;
       delete l.members;
     }
     expect(MIGRATIONS[6](v6).schemaVersion).toBe(7);
     const loaded = migrate(v6);
-    for (const id of loaded.levelOrder) expect([loaded.levels[id].joistZones, loaded.levels[id].members]).toEqual([{}, {}]);
+    for (const id of firstStructure(loaded).levelOrder) expect([loaded.levels[id].joistZones, loaded.levels[id].members]).toEqual([{}, {}]);
   });
 
   it('keeps good members, zones, framing and bearing flags, drops broken ones with a warning, and round-trips', () => {

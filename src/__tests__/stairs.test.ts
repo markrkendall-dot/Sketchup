@@ -23,6 +23,7 @@ import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
 import example from '../../docs/examples/146-mick-road.json';
 import type { Stairs } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const levelId = () => defaultLevelId(store().plan);
@@ -65,7 +66,7 @@ describe('stairs geometry', () => {
 
   it('risers from floor-to-floor height at about 7.5"', () => {
     const plan = createEmptyPlan();
-    const [b, f, s] = plan.levelOrder;
+    const [b, f, s] = firstStructure(plan).levelOrder;
     expect(floorToFloor(plan, b)).toBe(96 + 12);
     expect(floorToFloor(plan, f)).toBe(96 + 12);
     // Top level: its own floor thickness stands in for the missing floor above.
@@ -185,7 +186,7 @@ describe('stairs store actions', () => {
 describe('the opening a flight cuts in the floor above (REVIEW-2 A2)', () => {
   it("the example stair: 108\" floor to floor, 101\" run from x 31, the opening starts 7 3/4\" up, past the 30\" closet", () => {
     const plan = migrate(example);
-    const first = plan.levels[plan.levelOrder[1]];
+    const first = plan.levels[firstStructure(plan).levelOrder[1]];
     const st = Object.values(first.stairs)[0];
     const ftf = floorToFloor(plan, first.id);
     expect(ftf).toBe(108);
@@ -314,7 +315,7 @@ describe('short flights and landings: base, rise and risers', () => {
 
   it('the example stair has none of the new fields and keeps its steps and opening', () => {
     const plan = migrate(example);
-    const first = plan.levels[plan.levelOrder[1]];
+    const first = plan.levels[firstStructure(plan).levelOrder[1]];
     const st = Object.values(first.stairs)[0];
     for (const k of ['base', 'rise', 'risers']) expect(k in st).toBe(false);
     const ftf = floorToFloor(plan, first.id);
@@ -363,7 +364,7 @@ describe('short flights and landings: base, rise and risers', () => {
 });
 
 describe('outdoor stairs: below the lowest floor, open', () => {
-  const lowestId = () => store().plan.levelOrder[0];
+  const lowestId = () => firstStructure(store().plan).levelOrder[0];
 
   it('a flight on the lowest level may start below its floor; on any other level it may not', () => {
     // 13 risers from 96" below the basement floor up to the floor: outdoor steps down a slope.
@@ -376,7 +377,7 @@ describe('outdoor stairs: below the lowest floor, open', () => {
     expect(stairsHeightProblem({ base: -601, rise: 88 }, 108, true)).toMatch(/more than 600/);
     // A file keeps it on the lowest level and drops it elsewhere.
     const doc = JSON.parse(JSON.stringify(store().plan));
-    const first = doc.levelOrder[1];
+    const first = firstStructure(doc).levelOrder[1];
     doc.levels[first].stairs.up = { ...down, id: 'up' };
     const loaded = migrate(doc);
     expect(loaded.levels[lowestId()].stairs[id].base).toBe(-96);

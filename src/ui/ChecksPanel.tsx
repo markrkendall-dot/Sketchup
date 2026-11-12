@@ -3,6 +3,7 @@ import { issueCounts, type Issue, type Severity } from '../derive/checks';
 import { CODE_EDITION } from '../model/codeLimits';
 import { usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore, type Selection } from '../store/uiStore';
+import { allLevelIds, structureOf } from '../model/structures';
 
 const SEVERITY_WORD: Record<Severity, string> = { error: 'Error', warning: 'Check', info: 'Note' };
 
@@ -40,7 +41,9 @@ export function ChecksPanel() {
   const issues = useUiStore((s) => s.issues);
   const picked = useUiStore((s) => s.pickedIssueId);
   const levels = usePlanStore((s) => s.plan.levels);
-  const order = usePlanStore((s) => s.plan.levelOrder);
+  const order = usePlanStore((s) => allLevelIds(s.plan));
+  const many = usePlanStore((s) => s.plan.structureOrder.length > 1);
+  const plan = usePlanStore((s) => s.plan);
   const [showNotes, setShowNotes] = useState(false);
   if (!open) return null;
   const { toCheck, notes } = issueCounts(issues);
@@ -69,7 +72,7 @@ export function ChecksPanel() {
           .filter((lid) => shown.some((i) => i.levelId === lid))
           .map((lid) => (
             <div key={lid} className="checks-level">
-              <h4>{levels[lid]?.name ?? lid}</h4>
+              <h4>{many ? `${structureOf(plan, lid)?.name ?? ''}: ${levels[lid]?.name ?? lid}` : (levels[lid]?.name ?? lid)}</h4>
               <ul>
                 {shown
                   .filter((i) => i.levelId === lid)

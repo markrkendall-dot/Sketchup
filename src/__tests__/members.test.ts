@@ -12,6 +12,7 @@ import { CUT_WOOD, logEndColor, MEMBER_COLOR, memberProblem } from '../model/str
 import type { Beam, Id, Post } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION, useUiStore } from '../store/uiStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const ui = () => useUiStore.getState();
@@ -31,7 +32,7 @@ let s: Id;
 beforeEach(() => {
   store().setPlan(createEmptyPlan());
   clearHistory();
-  [b, f, s] = plan().levelOrder;
+  [b, f, s] = firstStructure(plan()).levelOrder;
   ui().setActiveLevel(f);
   ui().setViewMode('all');
   ui().setViewport({ tx: 0, ty: 0, k: 1 });

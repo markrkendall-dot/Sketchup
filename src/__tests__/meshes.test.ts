@@ -19,6 +19,7 @@ import { floorToFloor, stairsOutline, stairSteps } from '../derive/stairs';
 import { clipHalfPlane, halfPlaneCrossings, polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, createLevel } from '../model/plan';
 import type { Level, Opening, Phase, Plan, Roof, Stairs, Vec2, Wall } from '../model/types';
+import { firstStructure } from '../model/structures';
 
 type V3 = [number, number, number];
 
@@ -358,7 +359,7 @@ describe('a door at the end of a wall near an L corner', () => {
 /** A plan whose First Floor is a closed 20' x 20' box; the basement may have stairs. */
 function boxPlan(stairs?: Partial<Stairs>): { plan: Plan; basement: Level; first: Level } {
   const plan = createEmptyPlan();
-  const [b, f] = plan.levelOrder;
+  const [b, f] = firstStructure(plan).levelOrder;
   const first = plan.levels[f];
   const nodes = { a: { x: 0, y: 0 }, b: { x: 240, y: 0 }, c: { x: 240, y: 240 }, d: { x: 0, y: 240 } };
   for (const [id, p] of Object.entries(nodes)) first.nodes[id] = { id, ...p };
@@ -411,7 +412,7 @@ describe('floor slabs', () => {
     const withHole = getLevelMeshes(plan, first.id, 'all').floor!;
     // 108" floor to floor, 14 risers, 80" from the nosings to the basement's ceiling (the slab's
     // underside): the opening starts 120 * (ceiling - 80 - R) / 108 up the 120" run.
-    const ceil = plan.levels[plan.levelOrder[0]].wallHeight;
+    const ceil = plan.levels[firstStructure(plan).levelOrder[0]].wallHeight;
     const d0 = (120 * (ceil - 80 - 108 / 14)) / 108;
     expect(upArea(withHole)).toBeCloseTo(246.5 * 246.5 - 36 * (120 - d0), 2);
     // Floor over the low end of the flight (y 200 - 4), open over the top (y 200 - 100).
@@ -423,7 +424,7 @@ describe('floor slabs', () => {
     expect(upArea(getLevelMeshes(over.plan, over.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * 60, 2);
     const full = boxPlan({ holeStart: 0 });
     expect(upArea(getLevelMeshes(full.plan, full.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * 120, 2);
-    const tall = { ...plan, levels: { ...plan.levels, [plan.levelOrder[0]]: { ...plan.levels[plan.levelOrder[0]], wallHeight: 120 } } };
+    const tall = { ...plan, levels: { ...plan.levels, [firstStructure(plan).levelOrder[0]]: { ...plan.levels[firstStructure(plan).levelOrder[0]], wallHeight: 120 } } };
     const d1 = (120 * (120 - 80 - 132 / 18)) / 132;
     expect(upArea(getLevelMeshes(tall, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * (120 - d1), 2);
     const noCut = boxPlan({ cutsFloorAbove: false });
@@ -435,7 +436,7 @@ describe('floor slabs', () => {
     // basement 60" high) is short of headroom from the bottom step, so it is open all the way.
     const top = boxPlan({ holeStart: 120 });
     expect(upArea(getLevelMeshes(top.plan, top.first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5, 3);
-    const lowCeiling = { ...plan, levels: { ...plan.levels, [plan.levelOrder[0]]: { ...plan.levels[plan.levelOrder[0]], wallHeight: 60 } } };
+    const lowCeiling = { ...plan, levels: { ...plan.levels, [firstStructure(plan).levelOrder[0]]: { ...plan.levels[firstStructure(plan).levelOrder[0]], wallHeight: 60 } } };
     expect(upArea(getLevelMeshes(lowCeiling, first.id, 'all').floor!)).toBeCloseTo(246.5 * 246.5 - 36 * 120, 2);
   });
 });
@@ -567,7 +568,7 @@ describe('joins between walls of different heights', () => {
     ]);
     level.walls.w1.heightOverride = 120;
     const plan = createEmptyPlan();
-    const id = plan.levelOrder[1];
+    const id = firstStructure(plan).levelOrder[1];
     plan.levels[id] = { ...level, id };
     const m = getLevelMeshes(plan, id, 'all');
     const both = mergeAll(m.walls.map((w) => w.geometry.clone()));
@@ -585,7 +586,7 @@ describe('joins with a demolished (translucent) wall', () => {
       ['q', 'r', 6.5, 'demo'],
     ]);
     const plan = createEmptyPlan();
-    const id = plan.levelOrder[1];
+    const id = firstStructure(plan).levelOrder[1];
     plan.levels[id] = { ...level, id };
     const m = getLevelMeshes(plan, id, 'all');
     const g0 = m.walls.find((w) => w.id === 'w0')!.geometry;
@@ -879,7 +880,7 @@ describe('platform framing: exterior walls run up through the slab above', () =>
   function threeStories(): { plan: Plan; ids: string[] } {
     const plan = createEmptyPlan();
     const t = [8, 6.5, 6.5];
-    plan.levelOrder.forEach((id, i) => {
+    firstStructure(plan).levelOrder.forEach((id, i) => {
       const l = plan.levels[id];
       const nodes = { a: { x: 0, y: 0 }, b: { x: 240, y: 0 }, c: { x: 240, y: 240 }, d: { x: 0, y: 240 } };
       for (const [nid, p] of Object.entries(nodes)) l.nodes[nid] = { id: nid, ...p };
@@ -887,7 +888,7 @@ describe('platform framing: exterior walls run up through the slab above', () =>
         l.walls[`w${k}`] = { id: `w${k}`, a: pair[0], b: pair[1], thickness: t[i], kind: 'exterior', phase: 'existing' };
       });
     });
-    return { plan, ids: plan.levelOrder };
+    return { plan, ids: firstStructure(plan).levelOrder };
   }
 
   it('an exterior wall with a level above is that level floorThickness taller; the top level is not', () => {

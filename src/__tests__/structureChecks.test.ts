@@ -4,6 +4,7 @@ import { structureIssues } from '../derive/structureChecks';
 import { createEmptyPlan } from '../model/plan';
 import type { Id, Vec2, Wall } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
@@ -43,7 +44,7 @@ let s = '';
 beforeEach(() => {
   store().setPlan(createEmptyPlan());
   clearHistory();
-  [b, f, s] = plan().levelOrder;
+  [b, f, s] = firstStructure(plan()).levelOrder;
   for (const lid of [b, f, s]) {
     box(lid, rect(0, 0, 360, 480));
     store().setLevelFraming(lid, { joists: 90 });

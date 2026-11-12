@@ -5,6 +5,7 @@ import { autosaveFailureReason, startAutosave } from '../io/file';
 import { createEmptyPlan, defaultLevelId } from '../model/plan';
 import type { Plan } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const ext = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;
@@ -17,13 +18,13 @@ beforeEach(() => {
 describe('derive caches keyed by level id', () => {
   it('forget levels that are no longer in the plan (New / Open)', () => {
     const touch = (plan: Plan) => {
-      for (const id of plan.levelOrder) {
+      for (const id of firstStructure(plan).levelOrder) {
         getFootprints(plan.levels[id], 'all');
         getFootprints(plan.levels[id], 'proposed');
         getOpeningsByWall(plan.levels[id]);
       }
     };
-    pruneDerivedCaches({ levelOrder: [] });
+    pruneDerivedCaches({ levels: {} });
     for (let i = 0; i < 5; i++) {
       const plan = createEmptyPlan();
       store().setPlan(plan);
@@ -33,7 +34,7 @@ describe('derive caches keyed by level id', () => {
     }
     expect(footprintLevelCount()).toBe(3);
     expect(openingLevelCount()).toBe(3);
-    pruneDerivedCaches({ levelOrder: [] });
+    pruneDerivedCaches({ levels: {} });
     expect(footprintLevelCount()).toBe(0);
     expect(openingLevelCount()).toBe(0);
   });

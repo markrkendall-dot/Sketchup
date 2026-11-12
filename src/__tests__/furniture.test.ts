@@ -15,6 +15,7 @@ import { useUiStore } from '../store/uiStore';
 import { BUFFALO_CHECK, clampWarmth, fabricPixels, paintPixels, PINE_MAX_WARMTH, woodPixels } from '../view3d/proceduralTextures';
 import { PX_PER_INCH, TEXTURE_PX } from '../view3d/textures';
 import { furnitureMaterial, stairPartMaterial } from '../view3d/materials';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 
@@ -144,7 +145,7 @@ describe('furniture solids', () => {
 describe('furniture in the plan', () => {
   it('loads a piece with its wood and fabric, drops a piece it does not know and a bad wood alone', () => {
     const plan = createEmptyPlan();
-    const lid = plan.levelOrder[0];
+    const lid = firstStructure(plan).levelOrder[0];
     const raw = JSON.parse(JSON.stringify(plan));
     raw.levels[lid].fixtures = {
       a: { ...piece('bed'), id: 'a', wood: 'hickory', fabric: 'buffaloRed' },

@@ -9,10 +9,11 @@ import { flightSteps, floorToFloor, stairsHoleOutline } from '../derive/stairs';
 import { getStaircaseLayout, heightAt } from '../derive/staircase';
 import { migrate } from '../model/plan';
 import type { Level, Plan, ViewMode } from '../model/types';
+import { firstStructure } from '../model/structures';
 
 const plan: Plan = migrate(rebuild);
-const [bId, fId] = plan.levelOrder;
-const [b, f, s] = plan.levelOrder.map((id) => plan.levels[id]);
+const [bId, fId] = firstStructure(plan).levelOrder;
+const [b, f, s] = firstStructure(plan).levelOrder.map((id) => plan.levels[id]);
 
 /** The names of the rooms whose faces a view finds on a level, sorted. */
 const roomNames = (level: Level, vm: ViewMode): string[] =>
@@ -48,16 +49,16 @@ describe('docs/examples/146-mick-road-rebuild.json', () => {
   it('is a second plan on the same levels and foundation as the starter', () => {
     expect(plan.id).toBe('plan-146-mick-road-rebuild');
     expect(plan.name).toBe('146 Mick Road (rebuilt on the foundation, design study)');
-    expect(plan.levelOrder.map((id) => plan.levels[id].name)).toEqual(['Basement', 'First Floor', 'Second Floor']);
+    expect(firstStructure(plan).levelOrder.map((id) => plan.levels[id].name)).toEqual(['Basement', 'First Floor', 'Second Floor']);
     expect([b.wallHeight, b.floorThickness, f.wallHeight, f.floorThickness, s.wallHeight, s.floorThickness]).toEqual([90, 4, 96, 12, 96, 12]);
-    expect(plan.baseFloorElevation).toBe(-100);
+    expect(firstStructure(plan).baseFloorElevation).toBe(-100);
     expect(getLevelElevations(plan)[fId].floorTop).toBe(2);
   });
 
   it('shows the house as it stands in the Existing view, with the same rooms as the starter', () => {
     const old = migrate(starter);
-    for (const [i, id] of plan.levelOrder.entries()) {
-      expect(roomNames(plan.levels[id], 'existing'), plan.levels[id].name).toEqual(roomNames(old.levels[old.levelOrder[i]], 'existing'));
+    for (const [i, id] of firstStructure(plan).levelOrder.entries()) {
+      expect(roomNames(plan.levels[id], 'existing'), plan.levels[id].name).toEqual(roomNames(old.levels[firstStructure(old).levelOrder[i]], 'existing'));
     }
   });
 
@@ -133,7 +134,7 @@ describe('docs/examples/146-mick-road-rebuild.json', () => {
 
   it('has no open wall ends but the retaining wall\'s free west end in any view, and no orphan labels in the Existing and Proposed views', () => {
     for (const vm of ['existing', 'proposed', 'all'] as const) {
-      for (const id of plan.levelOrder) {
+      for (const id of firstStructure(plan).levelOrder) {
         const level = plan.levels[id];
         const set = getFaces(level, vm);
         const ends = set.openEnds.map((n) => [level.nodes[n].x, level.nodes[n].y]);

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
 import { planSvg } from '../io/exportPlan';
+import { firstStructure, structuresOf } from '../model/structures';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore } from '../store/uiStore';
 import Scene3D from '../view3d/Scene3D';
@@ -19,7 +20,7 @@ export function ViewerApp() {
   const name = usePlanStore((s) => s.plan.name);
   const viewMode = useUiStore((s) => s.viewMode);
   const hasPhases = usePlanStore((s) =>
-    s.plan.levelOrder.some((id) => {
+    Object.keys(s.plan.levels).some((id) => {
       const l = s.plan.levels[id];
       const any = (items: Record<string, { phase: string }>) => Object.values(items).some((x) => x.phase !== 'existing');
       return !!l && (any(l.walls) || any(l.openings) || any(l.stairs) || any(l.roofs) || any(l.fixtures ?? {}) || any(l.decks ?? {}) || any(l.floorOpenings ?? {}));
@@ -76,7 +77,8 @@ function PlanTab() {
   const viewMode = useUiStore((s) => s.viewMode);
   const furniture = useUiStore((s) => s.showFurniture);
   const activeLevelId = useUiStore((s) => s.activeLevelId);
-  const levelId = plan.levels[activeLevelId] ? activeLevelId : plan.levelOrder[0];
+  const levelId = plan.levels[activeLevelId] ? activeLevelId : firstStructure(plan).levelOrder[0];
+  const many = plan.structureOrder.length > 1;
   const svg = useMemo(() => {
     try {
       // The export sizes itself in inches for printing; here it fills the pan-zoom area instead.
@@ -88,11 +90,13 @@ function PlanTab() {
   return (
     <>
       <div className="viewer-levels" role="tablist" aria-label="Level">
-        {[...plan.levelOrder].reverse().map((id) => (
-          <button key={id} role="tab" aria-selected={id === levelId} className={id === levelId ? 'active' : ''} onClick={() => useUiStore.getState().setActiveLevel(id)}>
-            {plan.levels[id].name}
-          </button>
-        ))}
+        {structuresOf(plan).flatMap((st) =>
+          [...st.levelOrder].reverse().map((id) => (
+            <button key={id} role="tab" aria-selected={id === levelId} className={id === levelId ? 'active' : ''} onClick={() => useUiStore.getState().setActiveLevel(id)}>
+              {many ? `${st.name}: ${plan.levels[id].name}` : plan.levels[id].name}
+            </button>
+          )),
+        )}
       </div>
       <PanZoom key={levelId}>
         {svg ? (

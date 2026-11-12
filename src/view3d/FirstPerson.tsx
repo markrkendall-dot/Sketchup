@@ -109,7 +109,7 @@ export function FirstPerson() {
       const plan = getPlan();
       const current = levelId.current;
       if (!current) return;
-      const next = stepLevel(walkLevels(plan, useUiStore.getState()), current, dir);
+      const next = stepLevel(walkLevels(plan, useUiStore.getState()), current, dir, plan);
       if (!next) return;
       camera.position.y = eyeElevation(plan, next);
       feet.current = camera.position.y - EYE_HEIGHT;
@@ -224,7 +224,7 @@ export function FirstPerson() {
     camera.position.x = moved.at.x;
     camera.position.z = moved.at.y;
     feet.current = moved.feet;
-    const on = levelAtFeet(plan, levels, moved.feet);
+    const on = levelAtFeet(plan, levels, moved.feet, moved.at);
     if (on && on !== levelId.current) {
       levelId.current = on;
       ui.setWalkLevel(on);

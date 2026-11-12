@@ -10,6 +10,7 @@ import type { Id, Plan, Vec2 } from '../model/types';
 import { guardIssues } from './guardChecks';
 import { stairIssues } from './stairChecks';
 import { structureIssues } from './structureChecks';
+import { allLevelIds } from '../model/structures';
 
 export type Severity = 'error' | 'warning' | 'info';
 export type IssueCategory = 'guard' | 'stair' | 'structure';
@@ -61,7 +62,7 @@ const cache = new WeakMap<Plan, readonly Issue[]>();
 export function getIssues(plan: Plan): readonly Issue[] {
   const hit = cache.get(plan);
   if (hit) return hit;
-  const levelIndex = new Map(plan.levelOrder.map((id, i) => [id, i]));
+  const levelIndex = new Map(allLevelIds(plan).map((id, i) => [id, i]));
   const issues = [...guardIssues(plan), ...stairIssues(plan), ...structureIssues(plan)].sort(
     (a, b) =>
       (levelIndex.get(a.levelId) ?? 0) - (levelIndex.get(b.levelId) ?? 0) ||

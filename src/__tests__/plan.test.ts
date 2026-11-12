@@ -16,6 +16,7 @@ import {
   usePlanStore,
 } from '../store/planStore';
 import { loadMeasureTo, loadOrthoLock, useUiStore } from '../store/uiStore';
+import { firstStructure } from '../model/structures';
 
 const opts = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;
 const store = () => usePlanStore.getState();
@@ -34,16 +35,16 @@ describe('createEmptyPlan', () => {
   it('has three levels with the documented defaults', () => {
     const plan = createEmptyPlan();
     expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(plan.levelOrder.map((id) => plan.levels[id].name)).toEqual([
+    expect(firstStructure(plan).levelOrder.map((id) => plan.levels[id].name)).toEqual([
       'Basement',
       'First Floor',
       'Second Floor',
     ]);
-    const [b, f, s] = plan.levelOrder.map((id) => plan.levels[id]);
+    const [b, f, s] = firstStructure(plan).levelOrder.map((id) => plan.levels[id]);
     expect([b.wallHeight, b.floorThickness]).toEqual([96, 4]);
     expect([f.wallHeight, f.floorThickness]).toEqual([96, 12]);
     expect([s.wallHeight, s.floorThickness]).toEqual([96, 12]);
-    expect(plan.baseFloorElevation).toBe(-100);
+    expect(firstStructure(plan).baseFloorElevation).toBe(-100);
     expect(plan.settings).toEqual({
       snapGrid: 1,
       displayGrid: 12,
@@ -51,7 +52,7 @@ describe('createEmptyPlan', () => {
       defaultExteriorThickness: 6.5,
       defaultInteriorThickness: 4.5,
     });
-    expect(defaultLevelId(plan)).toBe(plan.levelOrder[1]);
+    expect(defaultLevelId(plan)).toBe(firstStructure(plan).levelOrder[1]);
     expect(floorTops(plan)).toEqual([-100, 8, 116]);
   });
 });
@@ -291,8 +292,8 @@ describe('editor preferences are not plan data', () => {
 });
 
 describe('undo and redo on another level', () => {
-  const second = () => store().plan.levelOrder[2];
-  const first = () => store().plan.levelOrder[1];
+  const second = () => firstStructure(store().plan).levelOrder[2];
+  const first = () => firstStructure(store().plan).levelOrder[1];
 
   beforeEach(() => {
     useUiStore.getState().setActiveLevel(second());
@@ -390,7 +391,7 @@ describe('a wall on top of a wall (REVIEW-2 A1)', () => {
 
   it('copyWallsFromLevel skips the walls that would lie on walls already there, and says how many', () => {
     const id = box();
-    const second = store().plan.levelOrder[2];
+    const second = firstStructure(store().plan).levelOrder[2];
     store().addWall(second, { x: 0, y: 0 }, { x: 120, y: 0 }, newOpts);
     expect(store().copyWallsFromLevel(id, second)).toEqual({ copied: 3, skipped: 1 });
     const walls = Object.values(store().plan.levels[second].walls);
@@ -423,7 +424,7 @@ describe('a wall on top of a wall (REVIEW-2 A1)', () => {
   it("the north-wall repro on the example's First Floor leaves its walls and no open ends", () => {
     const plan = migrate(example);
     store().setPlan(plan);
-    const first = plan.levelOrder[1];
+    const first = firstStructure(plan).levelOrder[1];
     const walls = () => store().plan.levels[first].walls;
     // The house as it stands (24 walls, 28 pieces where the proposed walls meet them; a new wall does
     // not split a demolished one) and 21 proposed ones (two rebuild today's west wall from its front

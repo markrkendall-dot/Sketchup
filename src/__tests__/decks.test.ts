@@ -3,6 +3,8 @@ import { createEmptyPlan, defaultLevelId, migrate, MIGRATIONS, normalizeRailings
 import type { Deck, Vec2 } from '../model/types';
 import { clearHistory, undo, usePlanStore, type NewDeck } from '../store/planStore';
 import { EMPTY_SELECTION } from '../store/uiStore';
+import { firstStructure } from '../model/structures';
+import { legacyDoc } from './legacy';
 
 const store = () => usePlanStore.getState();
 
@@ -77,20 +79,20 @@ describe('deck store actions', () => {
 describe('decks in files', () => {
   it('schema 4 adds decks to every level; a v3 file gains empty records', () => {
     expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(4);
-    const v3 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 3 }));
+    const v3 = legacyDoc(createEmptyPlan(), 3);
     for (const l of Object.values(v3.levels) as Record<string, unknown>[]) delete l.decks;
     const up = MIGRATIONS[3](v3);
     expect(up.schemaVersion).toBe(4);
     for (const l of Object.values(up.levels as Record<string, Record<string, unknown>>)) expect(l.decks).toEqual({});
     const plan = migrate(v3);
     expect(plan.schemaVersion).toBe(SCHEMA_VERSION);
-    for (const id of plan.levelOrder) expect(plan.levels[id].decks).toEqual({});
+    for (const id of firstStructure(plan).levelOrder) expect(plan.levels[id].decks).toEqual({});
   });
 
   /** A v4 file with the given decks on its one level. */
   const file = (decks: Record<string, unknown>) => {
     const p = createEmptyPlan();
-    const lid = p.levelOrder[1];
+    const lid = firstStructure(p).levelOrder[1];
     const doc = JSON.parse(JSON.stringify(p));
     doc.levels[lid].decks = decks;
     return { doc, lid };

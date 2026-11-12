@@ -16,10 +16,11 @@ import { getLevelElevations } from './levels';
 import { beamOutline, memberBoxes } from './members';
 import { isVisible } from './phase';
 import { getFaces } from './rooms';
-import { groundAt } from './site';
+import { groundAtLevel } from './site';
 import { getStaircaseLayout } from './staircase';
 import { flightLinks, stairChains, stairsTop } from './stairChain';
 import { directionVector, flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsOutline, stairsPoint } from './stairs';
+import { allLevelIds, structuresOf } from '../model/structures';
 
 const VIEW = 'proposed';
 /** Slack on every limit, so a number typed to the limit passes (rounding, not a tolerance). */
@@ -58,14 +59,14 @@ export function stairIssues(plan: Plan): Issue[] {
   const elev = getLevelElevations(plan);
   // Flights that reach a deck: they arrive at its boards, not at the floor above.
   const toDeck = new Set<Id>();
-  for (const lid of plan.levelOrder) {
+  for (const lid of allLevelIds(plan)) {
     for (const d of Object.values(plan.levels[lid]?.decks ?? {})) {
       if (!isVisible(d.phase, VIEW)) continue;
       for (const o of getDeckLayout(plan, lid, d.id, VIEW)?.openings ?? []) if (o.stairsId) toDeck.add(o.stairsId);
     }
   }
 
-  plan.levelOrder.forEach((levelId, li) => {
+  for (const { levelOrder: order } of structuresOf(plan)) order.forEach((levelId, li) => {
     const level = plan.levels[levelId];
     const e = elev[levelId];
     if (!level || !e) return;
@@ -85,7 +86,7 @@ export function stairIssues(plan: Plan): Issue[] {
     const centre = (s: Stairs) => stairsPoint(stairsFrame(s), s.run / 2, 0);
 
     // What is over the treads: the slab above, but for floor openings and the holes flights cut.
-    const above = plan.levels[plan.levelOrder[li + 1]];
+    const above = plan.levels[order[li + 1]];
     const holes: Vec2[][] = above ? floorOpeningHoles(plan, above.id, VIEW) : [];
     for (const s of all) if (s.cutsFloorAbove) holes.push(...[stairsHoleOutline(s, ftf, level.wallHeight)].filter((h): h is Vec2[] => !!h));
     const ceiling = level.wallHeight;
@@ -104,7 +105,7 @@ export function stairIssues(plan: Plan): Issue[] {
     const inWall = (p: Vec2) => wallPolys.some((poly) => pointInPolygon(p, poly));
     const outer = getFaces(level, VIEW).outerFaces;
     /** The surface under a point beside the stairs, over the level's floor: the floor inside the house, the ground outside. */
-    const below = (p: Vec2) => (outer.some((poly) => pointInPolygon(p, poly)) ? 0 : Math.min(lowest ? 0 : Infinity, groundAt(plan, p) - e.floorTop));
+    const below = (p: Vec2) => (outer.some((poly) => pointInPolygon(p, poly)) ? 0 : Math.min(lowest ? 0 : Infinity, groundAtLevel(plan, levelId, p) - e.floorTop));
 
     for (const s of all) {
       if (!isNew(s)) continue;

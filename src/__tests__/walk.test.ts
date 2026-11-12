@@ -3,11 +3,12 @@ import { createEmptyPlan } from '../model/plan';
 import type { Plan, Wall } from '../model/types';
 import { ENTRY_INSET, entryDoorPose, EYE_HEIGHT, eyeElevation, startLevel, stepLevel, walkLevels, walkStart, walkStartLevel, walkStep } from '../view3d/walk';
 import type { Opening } from '../model/types';
+import { firstStructure } from '../model/structures';
 
 /** First Floor: a 30' x 40' box, optionally with an interior divider across the middle. */
 function plan(divider: boolean): Plan {
   const p = createEmptyPlan();
-  const first = p.levels[p.levelOrder[1]];
+  const first = p.levels[firstStructure(p).levelOrder[1]];
   const nodes = { a: { x: 0, y: 0 }, b: { x: 360, y: 0 }, c: { x: 360, y: 480 }, d: { x: 0, y: 480 } };
   for (const [id, pt] of Object.entries(nodes)) first.nodes[id] = { id, ...pt };
   const wall = (id: string, a: string, b: string, extra: Partial<Wall> = {}): Wall => ({
@@ -38,14 +39,14 @@ function plan(divider: boolean): Plan {
 const ui = (p: Plan, extra: Partial<{ hidden3dLevels: string[]; only3dActiveAndBelow: boolean }> = {}) => ({
   hidden3dLevels: [],
   only3dActiveAndBelow: false,
-  activeLevelId: p.levelOrder[1],
+  activeLevelId: firstStructure(p).levelOrder[1],
   ...extra,
 });
 
 describe('walk levels', () => {
   it('walks on the shown levels, starting on the active one', () => {
     const p = plan(false);
-    const [b, f, s] = p.levelOrder;
+    const [b, f, s] = firstStructure(p).levelOrder;
     expect(walkLevels(p, ui(p))).toEqual([b, f, s]);
     expect(walkLevels(p, ui(p, { hidden3dLevels: [s] }))).toEqual([b, f]);
     expect(walkLevels(p, ui(p, { only3dActiveAndBelow: true }))).toEqual([b, f]);
@@ -60,7 +61,7 @@ describe('walk levels', () => {
 
   it('eye height is 66" above each level\'s floor top', () => {
     const p = plan(false);
-    const [b, f, s] = p.levelOrder;
+    const [b, f, s] = firstStructure(p).levelOrder;
     expect(eyeElevation(p, b)).toBe(-100 + EYE_HEIGHT);
     expect(eyeElevation(p, f)).toBe(8 + EYE_HEIGHT);
     expect(eyeElevation(p, s)).toBe(116 + EYE_HEIGHT);
@@ -70,22 +71,22 @@ describe('walk levels', () => {
 describe('walkStart', () => {
   it('starts at the centre of the outer face', () => {
     const p = plan(false);
-    expect(walkStart(p, p.levelOrder[1], 'all', p.levelOrder)).toEqual({ at: { x: 180, y: 240 }, dir: { x: 1, y: 0 } });
+    expect(walkStart(p, firstStructure(p).levelOrder[1], 'all', firstStructure(p).levelOrder)).toEqual({ at: { x: 180, y: 240 }, dir: { x: 1, y: 0 } });
   });
 
   it('moves into a room when the centre is inside a wall', () => {
     const p = plan(true);
-    const { at } = walkStart(p, p.levelOrder[1], 'all', p.levelOrder);
+    const { at } = walkStart(p, firstStructure(p).levelOrder[1], 'all', firstStructure(p).levelOrder);
     expect(at.x).toBeCloseTo(180, 6);
     expect(Math.abs(at.y - 240)).toBeGreaterThan(60);
     // Without the divider (proposed view of a demolished divider would be the same) it is the centre.
-    p.levels[p.levelOrder[1]].walls.div.phase = 'demo';
-    expect(walkStart(p, p.levelOrder[1], 'proposed', p.levelOrder).at).toEqual({ x: 180, y: 240 });
+    p.levels[firstStructure(p).levelOrder[1]].walls.div.phase = 'demo';
+    expect(walkStart(p, firstStructure(p).levelOrder[1], 'proposed', firstStructure(p).levelOrder).at).toEqual({ x: 180, y: 240 });
   });
 
   it('a level without a closed outline starts at the middle of the shown levels', () => {
     const p = plan(false);
-    const { at } = walkStart(p, p.levelOrder[0], 'all', p.levelOrder);
+    const { at } = walkStart(p, firstStructure(p).levelOrder[0], 'all', firstStructure(p).levelOrder);
     expect(at).toEqual({ x: 180, y: 240 });
   });
 });
@@ -112,7 +113,7 @@ describe('walkStep', () => {
 describe('walking from site mode (REVIEW-2 A4)', () => {
   it('starts on the first floor, the level the site view shows, not the lowest', () => {
     const p = plan(false);
-    const [b, f, s] = p.levelOrder;
+    const [b, f, s] = firstStructure(p).levelOrder;
     const site = { hidden3dLevels: [], only3dActiveAndBelow: false, activeLevelId: b, siteMode: true };
     expect(walkStartLevel(p, site)).toBe(f);
     // "Only active and below" keeps the first floor and the basement.
@@ -145,10 +146,10 @@ describe('walk start at the entry door (REVIEW-2 C5)', () => {
 
   it('starts 24" inside an exterior door at its centre, looking into the house', () => {
     const p = plan(false);
-    const first = p.levels[p.levelOrder[1]];
+    const first = p.levels[firstStructure(p).levelOrder[1]];
     // The west wall runs d (0, 480) -> a (0, 0): a door 100" from d is at y 380.
     first.openings.o1 = door('o1', 'w3', 100);
-    const pose = walkStart(p, first.id, 'all', p.levelOrder);
+    const pose = walkStart(p, first.id, 'all', firstStructure(p).levelOrder);
     expect(pose.at.x).toBeCloseTo(ENTRY_INSET, 6);
     expect(pose.at.y).toBeCloseTo(380, 6);
     expect(pose.dir.x).toBeCloseTo(1, 6);
@@ -164,7 +165,7 @@ describe('walk start at the entry door (REVIEW-2 C5)', () => {
 
   it('ignores windows, interior doors and doors hidden in the view', () => {
     const p = plan(true);
-    const first = p.levels[p.levelOrder[1]];
+    const first = p.levels[firstStructure(p).levelOrder[1]];
     first.openings.w = door('w', 'ab', 100, { type: 'window', sill: 30 });
     first.openings.i = door('i', 'div', 100);
     first.openings.d = door('d', 'cd', 100, { phase: 'demo' });
@@ -177,7 +178,7 @@ describe('walk start at the entry door (REVIEW-2 C5)', () => {
 
   it('a door between the house and a closed porch looks into the house, not the porch', () => {
     const p = plan(false);
-    const first = p.levels[p.levelOrder[1]];
+    const first = p.levels[firstStructure(p).levelOrder[1]];
     // A porch west of the west wall, y 0..96: rooms on both sides of the wall piece with the door.
     first.nodes.p1 = { id: 'p1', x: -66, y: 0 };
     first.nodes.p2 = { id: 'p2', x: -66, y: 96 };
@@ -196,12 +197,12 @@ describe('walk start at the entry door (REVIEW-2 C5)', () => {
 
   it('"Walk from here" wins on its own level, looking east', () => {
     const p = plan(false);
-    const [b, f] = p.levelOrder;
+    const [b, f] = firstStructure(p).levelOrder;
     p.levels[f].openings.o1 = door('o1', 'w3', 100);
     const from = { levelId: f, point: { x: 200, y: 300 } };
-    expect(walkStart(p, f, 'all', p.levelOrder, from)).toEqual({ at: { x: 200, y: 300 }, dir: { x: 1, y: 0 } });
+    expect(walkStart(p, f, 'all', firstStructure(p).levelOrder, from)).toEqual({ at: { x: 200, y: 300 }, dir: { x: 1, y: 0 } });
     // Another level: the usual rule.
-    expect(walkStart(p, f, 'all', p.levelOrder, { ...from, levelId: b }).at.x).toBeCloseTo(ENTRY_INSET, 6);
-    expect(walkStart(p, f, 'all', p.levelOrder, null).at.x).toBeCloseTo(ENTRY_INSET, 6);
+    expect(walkStart(p, f, 'all', firstStructure(p).levelOrder, { ...from, levelId: b }).at.x).toBeCloseTo(ENTRY_INSET, 6);
+    expect(walkStart(p, f, 'all', firstStructure(p).levelOrder, null).at.x).toBeCloseTo(ENTRY_INSET, 6);
   });
 });

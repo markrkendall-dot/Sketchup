@@ -4,6 +4,8 @@ import { setTextureRedraw } from './textureQueue';
 import { useEffect, useMemo } from 'react';
 import { BackSide, Color, DirectionalLight, Mesh, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry, type Object3D } from 'three';
 import { lowestGround } from '../derive/site';
+import { structuresOf } from '../model/structures';
+import { useShallow } from 'zustand/react/shallow';
 import { usePlanStore } from '../store/planStore';
 import { useUiStore, type UiState, type View3dPreset } from '../store/uiStore';
 import { focusCanvas } from '../ui/focus';
@@ -296,20 +298,30 @@ function SkyEnvironment() {
   return null;
 }
 
+/**
+ * Every structure in a group at its place on the site (origin, and its turn about the vertical:
+ * a clockwise turn on the plan is a negative one about three's +Y), its shown levels inside.
+ */
 function Levels() {
-  const order = usePlanStore((s) => s.plan.levelOrder);
+  const plan = usePlanStore((s) => s.plan);
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const active = useUiStore((s) => s.activeLevelId);
   const siteMode = useUiStore((s) => s.siteMode);
   const shown = useMemo(
-    () => visible3dLevels(order, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode }),
-    [order, hidden, only, active, siteMode],
+    () => new Set(visible3dLevels(plan, { hidden3dLevels: hidden, only3dActiveAndBelow: only, activeLevelId: active, siteMode })),
+    [plan, hidden, only, active, siteMode],
   );
   return (
     <>
-      {shown.map((id) => (
-        <LevelMeshes key={id} levelId={id} />
+      {structuresOf(plan).map((st) => (
+        <group key={st.id} name={`structure:${st.id}`} position={[st.origin.x, 0, st.origin.y]} rotation={[0, (-st.rotation * Math.PI) / 180, 0]}>
+          {st.levelOrder
+            .filter((id) => shown.has(id))
+            .map((id) => (
+              <LevelMeshes key={id} levelId={id} />
+            ))}
+        </group>
       ))}
     </>
   );
@@ -326,8 +338,13 @@ const PRESET_BUTTONS: { preset: View3dPreset; label: string; title: string }[] =
 
 /** Small overlay toolbar: level and roof visibility, the view presets, Fit 3D, and the walk mode toggle. */
 function View3dToolbar() {
-  const order = usePlanStore((s) => s.plan.levelOrder);
-  const names = usePlanStore((s) => s.plan.levelOrder.map((id) => s.plan.levels[id]?.name ?? '').join('\u0000'));
+  // Each structure's levels, bottom to top; with more than one structure, each run of levels after its structure's name.
+  const rows = usePlanStore(
+    useShallow((s) => {
+      const many = s.plan.structureOrder.length > 1;
+      return structuresOf(s.plan).flatMap((st) => [...(many ? [`s|${st.id}|${st.name}`] : []), ...st.levelOrder.map((id) => `l|${id}|${s.plan.levels[id]?.name ?? ''}`)]);
+    }),
+  );
   const hidden = useUiStore((s) => s.hidden3dLevels);
   const only = useUiStore((s) => s.only3dActiveAndBelow);
   const grid = useUiStore((s) => s.show3dGrid);
@@ -338,15 +355,22 @@ function View3dToolbar() {
   // The standalone viewer has no walk mode (keyboard driven) and no grid.
   const viewer = useUiStore((s) => s.viewerMode);
   const { toggle3dLevel, setOnly3dActiveAndBelow, setShow3dGrid, setShow3dRoofs, setShowFurniture, requestFit3d, setCameraMode, setView3dPreset } = useUiStore.getState();
-  const nameList = names.split('\u0000');
   return (
     <div className="view3d-toolbar" role="toolbar" aria-label="3D view">
-      {order.map((id, i) => (
-        <label key={id} title="Show this level in 3D">
-          <input type="checkbox" checked={!hidden.includes(id)} onChange={() => toggle3dLevel(id)} />
-          {nameList[i]}
-        </label>
-      ))}
+      {rows.map((row) => {
+        const [kind, id, ...rest] = row.split('|');
+        const name = rest.join('|');
+        return kind === 's' ? (
+          <span key={row} className="view3d-structure">
+            {name}:
+          </span>
+        ) : (
+          <label key={id} title="Show this level in 3D">
+            <input type="checkbox" checked={!hidden.includes(id)} onChange={() => toggle3dLevel(id)} />
+            {name}
+          </label>
+        );
+      })}
       <span className="sep" />
       <label title="Hide the levels above the one being edited">
         <input type="checkbox" checked={only} onChange={(e) => setOnly3dActiveAndBelow(e.target.checked)} />

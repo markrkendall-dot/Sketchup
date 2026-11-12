@@ -4,6 +4,7 @@ import { createLibrary, LEGACY_AUTOSAVE_KEY, LIBRARY_INDEX_KEY, memoryStore, pla
 import { createEmptyPlan } from '../model/plan';
 import type { Plan } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const plan = (name: string, modifiedAt: string): Plan => ({ ...createEmptyPlan(name), modifiedAt });
 
@@ -27,7 +28,7 @@ describe('property library', () => {
     expect(kv.data.has(planKey(a.id))).toBe(true);
     const loaded = await lib.load(a.id);
     expect(loaded?.name).toBe('A2');
-    expect(loaded?.levelOrder).toEqual(a.levelOrder);
+    expect(firstStructure(loaded!).levelOrder).toEqual(firstStructure(a).levelOrder);
     expect(await lib.load('missing')).toBeNull();
   });
 
@@ -44,7 +45,7 @@ describe('property library', () => {
     const copy = await lib.duplicate(a.id);
     expect(copy.id).not.toBe(a.id);
     expect(copy.name).toBe('House copy');
-    expect(copy.levelOrder).toEqual(a.levelOrder);
+    expect(firstStructure(copy).levelOrder).toEqual(firstStructure(a).levelOrder);
     expect((await lib.list()).map((e) => e.name).sort()).toEqual(['House', 'House copy']);
     expect((await lib.load(a.id))?.name).toBe('House');
   });

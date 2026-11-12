@@ -88,6 +88,18 @@ export const CONCRETE_COLOR = '#b3b0a8';
  */
 export const RETAIN = { y: ft(26) + 3 + ft(10), bend: { x: 56, y: 489 }, west: -388 };
 export const RETAIN_NEW = [{ x: -660, y: 519 }, { x: -984, y: 519 }];
+/**
+ * The planned garage (README, "Still open"; MK, after the site sketch, photo 10), outside faces, in
+ * site coordinates: 24' east-west by 26' north-south, 55' west of the house (its east face at x
+ * -660) and 3' off the west property line (x -984, the retaining wall's new west end), so its west
+ * face is at x -948; the two agree. Its south side is set by the retaining wall carried west: 5'
+ * north of the new straight piece's north face (centerline y 519, 10" thick), so y 454, and its
+ * north face 26' further north at y 142. The README's "20' from the road" (the road's near edge at
+ * y -144) would put it 46" further north; the sketch is not to scale, and the wall setting its
+ * south side is what the README says decides it. Its floor is a slab at the lawn's -6 there. Wall
+ * height, roof and doors are not given anywhere: the garage preset's 84" storey, no roof, no door.
+ */
+export const GARAGE = { x0: -948, x1: -660, y0: 142, y1: 454, floor: -6 };
 /** The retaining wall's centerline y at plan x (the existing wall and the new one). */
 export const retainY = (x: number): number => {
   if (x >= RETAIN.bend.x) return RETAIN.y + ((CL.x1 - x) / (CL.x1 - RETAIN.bend.x)) * (RETAIN.bend.y - RETAIN.y);
@@ -401,9 +413,11 @@ export function stableIds(plan: Plan, planId: string): string {
   const add = (old: string, name: string) => names.set(old, name);
   add(plan.id, planId);
   const prefixes = ['b', 'f', 's'];
-  plan.levelOrder.forEach((lid, li) => {
+  // The main structure is `house` with levels b, f, s; another structure i (from 2) is `structure-i`
+  // with levels `s<i>l<n>`.
+  plan.structureOrder.forEach((sid, si) => add(sid, si === 0 ? 'house' : `structure-${si + 1}`));
+  plan.structureOrder.flatMap((sid, si) => plan.structures[sid].levelOrder.map((lid, li) => [lid, si === 0 ? (prefixes[li] ?? `l${li}`) : `s${si + 1}l${li + 1}`] as const)).forEach(([lid, pre]) => {
     const lvl = plan.levels[lid];
-    const pre = prefixes[li] ?? `l${li}`;
     add(lid, `level-${pre}`);
     const kinds: [string, Record<string, unknown>][] = [
       ['n', lvl.nodes],

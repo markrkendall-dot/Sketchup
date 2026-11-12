@@ -6,6 +6,7 @@ import { formatLength } from '../../model/units';
 import { EMPTY_SELECTION } from '../../store/uiStore';
 import type { Tool, ToolContext, ToolPointerEvent } from './index';
 import { makeOutlineTool } from './outlineTool';
+import { isLowestLevel, levelAboveId } from '../../model/structures';
 
 /** The snapped point for a member: corners, wall centerlines, the level below, the grid. */
 const memberSnap = (ctx: ToolContext, e: ToolPointerEvent, from: Vec2 | null) => ctx.snap(e.world, { from, shift: e.shiftKey });
@@ -77,7 +78,7 @@ export const postTool: Tool = {
     const ui = ctx.ui();
     const snap = snapToBeamEnds(ctx, e) ?? memberSnap(ctx, e, null);
     const d = MEMBER_DEFAULTS.post;
-    const lowest = ctx.plan().levelOrder[0] === ctx.levelId;
+    const lowest = isLowestLevel(ctx.plan(), ctx.levelId);
     const id = ctx.actions.addMember(ctx.levelId, {
       kind: 'post',
       at: snap.point,
@@ -112,8 +113,8 @@ export const postTool: Tool = {
 function snapToBeamEnds(ctx: ToolContext, e: ToolPointerEvent) {
   const ui = ctx.ui();
   const plan = ctx.plan();
-  const i = plan.levelOrder.indexOf(ctx.levelId);
-  const levels = [plan.levels[ctx.levelId], plan.levels[plan.levelOrder[i + 1]]].filter(Boolean);
+  const aboveId = levelAboveId(plan, ctx.levelId);
+  const levels = [ctx.levelId, aboveId].flatMap((id) => (id && plan.levels[id] ? [plan.levels[id]] : []));
   const r = 10 / ui.viewport.k;
   let best: Vec2 | null = null;
   let bestD = r;

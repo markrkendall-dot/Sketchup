@@ -11,6 +11,7 @@ import { pruneSelection } from './editor2d/tools';
 import { startAutosave } from './io/file';
 import { library, startupPlan, writeLastPlanId } from './io/library';
 import { defaultLevelId, neighbourLevelId } from './model/plan';
+import { firstStructure, stackOf } from './model/structures';
 import type { Plan } from './model/types';
 import { clearHistory, usePlanStore } from './store/planStore';
 import { clearNoticeOnEdit, forgetGoneLevels, useUiStore } from './store/uiStore';
@@ -71,12 +72,12 @@ async function boot(): Promise<void> {
   usePlanStore.subscribe((s, prev) => {
     const ui = useUiStore.getState();
     // A deleted level (or one undo took away) hands over to its neighbour in the stack.
-    if (!s.plan.levels[ui.activeLevelId]) ui.setActiveLevel(neighbourLevelId(prev.plan.levelOrder, s.plan, ui.activeLevelId) ?? defaultLevelId(s.plan));
-    else if (ui.siteMode && s.plan.levelOrder[0] !== ui.activeLevelId) ui.enterSiteMode(s.plan.levelOrder[0]);
+    if (!s.plan.levels[ui.activeLevelId]) ui.setActiveLevel(neighbourLevelId(stackOf(prev.plan, ui.activeLevelId), s.plan, ui.activeLevelId) ?? defaultLevelId(s.plan));
+    else if (ui.siteMode && firstStructure(s.plan).levelOrder[0] !== ui.activeLevelId) ui.enterSiteMode(firstStructure(s.plan).levelOrder[0]);
     else if (s.plan !== prev.plan) pruneSelection();
-    // Levels went away (New, Open): forget what the derive caches kept per level id, and a walk
-    // start picked on a level that is gone.
-    if (s.plan.levelOrder !== prev.plan.levelOrder) {
+    // Levels went away (New, Open, a level or structure deleted): forget what the derive caches
+    // kept per level id, and a walk start picked on a level that is gone.
+    if (s.plan.structures !== prev.plan.structures) {
       pruneDerivedCaches(s.plan);
       const from = useUiStore.getState().walkFrom;
       if (from && !s.plan.levels[from.levelId]) useUiStore.getState().setWalkFrom(null);

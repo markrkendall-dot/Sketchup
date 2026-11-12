@@ -20,6 +20,7 @@ import {
   underlayCorners,
 } from '../model/underlay';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const IMG = 'data:image/jpeg;base64,AAAA';
 
@@ -251,7 +252,7 @@ describe('underlay store actions', () => {
     expect(level().underlay).toMatchObject({ scale: 0.2, origin: { x: 1, y: 2 }, rotation: 270 });
     expect(pastLength()).toBe(2);
     // Untouched levels keep their identity.
-    const other = before.levelOrder[0];
+    const other = firstStructure(before).levelOrder[0];
     expect(store().plan.levels[other]).toBe(before.levels[other]);
     undo();
     expect(level().underlay).toEqual(underlay());
@@ -277,7 +278,7 @@ describe('migrate with underlays', () => {
   it('accepts a plan without underlays', () => {
     const plan = createEmptyPlan();
     const out = migrate(JSON.parse(JSON.stringify(plan)));
-    for (const id of out.levelOrder) expect('underlay' in out.levels[id]).toBe(false);
+    for (const id of firstStructure(out).levelOrder) expect('underlay' in out.levels[id]).toBe(false);
   });
 
   it('keeps a valid underlay through a JSON round trip', () => {
@@ -290,7 +291,7 @@ describe('migrate with underlays', () => {
 
   it('fills defaults for missing fields and drops a broken underlay', () => {
     const plan = createEmptyPlan();
-    const [a, b] = plan.levelOrder;
+    const [a, b] = firstStructure(plan).levelOrder;
     const json = JSON.parse(JSON.stringify(plan));
     json.levels[a].underlay = { image: IMG, pixelWidth: 10, pixelHeight: 20, origin: { x: 0, y: 0 }, scale: 2 };
     json.levels[b].underlay = { image: IMG, pixelWidth: 10, pixelHeight: 20, origin: { x: 0 }, scale: 2 };

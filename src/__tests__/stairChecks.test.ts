@@ -6,6 +6,7 @@ import { stairIssues } from '../derive/stairChecks';
 import { createEmptyPlan, migrate } from '../model/plan';
 import type { Plan, Vec2 } from '../model/types';
 import { clearHistory, usePlanStore, type NewStairs } from '../store/planStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
@@ -25,7 +26,7 @@ let s = '';
 function reset() {
   store().setPlan(createEmptyPlan());
   clearHistory();
-  [, f, s] = plan().levelOrder;
+  [, f, s] = firstStructure(plan()).levelOrder;
   for (const lid of [f, s]) {
     const c = rect(0, 0, 240, 240);
     for (let i = 0; i < 4; i++) store().addWall(lid, c[i], c[(i + 1) % 4], { kind: 'exterior', thickness: 6, phase: 'existing' });
@@ -93,7 +94,7 @@ describe('a flight against the code', () => {
   });
 
   it('measures headroom only under the floor above: outdoor steps on the lowest level beside the house have the sky over them', () => {
-    const [b] = plan().levelOrder;
+    const [b] = firstStructure(plan()).levelOrder;
     // A new flight on the Basement climbing to 80" under the First Floor's slab (its wall height 90")...
     const flight = (x: number) => store().addStairs(b, { origin: { x, y: 120 }, direction: 270, width: 36, run: 110, rise: 80, risers: 11, phase: 'new', cutsFloorAbove: false, open: true, railings: { left: true, right: true } });
     flight(120);
@@ -158,7 +159,7 @@ describe('the starter', () => {
   const starter = migrate(example as unknown) as Plan;
 
   it('chains its grand stair: the bottom step, the landing, the straight run', () => {
-    const fid = starter.levelOrder[1];
+    const fid = firstStructure(starter).levelOrder[1];
     expect(stairChains(starter, fid, 'proposed')).toEqual([['f-s2', 'f-s3', 'f-s4']]);
     // The step arrives at the landing's bottom; the run leaves the landing by its side (the turn).
     expect(flightLinks(starter, fid, 'proposed').map((l) => [l.from, l.to, l.edge])).toEqual([

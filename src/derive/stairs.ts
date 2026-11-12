@@ -1,5 +1,6 @@
 import { add, dot, scale, sub } from '../model/geometry';
 import type { Degrees, Id, Plan, Stairs, Vec2 } from '../model/types';
+import { levelAboveId } from '../model/structures';
 
 // Stairs (DESIGN.md "Plan document"). `origin` is the middle of the bottom edge of the flight (where
 // you step on), `direction` the plan angle of travel going up (0 = +x, 90 = +y, i.e. down the
@@ -22,10 +23,10 @@ export const TARGET_RISE = 7.5;
 
 /** Floor top of this level to floor top of the next one (or this level's own floor thickness on top). */
 export function floorToFloor(plan: Plan, levelId: Id): number {
-  const i = plan.levelOrder.indexOf(levelId);
   const level = plan.levels[levelId];
   if (!level) return 0;
-  const above = i >= 0 ? plan.levels[plan.levelOrder[i + 1]] : undefined;
+  const aboveId = levelAboveId(plan, levelId);
+  const above = aboveId ? plan.levels[aboveId] : undefined;
   return level.wallHeight + (above ? above.floorThickness : level.floorThickness);
 }
 

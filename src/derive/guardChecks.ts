@@ -7,6 +7,7 @@ import { issueId, type Issue } from './checks';
 import { compassName, edgeOutward, getDeckLayout } from './decks';
 import { getFloorOpeningLayout } from './floorOpenings';
 import { isVisible } from './phase';
+import { allLevelIds } from '../model/structures';
 
 const VIEW = 'proposed';
 
@@ -23,7 +24,7 @@ const edgeNames = (outline: readonly Vec2[], edges: number[], northAngle: number
 export function guardIssues(plan: Plan): Issue[] {
   const out: Issue[] = [];
   const north = plan.site.northAngle;
-  for (const levelId of plan.levelOrder) {
+  for (const levelId of allLevelIds(plan)) {
     const level = plan.levels[levelId];
     if (!level) continue;
     for (const deck of Object.values(level.decks ?? {})) {

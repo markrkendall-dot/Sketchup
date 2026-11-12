@@ -10,10 +10,11 @@ import { FIXTURE_KINDS, FRONT_STYLES } from './casework';
 import { isFabricId, isFurniturePiece, isWoodId } from './furniture';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
-import type { Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
+import { firstStructure, isStructureKind, normalizeDegrees, structureOf } from './structures';
+import type { Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
-export const SCHEMA_VERSION = 8 as const;
+export const SCHEMA_VERSION = 9 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
 export const MERGE_EPS = 0.5;
 
@@ -85,20 +86,45 @@ const TEMPLATE_LEVELS: Record<PlanTemplate, { levels: [string, number, number][]
 
 export const isPlanTemplate = (v: unknown): v is PlanTemplate => typeof v === 'string' && v in TEMPLATE_LEVELS;
 
+/** Each template's levels (createLevel), bottom to top, and the lowest floor top. */
+export function templateLevels(template: PlanTemplate): { levels: Level[]; base: number } {
+  const t = TEMPLATE_LEVELS[template];
+  return { levels: t.levels.map(([n, h, f]) => createLevel(n, h, f)), base: t.base };
+}
+
+/** A structure holding `levels` (bottom to top), at the site's origin unless placed. */
+export function createStructure(
+  name: string,
+  kind: StructureKind,
+  levels: readonly Level[],
+  base: number,
+  placement: Partial<Pick<Structure, 'origin' | 'rotation'>> = {},
+): Structure {
+  return {
+    id: newId(),
+    name,
+    kind,
+    origin: { x: placement.origin?.x ?? 0, y: placement.origin?.y ?? 0 },
+    rotation: placement.rotation ?? 0,
+    baseFloorElevation: base,
+    levelOrder: levels.map((l) => l.id),
+  };
+}
+
 /**
- * A new plan with a template's levels (DESIGN.md "Levels"). The default, a basement and two floors,
- * is what every plan started with before templates.
+ * A new plan with a template's levels (DESIGN.md "Levels") in one structure. The default, a basement
+ * and two floors, is what every plan started with before templates.
  */
 export function createEmptyPlan(name = 'Untitled plan', template: PlanTemplate = 'basementTwoStorey'): Plan {
-  const t = TEMPLATE_LEVELS[template];
-  const levels = t.levels.map(([n, h, f]) => createLevel(n, h, f));
+  const { levels, base } = templateLevels(template);
+  const structure = template === 'outbuilding' ? createStructure('Outbuilding', 'other', levels, base) : createStructure('House', 'house', levels, base);
   return {
     schemaVersion: SCHEMA_VERSION,
     id: newId(),
     name,
-    levelOrder: levels.map((l) => l.id),
+    structures: { [structure.id]: structure },
+    structureOrder: [structure.id],
     levels: Object.fromEntries(levels.map((l) => [l.id, l])),
-    baseFloorElevation: t.base,
     settings: { ...DEFAULT_SETTINGS },
     site: defaultSite(),
     modifiedAt: new Date().toISOString(),
@@ -106,22 +132,30 @@ export function createEmptyPlan(name = 'Untitled plan', template: PlanTemplate =
 }
 
 /**
- * The ground floor: the level above the lowest when the lowest is below grade (a basement:
- * baseFloorElevation under 0, or not given), else the lowest. Always a level of a non-empty plan.
+ * A structure's ground floor: the level above the lowest when the lowest is below grade (a
+ * basement: baseFloorElevation under 0, or not given), else the lowest. Always a level of a
+ * non-empty stack. Given a plan, the main structure's (firstStructure).
  */
-export function groundLevelId(plan: { readonly levelOrder: readonly Id[]; readonly baseFloorElevation?: number }): Id | undefined {
-  const basement = plan.baseFloorElevation === undefined || plan.baseFloorElevation < 0;
-  return (basement ? plan.levelOrder[1] : undefined) ?? plan.levelOrder[0];
+export function groundLevelId(stack: { readonly levelOrder: readonly Id[]; readonly baseFloorElevation?: number }): Id | undefined {
+  const basement = stack.baseFloorElevation === undefined || stack.baseFloorElevation < 0;
+  return (basement ? stack.levelOrder[1] : undefined) ?? stack.levelOrder[0];
 }
 
-/** The level the editor opens on: the ground floor (groundLevelId), First Floor in a plan with a basement. */
-export function defaultLevelId(plan: Plan): Id {
-  return groundLevelId(plan) ?? plan.levelOrder[0];
+/** The ground floor of the structure a level is in (groundLevelId). */
+export function groundLevelOf(plan: Pick<Plan, 'structures' | 'structureOrder'>, levelId: Id): Id | undefined {
+  const s = structureOf(plan, levelId);
+  return s ? groundLevelId(s) : undefined;
+}
+
+/** The level the editor opens on: the main structure's ground floor (groundLevelId), First Floor in a house with a basement. */
+export function defaultLevelId(plan: Pick<Plan, 'structures' | 'structureOrder'>): Id {
+  const s = firstStructure(plan);
+  return groundLevelId(s) ?? s.levelOrder[0];
 }
 
 /**
  * The level to show when `goneId` is no longer in `plan`: the nearest level below it in `prevOrder`
- * that is still there, else the nearest above, else undefined.
+ * (its structure's stack before the edit) that is still there, else the nearest above, else undefined.
  */
 export function neighbourLevelId(prevOrder: readonly Id[], plan: Plan, goneId: Id): Id | undefined {
   const i = prevOrder.indexOf(goneId);
@@ -131,17 +165,23 @@ export function neighbourLevelId(prevOrder: readonly Id[], plan: Plan, goneId: I
   return undefined;
 }
 
-/** Floor-top elevation of each level, bottom to top (see DESIGN.md elevation rule). */
-export function floorTops(plan: Plan): number[] {
+/** Floor-top elevation of each level of a stack, bottom to top (see DESIGN.md elevation rule). */
+export function stackFloorTops(stack: Pick<Structure, 'levelOrder' | 'baseFloorElevation'>, levels: Readonly<Record<Id, Level>>): number[] {
   const tops: number[] = [];
-  plan.levelOrder.forEach((id, i) => {
-    if (i === 0) tops.push(plan.baseFloorElevation);
+  stack.levelOrder.forEach((id, i) => {
+    if (i === 0) tops.push(stack.baseFloorElevation);
     else {
-      const below = plan.levels[plan.levelOrder[i - 1]];
-      tops.push(tops[i - 1] + below.wallHeight + plan.levels[id].floorThickness);
+      const below = levels[stack.levelOrder[i - 1]];
+      tops.push(tops[i - 1] + below.wallHeight + levels[id].floorThickness);
     }
   });
   return tops;
+}
+
+/** Floor-top elevation of each level of a structure (the main one by default), bottom to top. */
+export function floorTops(plan: Plan, structureId: Id = plan.structureOrder[0]): number[] {
+  const s = plan.structures[structureId];
+  return s ? stackFloorTops(s, plan.levels) : [];
 }
 
 export function wallLength(level: Level, wall: Wall): number {
@@ -640,7 +680,33 @@ export const MIGRATIONS: Record<number, (doc: Json) => Json> = {
     next.schemaVersion = 8;
     return next;
   },
+  /**
+   * Version 8: one stack of levels (`levelOrder`, `baseFloorElevation` on the plan). Wrap it in one
+   * structure, a house at the site's origin, unturned (DESIGN.md "Structures").
+   */
+  8: (doc) => {
+    const next: Json = { ...doc };
+    delete next.levelOrder;
+    delete next.baseFloorElevation;
+    next.structures = {
+      [MIGRATED_STRUCTURE_ID]: {
+        id: MIGRATED_STRUCTURE_ID,
+        name: 'House',
+        kind: 'house',
+        origin: { x: 0, y: 0 },
+        rotation: 0,
+        baseFloorElevation: doc.baseFloorElevation,
+        levelOrder: doc.levelOrder,
+      },
+    };
+    next.structureOrder = [MIGRATED_STRUCTURE_ID];
+    next.schemaVersion = 9;
+    return next;
+  },
 };
+
+/** The id migration 8 gives the one structure it makes. */
+export const MIGRATED_STRUCTURE_ID = 'house';
 
 const PHASES = new Set(['existing', 'demo', 'new']);
 const phaseOf = (v: unknown): Phase => (typeof v === 'string' && PHASES.has(v) ? (v as Phase) : 'existing');
@@ -668,7 +734,8 @@ const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', '
 const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
 const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'underlay'] as const;
-const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'levelOrder', 'levels', 'baseFloorElevation', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook'] as const;
+const STRUCTURE_KEYS = ['id', 'name', 'kind', 'origin', 'rotation', 'baseFloorElevation', 'levelOrder'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
 
@@ -1383,6 +1450,70 @@ function migrateSettings(raw: Json): PlanSettings {
   return out as unknown as PlanSettings;
 }
 
+/**
+ * The structures and their levels (DESIGN.md "Structures"): at least one structure, each with at
+ * least one level, every listed level present and in exactly one structure's stack. A level no
+ * structure lists is dropped (as a level missing from levelOrder always was).
+ */
+function migrateStructures(doc: Json): { structures: Record<Id, Structure>; structureOrder: Id[]; levels: Record<Id, Level> } {
+  if (!Array.isArray(doc.structureOrder) || doc.structureOrder.length === 0) fail('structureOrder must be a non-empty array');
+  const rawStructures = record(doc.structures, 'structures');
+  const rawLevels = record(doc.levels, 'levels');
+  const structures: Record<Id, Structure> = {};
+  const levels: Record<Id, Level> = {};
+  for (const sid of doc.structureOrder) {
+    if (typeof sid !== 'string') fail('structureOrder must contain structure ids');
+    if (sid in structures) fail(`structure ${sid} is listed twice in structureOrder`);
+    const raw = rawStructures[sid];
+    if (!isObject(raw)) fail(`structure ${sid} is listed in structureOrder but missing`);
+    const order = raw.levelOrder;
+    if (!Array.isArray(order) || order.length === 0) fail(`structure ${sid}: levelOrder must be a non-empty array`);
+    for (const id of order) {
+      if (typeof id !== 'string') fail(`structure ${sid}: levelOrder must contain level ids`);
+      if (!(id in rawLevels)) fail(`level ${id} is listed in levelOrder but missing`);
+      if (id in levels) fail(`level ${id} is listed twice in levelOrder`);
+      levels[id] = migrateLevel(rawLevels[id], id, id === order[0]);
+    }
+    const s = pick(raw, STRUCTURE_KEYS);
+    s.id = sid;
+    s.name = typeof raw.name === 'string' && raw.name.trim() ? raw.name : 'Building';
+    s.kind = isStructureKind(raw.kind) ? raw.kind : 'other';
+    s.origin = isPoint(raw.origin) ? { x: raw.origin.x, y: raw.origin.y } : { x: 0, y: 0 };
+    s.rotation = isNum(raw.rotation) ? normalizeDegrees(raw.rotation) : 0;
+    s.baseFloorElevation = isNum(raw.baseFloorElevation) ? raw.baseFloorElevation : 0;
+    s.levelOrder = [...(order as string[])];
+    structures[sid] = s as unknown as Structure;
+  }
+  for (const sid of Object.keys(rawStructures)) if (!(sid in structures)) fail(`structure ${sid} is not listed in structureOrder`);
+  return { structures, structureOrder: [...(doc.structureOrder as string[])], levels };
+}
+
+/**
+ * What breaks the structure invariants of a plan in memory, or null: at least one structure, each
+ * listed once with at least one level, every level in exactly one structure's stack and every
+ * listed level present.
+ */
+export function structureProblem(plan: Pick<Plan, 'structures' | 'structureOrder' | 'levels'>): string | null {
+  if (plan.structureOrder.length === 0) return 'the plan has no structure';
+  const seen = new Set<Id>();
+  const owner = new Map<Id, Id>();
+  for (const sid of plan.structureOrder) {
+    if (seen.has(sid)) return `structure ${sid} is listed twice`;
+    seen.add(sid);
+    const s = plan.structures[sid];
+    if (!s) return `structure ${sid} is missing`;
+    if (s.levelOrder.length === 0) return `${s.name} has no level`;
+    for (const id of s.levelOrder) {
+      if (!plan.levels[id]) return `level ${id} of ${s.name} is missing`;
+      if (owner.has(id)) return `level ${id} is in two structures`;
+      owner.set(id, sid);
+    }
+  }
+  for (const sid of Object.keys(plan.structures)) if (!seen.has(sid)) return `structure ${sid} is not in structureOrder`;
+  for (const id of Object.keys(plan.levels)) if (!owner.has(id)) return `level ${id} is in no structure`;
+  return null;
+}
+
 /** Validate (loosely) and upgrade a parsed JSON document to the current Plan schema. */
 export function migrate(json: unknown): Plan {
   if (!isObject(json)) fail('expected a JSON object');
@@ -1398,22 +1529,14 @@ export function migrate(json: unknown): Plan {
     doc = step(doc);
     version = doc.schemaVersion;
   }
-  if (!Array.isArray(doc.levelOrder) || doc.levelOrder.length === 0) fail('levelOrder must be a non-empty array');
-  const rawLevels = record(doc.levels, 'levels');
-  const levels: Record<string, Level> = {};
-  for (const id of doc.levelOrder) {
-    if (typeof id !== 'string') fail('levelOrder must contain level ids');
-    if (!(id in rawLevels)) fail(`level ${id} is listed in levelOrder but missing`);
-    if (id in levels) fail(`level ${id} is listed twice in levelOrder`);
-    levels[id] = migrateLevel(rawLevels[id], id, id === doc.levelOrder[0]);
-  }
+  const { structures, structureOrder, levels } = migrateStructures(doc);
   const plan = pick(doc, PLAN_KEYS);
   plan.schemaVersion = SCHEMA_VERSION;
   plan.id = typeof doc.id === 'string' && doc.id ? doc.id : newId();
   plan.name = typeof doc.name === 'string' && doc.name.trim() ? doc.name : 'Untitled plan';
-  plan.levelOrder = [...(doc.levelOrder as string[])];
+  plan.structures = structures;
+  plan.structureOrder = structureOrder;
   plan.levels = levels;
-  plan.baseFloorElevation = isNum(doc.baseFloorElevation) ? doc.baseFloorElevation : 0;
   plan.settings = migrateSettings(record(doc.settings, 'settings'));
   plan.site = migrateSite(doc.site);
   plan.modifiedAt = typeof doc.modifiedAt === 'string' ? doc.modifiedAt : new Date().toISOString();

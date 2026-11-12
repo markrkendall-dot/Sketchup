@@ -10,14 +10,15 @@ import { ATTIC_JOIST_DEPTH, isTimber } from '../model/structure';
 import type { Beam, Id, Level, Member, Plan, Post, Vec2, ViewMode } from '../model/types';
 import type { DeckBox } from './decks';
 import { isVisible, phasesCoexist } from './phase';
+import { levelAboveId } from '../model/structures';
 
 /** The subfloor over the joists, inches. */
 export const SUBFLOOR = 0.75;
 
 /** The level above, if any. */
 const levelAbove = (plan: Plan, levelId: Id): Level | undefined => {
-  const i = plan.levelOrder.indexOf(levelId);
-  return i >= 0 ? plan.levels[plan.levelOrder[i + 1]] : undefined;
+  const id = levelAboveId(plan, levelId);
+  return id ? plan.levels[id] : undefined;
 };
 
 /** How deep the joists over a level are. */

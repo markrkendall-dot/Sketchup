@@ -9,6 +9,7 @@ import { groundAt } from '../derive/site';
 import { getStaircaseLayout, heightAt } from '../derive/staircase';
 import { flightSteps, floorToFloor, stairsBase, stairsFrame, stairsHoleOutline, stairsOutline, stairsPoint } from '../derive/stairs';
 import { add, dist, dot, pointInPolygon, polygonSignedArea, projectPointToSegment, scale, sub } from '../model/geometry';
+import { allLevelIds, levelBelowId, structureOf, toLocal, toSite, type Placement } from '../model/structures';
 import type { Id, Plan, Vec2, ViewMode } from '../model/types';
 import { planBox } from './bounds';
 import { active3dLevel, visible3dLevels } from './visibility';
@@ -27,8 +28,8 @@ type LevelVisibility = Parameters<typeof visible3dLevels>[1];
 
 /** The levels one can walk on: those the 3D view shows, bottom to top (all levels if none is). */
 export function walkLevels(plan: Plan, ui: LevelVisibility): Id[] {
-  const shown = visible3dLevels(plan.levelOrder, ui);
-  return shown.length ? shown : [...plan.levelOrder];
+  const shown = visible3dLevels(plan, ui);
+  return shown.length ? shown : [...allLevelIds(plan)];
 }
 
 /** The level walking starts on: the active one when it is shown, else the lowest shown. */
@@ -41,11 +42,18 @@ export function startLevel(levels: readonly Id[], activeLevelId: Id): Id | undef
  * the level the site view shows; active3dLevel) when the 3D view shows it, else the lowest shown.
  */
 export function walkStartLevel(plan: Plan, ui: LevelVisibility): Id | undefined {
-  return startLevel(walkLevels(plan, ui), active3dLevel(plan.levelOrder, ui));
+  return startLevel(walkLevels(plan, ui), active3dLevel(plan, ui));
 }
 
-/** The next level below (-1) or above (+1) in `levels`, or null at the bottom / top. */
-export function stepLevel(levels: readonly Id[], current: Id, dir: -1 | 1): Id | null {
+/**
+ * The next level below (-1) or above (+1) in `levels`, or null at the bottom / top. Given the plan,
+ * only levels of the current level's structure count (Q and E stay in the building).
+ */
+export function stepLevel(levels: readonly Id[], current: Id, dir: -1 | 1, plan?: Plan): Id | null {
+  if (plan) {
+    const own = structureOf(plan, current);
+    if (own) levels = levels.filter((id) => own.levelOrder.includes(id));
+  }
   const i = levels.indexOf(current);
   if (i < 0) return levels[0] ?? null;
   return levels[i + dir] ?? null;
@@ -59,7 +67,7 @@ export function eyeElevation(plan: Plan, levelId: Id): number {
 /** How far inside the wall's centerline a walk through the entry door starts, inches. */
 export const ENTRY_INSET = 24;
 
-/** Where walking starts and the way the eye looks (a unit vector in plan coordinates). */
+/** Where walking starts and the way the eye looks (a unit vector in site coordinates). */
 export interface WalkPose {
   at: Vec2;
   dir: Vec2;
@@ -111,6 +119,22 @@ export function walkStart(
   levels: readonly Id[],
   walkFrom?: { levelId: Id; point: Vec2 } | null,
 ): WalkPose {
+  const st = structureOf(plan, levelId);
+  const local = walkStartLocal(plan, levelId, viewMode, walkFrom);
+  if (local) return st ? placePose(st, local) : local;
+  const box = planBox(plan, levels);
+  return { at: { x: (box.min[0] + box.max[0]) / 2, y: (box.min[2] + box.max[2]) / 2 }, dir: EAST };
+}
+
+/** A pose in a structure's coordinates, on the site. */
+function placePose(st: Placement, pose: WalkPose): WalkPose {
+  const o = toSite(st, { x: 0, y: 0 });
+  const d = toSite(st, pose.dir);
+  return { at: toSite(st, pose.at), dir: { x: d.x - o.x, y: d.y - o.y } };
+}
+
+/** walkStart's steps 1 to 3, in the level's own coordinates; null for step 4. */
+function walkStartLocal(plan: Plan, levelId: Id, viewMode: ViewMode, walkFrom?: { levelId: Id; point: Vec2 } | null): WalkPose | null {
   if (walkFrom && walkFrom.levelId === levelId && plan.levels[levelId]) return { at: { ...walkFrom.point }, dir: EAST };
   const door = entryDoorPose(plan, levelId, viewMode);
   if (door) return door;
@@ -131,8 +155,7 @@ export function walkStart(
       return { at: largest ? largest.labelPoint : c, dir: EAST };
     }
   }
-  const box = planBox(plan, levels);
-  return { at: { x: (box.min[0] + box.max[0]) / 2, y: (box.min[2] + box.max[2]) / 2 }, dir: EAST };
+  return null;
 }
 
 /**
@@ -214,6 +237,26 @@ function inShape(s: Shape, p: Vec2, pad = 0): boolean {
   return s.poly.some((q, i) => projectPointToSegment(p, q, s.poly[(i + 1) % s.poly.length]).distance <= pad);
 }
 
+/** Move shapes from `from` on, built in a structure's coordinates, onto the site; their heights read the site point back in its coordinates. */
+function placeShapes<T extends Shape & { top: Height; bottom?: Height }>(st: Placement, list: T[], from: number): void {
+  if (st.origin.x === 0 && st.origin.y === 0 && st.rotation === 0) return;
+  for (let i = from; i < list.length; i++) {
+    const s = list[i];
+    const placed = shape(
+      s.poly.map((p) => toSite(st, p)),
+      s.holes?.map((h) => h.map((p) => toSite(st, p))),
+    );
+    const top = s.top;
+    const next = { ...s, ...placed, top: (p: Vec2) => top(toLocal(st, p)) } as T;
+    if (!s.holes?.length) delete next.holes;
+    if (s.bottom) {
+      const bottom = s.bottom;
+      next.bottom = (p: Vec2) => bottom(toLocal(st, p));
+    }
+    list[i] = next;
+  }
+}
+
 const worldCache = new WeakMap<Plan, Map<string, WalkWorld>>();
 
 /** The surfaces and obstacles of the levels one walks on, in a view (memoized per plan). */
@@ -228,17 +271,22 @@ export function walkWorld(plan: Plan, viewMode: ViewMode, levels: readonly Id[])
   const obstacles: WalkObstacle[] = [];
   const box = (b: DeckBox, z: number, pad = 0): WalkObstacle => ({ ...shape(b.poly, b.holes), bottom: flat(z + b.bottom), top: flat(z + b.top), pad });
   const footprints: Vec2[][] = [];
-  for (const id of plan.levelOrder) {
+  for (const id of allLevelIds(plan)) {
     const level = plan.levels[id];
-    if (level) footprints.push(...slabOutlines(getFaces(level, viewMode), true));
+    const st = structureOf(plan, id);
+    if (level && st) footprints.push(...slabOutlines(getFaces(level, viewMode), true).map((f) => f.map((p) => toSite(st, p))));
   }
   for (const id of levels) {
     const level = plan.levels[id];
     const z = elev[id]?.floorTop;
-    if (!level || z === undefined) continue;
+    const st = structureOf(plan, id);
+    if (!level || z === undefined || !st) continue;
+    // Built in the level's coordinates, then placed on the site with its structure (placeShapes).
+    const firstSurface = surfaces.length;
+    const firstObstacle = obstacles.length;
     // The floor, less its openings and the holes the flights below cut in it.
-    const i = plan.levelOrder.indexOf(id);
-    const below = plan.levels[plan.levelOrder[i - 1]];
+    const belowId = levelBelowId(plan, id);
+    const below = belowId ? plan.levels[belowId] : undefined;
     const holes = floorOpeningHoles(plan, id, viewMode);
     if (below) {
       const ftf = floorToFloor(plan, below.id);
@@ -295,6 +343,8 @@ export function walkWorld(plan: Plan, viewMode: ViewMode, levels: readonly Id[])
       const layout = getFloorOpeningLayout(plan, id, o.id, viewMode);
       for (const r of [...(layout?.railing ?? []), ...(layout?.rail ?? [])]) obstacles.push(box(r, z, BODY_RADIUS));
     }
+    placeShapes(st, surfaces, firstSurface);
+    placeShapes(st, obstacles, firstObstacle);
   }
   const world: WalkWorld = {
     surfaces,
@@ -360,9 +410,20 @@ export function walkMove(world: WalkWorld, from: WalkState, to: Vec2): WalkState
   return { at, feet };
 }
 
-/** The level the feet are on: the highest walkable level whose floor is not above them. */
-export function levelAtFeet(plan: Plan, levels: readonly Id[], feet: number): Id | undefined {
+/**
+ * The level the feet are on: the highest walkable level whose floor is not above them. Given where
+ * they stand (site coordinates), the levels of the structure whose outline holds that point come first.
+ */
+export function levelAtFeet(plan: Plan, levels: readonly Id[], feet: number, at?: Vec2): Id | undefined {
   const elev = getLevelElevations(plan);
+  if (at) {
+    const inside = levels.filter((id) => {
+      const st = structureOf(plan, id);
+      const level = plan.levels[id];
+      return !!st && !!level && getFaces(level, 'all').outerFaces.some((f) => pointInPolygon(toLocal(st, at), f));
+    });
+    if (inside.length) levels = inside;
+  }
   let best: Id | undefined;
   for (const id of levels) {
     const z = elev[id]?.floorTop;

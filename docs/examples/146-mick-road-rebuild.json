@@ -1,11 +1,27 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "plan-146-mick-road-rebuild",
   "name": "146 Mick Road (rebuilt on the foundation, design study)",
-  "levelOrder": [
-    "level-b",
-    "level-f",
-    "level-s"
+  "structures": {
+    "house": {
+      "id": "house",
+      "name": "House",
+      "kind": "house",
+      "origin": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "baseFloorElevation": -100,
+      "levelOrder": [
+        "level-b",
+        "level-f",
+        "level-s"
+      ]
+    }
+  },
+  "structureOrder": [
+    "house"
   ],
   "levels": {
     "level-b": {
@@ -5769,7 +5785,6 @@
       }
     }
   },
-  "baseFloorElevation": -100,
   "settings": {
     "snapGrid": 1,
     "displayGrid": 12,

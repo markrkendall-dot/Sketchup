@@ -9,6 +9,8 @@ import { createEmptyPlan, migrate, MIGRATIONS, SCHEMA_VERSION } from '../model/p
 import type { Vec2 } from '../model/types';
 import { clearHistory, undo, usePlanStore } from '../store/planStore';
 import { EMPTY_SELECTION } from '../store/uiStore';
+import { firstStructure } from '../model/structures';
+import { legacyDoc } from './legacy';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
@@ -44,7 +46,7 @@ beforeEach(() => {
   clearHistory();
   clearFloorOpeningLayouts();
   clearMeshCache();
-  [, f, s] = plan().levelOrder;
+  [, f, s] = firstStructure(plan()).levelOrder;
   for (const lid of [f, s]) {
     const c = rect(0, 0, 240, 240);
     for (let i = 0; i < 4; i++) store().addWall(lid, c[i], c[(i + 1) % 4], { kind: 'exterior', thickness: 6, phase: 'existing' });
@@ -90,18 +92,18 @@ describe('floor opening store actions', () => {
 describe('floor openings in files', () => {
   it('schema 5 adds floor openings to every level; a v4 file gains empty records', () => {
     expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(5);
-    const v4 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 4 }));
+    const v4 = legacyDoc(createEmptyPlan(), 4);
     for (const l of Object.values(v4.levels) as Record<string, unknown>[]) delete l.floorOpenings;
     const up = MIGRATIONS[4](v4);
     expect(up.schemaVersion).toBe(5);
     for (const l of Object.values(up.levels as Record<string, Record<string, unknown>>)) expect(l.floorOpenings).toEqual({});
     const loaded = migrate(v4);
-    for (const id of loaded.levelOrder) expect(loaded.levels[id].floorOpenings).toEqual({});
+    for (const id of firstStructure(loaded).levelOrder) expect(loaded.levels[id].floorOpenings).toEqual({});
   });
 
   it('keeps a good opening, fits its railings, drops a broken one with a warning, and round-trips', () => {
     const doc = JSON.parse(JSON.stringify(createEmptyPlan()));
-    const lid = doc.levelOrder[2];
+    const lid = firstStructure(doc).levelOrder[2];
     doc.levels[lid].floorOpenings = {
       good: { id: 'good', outline: OUTLINE, railings: [false, true], phase: 'new', extra: 1 },
       flat: { id: 'flat', outline: OUTLINE.slice(0, 2), railings: [], phase: 'new' },

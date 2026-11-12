@@ -7,10 +7,11 @@ import { createEmptyPlan, defaultLevelId, groundLevelId, migrate, neighbourLevel
 import type { Plan, Post, Vec2 } from '../model/types';
 import { clearHistory, redo, undo, usePlanStore } from '../store/planStore';
 import { forgetGoneLevels, useUiStore } from '../store/uiStore';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const plan = () => store().plan;
-const order = () => plan().levelOrder;
+const order = () => firstStructure(plan()).levelOrder;
 const tops = () => {
   const e = getLevelElevations(plan());
   return Object.fromEntries(order().map((id) => [id, e[id].floorTop]));
@@ -39,32 +40,32 @@ function start(template?: PlanTemplate): void {
 describe('templates', () => {
   it('keeps the default plan as it was: a basement and two floors', () => {
     const p = createEmptyPlan();
-    expect(p.levelOrder.map((id) => [p.levels[id].name, p.levels[id].wallHeight, p.levels[id].floorThickness])).toEqual([
+    expect(firstStructure(p).levelOrder.map((id) => [p.levels[id].name, p.levels[id].wallHeight, p.levels[id].floorThickness])).toEqual([
       ['Basement', 96, 4],
       ['First Floor', 96, 12],
       ['Second Floor', 96, 12],
     ]);
-    expect(p.baseFloorElevation).toBe(-100);
-    expect(defaultLevelId(p)).toBe(p.levelOrder[1]);
+    expect(firstStructure(p).baseFloorElevation).toBe(-100);
+    expect(defaultLevelId(p)).toBe(firstStructure(p).levelOrder[1]);
   });
 
   it.each(PLAN_TEMPLATES.map((t) => t.id))('%s survives validation unchanged and opens on its ground floor', (t) => {
     const p = createEmptyPlan('T', t);
     expect(roundTrip(p)).toEqual(p);
-    const ground = t === 'basementTwoStorey' ? p.levelOrder[1] : p.levelOrder[0];
+    const ground = t === 'basementTwoStorey' ? firstStructure(p).levelOrder[1] : firstStructure(p).levelOrder[0];
     expect(defaultLevelId(p)).toBe(ground);
-    expect(siteGhostLevelId(p)).toBe(ground);
+    expect(siteGhostLevelId(firstStructure(p))).toBe(ground);
     expect(getLevelElevations(p)[ground].floorTop).toBeGreaterThanOrEqual(0);
   });
 
   it('has the levels each template names', () => {
-    const count = (t: PlanTemplate) => createEmptyPlan('T', t).levelOrder.length;
+    const count = (t: PlanTemplate) => firstStructure(createEmptyPlan('T', t)).levelOrder.length;
     expect([count('single'), count('twoStorey'), count('basementTwoStorey'), count('outbuilding')]).toEqual([1, 2, 3, 1]);
     const shed = createEmptyPlan('T', 'outbuilding');
-    const level = shed.levels[shed.levelOrder[0]];
+    const level = shed.levels[firstStructure(shed).levelOrder[0]];
     expect(level.wallHeight).toBeLessThan(96);
     expect(level.floorThickness).toBe(4);
-    expect(shed.baseFloorElevation).toBe(0);
+    expect(firstStructure(shed).baseFloorElevation).toBe(0);
   });
 
   it('groundLevelId without a base elevation keeps the old rule (the level above the lowest)', () => {
@@ -98,7 +99,7 @@ describe('addLevel', () => {
     const added = plan().levels[r.id];
     expect(added.wallHeight).toBe(plan().levels[b].wallHeight);
     expect(added.floorThickness).toBe(plan().levels[b].floorThickness);
-    expect(plan().baseFloorElevation).toBe(-100 - 96 - 4);
+    expect(firstStructure(plan()).baseFloorElevation).toBe(-100 - 96 - 4);
     // The new level's ceiling is the bottom of the old lowest level's floor.
     expect(getLevelElevations(plan())[r.id].ceiling).toBe(getLevelElevations(plan())[b].slabBottom);
   });
@@ -123,7 +124,7 @@ describe('addLevel', () => {
     expect(order()).toHaveLength(3);
     undo();
     expect(order()).toHaveLength(2);
-    expect(plan().baseFloorElevation).toBe(0);
+    expect(firstStructure(plan()).baseFloorElevation).toBe(0);
     undo();
     expect(order()).toEqual([g]);
     redo();
@@ -189,7 +190,7 @@ describe('deleteLevel', () => {
     expect(order()).toEqual([f, s]);
     expect(tops()[f]).toBe(before[f]);
     expect(tops()[s]).toBe(before[s]);
-    expect(plan().baseFloorElevation).toBe(before[f]);
+    expect(firstStructure(plan()).baseFloorElevation).toBe(before[f]);
   });
 
   it('drops a set climb that no longer fits under the floor above', () => {
@@ -212,7 +213,7 @@ describe('moveLevel', () => {
     expect(store().moveLevel(b, 'down')).toBeNull();
     store().moveLevel(f, 'up');
     expect(order()).toEqual([b, s, f]);
-    expect(plan().baseFloorElevation).toBe(-100);
+    expect(firstStructure(plan()).baseFloorElevation).toBe(-100);
     store().moveLevel(f, 'down');
     store().moveLevel(f, 'down');
     expect(order()).toEqual([f, b, s]);

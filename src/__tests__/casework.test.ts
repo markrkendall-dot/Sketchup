@@ -8,6 +8,8 @@ import { polygonSignedArea } from '../model/geometry';
 import { createEmptyPlan, defaultLevelId, fixtureProblem, migrate, MIGRATIONS, SCHEMA_VERSION } from '../model/plan';
 import type { Fixture, Id } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
+import { firstStructure } from '../model/structures';
+import { legacyDoc } from './legacy';
 
 const store = () => usePlanStore.getState();
 
@@ -398,18 +400,18 @@ describe('casework meshes', () => {
 describe('fixtures in files', () => {
   it('schema 3 adds fixtures to every level; a v2 file gains empty records', () => {
     expect(createEmptyPlan().schemaVersion).toBe(SCHEMA_VERSION);
-    const v2 = JSON.parse(JSON.stringify({ ...createEmptyPlan(), schemaVersion: 2 }));
+    const v2 = legacyDoc(createEmptyPlan(), 2);
     for (const l of Object.values(v2.levels) as Record<string, unknown>[]) delete l.fixtures;
     const up = MIGRATIONS[2](v2);
     expect(up.schemaVersion).toBe(3);
     for (const l of Object.values(up.levels as Record<string, Record<string, unknown>>)) expect(l.fixtures).toEqual({});
     const plan = migrate(v2);
-    for (const id of plan.levelOrder) expect(plan.levels[id].fixtures).toEqual({});
+    for (const id of firstStructure(plan).levelOrder) expect(plan.levels[id].fixtures).toEqual({});
   });
 
   it('keeps valid fixtures and finishes, drops a fixture with an unknown kind or a bad size, and bad optional fields', () => {
     const base = createEmptyPlan();
-    const lid = base.levelOrder[1];
+    const lid = firstStructure(base).levelOrder[1];
     const doc = JSON.parse(JSON.stringify(base));
     doc.levels[lid].fixtures = {
       ok: { ...fixture('base'), id: 'ok', frontColor: '#ABCDEF', label: '  ', frontStyle: 'glass', counterOverhang: { front: 1 } },

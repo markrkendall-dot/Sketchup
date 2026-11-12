@@ -7,8 +7,9 @@ import { getLevelElevations } from './levels';
 import { isVisible, phasesCoexist } from './phase';
 import { wallExtensions } from './platform';
 import { insetPolygon } from './rooms';
-import { groundAt } from './site';
+import { groundAtLevel } from './site';
 import { floorToFloor, stairsBase, stairsOutline, stairsRise } from './stairs';
+import { stackOf } from '../model/structures';
 
 // Decks (DESIGN.md "Decks"). Pure: no three, no React, so the 2D plan, the 3D meshes and the panel
 // share one layout. Heights are level-local (0 = the deck's level's floor top), like the level's
@@ -184,7 +185,7 @@ export function deckSupportedEdges(plan: Plan, levelId: Id, outline: readonly Ve
   if (!at || outline.length < 3) return outline.map(() => false);
   const topAbs = at.floorTop + elevation;
   const frameBottomAbs = topAbs - DECK.board - DECK.joist;
-  const walls = plan.levelOrder.flatMap((lid) => {
+  const walls = stackOf(plan, levelId).flatMap((lid) => {
     const level = plan.levels[lid];
     const e = elev[lid];
     if (!level || !e) return [];
@@ -218,7 +219,7 @@ export function deckStairOpenings(plan: Plan, levelId: Id, deck: Pick<Deck, 'out
   const topAbs = at.floorTop + deck.elevation;
   const lens = edgeLengths(outline);
   const raw: DeckOpening[] = [];
-  for (const lid of plan.levelOrder) {
+  for (const lid of stackOf(plan, levelId)) {
     const level = plan.levels[lid];
     const e = elev[lid];
     if (!level || !e) continue;
@@ -318,7 +319,7 @@ function layoutInputs(plan: Plan, levelId: Id, deck: Deck, viewMode: ViewMode): 
   const supported = deckSupportedEdges(plan, levelId, outline, deck.elevation, viewMode, deck.phase);
   const openings = deckStairOpenings(plan, levelId, deck, viewMode);
   const postAt = postPositions(outline, supported);
-  const ground = (p: Vec2) => groundAt(plan, p) - floorTop;
+  const ground = (p: Vec2) => groundAtLevel(plan, levelId, p) - floorTop;
   const lens = edgeLengths(outline);
   const edgeDrops = outline.map((a, i) => {
     const d = edgeDir(outline, i);

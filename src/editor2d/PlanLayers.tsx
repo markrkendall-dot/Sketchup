@@ -22,6 +22,7 @@ import { formatArea, formatLengthCompact } from '../model/units';
 import { useLayerPlan, useLayerUi } from './layerStores';
 import { outlinePath } from './outline';
 import { faceWidth, nameWrapFor, ROOM_AREA_DY, ROOM_NAME_DY, ROOM_NAME_LINE_PX, ROOM_NAME_WRAP, roomNameLines } from './roomLabels';
+import { levelBelowId, structureOf, structuresOf, svgTransform } from '../model/structures';
 
 /**
  * A short wall of a small room has no dimension label (REVIEW-2 C2): under 4' long, and a face it
@@ -625,10 +626,7 @@ const StairsLayer = memo(function StairsLayer({ levelId }: { levelId: Id }) {
  * usual "open to below" mark, and the treads below it, faint. Nothing where the flight is not cut.
  */
 const StairHolesLayer = memo(function StairHolesLayer({ levelId }: { levelId: Id }) {
-  const belowId = useLayerPlan((s) => {
-    const i = s.plan.levelOrder.indexOf(levelId);
-    return i > 0 ? s.plan.levelOrder[i - 1] : null;
-  });
+  const belowId = useLayerPlan((s) => levelBelowId(s.plan, levelId) ?? null);
   const stairs = useLayerPlan((s) => (belowId ? s.plan.levels[belowId]?.stairs : undefined));
   const ftf = useLayerPlan((s) => (belowId ? floorToFloor(s.plan, belowId) : 0));
   const ceiling = useLayerPlan((s) => (belowId ? (s.plan.levels[belowId]?.wallHeight ?? 0) : 0));
@@ -1036,10 +1034,7 @@ const RoofsLayer = memo(function RoofsLayer({ levelId }: { levelId: Id }) {
 
 /** The roofs of the level below, faint, so an upper floor is drawn knowing where a lower roof is. */
 const RoofGhostLayer = memo(function RoofGhostLayer({ levelId }: { levelId: Id }) {
-  const belowId = useLayerPlan((s) => {
-    const i = s.plan.levelOrder.indexOf(levelId);
-    return i > 0 ? s.plan.levelOrder[i - 1] : null;
-  });
+  const belowId = useLayerPlan((s) => levelBelowId(s.plan, levelId) ?? null);
   const ids = useLayerPlan(useShallow((s) => Object.keys((belowId && s.plan.levels[belowId]?.roofs) || NO_RECORD)));
   if (!belowId || ids.length === 0) return null;
   return (
@@ -1405,7 +1400,7 @@ const NodesLayer = memo(function NodesLayer({ levelId }: { levelId: Id }) {
  * Faint, non-interactive outline of another level's walls (the level below), for aligning upper
  * floors. Openings are ignored; the view mode still applies.
  */
-export const GhostLevel = memo(function GhostLevel({ levelId }: { levelId: Id }) {
+export const GhostLevel = memo(function GhostLevel({ levelId, transform }: { levelId: Id; transform?: string }) {
   const level = useLayerPlan((s) => s.plan.levels[levelId]);
   const viewMode = useLayerUi((s) => s.viewMode);
   const d = useMemo(() => {
@@ -1416,7 +1411,7 @@ export const GhostLevel = memo(function GhostLevel({ levelId }: { levelId: Id })
   }, [level, viewMode]);
   if (!d) return null;
   return (
-    <g className="layer-ghost" pointerEvents="none" data-ghost-level={levelId}>
+    <g className="layer-ghost" pointerEvents="none" data-ghost-level={levelId} transform={transform}>
       <path className="ghost-wall" d={d} vectorEffect="non-scaling-stroke" />
     </g>
   );
@@ -1534,32 +1529,91 @@ const SiteLayer = memo(function SiteLayer() {
   );
 });
 
-/** Every level's roofs as faint ghosts, so a post is placed knowing where the roofs are. */
+/** Every level's roofs as faint ghosts, so a post is placed knowing where the roofs are (each structure where it stands). */
 const SiteRoofGhosts = memo(function SiteRoofGhosts() {
   const keys = useLayerPlan(
-    useShallow((s) => s.plan.levelOrder.flatMap((lid) => Object.keys(s.plan.levels[lid]?.roofs ?? NO_RECORD).map((rid) => `${lid}|${rid}`))),
+    useShallow((s) =>
+      structuresOf(s.plan).flatMap((st) => st.levelOrder.flatMap((lid) => Object.keys(s.plan.levels[lid]?.roofs ?? NO_RECORD).map((rid) => `${st.id}|${lid}|${rid}`))),
+    ),
   );
+  const placements = useLayerPlan(useShallow((s) => structuresOf(s.plan).map((st) => `${st.id}|${svgTransform(st) ?? ''}`)));
   if (keys.length === 0) return null;
+  const transformOf = new Map(placements.map((p) => [p.slice(0, p.indexOf('|')), p.slice(p.indexOf('|') + 1) || undefined]));
   return (
     <g className="layer-roof-ghost" pointerEvents="none">
       {keys.map((k) => {
-        const [lid, rid] = k.split('|');
-        return <RoofShape key={k} levelId={lid} roofId={rid} ghost />;
+        const [sid, lid, rid] = k.split('|');
+        return (
+          <g key={k} transform={transformOf.get(sid)}>
+            <RoofShape levelId={lid} roofId={rid} ghost />
+          </g>
+        );
       })}
     </g>
   );
 });
 
-/** What the 2D view shows in site mode: the first floor as a ghost, the roofs faintly, the site layer on top. */
+/** What the 2D view shows in site mode: every structure's ground floor as a ghost where it stands, the roofs faintly, the site layer on top. */
 export const SiteView = memo(function SiteView() {
-  const ghostId = useLayerPlan((s) => siteGhostLevelId(s.plan));
+  const ghosts = useLayerPlan(useShallow((s) => structuresOf(s.plan).flatMap((st) => {
+    const id = siteGhostLevelId(st);
+    return id ? [`${id}|${svgTransform(st) ?? ''}`] : [];
+  })));
   return (
     <>
       <PatternDefs />
-      <g className="site-ghost">{ghostId && <GhostLevel levelId={ghostId} />}</g>
+      <g className="site-ghost">
+        {ghosts.map((g) => {
+          const [id, transform] = [g.slice(0, g.indexOf('|')), g.slice(g.indexOf('|') + 1)];
+          return <GhostLevel key={id} levelId={id} transform={transform || undefined} />;
+        })}
+      </g>
       <SiteRoofGhosts />
       <SiteLayer />
     </>
+  );
+});
+
+/**
+ * While one structure is edited, the others faint where they stand on the site, drawn in its
+ * coordinates (DESIGN.md "Structures"): each one's ground floor in the ghost style with its roofs.
+ * Not editable and not snapped to.
+ */
+export const OtherStructures = memo(function OtherStructures({ levelId }: { levelId: Id }) {
+  const items = useLayerPlan(
+    useShallow((s) => {
+      const own = structureOf(s.plan, levelId);
+      if (!own) return [];
+      return structuresOf(s.plan).flatMap((st) => {
+        if (st === own) return [];
+        const id = siteGhostLevelId(st);
+        if (!id) return [];
+        const roofs = st.levelOrder.flatMap((lid) => Object.keys(s.plan.levels[lid]?.roofs ?? NO_RECORD).map((rid) => `${lid}/${rid}`));
+        return [`${id}|${svgTransform(st, own) ?? ''}|${roofs.join(',')}`];
+      });
+    }),
+  );
+  if (items.length === 0) return null;
+  return (
+    <g className="structure-ghosts" pointerEvents="none">
+      {items.map((it) => {
+        const [id, transform, roofs] = it.split('|');
+        return (
+          <g key={id} transform={transform || undefined} data-ghost-structure={id}>
+            <GhostLevel levelId={id} />
+            <g className="layer-roof-ghost">
+              {roofs
+                .split(',')
+                .filter(Boolean)
+                .map((r) => {
+                  const [lid, rid] = r.split('/');
+                  return <RoofShape key={r} levelId={lid} roofId={rid} ghost />;
+                })}
+            </g>
+          </g>
+        );
+      })}
+    </g>
   );
 });
 

@@ -7,6 +7,7 @@ import { createEmptyPlan } from '../model/plan';
 import type { Id, Phase, Plan } from '../model/types';
 import { clearHistory, usePlanStore } from '../store/planStore';
 import { wallMaterial } from '../view3d/materials';
+import { firstStructure } from '../model/structures';
 
 const store = () => usePlanStore.getState();
 const ext = { kind: 'exterior', thickness: 6.5, phase: 'existing' } as const;
@@ -55,7 +56,7 @@ interface Fixture {
 function fixture(): Fixture {
   store().setPlan(createEmptyPlan('Test House'));
   clearHistory();
-  const [basement, first, second] = store().plan.levelOrder;
+  const [basement, first, second] = firstStructure(store().plan).levelOrder;
   const corners = [
     { x: 0, y: 0 },
     { x: 360, y: 0 },
@@ -142,7 +143,7 @@ describe('buildExportScene', () => {
   it('clones the cached geometry, with normals and no colours; one material per phase/kind', () => {
     const { plan, first } = fixture();
     const cached = new Set<BufferGeometry>();
-    for (const id of plan.levelOrder) {
+    for (const id of firstStructure(plan).levelOrder) {
       const m = getLevelMeshes(plan, id, 'all');
       for (const w of m.walls) cached.add(w.geometry);
       for (const s of m.stairs) cached.add(s.geometry);
@@ -328,7 +329,7 @@ describe('buildExportScene', () => {
     const below = buildExportScene(plan, 'all', { ...allVisible(first), only3dActiveAndBelow: true });
     expect(meshNames(below)).toEqual(['First Floor']);
     disposeExportScene(below);
-    const none = buildExportScene(plan, 'all', { ...allVisible(first), hidden3dLevels: [...plan.levelOrder] });
+    const none = buildExportScene(plan, 'all', { ...allVisible(first), hidden3dLevels: [...firstStructure(plan).levelOrder] });
     expect(none.children).toHaveLength(0);
   });
 });

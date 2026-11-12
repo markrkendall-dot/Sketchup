@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { Issue } from '../derive/checks';
 import type { WallGeom } from '../derive/openings';
-import type { Column, FabricId, FixtureKind, FurniturePiece, Id, MeasureTo, Opening, Phase, SurfaceMaterial, Vec2, ViewMode, WallKind, WoodId } from '../model/types';
+import { structureOf } from '../model/structures';
+import type { Column, FabricId, FixtureKind, FurniturePiece, Id, MeasureTo, Opening, Phase, Plan, SurfaceMaterial, Vec2, ViewMode, WallKind, WoodId } from '../model/types';
 import type { BedSize } from '../model/furniture';
 
 export type OpeningToolName = Opening['type'];
@@ -755,4 +756,13 @@ export function forgetGoneLevels(plan: { readonly levels: Readonly<Record<Id, un
   if (s.wallMovePrompt && !(s.wallMovePrompt.levelId in plan.levels)) patch.wallMovePrompt = null;
   if (s.walkLevelId && !(s.walkLevelId in plan.levels)) Object.assign(patch, { cameraMode: 'orbit', walkLevelId: null, walkLocked: false });
   if (Object.keys(patch).length) useUiStore.setState(patch);
+}
+
+/**
+ * The structure being edited (DESIGN.md "Structures"): always the active level's, so the two never
+ * disagree; in site mode, which parks the active level on the main structure's lowest level, the
+ * main structure. Kept as a derivation rather than a second field for that reason.
+ */
+export function activeStructureId(plan: Pick<Plan, 'structures' | 'structureOrder'>, ui: Pick<UiState, 'activeLevelId'>): Id | undefined {
+  return structureOf(plan, ui.activeLevelId)?.id ?? plan.structureOrder[0];
 }
