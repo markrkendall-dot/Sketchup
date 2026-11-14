@@ -13,7 +13,7 @@ import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
 import { firstStructure, isStructureKind, normalizeDegrees, structureOf } from './structures';
 import { AS_TODAY } from './types';
-import type { OptionLook, CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { OptionLook, CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, OptionFinishes, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 10 as const;
@@ -848,7 +848,7 @@ const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
 const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'optionIds', 'label', 'za', 'zb', 'color', 'profile'] as const;
 const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'optionIds', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
 const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase', 'optionIds'] as const;
-const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'underlay'] as const;
+const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'optionFinishes', 'underlay'] as const;
 const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook', 'options'] as const;
 const STRUCTURE_KEYS = ['id', 'name', 'kind', 'origin', 'rotation', 'baseFloorElevation', 'levelOrder'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
@@ -1432,6 +1432,15 @@ function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
   return out;
 }
 
+/** An option's casework finishes (types.ts OptionFinishes): the valid level finishes less the ceiling; undefined when none. */
+export function optionFinishesOf(raw: unknown): OptionFinishes | undefined {
+  const f = migrateFinishes(raw);
+  if (!f) return undefined;
+  delete f.ceilingFinish;
+  delete f.ceilingColor;
+  return Object.keys(f).length ? f : undefined;
+}
+
 /** A level's casework defaults: each field kept when valid, the record dropped when empty. */
 function migrateFinishes(raw: unknown): LevelFinishes | undefined {
   if (!isObject(raw)) return undefined;
@@ -1604,6 +1613,15 @@ function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   level.joistZones = migrateJoistZones(record(raw.joistZones, `${where} joist zones`), where);
   level.members = migrateMembers(record(raw.members, `${where} members`), where, lowest);
   put(level, 'finishes', migrateFinishes(raw.finishes));
+  // Per-option casework finishes: each valid record kept (cleanOptionTags drops unknown options).
+  const perOption: Record<Id, OptionFinishes> = {};
+  if (isObject(raw.optionFinishes)) {
+    for (const [id, v] of Object.entries(raw.optionFinishes)) {
+      const f = optionFinishesOf(v);
+      if (f) perOption[id] = f;
+    }
+  }
+  put(level, 'optionFinishes', Object.keys(perOption).length ? perOption : undefined);
   put(level, 'underlay', migrateUnderlay(raw.underlay));
   put(level, 'foundation', migrateFoundation(raw.foundation));
   return level as unknown as Level;
@@ -1779,6 +1797,10 @@ export function cleanOptionTags(plan: Plan): void {
       }
       if (Object.keys(out).length) r.optionFinishes = out;
       else delete r.optionFinishes;
+    }
+    if (level.optionFinishes) {
+      for (const id of Object.keys(level.optionFinishes)) if (!known.has(id)) delete level.optionFinishes[id];
+      if (Object.keys(level.optionFinishes).length === 0) delete level.optionFinishes;
     }
   }
   for (const rec of [plan.site.columns, plan.site.surfaces, plan.site.fences] as Record<Id, Phased & { optionIds?: Id[] }>[]) {

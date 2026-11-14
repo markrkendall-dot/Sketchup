@@ -1,6 +1,6 @@
 import { BATH_KINDS, TUB_SHOWERS } from './bath';
 import { isHexColor } from './finish';
-import type { Backsplash, BacksplashFinish, CounterMaterial, Fixture, FixtureKind, FrontStyle, HandleFinish, HandleStyle, Level, LevelFinishes } from './types';
+import type { Backsplash, BacksplashFinish, CounterMaterial, Fixture, FixtureKind, FrontStyle, HandleFinish, HandleStyle, Level, LevelFinishes, OptionFinishes } from './types';
 
 // Casework data (DESIGN.md "Casework"): the kinds of fixture, their stock sizes, the counter and
 // toe-kick dimensions and the colour defaults. Pure data shared by the tool, the panel, the 3D
@@ -295,6 +295,41 @@ export function validKitchenFields(raw: Record<string, unknown>, kind: FixtureKi
     out[k] = typeof v === 'string' && isHexColor(v) ? v.toLowerCase() : v;
   }
   return out as Partial<Pick<Fixture, KitchenField>>;
+}
+
+/** An option's casework finishes (Level.optionFinishes) and the fixture field each one fills. */
+const OPTION_FINISH_FIELD: [keyof OptionFinishes, keyof Fixture][] = [
+  ['cabinetColor', 'frontColor'],
+  ['cabinetWood', 'wood'],
+  ['frontStyle', 'frontStyle'],
+  ['counterColor', 'counterColor'],
+  ['counterMaterial', 'counterMaterial'],
+  ['counterThickness', 'counterThickness'],
+  ['backsplash', 'backsplash'],
+  ['backsplashFinish', 'backsplashFinish'],
+  ['backsplashColor', 'backsplashColor'],
+  ['backsplashHeight', 'backsplashHeight'],
+  ['handles', 'handles'],
+  ['handleFinish', 'handleFinish'],
+];
+
+/**
+ * A new fixture with an option's casework finishes filled in where it sets none of its own and its
+ * kind takes the field. A wood the level gives its cabinets still shows unless the option names
+ * another (a wood wins over a colour). The same object when nothing is filled.
+ */
+export function withOptionFinishes(f: Fixture, own: OptionFinishes): Fixture {
+  if (f.phase !== 'new' || f.kind === 'furniture') return f;
+  let out: Fixture | null = null;
+  for (const [from, to] of OPTION_FINISH_FIELD) {
+    const v = own[from];
+    if (v === undefined || f[to] !== undefined) continue;
+    const rule = (KITCHEN_FIELDS as Record<string, { kinds: (k: FixtureKind) => boolean } | undefined>)[to];
+    if (rule && !rule.kinds(f.kind)) continue;
+    if (!out) out = { ...f };
+    (out as unknown as Record<string, unknown>)[to] = v;
+  }
+  return out ?? f;
 }
 
 /** The level's kitchen defaults: which keys and their checks (LevelFinishes). */

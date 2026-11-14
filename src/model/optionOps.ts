@@ -114,6 +114,7 @@ export function duplicateOptionIn(plan: Plan, srcId: Id, name?: string): DesignO
       const own = r.optionFinishes?.[srcId];
       if (own) r.optionFinishes![dst] = clone(own);
     }
+    if (level.optionFinishes?.[srcId]) level.optionFinishes[dst] = clone(level.optionFinishes[srcId]);
     if (wallMap.size) normalizeLevel(level);
   }
   for (const rec of siteRecords(plan.site)) copyInto(rec);
@@ -168,6 +169,10 @@ export function deleteOptionFrom(plan: Plan, id: Id): boolean {
       if (!r.optionFinishes?.[id]) continue;
       delete r.optionFinishes[id];
       if (Object.keys(r.optionFinishes).length === 0) delete r.optionFinishes;
+    }
+    if (level.optionFinishes?.[id]) {
+      delete level.optionFinishes[id];
+      if (Object.keys(level.optionFinishes).length === 0) delete level.optionFinishes;
     }
     // A staircase none of whose pieces is left goes with them.
     const used = new Set(Object.values(level.stairs).map((s) => s.staircaseId));

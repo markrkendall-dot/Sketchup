@@ -33,6 +33,7 @@ import {
   knownOptionIds,
   nodeMeets,
   roomOptionFinishesOf,
+  optionFinishesOf,
   foundationProblem,
   templateLevels,
   mergeLeftoverJoints,
@@ -305,6 +306,8 @@ export interface PlanState {
   duplicateFixtures: (levelId: Id, ids: Id[], offset: Vec2) => Id[];
   /** Set the level's casework defaults (cabinet colour, counter colour, front style); undefined clears a field. */
   updateFinishes: (levelId: Id, patch: FinishesPatch) => void;
+  /** Set or clear (undefined) a design option's own casework finishes on a level (Level.optionFinishes): for the cabinets it builds new. */
+  updateOptionFinishes: (levelId: Id, optionId: Id, patch: FinishesPatch) => void;
   /**
    * Split a wall at `at` inches from its a end (a node is inserted there and the level normalized,
    * so the wall becomes two). Null when done, else why not: too near an end, or inside an opening.
@@ -1554,6 +1557,24 @@ export const usePlanStore = create<PlanState>()(
             if (!changed) return false;
             if (Object.keys(cur).length) level.finishes = cur;
             else delete level.finishes;
+          }),
+
+        updateOptionFinishes: (levelId, optionId, patch) =>
+          editLevel(levelId, (level, plan) => {
+            if (!plan.options.some((o) => o.id === optionId)) return false;
+            const before = level.optionFinishes?.[optionId];
+            const merged: Record<string, unknown> = { ...(before ?? {}) };
+            for (const [k, v] of Object.entries(patch)) {
+              if (v === undefined) delete merged[k];
+              else merged[k] = v;
+            }
+            const next = optionFinishesOf(merged);
+            if (JSON.stringify(next ?? {}) === JSON.stringify(before ?? {})) return false;
+            const all = { ...(level.optionFinishes ?? {}) };
+            if (next) all[optionId] = next;
+            else delete all[optionId];
+            if (Object.keys(all).length) level.optionFinishes = all;
+            else delete level.optionFinishes;
           }),
 
         splitWall: (levelId, wallId, at) => {

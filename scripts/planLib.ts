@@ -11,6 +11,7 @@ import { dist, normalize, perpLeft, sub } from '../src/model/geometry';
 import type { FabricId, FurniturePiece, Id, Opening, Phase, Plan, Roof, Room, Vec2, WoodId } from '../src/model/types';
 import { furnitureDefaults, type BedSize } from '../src/model/furniture';
 import { getPlan, usePlanStore, type NewDeck, type NewFixture } from '../src/store/planStore';
+import { useUiStore } from '../src/store/uiStore';
 
 export const ft = (feet: number): number => feet * 12;
 export const round2 = (v: number): number => Math.round(v * 100) / 100;
@@ -407,6 +408,23 @@ export function furnish(
   });
 }
 
+/**
+ * Give the plan these design options (DESIGN.md "Design options"), in order: the plan's one option
+ * is renamed to the first, the rest are added. Returns their ids. Call before any new or demolished
+ * work, then `workIn` an option before drawing its changes.
+ */
+export function designOptions(names: string[]): Id[] {
+  const first = getPlan().options[0].id;
+  store().renameOption(first, names[0]);
+  return [first, ...names.slice(1).map((n) => store().addOption(n))];
+}
+
+/** New and demolished work from here on belongs to this option (the store tags it with the active one). */
+export function workIn(optionId: Id): void {
+  if (!getPlan().options.some((o) => o.id === optionId)) throw new Error(`no design option ${optionId}`);
+  useUiStore.getState().setActiveOption(optionId);
+}
+
 /** Replace every generated id with a readable, stable one (the plan's `planId`) so the JSON is identical from run to run. */
 export function stableIds(plan: Plan, planId: string): string {
   const names = new Map<string, string>();
@@ -435,6 +453,8 @@ export function stableIds(plan: Plan, planId: string): string {
     ];
     for (const [k, rec] of kinds) Object.keys(rec).forEach((id, i) => add(id, `${pre}-${k}${i + 1}`));
   });
+  // Design options after the first (whose id is fixed already) were given random ids.
+  plan.options.slice(1).forEach((o, i) => add(o.id, `option-${String.fromCharCode(98 + i)}`));
   Object.keys(plan.site.gradePoints).forEach((id, i) => add(id, `grade-${i + 1}`));
   Object.keys(plan.site.columns).forEach((id, i) => add(id, `column-${i + 1}`));
   Object.keys(plan.site.surfaces).forEach((id, i) => add(id, `surface-${i + 1}`));

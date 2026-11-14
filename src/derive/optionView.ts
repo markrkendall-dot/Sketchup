@@ -1,4 +1,5 @@
-import { AS_TODAY, type AsToday, type DesignOption, type Id, type Level, type Plan, type ProposedLook, type Room, type Site, type ViewMode } from '../model/types';
+import { AS_TODAY, type AsToday, type DesignOption, type Fixture, type Id, type Level, type Plan, type ProposedLook, type Room, type Site, type ViewMode } from '../model/types';
+import { withOptionFinishes } from '../model/casework';
 import { isOptionTagged, phaseIn, type Phased } from './phase';
 
 // The plan as one design option sees it (DESIGN.md "Design options"): every entity tagged for other
@@ -83,6 +84,7 @@ function levelVaries(level: Level, optionId: Id): boolean {
   const recs: Rec<Phased>[] = [level.walls, level.openings, level.rooms, level.stairs, level.roofs, level.fixtures, level.decks, level.floorOpenings, level.joistZones, level.members];
   for (const rec of recs) for (const e of Object.values(rec ?? {})) if (isOptionTagged(e) && !e.optionIds!.includes(optionId)) return true;
   for (const r of Object.values(level.rooms)) if (r.optionFinishes?.[optionId]) return true;
+  if (level.optionFinishes?.[optionId]) return true;
   return false;
 }
 
@@ -125,6 +127,19 @@ export function levelIn(level: Level, optionId: Id | undefined): Level {
       const used = new Set(Object.values(stairs).map((s) => s.staircaseId));
       if (Object.keys(staircases).some((id) => !used.has(id))) staircases = Object.fromEntries(Object.entries(staircases).filter(([id]) => used.has(id)));
     }
+    // The option's own casework finishes, on the cabinets it builds new that set none themselves.
+    let fixtures = recordIn(level.fixtures, optionId);
+    const ownFinishes = level.optionFinishes?.[optionId];
+    if (ownFinishes) {
+      let filled: Rec<Fixture> | null = null;
+      for (const [id, f] of Object.entries(fixtures)) {
+        const next = withOptionFinishes(f, ownFinishes);
+        if (next === f) continue;
+        if (!filled) filled = { ...fixtures };
+        filled[id] = next;
+      }
+      if (filled) fixtures = filled;
+    }
     out = {
       ...level,
       nodes,
@@ -134,7 +149,7 @@ export function levelIn(level: Level, optionId: Id | undefined): Level {
       stairs,
       staircases,
       roofs: recordIn(level.roofs, optionId),
-      fixtures: recordIn(level.fixtures, optionId),
+      fixtures,
       decks: recordIn(level.decks, optionId),
       floorOpenings: recordIn(level.floorOpenings, optionId),
       joistZones: recordIn(level.joistZones, optionId),

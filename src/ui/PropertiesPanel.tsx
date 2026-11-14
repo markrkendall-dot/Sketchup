@@ -75,7 +75,7 @@ import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FEN
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
 import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, TUB_SHOWER_LABEL, TUB_SHOWERS, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
-import type { TubShower, RoomOptionFinishes, OptionLook, ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind } from '../model/types';
+import type { TubShower, RoomOptionFinishes, OptionLook, ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind , LevelFinishes } from '../model/types';
 import { AS_TODAY } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type EntitySelection, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
@@ -2261,11 +2261,31 @@ function CeilingDefaults({ level }: { level: Level }) {
 
 /** A level's casework defaults: the cabinet and counter colours and the front style its fixtures use unless they set their own. */
 function CaseworkDefaults({ level }: { level: Level }) {
-  const updateFinishes = usePlanStore((s) => s.updateFinishes);
-  const f = level.finishes;
+  const updateLevel = usePlanStore((s) => s.updateFinishes);
+  const updateOwn = usePlanStore((s) => s.updateOptionFinishes);
+  // With several design options, the fields can edit the active option's own finishes instead: they
+  // apply to the cabinets that option builds new (Level.optionFinishes), over the level's.
+  const multi = useViewPlanStore((s) => s.plan.options.length > 1);
+  const optionId = useViewPlanStore((s) => s.optionId);
+  const optionName = useViewPlanStore((s) => s.plan.options.find((o) => o.id === s.optionId)?.name ?? '');
+  const [mine, setMine] = useState(false);
+  const own = multi && mine && optionId ? optionId : null;
+  const f: LevelFinishes | undefined = own ? { ...(level.finishes ?? {}), ...(level.optionFinishes?.[own] ?? {}) } : level.finishes;
+  const updateFinishes = (levelId: Id, patch: Parameters<typeof updateLevel>[1]) => (own ? updateOwn(levelId, own, patch) : updateLevel(levelId, patch));
   const count = Object.keys(level.fixtures ?? {}).length;
   return (
     <>
+      {multi && (
+        <SelectField
+          label="Cabinet finishes for"
+          value={mine ? 'mine' : 'level'}
+          options={[
+            { value: 'level', label: 'Every cabinet (the level\'s)' },
+            { value: 'mine', label: `${optionName}'s new cabinets` },
+          ]}
+          onChange={(v) => setMine(v === 'mine')}
+        />
+      )}
       <ColorField
         label="Cabinet colour"
         value={f?.cabinetColor ?? DEFAULT_CABINET_COLOR}

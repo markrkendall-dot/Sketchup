@@ -495,6 +495,9 @@ export interface LevelFinishes {
   ceilingColor?: string;
 }
 
+/** An option's own casework finishes on a level (Level.optionFinishes): the level's, less the ceiling. */
+export type OptionFinishes = Omit<LevelFinishes, 'ceilingFinish' | 'ceilingColor'>;
+
 /** A post or chimney on the site (M9 implements their behaviour). */
 export interface Column {
   id: Id;
@@ -748,6 +751,12 @@ export interface Level {
   /** Beams in the framing over this level and posts standing on its floor (schema version 7). */
   members: Record<Id, Member>;
   finishes?: LevelFinishes;
+  /**
+   * A design option's own casework finishes for the cabinets it builds new on this level (DESIGN.md
+   * "Design options"): over the level's, for new fixtures that set none of their own. Existing
+   * cabinets keep the level's.
+   */
+  optionFinishes?: Record<Id, OptionFinishes>;
   underlay?: Underlay;
   /** Under the parts of the floor with nothing of the building below (absent: none). */
   foundation?: Foundation;
