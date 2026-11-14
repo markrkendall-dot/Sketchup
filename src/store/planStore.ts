@@ -33,6 +33,7 @@ import {
   knownOptionIds,
   nodeMeets,
   roomOptionFinishesOf,
+  viewProblem,
   optionFinishesOf,
   foundationProblem,
   templateLevels,
@@ -41,7 +42,7 @@ import {
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import { planRenovation } from '../model/renovate';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from '../model/structure';
-import type { OptionLook, Beam, Column, RoomOptionFinishes, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { OptionLook, Beam, Column, RoomOptionFinishes, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, SavedView, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
@@ -406,6 +407,9 @@ export interface PlanState {
    * rotation is normalized to [0, 360). No-op without an underlay. One undo step.
    */
   updateUnderlay: (levelId: Id, patch: UnderlayPatch) => void;
+  /** Save a viewpoint (Plan.views); returns its id, or null when it is not usable (model/plan.ts viewProblem). */
+  addView: (view: Omit<SavedView, 'id'>) => Id | null;
+  deleteView: (id: Id) => void;
   /** Add a design option (blank name: the next "Option X"); returns its id. One undo step. */
   addOption: (name?: string) => Id;
   /** Add an option copied from another (model/optionOps.ts duplicateOptionIn); null when there is no such option. */
@@ -1862,6 +1866,27 @@ export const usePlanStore = create<PlanState>()(
             }
             if (Object.keys(look).length) opt.proposedLook = look as OptionLook;
             else delete opt.proposedLook;
+            touch(s.plan);
+          }),
+
+        addView: (view) => {
+          let id: Id | null = null;
+          set((s) => {
+            if (viewProblem(view, s.plan.levels)) return;
+            id = newId();
+            const next: SavedView = { id, name: view.name.trim(), levelId: view.levelId, at: { x: view.at.x, y: view.at.y }, yaw: view.yaw, pitch: Math.max(-1.4, Math.min(1.4, view.pitch)) };
+            s.plan.views = [...(s.plan.views ?? []), next];
+            touch(s.plan);
+          });
+          return id;
+        },
+
+        deleteView: (id) =>
+          set((s) => {
+            if (!s.plan.views?.some((v) => v.id === id)) return;
+            const rest = s.plan.views.filter((v) => v.id !== id);
+            if (rest.length) s.plan.views = rest;
+            else delete s.plan.views;
             touch(s.plan);
           }),
 

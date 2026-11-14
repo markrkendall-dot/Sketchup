@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Issue } from '../derive/checks';
 import type { WallGeom } from '../derive/openings';
 import { structureOf } from '../model/structures';
-import type { Column, FabricId, Fixture, FixtureKind, FurniturePiece, Id, MeasureTo, Opening, Phase, Plan, SurfaceMaterial, Vec2, ViewMode, WallKind, WoodId } from '../model/types';
+import type { Column, FabricId, Fixture, FixtureKind, FurniturePiece, Id, MeasureTo, Opening, Phase, Plan, SavedView, SurfaceMaterial, Vec2, ViewMode, WallKind, WoodId } from '../model/types';
 import type { BedSize } from '../model/furniture';
 
 export type OpeningToolName = Opening['type'];
@@ -254,6 +254,9 @@ export const NOTICE_MS = 8000;
 export interface WalkFrom {
   levelId: Id;
   point: Vec2;
+  /** The way the eye looks there (a saved viewpoint's; absent: east, level). */
+  yaw?: number;
+  pitch?: number;
 }
 
 /**
@@ -406,6 +409,8 @@ export interface UiState {
   notice: Notice | null;
   /** The walk start the user picked in 2D (not part of the plan, so not saved or undone). */
   walkFrom: WalkFrom | null;
+  /** Bumped to put the walker at `walkFrom` again while already walking (goToView). */
+  walkJump: number;
   /** The open 2D context menu, if any. */
   contextMenu: ContextMenu | null;
   /** The plan's code checks (derive/checks.ts), kept up to date by ui/checks.ts after edits settle. */
@@ -476,6 +481,8 @@ export interface UiState {
   /** Show (or clear) a notice; an info notice clears itself after NOTICE_MS. */
   setNotice: (notice: Notice | null) => void;
   setWalkFrom: (walkFrom: WalkFrom | null) => void;
+  /** Walk from a saved viewpoint (Plan.views): its level becomes the active one, the walker is put there (again, if already walking). */
+  goToView: (view: SavedView) => void;
   setWalkCollision: (on: boolean) => void;
   setContextMenu: (menu: ContextMenu | null) => void;
   setIssues: (issues: readonly Issue[]) => void;
@@ -592,6 +599,7 @@ export const useUiStore = create<UiState>()((set) => ({
   libraryOpen: false,
   notice: null,
   walkFrom: null,
+  walkJump: 0,
   contextMenu: null,
   issues: [],
   checksOpen: false,
@@ -740,6 +748,17 @@ export const useUiStore = create<UiState>()((set) => ({
     }
   },
   setWalkFrom: (walkFrom) => set({ walkFrom }),
+  goToView: (view) =>
+    set((s) => ({
+      walkFrom: { levelId: view.levelId, point: { ...view.at }, yaw: view.yaw, pitch: view.pitch },
+      walkJump: s.walkJump + 1,
+      activeLevelId: view.levelId,
+      siteMode: false,
+      hidden3dLevels: s.hidden3dLevels.filter((id) => id !== view.levelId),
+      cameraMode: 'walk',
+      view3dPreset: 'perspective',
+      layout: s.layout === '2d' ? '3d' : s.layout,
+    })),
   setContextMenu: (contextMenu) => set((s) => (s.contextMenu === contextMenu ? s : { contextMenu })),
   setIssues: (issues) =>
     set((s) => ({ issues, pickedIssueId: s.pickedIssueId && issues.some((i) => i.id === s.pickedIssueId) ? s.pickedIssueId : null })),

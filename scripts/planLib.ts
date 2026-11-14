@@ -455,6 +455,7 @@ export function stableIds(plan: Plan, planId: string): string {
   });
   // Design options after the first (whose id is fixed already) were given random ids.
   plan.options.slice(1).forEach((o, i) => add(o.id, `option-${String.fromCharCode(98 + i)}`));
+  (plan.views ?? []).forEach((v, i) => add(v.id, `view-${i + 1}`));
   Object.keys(plan.site.gradePoints).forEach((id, i) => add(id, `grade-${i + 1}`));
   Object.keys(plan.site.columns).forEach((id, i) => add(id, `column-${i + 1}`));
   Object.keys(plan.site.surfaces).forEach((id, i) => add(id, `surface-${i + 1}`));

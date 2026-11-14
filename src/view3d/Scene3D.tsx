@@ -1,10 +1,10 @@
 import { AdaptiveDpr, Grid, Sky } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
 import { setTextureRedraw } from './textureQueue';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { BackSide, Color, DirectionalLight, Mesh, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry, type Object3D } from 'three';
 import { lowestGround } from '../derive/site';
-import { structuresOf } from '../model/structures';
+import { structureOf, structuresOf, toLocal } from '../model/structures';
 import { useShallow } from 'zustand/react/shallow';
 import { usePlanStore } from '../store/planStore';
 import { viewPlanStore } from '../store/viewStore';
@@ -19,6 +19,7 @@ import { LevelMeshes } from './LevelMeshes';
 import { setEnvironmentMap } from './materials';
 import { FarGround, SiteColumns, SiteFences, SiteSurfaces, Terrain } from './SiteMeshes';
 import { visible3dLevels } from './visibility';
+import { walkInput, walkNow } from './walkInput';
 
 // Light (DESIGN.md "3D"): the sun casts shadows, a hemisphere light is the sky's fill, drei's Sky
 // is the backdrop, and a gradient sky rendered once into a PMREM environment map is what glass
@@ -430,22 +431,128 @@ function View3dToolbar() {
         disabled={walking} title="Frame the visible levels in the 3D view">
         Fit 3D
       </button>
-      {!viewer && (
-        <button
-          className={walking ? 'active' : ''}
-          aria-pressed={walking}
-          onClick={() => {
-            setCameraMode(walking ? 'orbit' : 'walk');
-            focusCanvas();
-          }}
-          title="Walk through the model in first person (F); Esc returns to orbit"
-        >
-          Walk <kbd>F</kbd>
-        </button>
-      )}
+      <button
+        className={walking ? 'active' : ''}
+        aria-pressed={walking}
+        onClick={() => {
+          setCameraMode(walking ? 'orbit' : 'walk');
+          focusCanvas();
+        }}
+        title="Walk through the model in first person (F); Esc returns to orbit"
+      >
+        Walk{!viewer && (
+          <>
+            {' '}
+            <kbd>F</kbd>
+          </>
+        )}
+      </button>
+      <SavedViews editable={!viewer} walking={walking} />
     </div>
   );
 }
+
+/**
+ * The saved viewpoints (Plan.views): a button each, to walk from there; in the editor, "Save view"
+ * while walking keeps where one stands and looks, and a view's x removes it.
+ */
+function SavedViews({ editable, walking }: { editable: boolean; walking: boolean }) {
+  const views = usePlanStore((s) => s.plan.views);
+  if (!views?.length && !(editable && walking)) return null;
+  const save = () => {
+    const pose = walkNow.pose;
+    const plan = usePlanStore.getState().plan;
+    const st = pose && structureOf(plan, pose.levelId);
+    if (!pose || !st) return;
+    const name = window.prompt('Name this view', `View ${(views?.length ?? 0) + 1}`);
+    if (!name?.trim()) return;
+    // Kept in the level's own coordinates, so it moves with its building.
+    const at = toLocal(st, pose.at);
+    const ahead = toLocal(st, { x: pose.at.x - Math.sin(pose.yaw), y: pose.at.y - Math.cos(pose.yaw) });
+    usePlanStore.getState().addView({ name, levelId: pose.levelId, at, yaw: Math.atan2(-(ahead.x - at.x), -(ahead.y - at.y)), pitch: pose.pitch });
+  };
+  return (
+    <>
+      <span className="sep" />
+      <div className="group saved-views" role="group" aria-label="Saved views">
+        {views?.map((v) => (
+          <span key={v.id} className="saved-view">
+            <button
+              title={`Walk from "${v.name}"`}
+              onClick={() => {
+                useUiStore.getState().goToView(v);
+                focusCanvas();
+              }}
+            >
+              {v.name}
+            </button>
+            {editable && (
+              <button className="saved-view-remove" title={`Remove the view "${v.name}"`} aria-label={`Remove the view ${v.name}`} onClick={() => usePlanStore.getState().deleteView(v.id)}>
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        {editable && walking && (
+          <button title="Keep where you stand and look as a named view" onClick={save}>
+            Save view
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** How far the touch pad's knob travels from its centre, px. */
+const PAD_REACH = 44;
+
+/**
+ * Walk mode on a touch screen: a pad to push the way to walk (up is forward), written to walkInput
+ * for the frame loop. Dragging anywhere else on the view looks around.
+ */
+function WalkPad() {
+  const [knob, setKnob] = useState<{ x: number; y: number } | null>(null);
+  const move = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    let x = e.clientX - (r.left + r.width / 2);
+    let y = e.clientY - (r.top + r.height / 2);
+    const len = Math.hypot(x, y);
+    if (len > PAD_REACH) {
+      x = (x / len) * PAD_REACH;
+      y = (y / len) * PAD_REACH;
+    }
+    walkInput.right = x / PAD_REACH;
+    walkInput.forward = -y / PAD_REACH;
+    setKnob({ x, y });
+  };
+  const release = () => {
+    walkInput.forward = 0;
+    walkInput.right = 0;
+    setKnob(null);
+  };
+  useEffect(() => release, []);
+  return (
+    <div
+      className="walk-pad"
+      role="application"
+      aria-label="Walk: push the way to go"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        move(e);
+      }}
+      onPointerMove={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e);
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+    >
+      <div className="walk-pad-knob" style={knob ? { transform: `translate(${knob.x}px, ${knob.y}px)` } : undefined} />
+    </div>
+  );
+}
+
+/** True on a device with a touch screen (the walk pad and the touch hint show). */
+const hasTouch = (): boolean => typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
 
 /** Walk mode: a crosshair and the controls hint. */
 function WalkOverlay() {
@@ -453,6 +560,21 @@ function WalkOverlay() {
   const levelId = useUiStore((s) => s.walkLevelId);
   const collision = useUiStore((s) => s.walkCollision);
   const levelName = useViewPlanStore((s) => (levelId ? (s.plan.levels[levelId]?.name ?? '') : ''));
+  if (hasTouch()) {
+    return (
+      <>
+        <div className="walk-crosshair" aria-hidden="true" />
+        <WalkPad />
+        <div className="walk-hint walk-hint-touch" role="status">
+          {levelName && <strong>{levelName}</strong>}
+          <span>Push the pad to walk, drag the view to look</span>
+          <label className="walk-collision">
+            <input type="checkbox" checked={collision} onChange={(e) => useUiStore.getState().setWalkCollision(e.target.checked)} /> Solid walls and cabinets
+          </label>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="walk-crosshair" aria-hidden="true" />
@@ -472,7 +594,7 @@ function WalkOverlay() {
           <kbd>Esc</kbd> back to orbit
         </span>
         <label className="walk-collision">
-          <input type="checkbox" checked={collision} onChange={(e) => useUiStore.getState().setWalkCollision(e.target.checked)} /> Walls are solid (<kbd>C</kbd>)
+          <input type="checkbox" checked={collision} onChange={(e) => useUiStore.getState().setWalkCollision(e.target.checked)} /> Walls and cabinets are solid (<kbd>C</kbd>)
         </label>
       </div>
     </>

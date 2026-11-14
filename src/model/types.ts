@@ -850,4 +850,20 @@ export interface Plan {
   proposedLook?: ProposedLook;
   /** The design options, at least one; the first is the one a plan opens on. */
   options: DesignOption[];
+  /** Saved viewpoints to walk from (DESIGN.md "3D"); the viewer opens on the first. Absent: none. */
+  views?: SavedView[];
+}
+
+/**
+ * A saved viewpoint: where the walker stands on a level (the level's own coordinates) and the way
+ * the eye looks (`yaw` about the vertical, radians, 0 looking along -y on the plan; `pitch` up
+ * positive).
+ */
+export interface SavedView {
+  id: Id;
+  name: string;
+  levelId: Id;
+  at: Vec2;
+  yaw: number;
+  pitch: number;
 }

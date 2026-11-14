@@ -13,7 +13,7 @@ import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
 import { firstStructure, isStructureKind, normalizeDegrees, structureOf } from './structures';
 import { AS_TODAY } from './types';
-import type { OptionLook, CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, OptionFinishes, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { OptionLook, CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, OptionFinishes, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, SavedView, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
 
 export const SCHEMA_VERSION = 10 as const;
@@ -849,7 +849,7 @@ const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', '
 const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'optionIds', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
 const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase', 'optionIds'] as const;
 const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'optionFinishes', 'underlay'] as const;
-const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook', 'options'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook', 'options', 'views'] as const;
 const STRUCTURE_KEYS = ['id', 'name', 'kind', 'origin', 'rotation', 'baseFloorElevation', 'levelOrder'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
@@ -1737,7 +1737,31 @@ export function migrate(json: unknown): Plan {
   put(plan, 'proposedLook', migrateProposedLook(doc.proposedLook));
   plan.options = migrateOptions(doc.options);
   cleanOptionTags(plan as unknown as Plan);
+  put(plan, 'views', migrateViews(doc.views, levels));
   return plan as unknown as Plan;
+}
+
+/** A saved viewpoint's problem, or null: a name, a level the plan has, a finite point and angles. */
+export function viewProblem(v: Pick<SavedView, 'name' | 'levelId' | 'at' | 'yaw' | 'pitch'>, levels: Record<Id, unknown>): string | null {
+  if (typeof v.name !== 'string' || !v.name.trim()) return 'a view needs a name';
+  if (!(v.levelId in levels)) return 'no such level';
+  if (!isObject(v.at) || !isNum(v.at.x) || !isNum(v.at.y) || !isNum(v.yaw) || !isNum(v.pitch)) return 'a view needs a finite point and angles';
+  return null;
+}
+
+/** The saved viewpoints: each valid one kept (unique ids), undefined when none. */
+function migrateViews(raw: unknown, levels: Record<Id, unknown>): SavedView[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: SavedView[] = [];
+  const seen = new Set<Id>();
+  for (const v of raw as unknown[]) {
+    if (!isObject(v) || typeof v.id !== 'string' || !v.id || seen.has(v.id)) continue;
+    const view = v as unknown as SavedView;
+    if (viewProblem(view, levels)) continue;
+    seen.add(view.id);
+    out.push({ id: view.id, name: view.name.trim(), levelId: view.levelId, at: { x: view.at.x, y: view.at.y }, yaw: view.yaw, pitch: Math.max(-1.4, Math.min(1.4, view.pitch)) });
+  }
+  return out.length ? out : undefined;
 }
 
 /**

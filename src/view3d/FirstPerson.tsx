@@ -22,6 +22,7 @@ import {
   walkWorld,
   surfaceAt,
 } from './walk';
+import { walkInput, walkNow } from './walkInput';
 
 /** Wider than the orbit view's 50 degrees: rooms feel less like a keyhole. */
 const WALK_FOV = 65;
@@ -71,22 +72,43 @@ export function FirstPerson() {
   /** The feet's elevation: the eye eases to EYE_HEIGHT over it (walk.ts walkMove moves them). */
   const feet = useRef(0);
 
-  // Enter: eye height on the start level, at the start point (the picked one, the entry door, or
-  // the middle of the house; walk.ts walkStart), looking the way it says.
-  useEffect(() => {
+  // Stand at the start point (the picked one or a saved viewpoint, the entry door, or the middle of
+  // the house; walk.ts walkStart) at eye height on the start level, looking the way it says.
+  const place = useCallback((): boolean => {
     const plan = getViewPlan();
     const ui = useUiStore.getState();
     const levels = walkLevels(plan, ui);
     const id = walkStartLevel(plan, ui);
-    if (!id) return;
+    if (!id) return false;
     const { at, dir } = walkStart(plan, id, ui.viewMode, levels, ui.walkFrom);
     const floor = getLevelElevations(plan)[id]?.floorTop ?? 0;
     feet.current = surfaceAt(walkWorld(plan, ui.viewMode, levels), at, floor) ?? floor;
     const y = feet.current + EYE_HEIGHT;
     camera.position.set(at.x, y, at.y);
     camera.lookAt(at.x + dir.x, y, at.y + dir.y);
+    const pitch = ui.walkFrom?.levelId === id ? ui.walkFrom.pitch : undefined;
+    if (pitch) {
+      euler.setFromQuaternion(camera.quaternion);
+      euler.x = Math.max(Math.PI / 2 - MAX_POLAR, Math.min(Math.PI / 2 - MIN_POLAR, pitch));
+      camera.quaternion.setFromEuler(euler);
+    }
     levelId.current = id;
     ui.setWalkLevel(id);
+    return true;
+  }, [camera]);
+
+  // A saved viewpoint picked while already walking: stand there.
+  const jump = useUiStore((s) => s.walkJump);
+  const firstJump = useRef(jump);
+  useEffect(() => {
+    if (jump === firstJump.current) return;
+    firstJump.current = jump;
+    place();
+  }, [jump, place]);
+
+  // Enter.
+  useEffect(() => {
+    if (!place()) return;
     const fov = camera instanceof PerspectiveCamera ? camera.fov : null;
     if (camera instanceof PerspectiveCamera) {
       camera.fov = WALK_FOV;
@@ -101,8 +123,11 @@ export function FirstPerson() {
       }
       if (document.pointerLockElement === gl.domElement) document.exitPointerLock();
       useUiStore.getState().setWalkLocked(false);
+      walkInput.forward = 0;
+      walkInput.right = 0;
+      walkNow.pose = null;
     };
-  }, [camera, gl]);
+  }, [camera, gl, place]);
 
   const changeLevel = useCallback(
     (dir: -1 | 1) => {
@@ -158,9 +183,12 @@ export function FirstPerson() {
   useEffect(() => {
     const el = gl.domElement;
     let drag: number | null = null;
+    let last = { x: 0, y: 0 };
     let lockRefused = false;
+    // A finger looks round by dragging; the pointer lock is for a mouse.
+    let touch = false;
     const onClick = () => {
-      if (lockRefused || document.pointerLockElement === el) return;
+      if (touch || lockRefused || document.pointerLockElement === el) return;
       try {
         const p = el.requestPointerLock() as Promise<void> | undefined;
         p?.catch(() => {
@@ -171,15 +199,24 @@ export function FirstPerson() {
       }
     };
     const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0 || document.pointerLockElement === el) return;
+      touch = e.pointerType === 'touch';
+      if (e.button !== 0 || document.pointerLockElement === el || drag !== null) return;
       drag = e.pointerId;
+      last = { x: e.clientX, y: e.clientY };
       el.setPointerCapture(e.pointerId);
     };
     const onPointerMove = (e: PointerEvent) => {
       if (drag !== e.pointerId || document.pointerLockElement === el) return;
+      // From the positions, not movementX / Y, which a touch does not report everywhere. A finger
+      // drags the scene (the view turns against it); a mouse turns the head (with it).
+      const sign = e.pointerType === 'touch' ? -1 : 1;
+      const speed = e.pointerType === 'touch' ? LOOK_SPEED * 2 : LOOK_SPEED;
+      const dx = e.clientX - last.x;
+      const dy = e.clientY - last.y;
+      last = { x: e.clientX, y: e.clientY };
       euler.setFromQuaternion(camera.quaternion);
-      euler.y -= e.movementX * LOOK_SPEED;
-      euler.x -= e.movementY * LOOK_SPEED;
+      euler.y -= sign * dx * speed;
+      euler.x -= sign * dy * speed;
       euler.x = Math.max(Math.PI / 2 - MAX_POLAR, Math.min(Math.PI / 2 - MIN_POLAR, euler.x));
       camera.quaternion.setFromEuler(euler);
     };
@@ -207,14 +244,14 @@ export function FirstPerson() {
     const eye = feet.current + EYE_HEIGHT;
     if (Math.abs(camera.position.y - eye) > 0.01) camera.position.y += (eye - camera.position.y) * Math.min(1, delta * EYE_EASE);
     lamp.current?.position.copy(camera.position);
+    euler.setFromQuaternion(camera.quaternion);
+    if (levelId.current) walkNow.pose = { levelId: levelId.current, at: { x: camera.position.x, y: camera.position.z }, yaw: euler.y, pitch: euler.x };
     const k = keys.current;
-    if (!k.size) return;
     const has = (codes: string[]) => codes.some((c) => k.has(c));
-    const forward = Number(has(FORWARD)) - Number(has(BACK));
-    const right = Number(has(RIGHT)) - Number(has(LEFT));
+    const forward = Number(has(FORWARD)) - Number(has(BACK)) + walkInput.forward;
+    const right = Number(has(RIGHT)) - Number(has(LEFT)) + walkInput.right;
     if (!forward && !right) return;
     const distance = WALK_SPEED * (has(RUN) ? RUN_FACTOR : 1) * Math.min(delta, MAX_STEP_SECONDS);
-    euler.setFromQuaternion(camera.quaternion);
     const [dx, dz] = walkStep(euler.y, forward, right, distance);
     // Feet on what is there: up a step, down to what is below, stopped by rails and stair sides.
     const plan = getViewPlan();

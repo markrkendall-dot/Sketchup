@@ -30,6 +30,13 @@ async function boot(): Promise<void> {
     // It opens like the editor (MK, 15 Oct 2026): on the proposed design, roofs and furniture off;
     // Existing and All, the roofs and the furniture are a tap away.
     useUiStore.setState({ viewerMode: true, viewMode: 'proposed', show3dRoofs: false, showFurniture: false });
+    // A plan with saved viewpoints (an interior to walk, like a kitchen) opens standing at the first,
+    // under its ceiling and with its furniture.
+    const first = plan.views?.[0];
+    if (first) {
+      useUiStore.setState({ show3dRoofs: true, showFurniture: true });
+      useUiStore.getState().goToView(first);
+    }
     document.title = `${plan.name.replace(/\s*\(.*\)\s*$/, '')} Viewer`;
     createRoot(root).render(
       <StrictMode>

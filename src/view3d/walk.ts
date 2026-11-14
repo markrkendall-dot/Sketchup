@@ -1,3 +1,4 @@
+import { cornerOutline, fixtureOutline } from '../derive/casework';
 import { getDeckLayout, type DeckBox } from '../derive/decks';
 import { floorOpeningHoles, getFloorOpeningLayout } from '../derive/floorOpenings';
 import { getLevelElevations } from '../derive/levels';
@@ -118,7 +119,7 @@ export function walkStart(
   levelId: Id,
   viewMode: ViewMode,
   levels: readonly Id[],
-  walkFrom?: { levelId: Id; point: Vec2 } | null,
+  walkFrom?: { levelId: Id; point: Vec2; yaw?: number } | null,
 ): WalkPose {
   const st = structureOf(plan, levelId);
   const local = walkStartLocal(plan, levelId, viewMode, walkFrom);
@@ -135,8 +136,12 @@ function placePose(st: Placement, pose: WalkPose): WalkPose {
 }
 
 /** walkStart's steps 1 to 3, in the level's own coordinates; null for step 4. */
-function walkStartLocal(plan: Plan, levelId: Id, viewMode: ViewMode, walkFrom?: { levelId: Id; point: Vec2 } | null): WalkPose | null {
-  if (walkFrom && walkFrom.levelId === levelId && plan.levels[levelId]) return { at: { ...walkFrom.point }, dir: EAST };
+function walkStartLocal(plan: Plan, levelId: Id, viewMode: ViewMode, walkFrom?: { levelId: Id; point: Vec2; yaw?: number } | null): WalkPose | null {
+  if (walkFrom && walkFrom.levelId === levelId && plan.levels[levelId]) {
+    // A saved viewpoint looks its own way: yaw 0 is along -y on the plan (three's -Z).
+    const dir = walkFrom.yaw === undefined ? EAST : { x: -Math.sin(walkFrom.yaw), y: -Math.cos(walkFrom.yaw) };
+    return { at: { ...walkFrom.point }, dir };
+  }
   const door = entryDoorPose(plan, levelId, viewMode);
   if (door) return door;
   const level = plan.levels[levelId];
@@ -161,14 +166,16 @@ function walkStartLocal(plan: Plan, levelId: Id, viewMode: ViewMode, walkFrom?: 
 
 /**
  * Horizontal displacement (three x, z) for a step of `distance` with the camera turned by `yaw`
- * (rotation about +Y; 0 looks along -Z). forward / right are -1, 0 or 1; diagonals are normalized
- * so they are not faster.
+ * (rotation about +Y; 0 looks along -Z). forward / right are -1, 0 or 1 from the keys, or anything
+ * between from the touch pad: a push longer than 1 (a diagonal) is normalized so it is not faster,
+ * a shorter one is that much slower.
  */
 export function walkStep(yaw: number, forward: number, right: number, distance: number): [number, number] {
   const len = Math.hypot(forward, right);
   if (len === 0 || distance === 0) return [0, 0];
-  const f = (forward / len) * distance;
-  const r = (right / len) * distance;
+  const k = distance / Math.max(1, len);
+  const f = forward * k;
+  const r = right * k;
   const s = Math.sin(yaw);
   const c = Math.cos(yaw);
   // forward = (-sin yaw, 0, -cos yaw), right = (cos yaw, 0, -sin yaw)
@@ -182,7 +189,8 @@ export function walkStep(yaw: number, forward: number, right: number, distance: 
 // the way between a step and the waist (stair sides, guards, rails, deck edges) and, with
 // collision on (the default; the walk hint's "Walls are solid"), by the walls: a wall is in the way
 // except over its doors and passages (open or shut, any phase shown) and, in the All view, a wall
-// being demolished. Windows, cabinets and furniture are not in the way.
+// being demolished, and by cabinets, appliances and bath fixtures (fixtureObstacles), so a kitchen's
+// clearances can be felt. Windows and furniture are not in the way.
 
 /** The highest step the walker climbs, inches. */
 export const STEP_UP = 9;
@@ -305,6 +313,28 @@ export function wallObstacles(plan: Plan, levelId: Id, viewMode: ViewMode, z: nu
   return out;
 }
 
+/** How close the walker comes to a cabinet or appliance, inches (closer than to a wall: one leans over a counter). */
+export const FIXTURE_PAD = 2;
+
+/**
+ * The cabinets, appliances and bath fixtures of a level in the way of the walker (level-local plan,
+ * absolute heights): each visible one's footprint from its bottom to its top, so a wall cabinet
+ * over the waist is walked under. Furniture (a layer that can be hidden) is not in the way, nor is
+ * a fixture being demolished in the All view.
+ */
+export function fixtureObstacles(plan: Plan, levelId: Id, viewMode: ViewMode, z: number): WalkObstacle[] {
+  const level = plan.levels[levelId];
+  if (!level) return [];
+  const out: WalkObstacle[] = [];
+  for (const f of Object.values(level.fixtures ?? {})) {
+    if (f.kind === 'furniture' || !isVisible(f.phase, viewMode) || (viewMode === 'all' && f.phase === 'demo')) continue;
+    const poly = f.kind === 'cornerBase' || f.kind === 'cornerWall' ? cornerOutline(f) : fixtureOutline(f);
+    if (Math.abs(polygonSignedArea(poly)) < 1e-6) continue;
+    out.push({ ...shape(poly), bottom: flat(z + f.elevation), top: flat(z + f.elevation + f.height), pad: FIXTURE_PAD });
+  }
+  return out;
+}
+
 /** The part of poly with dot(p, d) >= c (sign 1) or <= c (sign -1). */
 function clipAlong(poly: Vec2[], d: Vec2, c: number, sign: 1 | -1): Vec2[] {
   const out: Vec2[] = [];
@@ -414,7 +444,7 @@ export function walkWorld(plan: Plan, viewMode: ViewMode, levels: readonly Id[],
       const layout = getFloorOpeningLayout(plan, id, o.id, viewMode);
       for (const r of [...(layout?.railing ?? []), ...(layout?.rail ?? [])]) obstacles.push(box(r, z, BODY_RADIUS));
     }
-    if (walls) obstacles.push(...wallObstacles(plan, id, viewMode, z));
+    if (walls) obstacles.push(...wallObstacles(plan, id, viewMode, z), ...fixtureObstacles(plan, id, viewMode, z));
     placeShapes(st, surfaces, firstSurface);
     placeShapes(st, obstacles, firstObstacle);
   }

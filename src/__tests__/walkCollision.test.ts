@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { getFootprints } from '../derive/footprint';
 import { getLevelElevations } from '../derive/levels';
 import { add, dot, scale, sub } from '../model/geometry';
-import { migrate } from '../model/plan';
-import type { Plan, Vec2, ViewMode } from '../model/types';
-import { blockedAt, surfaceAt, walkMove, walkWorld, type WalkState, type WalkWorld } from '../view3d/walk';
+import { createEmptyPlan, defaultLevelId, migrate } from '../model/plan';
+import type { Fixture, Plan, Vec2, ViewMode } from '../model/types';
+import { blockedAt, fixtureObstacles, surfaceAt, walkMove, walkWorld, type WalkState, type WalkWorld } from '../view3d/walk';
 import starter from '../../docs/examples/146-mick-road.json';
 import rebuild from '../../docs/examples/146-mick-road-rebuild.json';
 
@@ -32,6 +32,8 @@ function walkThroughDoors(plan: Plan, view: ViewMode): number {
     const level = plan.levels[lid];
     const z = getLevelElevations(plan)[lid].floorTop;
     const fps = getFootprints(level, view);
+    // A closet's opening with machines standing in it (the laundry's washer and dryer) is not walked through.
+    const fixtures = { surfaces: [], obstacles: fixtureObstacles(plan, lid, view, z), ground: () => null };
     for (const o of Object.values(level.openings)) {
       const w = level.walls[o.wallId];
       const fp = fps.get(o.wallId);
@@ -43,6 +45,7 @@ function walkThroughDoors(plan: Plan, view: ViewMode): number {
           const from = add(add(c, scale(fp.normal, sgn * 20)), scale(fp.dir, skew));
           const feet = surfaceAt(world, from, z);
           if (feet === null) continue;
+          if ([-24, -12, 0, 12, 20].some((d) => blockedAt(fixtures, add(add(c, scale(fp.normal, sgn * d)), scale(fp.dir, d === 20 ? skew : 0)), z))) continue;
           const end = walkTo(world, { at: from, feet }, add(c, scale(fp.normal, -sgn * 24)));
           walks++;
           expect(dot(sub(end.at, c), fp.normal) * sgn, `${view} ${level.name} ${o.type} ${o.id} from side ${sgn}, ${skew}" off`).toBeLessThan(-6);
@@ -88,5 +91,46 @@ describe('walk-mode collision', () => {
     // With collision off the walk goes through.
     const through = walkTo(off, from, target);
     expect(dot(sub(through.at, mid), fp.normal) * side).toBeLessThan(-wall.thickness);
+  });
+});
+
+describe('cabinets and appliances in the way (walk.ts fixtureObstacles)', () => {
+  const setup = () => {
+    const plan = createEmptyPlan('Kitchen', 'single');
+    const lid = defaultLevelId(plan);
+    const level = plan.levels[lid];
+    const z = getLevelElevations(plan)[lid].floorTop;
+    const fx = (id: string, f: Partial<Fixture>) => {
+      level.fixtures[id] = { id, kind: 'base', origin: { x: 0, y: 0 }, direction: 90, width: 30, depth: 24, height: 34.5, elevation: 0, phase: 'existing', ...f } as Fixture;
+    };
+    return { plan, lid, z, fx };
+  };
+
+  it('a base cabinet stops the walker, a wall cabinet over the waist and a piece of furniture do not', () => {
+    const { plan, lid, z, fx } = setup();
+    fx('base', {});
+    fx('upper', { kind: 'wall', origin: { x: 100, y: 0 }, depth: 12, height: 30, elevation: 54 });
+    fx('chest', { kind: 'furniture', piece: 'chest', origin: { x: 200, y: 0 } });
+    const world = { surfaces: [], obstacles: fixtureObstacles(plan, lid, 'existing', z), ground: () => null };
+    expect(world.obstacles).toHaveLength(2);
+    expect(blockedAt(world, { x: 0, y: 12 }, z)).toBe(true);
+    // Just clear of its front (24" deep, kept 2" from).
+    expect(blockedAt(world, { x: 0, y: 25 }, z)).toBe(true);
+    expect(blockedAt(world, { x: 0, y: 27 }, z)).toBe(false);
+    expect(blockedAt(world, { x: 100, y: 6 }, z)).toBe(false);
+    expect(blockedAt(world, { x: 200, y: 6 }, z)).toBe(false);
+  });
+
+  it('follows the view: a new cabinet is not there in Existing, a demolished one is open in All', () => {
+    const { plan, lid, z, fx } = setup();
+    fx('new', { phase: 'new' });
+    fx('demo', { phase: 'demo', origin: { x: 100, y: 0 } });
+    const ids = (view: ViewMode) => fixtureObstacles(plan, lid, view, z).length;
+    expect(ids('existing')).toBe(1);
+    expect(ids('proposed')).toBe(1);
+    expect(ids('all')).toBe(1);
+    const all = { surfaces: [], obstacles: fixtureObstacles(plan, lid, 'all', z), ground: () => null };
+    expect(blockedAt(all, { x: 0, y: 12 }, z)).toBe(true);
+    expect(blockedAt(all, { x: 100, y: 12 }, z)).toBe(false);
   });
 });
