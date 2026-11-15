@@ -1,12 +1,12 @@
 import { BATH_KINDS, TUB_SHOWERS } from './bath';
 import { isHexColor } from './finish';
-import type { Backsplash, BacksplashFinish, CounterMaterial, Fixture, FixtureKind, FrontStyle, HandleFinish, HandleStyle, Level, LevelFinishes, OptionFinishes } from './types';
+import type { ApplianceFinish, Backsplash, BacksplashFinish, CounterMaterial, Fixture, FridgeStyle, FixtureKind, FrontStyle, HandleFinish, HandleStyle, Level, LevelFinishes, OptionFinishes } from './types';
 
 // Casework data (DESIGN.md "Casework"): the kinds of fixture, their stock sizes, the counter and
 // toe-kick dimensions and the colour defaults. Pure data shared by the tool, the panel, the 3D
 // materials, the 2D symbols and the loader's validation.
 
-export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'cornerBase', 'wall', 'cornerWall', 'shelf', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', ...BATH_KINDS, 'box', 'furniture'];
+export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'cornerBase', 'wall', 'cornerWall', 'shelf', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', 'cooktop', 'recessedLight', 'pendant', 'underCabinetLight', ...BATH_KINDS, 'box', 'furniture'];
 /** The kinds the Cabinet tool offers (furniture has its own tool and catalogue, model/furniture.ts). */
 export const CASEWORK_KINDS: readonly FixtureKind[] = FIXTURE_KINDS.filter((k) => k !== 'furniture');
 
@@ -25,6 +25,10 @@ export const FIXTURE_LABEL: Record<FixtureKind, string> = {
   wallOven: 'Wall oven',
   hood: 'Range hood',
   microwave: 'Microwave',
+  cooktop: 'Cooktop',
+  recessedLight: 'Recessed light',
+  pendant: 'Pendant light',
+  underCabinetLight: 'Under-cabinet light',
   bathtub: 'Bathtub',
   shower: 'Shower',
   showerGlass: 'Glass panel',
@@ -46,6 +50,7 @@ export const FIXTURE_PLAN_LABEL: Partial<Record<FixtureKind, string>> = {
   wallOven: 'OVEN',
   hood: 'HOOD',
   microwave: 'MW',
+  cooktop: 'COOKTOP',
   washer: 'W',
   dryer: 'D',
   waterHeater: 'WH',
@@ -79,6 +84,12 @@ export const FIXTURE_DEFAULTS: Record<FixtureKind, FixtureSize> = {
   wallOven: { width: 30, depth: 24, height: 84, elevation: 0 },
   hood: { width: 30, depth: 18, height: 12, elevation: 66 },
   microwave: { width: 30, depth: 16, height: 17, elevation: 54 },
+  // A cooktop lies on the counter (36" up). The lights hang from a 96" ceiling: a 6" recessed can
+  // flush with it, a pendant 30" down to 66", a strip under a wall cabinet's bottom at 54".
+  cooktop: { width: 36, depth: 21, height: 1.5, elevation: 36 },
+  recessedLight: { width: 6, depth: 6, height: 0.5, elevation: 95.5 },
+  pendant: { width: 10, depth: 10, height: 30, elevation: 66 },
+  underCabinetLight: { width: 24, depth: 2, height: 0.75, elevation: 53.25 },
   // Bath and laundry (model/bath.ts): a 60" x 30" tub, a 36" square shower (its height the glass's),
   // a fixed 30" glass panel, a toilet (tank 20" wide), a 36" vanity (counter at 34"), a pedestal
   // basin, front-load washer and dryer, a 50-gallon water heater.
@@ -106,7 +117,20 @@ export const hasCounter = (kind: FixtureKind): boolean => kind === 'base' || kin
 export const isCabinet = (kind: FixtureKind): boolean =>
   kind === 'base' || kind === 'cornerBase' || kind === 'wall' || kind === 'cornerWall' || kind === 'tall' || kind === 'island' || kind === 'sink' || kind === 'vanity';
 /** Kinds that hang above the counter: drawn dashed on the plan. */
-export const isOverhead = (kind: FixtureKind): boolean => kind === 'wall' || kind === 'cornerWall' || kind === 'shelf' || kind === 'hood' || kind === 'microwave';
+export const isOverhead = (kind: FixtureKind): boolean => kind === 'wall' || kind === 'cornerWall' || kind === 'shelf' || kind === 'hood' || kind === 'microwave' || isLight(kind);
+/** The light fixtures: each lights the 3D view (view3d/LevelMeshes.tsx). */
+export const isLight = (kind: FixtureKind): boolean => kind === 'recessedLight' || kind === 'pendant' || kind === 'underCabinetLight';
+/** The appliances that take a finish (Fixture.applianceFinish). */
+export const takesApplianceFinish = (kind: FixtureKind): boolean =>
+  kind === 'range' || kind === 'fridge' || kind === 'dishwasher' || kind === 'wallOven' || kind === 'hood' || kind === 'microwave' || kind === 'cooktop' || kind === 'pendant';
+export const FRIDGE_STYLES: readonly FridgeStyle[] = ['topFreezer', 'frenchDoor', 'sideBySide'];
+export const FRIDGE_STYLE_LABEL: Record<FridgeStyle, string> = { topFreezer: 'Freezer on top', frenchDoor: 'French door (freezer drawer below)', sideBySide: 'Side by side' };
+export const APPLIANCE_FINISHES: readonly ApplianceFinish[] = ['steel', 'black', 'white', 'panel'];
+export const APPLIANCE_FINISH_LABEL: Record<ApplianceFinish, string> = { steel: 'Stainless steel', black: 'Black', white: 'White', panel: 'Panel (the cabinets\' colour)' };
+/** An appliance's colour by finish; a panel takes the cabinet front colour instead (meshes.ts). */
+export const APPLIANCE_FINISH_COLOR: Record<Exclude<ApplianceFinish, 'panel'>, string> = { steel: '#b8bcc0', black: '#232326', white: '#f1f1ee' };
+/** A light's glow: warm white. */
+export const LAMP_COLOR = '#fff1d6';
 /** The L-shaped corner units: one cabinet across an inside corner. */
 export const isCorner = (kind: FixtureKind): boolean => kind === 'cornerBase' || kind === 'cornerWall';
 /** Kinds that get a backsplash behind them when their back (or an end) is on a wall face: base runs and a range. */
@@ -267,6 +291,8 @@ export const KITCHEN_FIELDS = {
   corner: { kinds: isCorner, ok: (v: unknown) => v === 'left' || v === 'right' },
   shelves: { kinds: (k: FixtureKind) => k === 'shelf', ok: (v: unknown) => isIntIn(v, 1, SHELF.maxCount) },
   shelfThickness: { kinds: (k: FixtureKind) => k === 'shelf', ok: (v: unknown) => isFiniteNum(v) && v > 0 && v <= 6 },
+  fridgeStyle: { kinds: (k: FixtureKind) => k === 'fridge', ok: oneOf(FRIDGE_STYLES) },
+  applianceFinish: { kinds: takesApplianceFinish, ok: oneOf(APPLIANCE_FINISHES) },
   // Not the kitchen's, but checked the same way: a shower over a bathtub (model/bath.ts).
   tubShower: { kinds: (k: FixtureKind) => k === 'bathtub', ok: oneOf(TUB_SHOWERS) },
 } as const;

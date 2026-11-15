@@ -243,6 +243,17 @@ const RECIPES: Record<FurniturePiece, (b: Builder, x: Dims) => void> = {
     }
     chair(b, { ...x, y0: x.y0 + 1.5 }, 16, true);
   },
+  stool(b, x) {
+    // A seat on four legs with a footrest round them, a third of the way up.
+    const seat = 1.5;
+    const leg = 1.5;
+    b.box('wood', -x.hw, x.hw, 0, x.D, x.y1 - seat, x.y1, 's');
+    b.legs4(x, leg, 1, x.y1 - seat);
+    const y = x.y0 + (x.y1 - x.y0) / 3;
+    const s = x.hw - 1 - leg / 2;
+    for (const dd of [1 + leg / 2, x.D - 1 - leg / 2]) b.box('wood', -s, s, dd - 0.4, dd + 0.4, y, y + 0.8, 's');
+    for (const ss of [-s, s]) b.box('wood', ss - 0.4, ss + 0.4, 1 + leg, x.D - 1 - leg, y, y + 0.8, 'd');
+  },
   bench(b, x) {
     const seat = 2;
     b.box('wood', -x.hw, x.hw, 0, x.D, x.y1 - seat, x.y1, 's');

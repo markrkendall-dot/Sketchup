@@ -7,7 +7,7 @@ import { butcherBlockTextures, fabricTextures, paintTextures, pineFloorTextures,
 import type { FillPart } from '../derive/openings3d';
 import type { ChimneyPart } from '../derive/site';
 import { CERAMIC_WHITE, CHROME_COLOR, SHOWER_GLASS_COLOR } from '../model/bath';
-import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, HANDLE_COLOR, KICK_COLOR } from '../model/casework';
+import { APPLIANCE_COLOR, BASIN_COLOR, DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, HANDLE_COLOR, KICK_COLOR, LAMP_COLOR } from '../model/casework';
 import { CHECK_GROUND, CHIMNEY_CAP_COLOR, COLUMN_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, DECK_COLOR, DEFAULT_WEATHERING, defaultWallColor, FENCE_COLOR, RAILING_COLOR, SURFACE_COLOR, defaultWallFinish, isMetalRoof, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
 import type { Column, FloorFinish, Phase, RoofFinish, RoomWallFinish, SurfaceMaterial, WallFinish, WallKind } from '../model/types';
 import { GRASS_COLOR, grassTexture, surfaceTexture } from './groundTexture';
@@ -712,10 +712,44 @@ export function fenceMaterial(part: 'body' | 'end', phase: Phase, color: string 
   return trimLike(`fence-${part}`, part === 'end' ? logEndColor(color) : color, phase);
 }
 
+/** A light's lens: it glows its own warm white whatever lights it (demolished: translucent red, unlit). */
+export function lampMaterial(phase: Phase): MeshStandardMaterial {
+  const key = `lamp|${phase}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      m = make(LAMP_COLOR);
+      m.emissive = new Color(LAMP_COLOR);
+      m.emissiveIntensity = 1;
+    }
+    partMaterials.set(key, m);
+  }
+  return m;
+}
+
+/** An appliance in a finish other than stainless steel: enamel, a little glossy (demolished: translucent red; new: pulled toward green). */
+export function applianceMaterial(phase: Phase, color: string): MeshStandardMaterial {
+  const key = `appliance|${phase}|${color}`;
+  let m = partMaterials.get(key);
+  if (!m) {
+    if (phase === 'demo') m = make(PHASE_COLOR.demo, { transparent: true, opacity: 0.35 });
+    else {
+      m = make(phase === 'new' ? pullGreen(color) : color);
+      m.metalness = 0.1;
+      m.roughness = 0.4;
+    }
+    partMaterials.set(key, m);
+  }
+  return m;
+}
+
 /** The material of one part of a fixture mesh: a furniture piece's (furnitureMaterial) or casework's (caseworkMaterial, in its wood when it has one). */
-export function fixturePartMaterial(f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor' | 'handleFinish'>, part: FixturePart): MeshStandardMaterial {
+export function fixturePartMaterial(f: Pick<FixtureMesh, 'phase' | 'frontColor' | 'wood' | 'furniture' | 'bodyColor' | 'handleFinish' | 'applianceColor'>, part: FixturePart): MeshStandardMaterial {
   if (f.furniture) return furnitureMaterial(part, f.phase, f.furniture.wood, f.furniture.fabric);
   if (part === 'handle') return handleMaterial(f.phase, f.handleFinish);
+  if (part === 'lamp') return lampMaterial(f.phase);
+  if (part === 'appliance' && f.applianceColor) return applianceMaterial(f.phase, f.applianceColor);
   if (part === 'body' || part === 'chrome' || part === 'glass' || part === 'dark') return bathMaterial(part, f.phase, f.bodyColor);
   return caseworkMaterial(part, f.phase, f.frontColor, f.wood);
 }

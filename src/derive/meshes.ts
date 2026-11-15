@@ -4,7 +4,7 @@ import { clipHalfPlane, cross, dot, halfPlaneCrossings, pointInPolygon, polygonS
 import type { BacksplashFinish, CeilingFinish, Column, CounterMaterial, FabricId, HandleFinish, Fence, Fixture, FixtureKind, FloorFinish, FurniturePiece, WoodId, Id, Level, LevelFinishes, Opening, Phase, Plan, Roof, RoofFinish, Room, RoomWallFinish, Site, SiteSurface, Stairs, SurfaceMaterial, Vec2, ViewMode, Wall, WallFinish, WallKind } from '../model/types';
 import { counterRuns, fixtureBoxes, fixtureBoxKey, fixtureFrame, fixturePoint, type CasePart, type CounterRun } from './casework';
 import { backsplashPieces, type BacksplashPiece } from './backsplash';
-import { frontColorOf, handleFinishOf, hasCounter, isCabinet, takesHandles } from '../model/casework';
+import { APPLIANCE_FINISH_COLOR, frontColorOf, handleFinishOf, hasCounter, isCabinet, takesHandles } from '../model/casework';
 import { FURNITURE, pieceFabricOf, pieceWoodOf } from '../model/furniture';
 import { furnitureSolids, stickCorners, type FurniturePart, type GrainAxis, type Local3, type Solid } from './furniture';
 import { bathSolids, type BathPart } from './bath';
@@ -1351,6 +1351,8 @@ export interface FixtureMesh {
   bodyColor?: string;
   /** A cabinet's pulls' finish after the level's default (when it has pulls). */
   handleFinish?: HandleFinish;
+  /** An appliance's colour when it is not stainless steel (Fixture.applianceFinish; a panel: the cabinet colour). */
+  applianceColor?: string;
   /** A furniture piece's piece, wood and fabric after the catalogue's defaults. */
   furniture?: { piece: FurniturePiece; wood: WoodId; fabric: FabricId; floorLayer: boolean; builtIn: boolean };
   /** One merged geometry per material part, level-local like the walls. */
@@ -2624,6 +2626,7 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const mesh: FixtureMesh = { id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts };
     if (isBath(f.kind)) mesh.bodyColor = bathBodyColorOf(f);
     if (takesHandles(f.kind)) mesh.handleFinish = handleFinishOf(f, finishes);
+    if (f.applianceFinish && f.applianceFinish !== 'steel') mesh.applianceColor = f.applianceFinish === 'panel' ? mesh.frontColor : APPLIANCE_FINISH_COLOR[f.applianceFinish];
     if (f.kind === 'furniture' && f.piece) mesh.furniture = { piece: f.piece, wood: pieceWoodOf(f), fabric: pieceFabricOf(f), floorLayer: !!FURNITURE[f.piece].floorLayer, builtIn: !!f.builtIn };
     else if (isCabinet(f.kind) || f.kind === 'wallOven' || f.kind === 'box' || f.kind === 'shelf') {
       const wood = f.wood ?? (isCabinet(f.kind) || f.kind === 'shelf' ? finishes?.cabinetWood : undefined);

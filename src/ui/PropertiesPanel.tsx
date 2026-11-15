@@ -53,6 +53,12 @@ import {
   DEFAULT_CABINET_COLOR,
   DEFAULT_COUNTER_COLOR,
   CASEWORK_KINDS,
+  APPLIANCE_FINISHES,
+  APPLIANCE_FINISH_LABEL,
+  FRIDGE_STYLES,
+  FRIDGE_STYLE_LABEL,
+  isLight,
+  takesApplianceFinish,
   FIXTURE_DEFAULTS,
   FIXTURE_LABEL,
   FRONT_STYLE_LABEL,
@@ -75,7 +81,7 @@ import { boardColorOf, COLUMN_COLOR, columnColorOf, DECK_COLOR, deckColorOf, FEN
 import { FLOOR_COLOR, FLOOR_FINISH_LABEL, FLOOR_FINISHES, floorLookOf, ROOM_WALL_COLOR, ROOM_WALL_FINISH_LABEL, ROOM_WALL_FINISHES, roomWallLookOf } from '../model/finish';
 import { CEILING_COLOR, CEILING_FINISH_LABEL, CEILING_FINISHES } from '../model/finish';
 import { bathBodyColorOf, CERAMIC_WHITE, glassOf, isBath, SHOWER, TUB_SHOWER_LABEL, TUB_SHOWERS, VARIANT_LABEL, VARIANTS, variantOf } from '../model/bath';
-import type { TubShower, RoomOptionFinishes, OptionLook, ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind , LevelFinishes } from '../model/types';
+import type { ApplianceFinish, FridgeStyle, TubShower, RoomOptionFinishes, OptionLook, ProposedLook, Backsplash, BacksplashFinish, BathVariant, Beam, CounterMaterial, HandleFinish, HandleStyle, CeilingFinish, Column, Deck, FabricId, Fence, Fixture, FloorOpening, Foundation, FrontStyle, FurniturePiece, WoodId, GradePoint, Id, JoistZone, Level, Member, Opening, Phase, Roof, RoofFinish, RoofShape, Room, Site, SiteSurface, Staircase, StairHandrail, StairNewel, StairStartStep, StairStringer, StairUnderside, Stairs, Wall, WallFinish, WallKind , LevelFinishes } from '../model/types';
 import { AS_TODAY } from '../model/types';
 import { formatArea, formatLength, parseLength } from '../model/units';
 import { pauseHistory, resumeHistory, usePlanStore, type EntitySelection, type DeckPatch, type FloorOpeningPatch, type JoistZonePatch, type LengthAnchor, type MemberPatch, type RoomPatch, type StaircasePatch } from '../store/planStore';
@@ -2043,6 +2049,23 @@ function KitchenOptions({ level, fixture }: { level: Level; fixture: Fixture }) 
   const shelf = fixture.kind === 'shelf' ? shelfLayoutOf(fixture) : null;
   return (
     <>
+      {fixture.kind === 'fridge' && (
+        <SelectField
+          label="Doors"
+          value={(fixture.fridgeStyle ?? 'topFreezer') as FridgeStyle}
+          options={FRIDGE_STYLES.map((v) => ({ value: v, label: FRIDGE_STYLE_LABEL[v] }))}
+          onChange={(v) => set({ fridgeStyle: v === 'topFreezer' ? undefined : v })}
+        />
+      )}
+      {takesApplianceFinish(fixture.kind) && (
+        <SelectField
+          label="Finish"
+          value={(fixture.applianceFinish ?? 'steel') as ApplianceFinish}
+          options={APPLIANCE_FINISHES.map((v) => ({ value: v, label: APPLIANCE_FINISH_LABEL[v] }))}
+          onChange={(v) => set({ applianceFinish: v === 'steel' ? undefined : v })}
+        />
+      )}
+      {isLight(fixture.kind) && <p className="panel-note">Lights the 3D view from where it is. The bottom is its lens: set it just under the ceiling (or under a wall cabinet).</p>}
       {takesHandles(fixture.kind) && (
         <>
           <SelectField

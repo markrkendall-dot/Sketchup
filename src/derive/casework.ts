@@ -17,6 +17,7 @@ import {
   frontStyleOf,
   hasCounter,
   isCabinet,
+  isLight,
   isOverhead,
   PANEL,
   TOE_KICK,
@@ -123,7 +124,8 @@ export function basinOutlines(f: Pick<Fixture, 'kind' | 'origin' | 'direction' |
 // Boxes: a fixture as axis-aligned boxes in its own frame, one material part each.
 
 /** What a box is made of (view3d/materials.ts picks the material). */
-export type CasePart = 'carcass' | 'front' | 'kick' | 'appliance' | 'basin' | 'handle' | 'glass';
+/** `lamp`: a light's glowing lens; `chrome` and `dark` as the bath fixtures' (a tap, a cooktop's grates). */
+export type CasePart = 'carcass' | 'front' | 'kick' | 'appliance' | 'basin' | 'handle' | 'glass' | 'lamp' | 'chrome' | 'dark';
 
 export interface CaseBox {
   part: CasePart;
@@ -262,6 +264,13 @@ function doorPull(out: CaseBox[], style: HandleStyle, s0: number, s1: number, y0
 const drawerPull = (out: CaseBox[], style: HandleStyle, s0: number, s1: number, y0: number, y1: number, dFront: number): void =>
   pull(out, style, (s0 + s1) / 2, (y0 + y1) / 2, dFront, false, drawerBar(s1 - s0));
 
+/** A kitchen sink's tap (inches): how far behind the basin's edge it starts, its section, its height, the spout's reach and drop, the lever's offset. */
+export const TAP = { setback: 0.5, size: 1, height: 12, reach: 7, drop: 1.5, lever: 3 } as const;
+/** A cooktop's burner grates (square) and knobs. */
+export const COOKTOP = { grate: 9, knob: 1.2 } as const;
+/** A French-door or side-by-side fridge's bar handles: section, stand-off, inset from the door's ends, distance from the meeting edge. */
+const FRIDGE_BAR = { size: 0.9, gap: 1.2, inset: 4, edge: 2 } as const;
+
 /** The fronts' style, a cabinet's pulls, what a fixture's boxes depend on besides the fixture (meshes.ts caches on it). */
 export const fixtureBoxKey = (f: Fixture, finishes?: LevelFinishes): string =>
   `${frontStyleOf(f, finishes)}|${takesHandles(f.kind) ? handlesOf(f, finishes) : 'none'}|${hasCounter(f.kind) ? counterThicknessOf(f, finishes) : ''}`;
@@ -353,8 +362,61 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
       pushBox(out, box('basin', b.s1 - t, b.s1, b.d0, b.d1, bottom, top)); // right wall
       pushBox(out, box('basin', b.s0 + t, b.s1 - t, b.d0, b.d0 + t, bottom, top)); // back wall
       pushBox(out, box('basin', b.s0 + t, b.s1 - t, b.d1 - t, b.d1, bottom, top)); // front wall
+      // The tap, on the basin's back rim in the middle: a riser, a spout reaching over the bowl, and a lever beside it.
+      const back = Math.max(0, b.d0 - TAP.setback);
+      {
+        const r = TAP.size / 2;
+        const reach = Math.min(TAP.reach, (b.d1 - b.d0) * 0.6);
+        pushBox(out, box('chrome', -r, r, back, back + TAP.size, top, top + TAP.height));
+        pushBox(out, box('chrome', -r, r, back + TAP.size, back + TAP.size + reach, top + TAP.height - TAP.size, top + TAP.height));
+        pushBox(out, box('chrome', -r, r, back + reach, back + TAP.size + reach, top + TAP.height - TAP.size - TAP.drop, top + TAP.height - TAP.size));
+        pushBox(out, box('chrome', TAP.lever, TAP.lever + TAP.size, back, back + TAP.size, top, top + TAP.size * 3));
+      }
       break;
     }
+    case 'cooktop': {
+      // A steel tray on the counter, cast grates over its burners (five from 34" wide), knobs along the front.
+      const tray = Math.min(0.4, f.height / 2);
+      pushBox(out, box('appliance', -h, h, 0, D, y0, y0 + tray));
+      const knobs = COOKTOP.knob * 2.5;
+      const five = w >= 34;
+      const g = Math.min(COOKTOP.grate, (w - 2) / (five ? 3.4 : 2.2), (D - knobs - 1) / 2.2);
+      const cols = five ? [-w / 2 + 1 + g / 2, 0, w / 2 - 1 - g / 2] : [-w / 4, w / 4];
+      const rows = [1 + g / 2, D - knobs - g / 2];
+      for (const s of cols) {
+        for (const d of rows) {
+          // The middle column has one burner, in the middle.
+          if (five && s === 0 && d === rows[1]) continue;
+          const dd = five && s === 0 ? (rows[0] + rows[1]) / 2 : d;
+          pushBox(out, box('dark', s - g / 2, s + g / 2, dd - g / 2, dd + g / 2, y0 + tray, y1));
+        }
+      }
+      const n = five ? 5 : 4;
+      for (let i = 0; i < n; i++) {
+        const s = (i - (n - 1) / 2) * COOKTOP.knob * 3;
+        pushBox(out, box('chrome', s - COOKTOP.knob / 2, s + COOKTOP.knob / 2, D - knobs + COOKTOP.knob / 2, D - COOKTOP.knob, y0 + tray, y1));
+      }
+      break;
+    }
+    case 'recessedLight': {
+      // A trim ring flush with the ceiling, its lens set in from the edge.
+      const rim = Math.min(1, w / 6, D / 6);
+      pushBox(out, box('appliance', -h, h, 0, D, y0 + (y1 - y0) * 0.4, y1));
+      pushBox(out, box('lamp', -h + rim, h - rim, rim, D - rim, y0, y0 + (y1 - y0) * 0.6));
+      break;
+    }
+    case 'pendant': {
+      // A cord from the ceiling to a shade, the lamp glowing under it.
+      const shade = Math.min(8, f.height / 2);
+      const rim = Math.min(1.5, w / 5, D / 5);
+      pushBox(out, box('dark', -0.25, 0.25, D / 2 - 0.25, D / 2 + 0.25, y0 + shade, y1));
+      pushBox(out, box('appliance', -h, h, 0, D, y0 + 1, y0 + shade));
+      pushBox(out, box('lamp', -h + rim, h - rim, rim, D - rim, y0, y0 + 1));
+      break;
+    }
+    case 'underCabinetLight':
+      pushBox(out, box('lamp', -h, h, 0, D, y0, y1));
+      break;
     case 'range': {
       pushBox(out, box('appliance', -h, h, 0, D, y0, y1 - 1));
       pushBox(out, box('kick', -h, h, 0, D, y1 - 1, y1)); // the cooktop, dark
@@ -364,6 +426,32 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
     case 'fridge': {
       const split = y0 + f.height * 0.7;
       pushBox(out, box('appliance', -h, h, 0, D - FRONT.thickness, y0, y1));
+      if (f.fridgeStyle === 'frenchDoor' || f.fridgeStyle === 'sideBySide') {
+        const rv = FRONT.reveal;
+        const d0 = D - FRONT.thickness;
+        const bar = FRIDGE_BAR;
+        const door = (s0: number, s1: number, a: number, b: number) => pushBox(out, box('appliance', s0 + rv, s1 - rv, d0, D, a + rv, b - rv));
+        // A bar handle standing off the door: upright by an edge, or across a drawer.
+        const upright = (s: number, a: number, b: number) => pushBox(out, box('handle', s - bar.size / 2, s + bar.size / 2, D + bar.gap, D + bar.gap + bar.size, a + bar.inset, b - bar.inset));
+        if (f.fridgeStyle === 'frenchDoor') {
+          // A freezer drawer under two doors that meet in the middle.
+          const drawer = y0 + f.height * 0.32;
+          door(-h, h, y0, drawer);
+          pushBox(out, box('handle', -h + bar.inset, h - bar.inset, D + bar.gap, D + bar.gap + bar.size, drawer - bar.inset - bar.size, drawer - bar.inset));
+          door(-h, 0, drawer, y1);
+          door(0, h, drawer, y1);
+          upright(-bar.edge, drawer, y1);
+          upright(bar.edge, drawer, y1);
+        } else {
+          // The freezer's door, the narrower, on the left.
+          const mid = -h + w * 0.42;
+          door(-h, mid, y0, y1);
+          door(mid, h, y0, y1);
+          upright(mid - bar.edge, y0 + f.height * 0.2, y1 - f.height * 0.2);
+          upright(mid + bar.edge, y0 + f.height * 0.2, y1 - f.height * 0.2);
+        }
+        break;
+      }
       pushBox(out, box('appliance', -h + FRONT.reveal, h - FRONT.reveal, D - FRONT.thickness, D, y0 + FRONT.reveal, split - FRONT.reveal));
       pushBox(out, box('appliance', -h + FRONT.reveal, h - FRONT.reveal, D - FRONT.thickness, D, split + FRONT.reveal, y1 - FRONT.reveal));
       break;
@@ -807,7 +895,11 @@ export function fixtureSymbol(f: Fixture): FixtureSymbol {
   let labelAngle = (Math.atan2(fr.v.y, fr.v.x) * 180) / Math.PI;
   if (labelAngle > 90 || labelAngle <= -90) labelAngle += 180;
   const burners: { at: Vec2; r: number }[] = [];
-  if (f.kind === 'range') {
+  if (isLight(f.kind) && f.kind !== 'underCabinetLight') {
+    // A ceiling light: a circle in its square.
+    burners.push({ at: fixturePoint(fr, 0, f.depth / 2), r: Math.min(f.width, f.depth) / 2 - 0.5 });
+  }
+  if (f.kind === 'range' || f.kind === 'cooktop') {
     const r = Math.min(4, f.width / 8, f.depth / 8);
     const ds = f.width / 4;
     const dd = f.depth / 4;
@@ -823,7 +915,7 @@ export function fixtureSymbol(f: Fixture): FixtureSymbol {
   const word = f.label?.trim() || (f.kind === 'box' ? FIXTURE_PLAN_LABEL.box! : FIXTURE_PLAN_LABEL[f.kind]) || null;
   // A bath fixture's drawing says what it is (derive/bath.ts bathSymbol): a word only on the laundry
   // and the water heater, or when labelled.
-  const own = f.kind === 'range' || f.kind === 'sink' || (isBath(f.kind) && !FIXTURE_PLAN_LABEL[f.kind]);
+  const own = f.kind === 'range' || f.kind === 'cooktop' || isLight(f.kind) || f.kind === 'sink' || (isBath(f.kind) && !FIXTURE_PLAN_LABEL[f.kind]);
   return {
     outline,
     front: corner ? fronts[1] : [outline[1], outline[2]],

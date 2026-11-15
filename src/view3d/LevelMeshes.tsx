@@ -1,4 +1,7 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
+import { SpotLight } from 'three';
+import { levelLights, type LevelLight } from '../derive/lights';
+import { LAMP_COLOR } from '../model/casework';
 import { getLevelElevations } from '../derive/levels';
 import { getDeckMeshes, getFloorOpeningMeshes, getFoundationMeshes, getLevelMeshes, getMemberMeshes, openingPartColor } from '../derive/meshes';
 import { FOUNDATION_COLOR } from '../model/finish';
@@ -6,6 +9,34 @@ import type { Id } from '../model/types';
 import { useViewPlanStore } from '../store/viewStore';
 import { useUiStore } from '../store/uiStore';
 import { backsplashMaterial, ceilingMaterial, counterMaterial, fixturePartMaterial, isGlassPart, deckMaterial, memberMaterial, fasciaMaterial, railingMaterial, stairPartMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, flashingMaterial, roofMaterial, roomWallMaterial, stairsMaterial, wallMaterial } from './materials';
+
+/** A recessed can: a soft cone straight down (its target rides along as its child, an inch below). */
+function DownLight({ light }: { light: LevelLight }) {
+  const spot = useMemo(() => {
+    const l = new SpotLight(LAMP_COLOR, light.intensity, light.distance, 1.15, 1, 2);
+    l.target.position.set(0, -1, 0);
+    l.add(l.target);
+    return l;
+  }, [light.intensity, light.distance]);
+  return <primitive object={spot} position={light.position} />;
+}
+
+/**
+ * A level's interior lights (derive/lights.ts): warm white, falling off with the square of the
+ * distance, casting no shadows (a dozen shadow maps would cost more than they show).
+ */
+function LevelLights({ levelId }: { levelId: Id }) {
+  const viewMode = useUiStore((s) => s.viewMode);
+  const fixtures = useViewPlanStore((s) => s.plan.levels[levelId]?.fixtures);
+  const lights = useMemo(() => (fixtures ? levelLights({ fixtures }, viewMode) : []), [fixtures, viewMode]);
+  return (
+    <>
+      {lights.map((l) =>
+        l.kind === 'recessedLight' ? <DownLight key={l.id} light={l} /> : <pointLight key={l.id} color={LAMP_COLOR} position={l.position} intensity={l.intensity} distance={l.distance} decay={2} />,
+      )}
+    </>
+  );
+}
 
 /**
  * One level's walls, slab, stairs and roofs in a group at the level's floor top. Geometry comes from the
@@ -36,6 +67,7 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
   const foundation = useViewPlanStore((s) => getFoundationMeshes(s.plan, levelId, viewMode));
   return (
     <group position={[0, floorTop, 0]} name={`level:${levelId}`}>
+      <LevelLights levelId={levelId} />
       {foundation.map((f) => (
         <mesh
           key={f.phase}

@@ -321,6 +321,10 @@ export type FixtureKind =
   | 'hood'
   | 'microwave'
   | 'sink'
+  | 'cooktop'
+  | 'recessedLight'
+  | 'pendant'
+  | 'underCabinetLight'
   | 'bathtub'
   | 'shower'
   | 'showerGlass'
@@ -356,6 +360,10 @@ export type BacksplashFinish = 'tile' | 'slab';
 /** Door and drawer pulls: none, a knob, a bar pull. */
 export type HandleStyle = 'none' | 'knob' | 'bar';
 export type HandleFinish = 'steel' | 'black' | 'brass';
+/** A refrigerator's doors: a freezer over one door, two doors over a freezer drawer, or two full-height doors. */
+export type FridgeStyle = 'topFreezer' | 'frenchDoor' | 'sideBySide';
+/** An appliance's finish: stainless steel, black, white, or a panel in the cabinets' colour. */
+export type ApplianceFinish = 'steel' | 'black' | 'white' | 'panel';
 /** What a piece of furniture is (DESIGN.md "Furniture"; model/furniture.ts FURNITURE). */
 export type FurniturePiece =
   | 'bed'
@@ -373,6 +381,7 @@ export type FurniturePiece =
   | 'sideTable'
   | 'bookcase'
   | 'bench'
+  | 'stool'
   | 'trunk'
   | 'adirondackChair'
   | 'floorLamp'
@@ -472,6 +481,10 @@ export interface Fixture {
   shelves?: number;
   /** Open shelves: each board's thickness (absent 1 1/2"). */
   shelfThickness?: Inches;
+  /** A refrigerator's doors (absent: a freezer over one door). */
+  fridgeStyle?: FridgeStyle;
+  /** An appliance's finish (absent: stainless steel). */
+  applianceFinish?: ApplianceFinish;
 }
 
 /** Per-level defaults for casework (DESIGN.md "Casework"); every field optional. */

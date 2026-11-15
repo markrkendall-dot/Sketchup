@@ -50,6 +50,7 @@ export const FURNITURE: Record<FurniturePiece, FurnitureSpec> = {
   sofa: spec({ label: 'Sofa', category: 'Seating', size: { width: 84, depth: 36, height: 34 }, min: { width: 48, depth: 28, height: 26 }, wood: 'peeledLog', fabric: 'buffaloRed', placement: 'free' }),
   armchair: spec({ label: 'Armchair', category: 'Seating', size: { width: 34, depth: 34, height: 34 }, min: { width: 26, depth: 26, height: 26 }, wood: 'peeledLog', fabric: 'woolPlaid', placement: 'free' }),
   rocker: spec({ label: 'Rocking chair', category: 'Seating', size: { width: 24, depth: 34, height: 42 }, min: { width: 18, depth: 26, height: 34 }, wood: 'hickory', placement: 'free', uses: { fabric: false } }),
+  stool: spec({ label: 'Counter stool', category: 'Seating', size: { width: 16, depth: 16, height: 25 }, min: { width: 12, depth: 12, height: 16 }, wood: 'hickory', placement: 'free', uses: { fabric: false } }),
   bench: spec({ label: 'Bench', category: 'Seating', size: { width: 48, depth: 16, height: 18 }, min: { width: 18, depth: 10, height: 12 }, wood: 'hickory', placement: 'wall' }),
   rug: spec({ label: 'Rug', category: 'Rugs and lamps', size: { width: 96, depth: 60, height: 0.375 }, min: { width: 24, depth: 18, height: 0.25 }, wood: 'nordicPine', fabric: 'navajo', placement: 'free', floorLayer: true, uses: { wood: false } }),
   floorLamp: spec({ label: 'Floor lamp', category: 'Rugs and lamps', size: { width: 16, depth: 16, height: 60 }, min: { width: 10, depth: 10, height: 36 }, wood: 'darkLog', placement: 'free', uses: { wood: false } }),
