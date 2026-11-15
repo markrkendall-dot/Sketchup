@@ -2160,6 +2160,25 @@ only stay apart, two walls between the same corners in different options only ar
 splits and crossings use `entitiesCoexist` (phasesCoexist in some option where both exist). Adding a
 wall is refused only on top of a wall of an option it shares.
 
+### An option's casework finishes (`Level.optionFinishes`, `model/casework.ts withOptionFinishes`)
+
+A level's casework defaults (`Level.finishes`) are shared by every option and by the existing
+cabinets. `Level.optionFinishes[optionId]` holds one option's own (the same fields less the
+ceiling). They are not merged into the level's finishes, because the existing cabinets read those
+too and the Existing view must not change with the option: instead `levelIn` fills them into each
+fixture that is new in that option and sets no value of its own, for the fields its kind takes. So
+everything downstream (boxes, counters, backsplashes, materials, the export) sees ordinary fixture
+fields and has no option logic. The stored fixtures are untouched. Duplicating an option copies its
+record, deleting one removes it, and the loader drops a record for an option the plan lacks. No
+schema bump: the field is optional and an older build drops it on load.
+
+### Scripted options (`scripts/planLib.ts designOptions`, `workIn`, `stableIds`)
+
+A script names its options with `designOptions`, then calls `workIn(id)` before each option's
+changes: the store tags new and demolished work with the active option (`tagWork`), exactly as
+drawing in the editor does. `stableIds` renames the options after the first to `option-b`,
+`option-c` and saved views to `view-1`, so the JSON is the same on every run.
+
 ## Derivation and memoization
 
 `derive/*` are pure functions of plan objects. `getGraph(level)`, `getFootprints(level, viewMode)`,
@@ -2382,6 +2401,31 @@ invalidated. Without a 3D view it returns null. `downloadElevations` renders nor
 then downloads each through `downloadBlob` as `planFileName`'s slug plus `-<side>-elevation.png`. The menu
 item is disabled in the 2D layout ("Open the 3D view first"); a split layout too narrow for the 3D pane
 gets that message as an alert. Shadows and textures stay on: these are renderings, not line drawings.
+
+### Walking: touch, cabinets, saved views (`view3d/walkInput.ts`, `walk.ts fixtureObstacles`, `Plan.views`)
+
+- **Touch.** `Scene3D`'s `WalkPad` (shown when the device has a touch screen) writes its push to
+  the module state `walkInput`; `FirstPerson`'s frame loop adds it to the keys. `walkStep` takes a
+  push shorter than 1 as that much slower. Looking uses pointer positions (not `movementX`, which
+  a touch does not report everywhere), and a touch never asks for the pointer lock.
+- **Cabinets are in the way.** With collision on, `walkWorld` adds `fixtureObstacles`: each visible
+  fixture's footprint (a corner unit's L) from its bottom to its top, 2" pad. `blockedAt` already
+  tests between a step up and the waist, so wall cabinets and ceiling lights are walked under.
+  Furniture is left out (its layer can be hidden), and a fixture being demolished is open in All.
+- **Saved views** (`Plan.views`, optional): a name, a level, a point in the level's coordinates,
+  yaw and pitch. `uiStore.goToView` sets `walkFrom` (now with yaw and pitch), makes the level
+  active and shown, enters walk mode and bumps `walkJump`, which `FirstPerson` watches to stand
+  there again when already walking. The viewer opens on the first view (`viewer/main.tsx`).
+  `walkNow.pose` is where the walker is, for "Save view".
+
+### Interior lights (`derive/lights.ts`, `view3d/LevelMeshes.tsx LevelLights`)
+
+The light fixture kinds (`recessedLight`, `pendant`, `underCabinetLight`) each have a `lamp` part
+(an emissive lens) and a light source: a spot straight down for a recessed light, a point light for
+the others, warm white, inverse-square falloff, no shadows. The scene is in inches, so intensities
+are large (`LIGHT_SPEC`): 9000 is about 2.5 on a counter 60" below, the sky's fill being 2.4.
+`levelLights` caps a level at `MAX_LEVEL_LIGHTS` (12), because every lit material pays for each
+light and a change in their number recompiles the shaders.
 
 ## Persistence and export
 

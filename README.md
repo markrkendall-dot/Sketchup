@@ -356,6 +356,17 @@ pick one there. Then:
   burners and a sink its basin. In 3D they are painted boxes with doors, drawer fronts, pulls and
   toe kicks, steel appliances, the counter in its material and the backsplash on the wall.
 
+More kitchen pieces: a **Cooktop** lies on the counter (place it over the base cabinets; its bottom
+is the counter's top, 36"), with five burners from 34" wide and four below. A **Sink cabinet** has
+its tap. A **Refrigerator** has a "Doors" choice (freezer on top, French door, side by side), and
+every appliance and pendant a "Finish" (stainless steel, black, white, or a panel in the cabinets'
+colour). The Furniture tool has a **Counter stool**.
+
+With several design options, the level's cabinet finishes have a "Cabinet finishes for" choice:
+"Every cabinet (the level's)", or the active option's new cabinets only. An option's own colour,
+front style, counter, backsplash and pulls apply to the cabinets that option builds new and that
+set none themselves; the existing cabinets keep the level's, so the Existing view does not change.
+
 Cabinets follow the phases like walls: draw the new kitchen as *new*, mark the old cabinets
 *demolish*, and the Existing, Proposed and All views show each state.
 
@@ -523,8 +534,27 @@ look with the mouse, WASD or the arrows to move, Shift to go faster, Q/E to jump
 leave. You walk on what is there: up stairs and steps (9" at most), down to what is below, and the
 rails, guards and the sides of stairs stop you; the level follows your feet, so walking up the
 grand stair puts you on the Second Floor. Walls are solid: you go through doors (open or shut) and
-passages only, and leave the house by a door. Untick **Walls are solid** in the walk hint (or press
-`C`) to walk through them. Cabinets and furniture do not stop you.
+passages only, and leave the house by a door. Cabinets, appliances and bath fixtures are solid too,
+so a kitchen's aisles can be walked and felt (wall cabinets are walked under; furniture does not
+stop you). Untick **Walls and cabinets are solid** in the walk hint (or press `C`) to walk through
+them.
+
+On a touch screen (an iPad, a phone) a round pad appears at the bottom left: push it the way you
+want to walk (up is forward, a small push is slow) and drag anywhere else on the view to look
+around.
+
+**Saved views.** While walking, **Save view** in the 3D bar keeps where you stand and the way you
+look under a name. Each saved view is a button in the 3D bar (in the viewer too): click it to
+stand there, whether you were walking or not. The x beside it removes it. They are part of the
+plan (undo works on them), and a viewer of a plan that has any opens standing at the first, with
+the roofs and furniture on.
+
+**Lights.** Recessed lights, pendants and under-cabinet strips (Cabinet tool, kinds "Recessed
+light", "Pendant light", "Under-cabinet light") light the 3D view from where they are, in every
+camera mode. Set a light's bottom to its lens: just under the ceiling for a recessed light, the
+height the shade hangs at for a pendant, just under the wall cabinet for a strip. A level shines at
+most 12 at once (recessed first, then pendants, then strips), to keep a phone smooth; they cast no
+shadows.
 
 **N**, **S**, **E** and **W** in the 3D bar show an elevation: a straight-on view of that side of
 the house, without perspective, framed to fill the view and lit from over your left shoulder, so
@@ -553,6 +583,9 @@ visible levels): to export the proposed design, switch to Proposed first.
 
 ## Share a viewer
 
+The viewer has **Walk** (keys, mouse, or the touch pad), the saved views, and a button per design
+option; switching option keeps where you stand, so designs are compared from one spot.
+
 `npm run build:viewer` makes `dist-viewer/146-mick-road-viewer.html`: one self-contained HTML
 file (about 1.6 MB, no network access needed) that shows the house in 3D (drag or one finger to
 orbit, two fingers to pinch and pan, level checkboxes, a Roofs checkbox to look down into the
@@ -565,7 +598,8 @@ it from the editor and run `node scripts/build-viewer.mjs that-plan.json` after 
 A built copy of the starter's viewer is kept at `docs/viewer/146-mick-road-viewer.html` so it can
 be downloaded from GitHub (the download button on the file's page) and passed on by AirDrop or
 mail; rebuild and copy it over after changing the starter. The rebuild plan's viewer is beside it,
-`docs/viewer/146-mick-road-rebuild-viewer.html` (`npm run build:viewer` makes both).
+`docs/viewer/146-mick-road-rebuild-viewer.html`, and the kitchen's, `docs/viewer/kitchen-viewer.html`
+(`npm run build:viewer` makes all three).
 
 The same two files are also a web site, so a link is enough: https://markrkendall-dot.github.io/Sketchup/
 is the front page (`docs/index.html`, which links the two viewers and says how to look around),
@@ -1355,6 +1389,21 @@ the engineer, the trades and the tape measure):
 To change the design, edit it in the app (select, move, **Mark demolish**, draw with **Draw as:
 new**) or edit `proposed()` in the script and run `npm run build:example`.
 
+## The kitchen redesign (a third plan)
+
+`docs/examples/kitchen.json` (File > Open kitchen; `docs/viewer/kitchen-viewer.html`) is a real
+kitchen about to be redesigned, written by `scripts/kitchen-plan.ts`: the room as it stands in the
+Existing view and the design options in Proposed. **It is not measured yet.** Every size is read
+off one photo (`docs/kitchen/photos/01-kitchen-from-dining.jpg`) against standard cabinet sizes;
+the script's header lists the guesses, and `docs/kitchen/MEASURE.md` is the list of what to
+measure. The two options in it now ("Draft A: same layout, light finishes" and "Draft B: pantry
+out, island") are drafts that exercise the software, not proposals: the real designs follow the
+measurements. The windows stay in every option; the pantry's walls and door may go.
+
+To add a design: in the script, add its name to `designOptions([...])`, write a function that calls
+`workIn(option)`, demolishes what goes (`demolish`), adds the new cabinets as `NEW`, and sets the
+option's finishes (`store().updateOptionFinishes`); then regenerate (CLAUDE.md, "Generated files").
+
 ## The rebuild (a second plan)
 
 `docs/examples/146-mick-road-rebuild.json` is a second plan of the same house (MK's brief of 24 Oct
@@ -1494,8 +1543,14 @@ bedrooms); change them in each room's panel.
   (no blind corner), and a counter is joined only across cabinets square to one another (one at an
   odd angle to its neighbour carries its own). A backsplash "to the ceiling" goes to the wall's
   height.
-- **Walk mode** stops at walls but not at cabinets, furniture, window sills or columns, and the
+- **Walk mode** stops at walls and cabinets but not at furniture, window sills or columns, and the
   ground is not solid from below.
+- **Lights** are warm white only, cast no shadows and are not dimmable; a recessed light is drawn
+  square. The rendering is not photoreal: no reflections of the room, no soft shadows indoors.
+- A room has **one floor finish**: a floor that changes within a room (tile in the kitchen half,
+  wood in the dining half) is not drawn unless a wall divides the room.
+- An option's own cabinet finishes cannot paint over a wood the level gives its cabinets, or go
+  back to laminate over a level's stone; set those on the cabinets themselves.
 - The terrain is the triangulated surface through your grade points: straight between neighbouring
   points, level between points at one height, and level beyond the outermost ones. Under the lowest level's
   footprint (out to its walls' outside faces) it drops to 2" below that level's slab, so the

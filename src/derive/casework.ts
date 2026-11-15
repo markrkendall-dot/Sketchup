@@ -357,6 +357,18 @@ export function fixtureBoxes(f: Fixture, finishes?: LevelFinishes): CaseBox[] {
       const top = counterTopOf(f, counterThicknessOf(f, finishes));
       const bottom = Math.max(kickTop + 1, top - BASIN.deep);
       const t = BASIN.wall;
+      // The carcass makes room for the bowl: whole below it, a ring round it above (else its top
+      // would show through the counter's hole, an inch and a half down, in the cabinet's colour).
+      const ci = out.findIndex((x) => x.part === 'carcass');
+      if (ci >= 0 && bottom < y1) {
+        const c = out[ci];
+        out.splice(ci, 1);
+        pushBox(out, box('carcass', c.s0, c.s1, c.d0, c.d1, c.y0, bottom));
+        pushBox(out, box('carcass', c.s0, b.s0, c.d0, c.d1, bottom, c.y1));
+        pushBox(out, box('carcass', b.s1, c.s1, c.d0, c.d1, bottom, c.y1));
+        pushBox(out, box('carcass', b.s0, b.s1, c.d0, b.d0, bottom, c.y1));
+        pushBox(out, box('carcass', b.s0, b.s1, b.d1, c.d1, bottom, c.y1));
+      }
       pushBox(out, box('basin', b.s0, b.s1, b.d0, b.d1, bottom, bottom + t)); // bowl bottom
       pushBox(out, box('basin', b.s0, b.s0 + t, b.d0, b.d1, bottom, top)); // left wall
       pushBox(out, box('basin', b.s1 - t, b.s1, b.d0, b.d1, bottom, top)); // right wall

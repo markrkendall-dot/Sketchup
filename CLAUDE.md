@@ -10,10 +10,11 @@
 
 ## Generated files
 
-`docs/examples/146-mick-road.json`, `docs/examples/146-mick-road-rebuild.json` and the two viewers
-`docs/viewer/146-mick-road-viewer.html` and `docs/viewer/146-mick-road-rebuild-viewer.html` are
-generated from `scripts/example-plan.ts`, `scripts/rebuild-plan.ts` (both on `scripts/planLib.ts`)
-and the app. After a merge or rebase, do not hand-merge their conflicts: take either side, then
+`docs/examples/146-mick-road.json`, `docs/examples/146-mick-road-rebuild.json`,
+`docs/examples/kitchen.json` and the three viewers `docs/viewer/146-mick-road-viewer.html`,
+`docs/viewer/146-mick-road-rebuild-viewer.html` and `docs/viewer/kitchen-viewer.html` are
+generated from `scripts/example-plan.ts`, `scripts/rebuild-plan.ts`, `scripts/kitchen-plan.ts` (all
+on `scripts/planLib.ts`) and the app. After a merge or rebase, do not hand-merge their conflicts: take either side, then
 regenerate them.
 
 ```
@@ -21,6 +22,7 @@ npm run build:example
 npm run build:viewer
 cp dist-viewer/146-mick-road-viewer.html docs/viewer/146-mick-road-viewer.html
 cp dist-viewer/146-mick-road-rebuild-viewer.html docs/viewer/146-mick-road-rebuild-viewer.html
+cp dist-viewer/kitchen-viewer.html docs/viewer/kitchen-viewer.html
 ```
 
 ## Before pushing
@@ -38,6 +40,8 @@ Both must pass. `npm test` also checks the example JSON against the script, so a
   needs measuring.
 - `docs/DESIGN.md`: how the model, derivation and 3D are put together.
 - `docs/history/`: past plans and reviews (records; branch names in them are historical).
+- `docs/kitchen/`: the kitchen being redesigned: its photo and `MEASURE.md`, the list of what to
+  measure. The plan is `scripts/kitchen-plan.ts` (README, "The kitchen redesign").
 - `docs/TODO.md`: changes MK has asked for that are not yet made.
 - `docs/photos/`: the reference photos the starter is built from, numbered as the script cites them.
 - `docs/index.html`, `docs/viewer/` and `.github/workflows/pages.yml`: the GitHub Pages site,

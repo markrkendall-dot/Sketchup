@@ -1,0 +1,1700 @@
+{
+  "schemaVersion": 10,
+  "id": "plan-kitchen",
+  "name": "Kitchen redesign (draft, not yet measured)",
+  "structures": {
+    "house": {
+      "id": "house",
+      "name": "House",
+      "kind": "house",
+      "origin": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "baseFloorElevation": 0,
+      "levelOrder": [
+        "level-b"
+      ]
+    }
+  },
+  "structureOrder": [
+    "house"
+  ],
+  "levels": {
+    "level-b": {
+      "id": "level-b",
+      "name": "Main Floor",
+      "wallHeight": 108,
+      "floorThickness": 12,
+      "nodes": {
+        "b-n1": {
+          "id": "b-n1",
+          "x": -3,
+          "y": -3
+        },
+        "b-n2": {
+          "id": "b-n2",
+          "x": 153,
+          "y": -3
+        },
+        "b-n3": {
+          "id": "b-n3",
+          "x": 153,
+          "y": 243
+        },
+        "b-n4": {
+          "id": "b-n4",
+          "x": -3,
+          "y": 243
+        },
+        "b-n5": {
+          "id": "b-n5",
+          "x": -3,
+          "y": 47.75
+        },
+        "b-n6": {
+          "id": "b-n6",
+          "x": 18,
+          "y": 47.75
+        },
+        "b-n7": {
+          "id": "b-n7",
+          "x": 43.75,
+          "y": 22
+        },
+        "b-n8": {
+          "id": "b-n8",
+          "x": 43.75,
+          "y": -3
+        }
+      },
+      "walls": {
+        "b-w1": {
+          "id": "b-w1",
+          "a": "b-n1",
+          "b": "b-n8",
+          "thickness": 6,
+          "kind": "exterior",
+          "phase": "existing"
+        },
+        "b-w2": {
+          "id": "b-w2",
+          "a": "b-n2",
+          "b": "b-n3",
+          "thickness": 6,
+          "kind": "exterior",
+          "phase": "existing"
+        },
+        "b-w3": {
+          "id": "b-w3",
+          "a": "b-n3",
+          "b": "b-n4",
+          "thickness": 6,
+          "kind": "exterior",
+          "phase": "existing"
+        },
+        "b-w4": {
+          "id": "b-w4",
+          "a": "b-n4",
+          "b": "b-n5",
+          "thickness": 6,
+          "kind": "exterior",
+          "phase": "existing"
+        },
+        "b-w5": {
+          "id": "b-w5",
+          "a": "b-n5",
+          "b": "b-n6",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "demo",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-w6": {
+          "id": "b-w6",
+          "a": "b-n5",
+          "b": "b-n1",
+          "thickness": 6,
+          "kind": "exterior",
+          "phase": "existing"
+        },
+        "b-w7": {
+          "id": "b-w7",
+          "a": "b-n6",
+          "b": "b-n7",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "demo",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-w8": {
+          "id": "b-w8",
+          "a": "b-n7",
+          "b": "b-n8",
+          "thickness": 5,
+          "kind": "interior",
+          "phase": "demo",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-w9": {
+          "id": "b-w9",
+          "a": "b-n8",
+          "b": "b-n2",
+          "thickness": 6,
+          "kind": "exterior",
+          "phase": "existing"
+        }
+      },
+      "openings": {
+        "b-o1": {
+          "wallId": "b-w7",
+          "type": "door",
+          "offset": 18.208,
+          "width": 28,
+          "height": 80,
+          "sill": 0,
+          "phase": "demo",
+          "swing": {
+            "hinge": "a",
+            "side": "left"
+          },
+          "leafColor": "#f0eee8",
+          "id": "b-o1",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-o2": {
+          "wallId": "b-w4",
+          "type": "window",
+          "offset": 141,
+          "width": 56,
+          "height": 54,
+          "sill": 42,
+          "phase": "existing",
+          "lites": {
+            "cols": 1,
+            "rows": 1
+          },
+          "sashes": 2,
+          "id": "b-o2"
+        },
+        "b-o3": {
+          "wallId": "b-w9",
+          "type": "window",
+          "offset": 54.25,
+          "width": 28,
+          "height": 52,
+          "sill": 44,
+          "phase": "existing",
+          "lites": {
+            "cols": 1,
+            "rows": 2
+          },
+          "id": "b-o3"
+        },
+        "b-o4": {
+          "wallId": "b-w6",
+          "type": "window",
+          "offset": 25.75,
+          "width": 24,
+          "height": 48,
+          "sill": 40,
+          "phase": "existing",
+          "lites": {
+            "cols": 1,
+            "rows": 2
+          },
+          "id": "b-o4"
+        },
+        "b-o5": {
+          "wallId": "b-w3",
+          "type": "passage",
+          "offset": 78,
+          "width": 96,
+          "height": 96,
+          "sill": 0,
+          "phase": "existing",
+          "id": "b-o5"
+        }
+      },
+      "rooms": {
+        "b-r1": {
+          "name": "Kitchen",
+          "anchor": {
+            "x": 75,
+            "y": 190
+          },
+          "wallFinish": "paint",
+          "wallColor": "#d9dcd2",
+          "floorFinish": "boards",
+          "floorColor": "#b9976b",
+          "ceilingFinish": "paint",
+          "ceilingColor": "#f4f3ee",
+          "id": "b-r1"
+        },
+        "b-r2": {
+          "name": "Pantry",
+          "anchor": {
+            "x": 16,
+            "y": 20
+          },
+          "wallFinish": "paint",
+          "wallColor": "#d9dcd2",
+          "floorFinish": "boards",
+          "floorColor": "#b9976b",
+          "ceilingFinish": "paint",
+          "ceilingColor": "#f4f3ee",
+          "id": "b-r2",
+          "phase": "demo",
+          "optionIds": [
+            "option-b"
+          ]
+        }
+      },
+      "stairs": {},
+      "roofs": {
+        "b-k1": {
+          "shape": "flat",
+          "outline": [
+            {
+              "x": -3,
+              "y": -3
+            },
+            {
+              "x": 153,
+              "y": -3
+            },
+            {
+              "x": 153,
+              "y": 243
+            },
+            {
+              "x": -3,
+              "y": 243
+            }
+          ],
+          "ridgeAngle": 0,
+          "pitch": 0,
+          "overhang": 12,
+          "bearingOffset": 0,
+          "thickness": 2.5,
+          "fascia": 7,
+          "phase": "existing",
+          "finish": "metal",
+          "color": "#5b5852",
+          "eave": "open",
+          "rafter": {
+            "depth": 5.5,
+            "spacing": 24
+          },
+          "boardColor": "#5a3a35",
+          "weathering": 0,
+          "id": "b-k1"
+        }
+      },
+      "fixtures": {
+        "b-c1": {
+          "kind": "dishwasher",
+          "origin": {
+            "x": 0,
+            "y": 62
+          },
+          "direction": 0,
+          "width": 24,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c1",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c2": {
+          "kind": "sink",
+          "origin": {
+            "x": 0,
+            "y": 92
+          },
+          "direction": 0,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c2",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c3": {
+          "kind": "base",
+          "origin": {
+            "x": 0,
+            "y": 122
+          },
+          "direction": 0,
+          "width": 24,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 3,
+          "phase": "demo",
+          "id": "b-c3",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c4": {
+          "kind": "base",
+          "origin": {
+            "x": 0,
+            "y": 149
+          },
+          "direction": 0,
+          "width": 30,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c4",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c5": {
+          "kind": "wallOven",
+          "origin": {
+            "x": 61.5,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 30,
+          "depth": 25,
+          "height": 96,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c5",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c6": {
+          "kind": "base",
+          "origin": {
+            "x": 95.5,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 37.5,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c6",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c7": {
+          "kind": "cornerBase",
+          "origin": {
+            "x": 132,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 36,
+          "depth": 36,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c7",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c8": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 45
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 4,
+          "phase": "demo",
+          "id": "b-c8",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c9": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c9",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c10": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 4,
+          "phase": "demo",
+          "id": "b-c10",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c11": {
+          "kind": "cooktop",
+          "origin": {
+            "x": 148,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 21,
+          "height": 1.5,
+          "elevation": 36,
+          "phase": "demo",
+          "id": "b-c11",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c12": {
+          "kind": "hood",
+          "origin": {
+            "x": 150,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 20,
+          "height": 30,
+          "elevation": 66,
+          "phase": "demo",
+          "id": "b-c12",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c13": {
+          "kind": "cornerWall",
+          "origin": {
+            "x": 137,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 26,
+          "depth": 26,
+          "height": 42,
+          "elevation": 54,
+          "phase": "demo",
+          "id": "b-c13",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c14": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 40
+          },
+          "direction": 180,
+          "width": 28,
+          "depth": 13,
+          "height": 42,
+          "elevation": 54,
+          "phase": "demo",
+          "id": "b-c14",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c15": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 13,
+          "height": 42,
+          "elevation": 54,
+          "phase": "demo",
+          "id": "b-c15",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c16": {
+          "kind": "fridge",
+          "origin": {
+            "x": 150,
+            "y": 126
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 30,
+          "height": 70,
+          "elevation": 0,
+          "fridgeStyle": "frenchDoor",
+          "phase": "demo",
+          "id": "b-c16",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c17": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 126
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 24,
+          "height": 24,
+          "elevation": 72,
+          "phase": "demo",
+          "id": "b-c17",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c18": {
+          "kind": "box",
+          "label": "End panel",
+          "origin": {
+            "x": 150,
+            "y": 144.75
+          },
+          "direction": 180,
+          "width": 1.5,
+          "depth": 30,
+          "height": 96,
+          "elevation": 0,
+          "phase": "demo",
+          "id": "b-c18",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c19": {
+          "kind": "box",
+          "label": "Soffit",
+          "origin": {
+            "x": 150,
+            "y": 72.75
+          },
+          "direction": 180,
+          "width": 145.5,
+          "depth": 14,
+          "height": 12,
+          "elevation": 96,
+          "phase": "demo",
+          "id": "b-c19",
+          "optionIds": [
+            "option-a",
+            "option-b"
+          ]
+        },
+        "b-c20": {
+          "kind": "island",
+          "origin": {
+            "x": 75,
+            "y": 96
+          },
+          "direction": 90,
+          "width": 30,
+          "depth": 48,
+          "height": 34.5,
+          "elevation": 0,
+          "frontColor": "#c9a36b",
+          "counterMaterial": "laminate",
+          "counterColor": "#f3f2ee",
+          "phase": "demo",
+          "id": "b-c20",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c21": {
+          "kind": "recessedLight",
+          "origin": {
+            "x": 45,
+            "y": 57
+          },
+          "direction": 90,
+          "width": 6,
+          "depth": 6,
+          "height": 0.5,
+          "elevation": 107.5,
+          "phase": "existing",
+          "id": "b-c21"
+        },
+        "b-c22": {
+          "kind": "recessedLight",
+          "origin": {
+            "x": 105,
+            "y": 57
+          },
+          "direction": 90,
+          "width": 6,
+          "depth": 6,
+          "height": 0.5,
+          "elevation": 107.5,
+          "phase": "existing",
+          "id": "b-c22"
+        },
+        "b-c23": {
+          "kind": "recessedLight",
+          "origin": {
+            "x": 45,
+            "y": 127
+          },
+          "direction": 90,
+          "width": 6,
+          "depth": 6,
+          "height": 0.5,
+          "elevation": 107.5,
+          "phase": "existing",
+          "id": "b-c23"
+        },
+        "b-c24": {
+          "kind": "recessedLight",
+          "origin": {
+            "x": 105,
+            "y": 127
+          },
+          "direction": 90,
+          "width": 6,
+          "depth": 6,
+          "height": 0.5,
+          "elevation": 107.5,
+          "phase": "existing",
+          "id": "b-c24"
+        },
+        "b-c25": {
+          "kind": "recessedLight",
+          "origin": {
+            "x": 45,
+            "y": 197
+          },
+          "direction": 90,
+          "width": 6,
+          "depth": 6,
+          "height": 0.5,
+          "elevation": 107.5,
+          "phase": "existing",
+          "id": "b-c25"
+        },
+        "b-c26": {
+          "kind": "recessedLight",
+          "origin": {
+            "x": 105,
+            "y": 197
+          },
+          "direction": 90,
+          "width": 6,
+          "depth": 6,
+          "height": 0.5,
+          "elevation": 107.5,
+          "phase": "existing",
+          "id": "b-c26"
+        },
+        "b-c27": {
+          "kind": "dishwasher",
+          "origin": {
+            "x": 0,
+            "y": 62
+          },
+          "direction": 0,
+          "width": 24,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "applianceFinish": "panel",
+          "phase": "new",
+          "id": "b-c27",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c28": {
+          "kind": "sink",
+          "origin": {
+            "x": 0,
+            "y": 92
+          },
+          "direction": 0,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c28",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c29": {
+          "kind": "base",
+          "origin": {
+            "x": 0,
+            "y": 122
+          },
+          "direction": 0,
+          "width": 24,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 3,
+          "phase": "new",
+          "id": "b-c29",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c30": {
+          "kind": "base",
+          "origin": {
+            "x": 0,
+            "y": 149
+          },
+          "direction": 0,
+          "width": 30,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c30",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c31": {
+          "kind": "wallOven",
+          "origin": {
+            "x": 61.5,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 30,
+          "depth": 25,
+          "height": 96,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c31",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c32": {
+          "kind": "base",
+          "origin": {
+            "x": 95.5,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 37.5,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c32",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c33": {
+          "kind": "cornerBase",
+          "origin": {
+            "x": 132,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 36,
+          "depth": 36,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c33",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c34": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 45
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 4,
+          "phase": "new",
+          "id": "b-c34",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c35": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c35",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c36": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 4,
+          "phase": "new",
+          "id": "b-c36",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c37": {
+          "kind": "cooktop",
+          "origin": {
+            "x": 148,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 21,
+          "height": 1.5,
+          "elevation": 36,
+          "phase": "new",
+          "id": "b-c37",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c38": {
+          "kind": "hood",
+          "origin": {
+            "x": 150,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 20,
+          "height": 30,
+          "elevation": 66,
+          "phase": "new",
+          "id": "b-c38",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c39": {
+          "kind": "cornerWall",
+          "origin": {
+            "x": 137,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 26,
+          "depth": 26,
+          "height": 42,
+          "elevation": 54,
+          "phase": "new",
+          "id": "b-c39",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c40": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 40
+          },
+          "direction": 180,
+          "width": 28,
+          "depth": 13,
+          "height": 42,
+          "elevation": 54,
+          "phase": "new",
+          "id": "b-c40",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c41": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 13,
+          "height": 42,
+          "elevation": 54,
+          "phase": "new",
+          "id": "b-c41",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c42": {
+          "kind": "fridge",
+          "origin": {
+            "x": 150,
+            "y": 126
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 30,
+          "height": 70,
+          "elevation": 0,
+          "fridgeStyle": "frenchDoor",
+          "phase": "new",
+          "id": "b-c42",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c43": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 126
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 24,
+          "height": 24,
+          "elevation": 72,
+          "phase": "new",
+          "id": "b-c43",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c44": {
+          "kind": "box",
+          "label": "End panel",
+          "origin": {
+            "x": 150,
+            "y": 144.75
+          },
+          "direction": 180,
+          "width": 1.5,
+          "depth": 30,
+          "height": 96,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c44",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c45": {
+          "kind": "box",
+          "label": "Soffit",
+          "origin": {
+            "x": 150,
+            "y": 72.75
+          },
+          "direction": 180,
+          "width": 145.5,
+          "depth": 14,
+          "height": 12,
+          "elevation": 96,
+          "phase": "new",
+          "id": "b-c45",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c46": {
+          "kind": "underCabinetLight",
+          "origin": {
+            "x": 146,
+            "y": 40
+          },
+          "direction": 180,
+          "width": 16,
+          "depth": 2,
+          "height": 0.75,
+          "elevation": 53.25,
+          "phase": "new",
+          "id": "b-c46",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c47": {
+          "kind": "underCabinetLight",
+          "origin": {
+            "x": 146,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 16,
+          "depth": 2,
+          "height": 0.75,
+          "elevation": 53.25,
+          "phase": "new",
+          "id": "b-c47",
+          "optionIds": [
+            "option-a"
+          ]
+        },
+        "b-c48": {
+          "kind": "tall",
+          "origin": {
+            "x": 15,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 30,
+          "depth": 24,
+          "height": 96,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c48",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c49": {
+          "kind": "wallOven",
+          "origin": {
+            "x": 45,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 30,
+          "depth": 25,
+          "height": 96,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c49",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c50": {
+          "kind": "base",
+          "origin": {
+            "x": 87,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 54,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 3,
+          "phase": "new",
+          "id": "b-c50",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c51": {
+          "kind": "base",
+          "origin": {
+            "x": 0,
+            "y": 44
+          },
+          "direction": 0,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 3,
+          "phase": "new",
+          "id": "b-c51",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c52": {
+          "kind": "dishwasher",
+          "origin": {
+            "x": 0,
+            "y": 74
+          },
+          "direction": 0,
+          "width": 24,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "applianceFinish": "panel",
+          "phase": "new",
+          "id": "b-c52",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c53": {
+          "kind": "sink",
+          "origin": {
+            "x": 0,
+            "y": 104
+          },
+          "direction": 0,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c53",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c54": {
+          "kind": "base",
+          "origin": {
+            "x": 0,
+            "y": 143
+          },
+          "direction": 0,
+          "width": 42,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c54",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c55": {
+          "kind": "cornerBase",
+          "origin": {
+            "x": 132,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 36,
+          "depth": 36,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c55",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c56": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 45
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 4,
+          "phase": "new",
+          "id": "b-c56",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c57": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c57",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c58": {
+          "kind": "base",
+          "origin": {
+            "x": 150,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 24,
+          "height": 34.5,
+          "elevation": 0,
+          "drawers": 4,
+          "phase": "new",
+          "id": "b-c58",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c59": {
+          "kind": "cooktop",
+          "origin": {
+            "x": 148,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 21,
+          "height": 1.5,
+          "elevation": 36,
+          "phase": "new",
+          "id": "b-c59",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c60": {
+          "kind": "hood",
+          "origin": {
+            "x": 150,
+            "y": 72
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 20,
+          "height": 30,
+          "elevation": 66,
+          "phase": "new",
+          "id": "b-c60",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c61": {
+          "kind": "cornerWall",
+          "origin": {
+            "x": 137,
+            "y": 0
+          },
+          "direction": 90,
+          "width": 26,
+          "depth": 26,
+          "height": 42,
+          "elevation": 54,
+          "phase": "new",
+          "id": "b-c61",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c62": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 40
+          },
+          "direction": 180,
+          "width": 28,
+          "depth": 13,
+          "height": 42,
+          "elevation": 54,
+          "phase": "new",
+          "id": "b-c62",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c63": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 18,
+          "depth": 13,
+          "height": 42,
+          "elevation": 54,
+          "phase": "new",
+          "id": "b-c63",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c64": {
+          "kind": "fridge",
+          "origin": {
+            "x": 150,
+            "y": 126
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 30,
+          "height": 70,
+          "elevation": 0,
+          "fridgeStyle": "frenchDoor",
+          "phase": "new",
+          "id": "b-c64",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c65": {
+          "kind": "wall",
+          "origin": {
+            "x": 150,
+            "y": 126
+          },
+          "direction": 180,
+          "width": 36,
+          "depth": 24,
+          "height": 24,
+          "elevation": 72,
+          "phase": "new",
+          "id": "b-c65",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c66": {
+          "kind": "box",
+          "label": "End panel",
+          "origin": {
+            "x": 150,
+            "y": 144.75
+          },
+          "direction": 180,
+          "width": 1.5,
+          "depth": 30,
+          "height": 96,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c66",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c67": {
+          "kind": "box",
+          "label": "Soffit",
+          "origin": {
+            "x": 150,
+            "y": 72.75
+          },
+          "direction": 180,
+          "width": 145.5,
+          "depth": 14,
+          "height": 12,
+          "elevation": 96,
+          "phase": "new",
+          "id": "b-c67",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c68": {
+          "kind": "island",
+          "origin": {
+            "x": 75,
+            "y": 92
+          },
+          "direction": 90,
+          "width": 30,
+          "depth": 66,
+          "height": 34.5,
+          "elevation": 0,
+          "counterOverhang": {
+            "front": 12,
+            "back": 1,
+            "left": 1,
+            "right": 1
+          },
+          "phase": "new",
+          "id": "b-c68",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c69": {
+          "kind": "furniture",
+          "piece": "stool",
+          "origin": {
+            "x": 66,
+            "y": 180
+          },
+          "direction": 270,
+          "width": 16,
+          "depth": 16,
+          "height": 25,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c69",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c70": {
+          "kind": "furniture",
+          "piece": "stool",
+          "origin": {
+            "x": 84,
+            "y": 180
+          },
+          "direction": 270,
+          "width": 16,
+          "depth": 16,
+          "height": 25,
+          "elevation": 0,
+          "phase": "new",
+          "id": "b-c70",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c71": {
+          "kind": "pendant",
+          "origin": {
+            "x": 75,
+            "y": 107
+          },
+          "direction": 90,
+          "width": 10,
+          "depth": 10,
+          "height": 38,
+          "elevation": 70,
+          "applianceFinish": "black",
+          "phase": "new",
+          "id": "b-c71",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c72": {
+          "kind": "pendant",
+          "origin": {
+            "x": 75,
+            "y": 139
+          },
+          "direction": 90,
+          "width": 10,
+          "depth": 10,
+          "height": 38,
+          "elevation": 70,
+          "applianceFinish": "black",
+          "phase": "new",
+          "id": "b-c72",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c73": {
+          "kind": "underCabinetLight",
+          "origin": {
+            "x": 146,
+            "y": 40
+          },
+          "direction": 180,
+          "width": 16,
+          "depth": 2,
+          "height": 0.75,
+          "elevation": 53.25,
+          "phase": "new",
+          "id": "b-c73",
+          "optionIds": [
+            "option-b"
+          ]
+        },
+        "b-c74": {
+          "kind": "underCabinetLight",
+          "origin": {
+            "x": 146,
+            "y": 99
+          },
+          "direction": 180,
+          "width": 16,
+          "depth": 2,
+          "height": 0.75,
+          "elevation": 53.25,
+          "phase": "new",
+          "id": "b-c74",
+          "optionIds": [
+            "option-b"
+          ]
+        }
+      },
+      "decks": {},
+      "floorOpenings": {},
+      "staircases": {},
+      "joistZones": {},
+      "members": {},
+      "finishes": {
+        "cabinetColor": "#2e211d",
+        "frontStyle": "slab",
+        "handles": "bar",
+        "handleFinish": "steel",
+        "counterMaterial": "butcherBlock",
+        "counterColor": "#8d5f33",
+        "backsplash": "toWall",
+        "backsplashFinish": "tile",
+        "backsplashColor": "#b6bdb0"
+      },
+      "optionFinishes": {
+        "option-a": {
+          "cabinetColor": "#f1efe9",
+          "frontStyle": "panel",
+          "handles": "bar",
+          "handleFinish": "black",
+          "counterMaterial": "stoneVeined",
+          "counterColor": "#edece7",
+          "backsplash": "toWall",
+          "backsplashFinish": "tile",
+          "backsplashColor": "#f5f3ee"
+        },
+        "option-b": {
+          "cabinetColor": "#34493f",
+          "frontStyle": "panel",
+          "handles": "knob",
+          "handleFinish": "brass",
+          "counterMaterial": "stoneSpeckled",
+          "counterColor": "#dad7d0",
+          "backsplash": "toWall",
+          "backsplashFinish": "tile",
+          "backsplashColor": "#f5f3ee"
+        }
+      }
+    }
+  },
+  "settings": {
+    "snapGrid": 1,
+    "displayGrid": 12,
+    "precisionDenominator": 16,
+    "defaultExteriorThickness": 6,
+    "defaultInteriorThickness": 4.5
+  },
+  "site": {
+    "northAngle": 0,
+    "gradePoints": {},
+    "columns": {},
+    "surfaces": {},
+    "fences": {}
+  },
+  "modifiedAt": "2026-01-01T00:00:00.000Z",
+  "options": [
+    {
+      "id": "option-a",
+      "name": "Draft A: same layout, light finishes"
+    },
+    {
+      "id": "option-b",
+      "name": "Draft B: pantry out, island"
+    }
+  ],
+  "views": [
+    {
+      "id": "view-1",
+      "name": "From the dining side",
+      "levelId": "level-b",
+      "at": {
+        "x": 75,
+        "y": 226
+      },
+      "yaw": 0,
+      "pitch": -0.1
+    },
+    {
+      "id": "view-2",
+      "name": "At the sink",
+      "levelId": "level-b",
+      "at": {
+        "x": 42,
+        "y": 104
+      },
+      "yaw": 1.5707963267948966,
+      "pitch": -0.1
+    },
+    {
+      "id": "view-3",
+      "name": "From the far window",
+      "levelId": "level-b",
+      "at": {
+        "x": 96,
+        "y": 34
+      },
+      "yaw": 3.141592653589793,
+      "pitch": -0.15
+    }
+  ]
+}

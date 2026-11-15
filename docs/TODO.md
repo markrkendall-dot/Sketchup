@@ -2,7 +2,13 @@
 
 Changes MK wants in the proposed design, not yet made in `scripts/example-plan.ts`.
 
-Nothing open.
+Nothing open for 146 Mick Road.
+
+## The kitchen redesign (`scripts/kitchen-plan.ts`)
+
+- [ ] MK to measure the kitchen (`docs/kitchen/MEASURE.md`); replace every estimate in the script.
+- [ ] Agree the designs with MK (how many, and the brief for each) and replace the two drafts.
+- [ ] Not drawn yet: the dark floor in the kitchen half (a room has one floor finish).
 
 ## Done
 

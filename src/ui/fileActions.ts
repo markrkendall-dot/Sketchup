@@ -270,11 +270,11 @@ export async function exportProperty(id: string): Promise<void> {
   }
 }
 
-/** The bundled 146 Mick Road plans (docs/examples): the starter with its renovation, and the house rebuilt on its foundation. */
-export type ExamplePlan = 'starter' | 'rebuild';
+/** The bundled plans (docs/examples): the 146 Mick Road starter with its renovation, that house rebuilt on its foundation, and the kitchen being redesigned. */
+export type ExamplePlan = 'starter' | 'rebuild' | 'kitchen';
 
 /**
- * Open a bundled 146 Mick Road plan (docs/examples). When the library has a copy of this example
+ * Open a bundled plan (docs/examples). When the library has a copy of this example
  * that is unmodified since it was added (`unmodifiedExample`: added from the same file, by content
  * hash, and its modifiedAt not moved since), that copy opens; otherwise a fresh copy is added (a
  * new id), so a changed copy is never overwritten. The JSON loads on demand, so it is not part of
@@ -282,7 +282,12 @@ export type ExamplePlan = 'starter' | 'rebuild';
  */
 export async function openExample(which: ExamplePlan = 'starter'): Promise<void> {
   try {
-    const { default: example } = which === 'rebuild' ? await import('../../docs/examples/146-mick-road-rebuild.json') : await import('../../docs/examples/146-mick-road.json');
+    const { default: example }: { default: unknown } =
+      which === 'kitchen'
+        ? await import('../../docs/examples/kitchen.json')
+        : which === 'rebuild'
+          ? await import('../../docs/examples/146-mick-road-rebuild.json')
+          : await import('../../docs/examples/146-mick-road.json');
     const hash = contentHash(example);
     await flushAutosave();
     const existing = unmodifiedExample(await library.list(), which, hash);
@@ -296,7 +301,7 @@ export async function openExample(which: ExamplePlan = 'starter'): Promise<void>
     }
     const plan = migrate(example);
     const stored = await storeAndOpen(plan, true, { example: { which, hash, modifiedAt: plan.modifiedAt } });
-    showNotice(which === 'rebuild' ? `Opened ${stored.name}: today's house in the Existing view, the rebuild in Proposed.` : `Opened the example: ${stored.name}. Replace its estimates with your measurements.`);
+    showNotice(which === 'kitchen' ? `Opened ${stored.name}: the kitchen as it stands in Existing, the design options in Proposed.` : which === 'rebuild' ? `Opened ${stored.name}: today's house in the Existing view, the rebuild in Proposed.` : `Opened the example: ${stored.name}. Replace its estimates with your measurements.`);
   } catch (err) {
     showNotice(`Could not open the example: ${errorText(err)}`, true);
   }
