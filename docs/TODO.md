@@ -7,10 +7,12 @@ Nothing open for 146 Mick Road.
 ## The 2926 Wesley kitchen redesign (`scripts/kitchen-plan.ts`)
 
 - [ ] MK to measure the kitchen (`docs/kitchen/MEASURE.md`); replace every estimate in the script.
+      Measured so far: the width, 13 ft.
 - [ ] Agree the designs with MK (how many, and the brief for each) and replace the two drafts.
 - [ ] The kitchen is its own plan for now: join it to the rest of 2926 Wesley (the house with the
       bike shed) once that plan is in this repository.
-- [ ] Not drawn yet: the dark floor in the kitchen half (a room has one floor finish).
+- [ ] Not drawn yet: the dark floor in the kitchen half, which ends on a line across the room at
+      the refrigerator's far side and the sink base's dining-side edge (a room has one floor finish).
 
 ## Done
 

@@ -32,14 +32,15 @@ describe('docs/examples/kitchen.json', () => {
     expect(buildKitchenJson()).toBe(buildKitchenJson());
   });
 
-  it('is one room under a 9 ft ceiling with two draft options and three saved views', () => {
+  it('is one room 13 ft wide under a 9 ft ceiling with two draft options and a saved view per photo', () => {
     expect(plan.id).toBe('plan-kitchen');
     expect(plan.levels[lid].wallHeight).toBe(CEILING);
     expect(plan.options.map((o) => o.id)).toEqual(['option-a', 'option-b']);
-    expect(plan.views?.map((v) => v.name)).toEqual(['From the dining side', 'At the sink', 'From the far window']);
+    expect(plan.views?.map((v) => v.name)).toEqual(['From the dining side', 'The pantry door', 'Toward the dining end', 'The cooktop wall', 'The sink wall']);
     const face = getFaces(plan.levels[lid], 'existing').faces.find((x) => x.roomId && plan.levels[lid].rooms[x.roomId].name === 'Kitchen')!;
     const xs = face.netPolygon.map((p) => p.x);
     const ys = face.netPolygon.map((p) => p.y);
+    expect(ROOM.w).toBe(156);
     expect([Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)].map((v) => Math.round(v))).toEqual([0, ROOM.w, 0, ROOM.d]);
   });
 
@@ -48,26 +49,26 @@ describe('docs/examples/kitchen.json', () => {
     expect(roomNames(a, 'proposed')).toEqual(['Kitchen', 'Pantry']);
     expect(roomNames(b, 'proposed')).toEqual(['Kitchen']);
     const windows = (id: string) => Object.values(inOption(id).openings).filter((o) => o.type === 'window' && o.phase === 'existing').length;
-    expect(windows(a)).toBe(3);
-    expect(windows(b)).toBe(3);
-    // The pantry's door goes with its wall in B only.
+    expect(windows(a)).toBe(5);
+    expect(windows(b)).toBe(5);
+    // The pantry's door goes with its wall in B only; the sliding glass door stays.
     const doors = (id: string) => Object.values(inOption(id).openings).filter((o) => o.type === 'door' && o.phase !== 'demo').length;
-    expect([doors(a), doors(b)]).toEqual([1, 0]);
+    expect([doors(a), doors(b)]).toEqual([2, 1]);
   });
 
   it("each draft's new cabinets take its own finishes; today's keep the level's", () => {
-    const fronts = (id: string, phase: string) => new Set(Object.values(inOption(id).fixtures).filter((f) => isCabinet(f.kind) && f.kind !== 'island' && f.phase === phase).map((f) => f.frontColor));
+    const fronts = (id: string, phase: string) => new Set(Object.values(inOption(id).fixtures).filter((f) => isCabinet(f.kind) && f.kind !== 'island' && f.phase === phase && f.label === undefined).map((f) => f.frontColor));
     expect([...fronts(a, 'new')]).toEqual(['#f1efe9']);
     expect([...fronts(b, 'new')]).toEqual(['#34493f']);
     expect([...fronts(a, 'demo')]).toEqual([undefined]);
     expect(plan.levels[lid].finishes?.cabinetColor).toBe('#2e211d');
   });
 
-  it('is lit: six recessed lights today, under-cabinet strips in the drafts, pendants over the island in B', () => {
+  it('is lit: six recessed lights and the chandelier today, under-cabinet strips in the drafts, pendants over the island in B', () => {
     const kinds = (id: string, vm: ViewMode) => levelLights(inOption(id), vm).map((l) => l.kind);
-    expect(kinds(a, 'existing')).toEqual(Array(6).fill('recessedLight'));
+    expect(kinds(a, 'existing')).toEqual([...Array(6).fill('recessedLight'), 'pendant']);
     expect(kinds(a, 'proposed').filter((k) => k === 'underCabinetLight')).toHaveLength(2);
-    expect(kinds(b, 'proposed').filter((k) => k === 'pendant')).toHaveLength(2);
+    expect(kinds(b, 'proposed').filter((k) => k === 'pendant')).toHaveLength(3);
   });
 
   it('every saved view stands on open floor in every option and view, and the checks find no error', () => {

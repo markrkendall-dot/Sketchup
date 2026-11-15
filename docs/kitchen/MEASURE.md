@@ -1,20 +1,24 @@
 # 2926 Wesley kitchen: what to measure
 
-Reference photo: `photos/01-kitchen-from-dining.jpg` (taken from the dining side, looking in).
-"Left", "right" and "far" below mean as seen in that photo. Inches are fine, to the nearest 1/4.
+Reference photos, in `photos/`: `01-kitchen-from-dining.jpg` (from the dining side, looking in),
+`02-pantry-inside.jpg`, `03-toward-dining.jpg`, `04-cooktop-wall.jpg`, `05-sink-wall.jpg`.
+"Left", "right" and "far" below mean as seen in photo 01.
+
+**Known so far:** the kitchen is 13 ft (156") wide, left wall to right wall (MK, 15 Nov 2026).
+ Inches are fine, to the nearest 1/4.
 A rough sketch with the numbers on it, photographed, is the easiest way to send them.
 More photos help too: one from the far window looking back, one of each wall square on, the pantry inside.
 
 ## Room
 
-1. Left wall: from the dining-side end of the cabinets to the pantry's angled wall.
-2. Far wall: from the pantry / oven tower to the right-hand corner. Also the full width of the room, left wall to right wall.
+1. Left wall: from the far corner (inside the pantry) to where the pantry's diagonal wall meets it, then on to the dining-side end of the cabinets, the sliding door's two edges, and the window beyond.
+2. Far wall: from the pantry's stub wall (where the oven tower stands) to the right-hand corner. The full width is known: 156".
 3. Right wall: from the far corner to the near side of the fridge cabinet, and on to wherever that wall ends.
 4. Ceiling height (floor to ceiling). If the dining side is different, both.
 5. Wall thickness at a window or the pantry door (trim edge to trim edge through the opening).
 6. Which way is north (or which wall faces the street).
 7. Where the dark kitchen floor meets the wood floor: distance from the far wall, and whether there is a step.
-8. How far the room continues toward the camera (to the next wall or opening), and anything on the walls there.
+8. The room's full length, far wall to the fireplace wall, and the two openings each side of the fireplace (width, and distance from the side walls). Also the small high window past the fridge.
 
 ## Windows (they stay)
 
@@ -26,8 +30,8 @@ For the left window and the far window, each:
 
 ## Pantry (may be removed)
 
-12. Outside footprint: how far it comes out from the left wall and from the far wall.
-13. Length of the angled wall and where each end of it lands.
+12. Its diagonal wall: where it meets the left wall (distance from the far corner) and where it meets the short stub wall beside the oven tower; the stub's length and its distance from the left wall.
+13. Length of the diagonal wall, and its thickness.
 14. Door width and height, and which side it hinges.
 15. The pantry window: same four numbers as items 9 to 11.
 16. Anything inside that cannot move: ducts, pipes, electrical panel, attic hatch.
