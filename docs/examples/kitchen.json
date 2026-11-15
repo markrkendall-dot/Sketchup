@@ -1,7 +1,7 @@
 {
   "schemaVersion": 10,
   "id": "plan-kitchen",
-  "name": "Kitchen redesign (draft, not yet measured)",
+  "name": "2926 Wesley kitchen (draft, not yet measured)",
   "structures": {
     "house": {
       "id": "house",

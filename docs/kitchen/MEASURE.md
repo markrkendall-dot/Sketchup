@@ -1,4 +1,4 @@
-# Kitchen: what to measure
+# 2926 Wesley kitchen: what to measure
 
 Reference photo: `photos/01-kitchen-from-dining.jpg` (taken from the dining side, looking in).
 "Left", "right" and "far" below mean as seen in that photo. Inches are fine, to the nearest 1/4.

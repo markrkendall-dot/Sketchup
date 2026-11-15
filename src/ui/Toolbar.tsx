@@ -256,7 +256,7 @@ function FileMenu() {
           </button>
           <button role="menuitem" aria-label="Open kitchen" onClick={() => pick(() => void openExample('kitchen'))}>
             Open kitchen
-            <small>The kitchen being redesigned, with its design options</small>
+            <small>The 2926 Wesley kitchen being redesigned, with its design options</small>
           </button>
           <button role="menuitem" onClick={() => pick(savePlan)}>
             Save <kbd>Ctrl+S</kbd>

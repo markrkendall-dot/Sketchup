@@ -612,6 +612,11 @@ the viewers on every push to `main` that changes them; with **Deploy from a bran
 folder as it is, without Jekyll). Either way the site shows a change a minute or two after the
 viewer is rebuilt, copied over and pushed.
 
+The viewers also open straight from the repository through githack, with nothing to switch on:
+https://raw.githack.com/markrkendall-dot/Sketchup/main/docs/viewer/kitchen-viewer.html (and the
+same address with `146-mick-road-viewer.html` or `146-mick-road-rebuild-viewer.html`). It serves
+what is on `main`, a few minutes behind a push.
+
 ## Export the plan
 
 **Export > Export plan (.svg)** saves the active level's 2D plan as a drawing for a contractor or a
@@ -1389,10 +1394,10 @@ the engineer, the trades and the tape measure):
 To change the design, edit it in the app (select, move, **Mark demolish**, draw with **Draw as:
 new**) or edit `proposed()` in the script and run `npm run build:example`.
 
-## The kitchen redesign (a third plan)
+## The 2926 Wesley kitchen redesign (a third plan)
 
-`docs/examples/kitchen.json` (File > Open kitchen; `docs/viewer/kitchen-viewer.html`) is a real
-kitchen about to be redesigned, written by `scripts/kitchen-plan.ts`: the room as it stands in the
+`docs/examples/kitchen.json` (File > Open kitchen; `docs/viewer/kitchen-viewer.html`) is the
+kitchen of 2926 Wesley, about to be redesigned (the room alone so far, not the rest of that house), written by `scripts/kitchen-plan.ts`: the room as it stands in the
 Existing view and the design options in Proposed. **It is not measured yet.** Every size is read
 off one photo (`docs/kitchen/photos/01-kitchen-from-dining.jpg`) against standard cabinet sizes;
 the script's header lists the guesses, and `docs/kitchen/MEASURE.md` is the list of what to

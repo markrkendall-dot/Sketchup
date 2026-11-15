@@ -40,7 +40,7 @@ Both must pass. `npm test` also checks the example JSON against the script, so a
   needs measuring.
 - `docs/DESIGN.md`: how the model, derivation and 3D are put together.
 - `docs/history/`: past plans and reviews (records; branch names in them are historical).
-- `docs/kitchen/`: the kitchen being redesigned: its photo and `MEASURE.md`, the list of what to
+- `docs/kitchen/`: the 2926 Wesley kitchen being redesigned: its photo and `MEASURE.md`, the list of what to
   measure. The plan is `scripts/kitchen-plan.ts` (README, "The kitchen redesign").
 - `docs/TODO.md`: changes MK has asked for that are not yet made.
 - `docs/photos/`: the reference photos the starter is built from, numbered as the script cites them.

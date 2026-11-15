@@ -4,10 +4,12 @@ Changes MK wants in the proposed design, not yet made in `scripts/example-plan.t
 
 Nothing open for 146 Mick Road.
 
-## The kitchen redesign (`scripts/kitchen-plan.ts`)
+## The 2926 Wesley kitchen redesign (`scripts/kitchen-plan.ts`)
 
 - [ ] MK to measure the kitchen (`docs/kitchen/MEASURE.md`); replace every estimate in the script.
 - [ ] Agree the designs with MK (how many, and the brief for each) and replace the two drafts.
+- [ ] The kitchen is its own plan for now: join it to the rest of 2926 Wesley (the house with the
+      bike shed) once that plan is in this repository.
 - [ ] Not drawn yet: the dark floor in the kitchen half (a room has one floor finish).
 
 ## Done

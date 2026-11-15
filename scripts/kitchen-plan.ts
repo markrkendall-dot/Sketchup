@@ -1,4 +1,4 @@
-// The kitchen to be redesigned (docs/examples/kitchen.json): the room as it stands, from photo
+// The kitchen of 2926 Wesley, to be redesigned (docs/examples/kitchen.json): the room as it stands, from photo
 // docs/kitchen/photos/01-kitchen-from-dining.jpg, with two draft design options to flip between.
 //
 // NOT MEASURED YET. Every size below is read off the one photo against standard cabinet sizes
@@ -215,7 +215,7 @@ function draftB(lid: Id, option: Id, old: { casework: Id[]; cart: Id }): void {
 
 /** Build the kitchen plan in the store and return it (the store is left holding it). */
 export function buildKitchenPlan(): Plan {
-  store().setPlan(createEmptyPlan('Kitchen redesign (draft, not yet measured)', 'single'));
+  store().setPlan(createEmptyPlan('2926 Wesley kitchen (draft, not yet measured)', 'single'));
   const [lid] = firstStructure(getPlan()).levelOrder;
   room(lid);
   const old = existingKitchen(lid);
