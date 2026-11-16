@@ -61,7 +61,7 @@ describe('docs/examples/kitchen.json', () => {
     expect([...fronts(a, 'new')]).toEqual(['#f1efe9']);
     expect([...fronts(b, 'new')]).toEqual(['#34493f']);
     expect([...fronts(a, 'demo')]).toEqual([undefined]);
-    expect(plan.levels[lid].finishes?.cabinetColor).toBe('#2e211d');
+    expect(plan.levels[lid].finishes?.cabinetColor).toBe('#33211c');
   });
 
   it('is lit: six recessed lights and the chandelier today, under-cabinet strips in the drafts, pendants over the island in B', () => {

@@ -53,11 +53,16 @@ const TOWER_W = 34.5;
 /** The west run's three cabinets from the pantry: dishwasher, sink base, drawer base (100" in all). */
 const WEST = { dishwasher: LEFT_START + 12, sink: LEFT_START + 42, drawers: LEFT_START + 80 };
 
-const ESPRESSO = '#2e211d';
-const BUTCHER = '#8d5f33';
-const SAGE_TILE = '#b6bdb0';
-const WALL_GREY = '#d9dcd2';
-const OAK_FLOOR = '#b9976b';
+// Today's finishes, matched to the photos: espresso cabinets, a mottled tan counter (drawn as
+// speckled stone: it has no board lines), sage-grey subway tile, pale grey-green walls, a
+// mid-brown wood-look plank floor.
+const ESPRESSO = '#33211c';
+const COUNTER_TAN = '#ad8a5c';
+const SAGE_TILE = '#99a092';
+const WALL_GREY = '#d4d7ce';
+const OAK_FLOOR = '#8c6f50';
+/** The outside walls' colour: white, so the window and door reveals read as the white casings (the outside of the house is not modelled). */
+const TRIM_WHITE = '#f1efe9';
 const CART_OAK = '#c9a36b';
 const WHITE = '#f1efe9';
 
@@ -106,11 +111,13 @@ function rightRun(lid: Id, phase: Phase): Id[] {
 function existingKitchen(lid: Id): { casework: Id[]; pantry: Id[]; cart: Id } {
   const add = (f: Omit<NewFixture, 'phase'>) => fixture(lid, { ...f, phase: 'existing' });
   const farBase = ROOM.w - 36 - (TOWER_X0 + TOWER_W);
+  // The west run's tile stops at the window sill (49" less the 37" counter).
+  const LOW_TILE = { backsplashHeight: 12 };
   const casework = [
     // The sink wall (photo 05), from the pantry toward the dining side: dishwasher, the sink under the window, a drawer base. The run ends there.
-    add({ kind: 'dishwasher', ...onLeft(WEST.dishwasher), width: 24, ...BASE }),
-    add({ kind: 'sink', ...onLeft(WEST.sink), width: 36, ...BASE }),
-    add({ kind: 'base', ...onLeft(WEST.drawers), width: 40, ...BASE, drawers: 2 }),
+    add({ kind: 'dishwasher', ...onLeft(WEST.dishwasher), width: 24, ...BASE, ...LOW_TILE }),
+    add({ kind: 'sink', ...onLeft(WEST.sink), width: 36, ...BASE, ...LOW_TILE }),
+    add({ kind: 'base', ...onLeft(WEST.drawers), width: 40, ...BASE, drawers: 2, ...LOW_TILE }),
     // The far wall: the oven tower against the pantry's stub, then a base cabinet under the window to the corner unit.
     add({ kind: 'wallOven', ...onFar(TOWER_X0 + TOWER_W / 2), width: TOWER_W, depth: 25, height: 96, elevation: 0 }),
     add({ kind: 'base', ...onFar(TOWER_X0 + TOWER_W + farBase / 2), width: farBase, ...BASE }),
@@ -122,7 +129,7 @@ function existingKitchen(lid: Id): { casework: Id[]; pantry: Id[]; cart: Id } {
     add({ kind: 'shelf', ...onLeft(19), width: 36, depth: 12, height: 50, elevation: 44, shelves: 4, frontColor: WHITE }),
   ];
   // The movable cart in the middle: an oak frame under a white top.
-  const cart = add({ kind: 'island', origin: { x: ROOM.w / 2, y: 100 }, direction: 90, width: 30, depth: 48, height: 34.5, elevation: 0, frontColor: CART_OAK, counterMaterial: 'laminate', counterColor: '#f3f2ee' });
+  const cart = add({ kind: 'island', origin: { x: ROOM.w / 2, y: 100 }, direction: 90, width: 30, depth: 48, height: 34.5, elevation: 0, frontColor: CART_OAK, handles: 'none', counterMaterial: 'laminate', counterColor: '#f3f2ee' });
   return { casework, pantry, cart };
 }
 
@@ -173,7 +180,7 @@ function room(lid: Id): void {
     { x: ROOM.w + h, y: ROOM.d + h },
     { x: -h, y: ROOM.d + h },
   ];
-  drawWalls(lid, box, TE, true);
+  store().updateWalls(lid, drawWalls(lid, box, TE, true), { finish: 'plain', color: TRIM_WHITE });
   // The pantry in the north-west corner (photo 05): a south wall the west run ends against, a
   // diagonal with the door, and an east wall back to the north wall that the oven tower stands against.
   const [p0, p1, p2, p3] = pantryWalls();
@@ -196,14 +203,14 @@ function room(lid: Id): void {
   label(lid, 'Kitchen', { x: ROOM.w / 2, y: 200 }, 'existing', finishes);
   label(lid, 'Pantry', { x: 12, y: 12 }, 'existing', finishes);
   roof(lid, { shape: 'flat', outline: box, ridgeAngle: 0, pitch: 0, overhang: 12 }, '#5b5852', 0);
-  // Today's finishes: espresso slab fronts with bar pulls, a wood-look counter, grey-green tile.
+  // Today's finishes: espresso slab fronts with bar pulls, a mottled tan counter, sage-grey tile.
   store().updateFinishes(lid, {
     cabinetColor: ESPRESSO,
     frontStyle: 'slab',
     handles: 'bar',
     handleFinish: 'steel',
-    counterMaterial: 'butcherBlock',
-    counterColor: BUTCHER,
+    counterMaterial: 'stoneSpeckled',
+    counterColor: COUNTER_TAN,
     backsplash: 'toWall',
     backsplashFinish: 'tile',
     backsplashColor: SAGE_TILE,

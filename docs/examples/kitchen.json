@@ -76,7 +76,9 @@
           "b": "b-n8",
           "thickness": 6.5,
           "kind": "exterior",
-          "phase": "existing"
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#f1efe9"
         },
         "b-w2": {
           "id": "b-w2",
@@ -84,7 +86,9 @@
           "b": "b-n3",
           "thickness": 6.5,
           "kind": "exterior",
-          "phase": "existing"
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#f1efe9"
         },
         "b-w3": {
           "id": "b-w3",
@@ -92,7 +96,9 @@
           "b": "b-n4",
           "thickness": 6.5,
           "kind": "exterior",
-          "phase": "existing"
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#f1efe9"
         },
         "b-w4": {
           "id": "b-w4",
@@ -100,7 +106,9 @@
           "b": "b-n5",
           "thickness": 6.5,
           "kind": "exterior",
-          "phase": "existing"
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#f1efe9"
         },
         "b-w5": {
           "id": "b-w5",
@@ -119,7 +127,9 @@
           "b": "b-n1",
           "thickness": 6.5,
           "kind": "exterior",
-          "phase": "existing"
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#f1efe9"
         },
         "b-w7": {
           "id": "b-w7",
@@ -149,7 +159,9 @@
           "b": "b-n2",
           "thickness": 6.5,
           "kind": "exterior",
-          "phase": "existing"
+          "phase": "existing",
+          "finish": "plain",
+          "color": "#f1efe9"
         }
       },
       "openings": {
@@ -286,9 +298,9 @@
             "y": 200
           },
           "wallFinish": "paint",
-          "wallColor": "#d9dcd2",
+          "wallColor": "#d4d7ce",
           "floorFinish": "boards",
-          "floorColor": "#b9976b",
+          "floorColor": "#8c6f50",
           "ceilingFinish": "paint",
           "ceilingColor": "#f4f3ee",
           "id": "b-r1"
@@ -300,9 +312,9 @@
             "y": 12
           },
           "wallFinish": "paint",
-          "wallColor": "#d9dcd2",
+          "wallColor": "#d4d7ce",
           "floorFinish": "boards",
-          "floorColor": "#b9976b",
+          "floorColor": "#8c6f50",
           "ceilingFinish": "paint",
           "ceilingColor": "#f4f3ee",
           "id": "b-r2",
@@ -365,6 +377,7 @@
           "depth": 24,
           "height": 35.5,
           "elevation": 0,
+          "backsplashHeight": 12,
           "phase": "demo",
           "id": "b-c1",
           "optionIds": [
@@ -383,6 +396,7 @@
           "depth": 24,
           "height": 35.5,
           "elevation": 0,
+          "backsplashHeight": 12,
           "phase": "demo",
           "id": "b-c2",
           "optionIds": [
@@ -402,6 +416,7 @@
           "height": 35.5,
           "elevation": 0,
           "drawers": 2,
+          "backsplashHeight": 12,
           "phase": "demo",
           "id": "b-c3",
           "optionIds": [
@@ -753,6 +768,7 @@
           "height": 34.5,
           "elevation": 0,
           "frontColor": "#c9a36b",
+          "handles": "none",
           "counterMaterial": "laminate",
           "counterColor": "#f3f2ee",
           "phase": "demo",
@@ -1895,15 +1911,15 @@
       "joistZones": {},
       "members": {},
       "finishes": {
-        "cabinetColor": "#2e211d",
+        "cabinetColor": "#33211c",
         "frontStyle": "slab",
         "handles": "bar",
         "handleFinish": "steel",
-        "counterMaterial": "butcherBlock",
-        "counterColor": "#8d5f33",
+        "counterMaterial": "stoneSpeckled",
+        "counterColor": "#ad8a5c",
         "backsplash": "toWall",
         "backsplashFinish": "tile",
-        "backsplashColor": "#b6bdb0"
+        "backsplashColor": "#99a092"
       },
       "optionFinishes": {
         "option-a": {

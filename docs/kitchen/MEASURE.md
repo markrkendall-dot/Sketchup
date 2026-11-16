@@ -14,6 +14,7 @@ Openings are inside the trim. These answer items 1 to 6, 9 to 15, 17 and most of
 - Room: 13 ft (156") wide, 27'6" (330") north wall to fireplace wall, ceiling 9 ft (108").
 - Walls through an opening, trim included: outside 8", pantry 6.5".
 - Floor: the dark floor is paint under a damaged floor. Draw one wood floor throughout.
+- Finishes today (from the photos): espresso slab cabinets with steel bar pulls, a mottled tan counter, sage-grey subway tile (to the sill on the west wall, to the wall cabinets elsewhere), pale grey-green walls, white trim, a mid-brown wood-look plank floor.
 - West wall, north to south: the sink window 54.5" wide x 47" tall, sill 59" below the ceiling,
   starting 16.5" south of the pantry's wall; 48" on, the sliding door, 68" x 93"; 45" on, a
   window 34" x 55", sill 68" below the ceiling.
