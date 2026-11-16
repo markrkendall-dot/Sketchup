@@ -4,10 +4,36 @@ Reference photos, in `photos/`: `01-kitchen-from-dining.jpg` (from the dining si
 `02-pantry-inside.jpg`, `03-toward-dining.jpg`, `04-cooktop-wall.jpg`, `05-sink-wall.jpg`.
 "Left", "right" and "far" below mean as seen in photo 01.
 
-**Known so far:** the kitchen is 13 ft (156") wide, left wall to right wall (MK, 15 Nov 2026).
- Inches are fine, to the nearest 1/4.
-A rough sketch with the numbers on it, photographed, is the easiest way to send them.
-More photos help too: one from the far window looking back, one of each wall square on, the pantry inside.
+North is the far wall: the sink is on the west (left) wall, the ovens on the north (far) wall, the
+cooktop and refrigerator on the east (right) wall.
+
+## Measured (MK, 15 and 16 Nov 2026)
+
+Openings are inside the trim. These answer items 1 to 6, 9 to 15, 17 and most of 18, 19 and 24 below.
+
+- Room: 13 ft (156") wide, 27'6" (330") north wall to fireplace wall, ceiling 9 ft (108").
+- Walls through an opening, trim included: outside 8", pantry 6.5".
+- Floor: the dark floor is paint under a damaged floor. Draw one wood floor throughout.
+- West wall, north to south: the sink window 54.5" wide x 47" tall, sill 59" below the ceiling,
+  starting 16.5" south of the pantry's wall; 48" on, the sliding door, 68" x 93"; 45" on, a
+  window 34" x 55", sill 68" below the ceiling.
+- North wall: a window 19.5" x 52", sill 65" below the ceiling, 23" from the north-east corner; the
+  pantry's window is its mirror image, 23" from the north-west corner.
+- East wall: a window 22.5" square, sill 40.5" below the ceiling, about 9 ft from the fireplace wall.
+- Pantry: its east wall's kitchen face is 97.5" from the east wall (where the oven tower meets it)
+  and runs 34" south from the north wall (to the door's hinge); its south wall's kitchen face, by
+  the dishwasher, is 60" from the north wall. Door 28" x 81". Nothing inside that cannot move.
+  MK expects to remove the pantry.
+- West run: 100" long from the pantry's wall, counter 25" deep, 37" high. The north run's counter is the same.
+- Oven tower: 34.5" wide.
+- East run: the refrigerator's north side is 112" from the north wall. The cooktop's north edge is
+  50.5" from the north wall and its south edge 25" from the refrigerator (so 36.5" wide). Gas is under it.
+
+## Still to measure
+
+Items 7 (no step: see Floor above), 8, 16 (answered: nothing), 20 to 23, 25 to 33, and the decisions, 34 to 37
+(35 in part: the pantry can go). Also the tower's depth and height, and how far the pantry's south
+wall runs from the west wall before the diagonal.
 
 ## Room
 

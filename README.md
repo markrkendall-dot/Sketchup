@@ -1398,14 +1398,16 @@ new**) or edit `proposed()` in the script and run `npm run build:example`.
 
 `docs/examples/kitchen.json` (File > Open kitchen; `docs/viewer/kitchen-viewer.html`) is the
 kitchen of 2926 Wesley, about to be redesigned (the room alone so far, not the rest of that house), written by `scripts/kitchen-plan.ts`: the room as it stands in the
-Existing view and the design options in Proposed. **One size is measured: the kitchen is 13 ft
-wide.** Every other size is read off the five photos in `docs/kitchen/photos/` (01 from the dining
+Existing view and the design options in Proposed. **The room is measured** (MK, 16 Nov 2026: its size, ceiling, windows, doors, pantry walls,
+the cabinet runs and where the cooktop and refrigerator stand; `docs/kitchen/MEASURE.md` has the
+numbers). North is the far wall in photo 01: the sink is on the west wall, the ovens north, the
+cooktop and refrigerator east. The rest (each cabinet's width, the wall cabinets, the lights) is read off the five photos in `docs/kitchen/photos/` (01 from the dining
 side, 02 the pantry inside, 03 toward the dining end, 04 the cooktop wall, 05 the sink wall)
 against standard cabinet sizes; the plan has a saved view at each photo's viewpoint, to compare
 them. The script's header lists the guesses and what is not drawn, and `docs/kitchen/MEASURE.md` is the list of what to
-measure. The two options in it now ("Draft A: same layout, light finishes" and "Draft B: pantry
-out, island") are drafts that exercise the software, not proposals: the real designs follow the
-measurements. The windows stay in every option; the pantry's walls and door may go.
+measure and what has been. The two options in it now ("Draft A: same layout, light finishes" and "Draft B: pantry
+out, island") are drafts that exercise the software, not proposals: the real designs are to be agreed with MK.
+The windows stay in every option; MK expects to remove the pantry.
 
 To add a design: in the script, add its name to `designOptions([...])`, write a function that calls
 `workIn(option)`, demolishes what goes (`demolish`), adds the new cabinets as `NEW`, and sets the
