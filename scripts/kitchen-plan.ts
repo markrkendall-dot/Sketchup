@@ -97,7 +97,8 @@ function rightRun(lid: Id, phase: Phase): Id[] {
     add({ kind: 'base', ...onRight(103.875), width: 16.25, ...BASE }),
     add({ kind: 'cooktop', origin: { x: ROOM.w - 2, y: COOKTOP_Y }, direction: 180, width: 36, depth: 21, height: 1.5, elevation: BASE_H + 1.5 }),
     add({ kind: 'hood', ...onRight(COOKTOP_Y), width: 36, depth: 20, height: 12, elevation: 66 }),
-    add({ kind: 'cornerWall', ...onFar(ROOM.w - 13), width: 26, depth: 26, height: UPPER.height, elevation: UPPER.elevation }),
+    // The wall cabinets are on the east wall only, starting at the north wall (MK): no corner unit.
+    add({ kind: 'wall', ...onRight(13), width: 26, ...UPPER }),
     add({ kind: 'wall', ...onRight(38.375), width: 24.75, ...UPPER }),
     add({ kind: 'wall', ...onRight(COOKTOP_Y), width: 36, depth: 13, height: 18, elevation: 78 }),
     add({ kind: 'wall', ...onRight(99.375), width: 25.25, ...UPPER }),
