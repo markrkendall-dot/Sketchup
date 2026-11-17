@@ -1,0 +1,20 @@
+// Writes the synthetic scan bundle (syntheticRoom.ts) to scripts/scan/fixtures/synthetic-room/:
+// meta.json, room.json and frames.json (no photos). Running it twice gives the same files.
+//   node scripts/run-ts.mjs scripts/scan/fixtures/makeSynthetic.ts
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { makeSyntheticBundle } from './syntheticRoom';
+
+export function main(): void {
+  const dir = new URL('./synthetic-room/', import.meta.url);
+  mkdirSync(dir, { recursive: true });
+  const bundle = makeSyntheticBundle();
+  for (const [file, data] of [
+    ['meta.json', bundle.meta],
+    ['room.json', bundle.room],
+    ['frames.json', bundle.frames],
+  ] as const) {
+    const target = new URL(file, dir);
+    writeFileSync(target, JSON.stringify(data, null, 2) + '\n');
+    console.log(`Wrote ${target.pathname}`);
+  }
+}

@@ -1,0 +1,559 @@
+{
+  "format": 1,
+  "story": 0,
+  "surfaces": [
+    {
+      "id": "W-NORTH",
+      "category": "wall",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        3.9751,
+        2.74955,
+        0
+      ],
+      "transform": [
+        0.960294,
+        0,
+        -0.278991,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.278991,
+        0,
+        0.960294,
+        0,
+        2.784142,
+        0.024775,
+        -2.720389,
+        1
+      ],
+      "curved": false
+    },
+    {
+      "id": "W-SOUTH",
+      "category": "wall",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        4.03225,
+        2.7432,
+        0
+      ],
+      "transform": [
+        0.953717,
+        0,
+        -0.300706,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.300706,
+        0,
+        0.953717,
+        0,
+        5.274375,
+        0.0216,
+        5.283635,
+        1
+      ],
+      "curved": false
+    },
+    {
+      "id": "W-EAST",
+      "category": "wall",
+      "parentId": null,
+      "confidence": "medium",
+      "dimensions": [
+        8.36295,
+        2.7305,
+        0
+      ],
+      "transform": [
+        -0.312335,
+        0,
+        -0.949972,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.949972,
+        0,
+        -0.312335,
+        0,
+        5.9217,
+        0.01525,
+        0.660169,
+        1
+      ],
+      "curved": false
+    },
+    {
+      "id": "W-WEST",
+      "category": "wall",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        8.31215,
+        2.7432,
+        0
+      ],
+      "transform": [
+        0.275637,
+        0,
+        0.961262,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -0.961262,
+        0,
+        0.275637,
+        0,
+        2.146205,
+        0.0216,
+        1.860925,
+        1
+      ],
+      "curved": false
+    },
+    {
+      "id": "O-DOOR",
+      "category": "door",
+      "parentId": "W-NORTH",
+      "confidence": "high",
+      "dimensions": [
+        0.8128,
+        2.032,
+        0
+      ],
+      "transform": [
+        0.960294,
+        0,
+        -0.278991,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.278991,
+        0,
+        0.960294,
+        0,
+        3.351191,
+        -0.334,
+        -2.885132,
+        1
+      ],
+      "curved": false,
+      "doorOpen": true
+    },
+    {
+      "id": "O-WINDOW",
+      "category": "window",
+      "parentId": "W-WEST",
+      "confidence": "medium",
+      "dimensions": [
+        0.9144,
+        1.2192,
+        0
+      ],
+      "transform": [
+        0.275637,
+        0,
+        0.961262,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -0.961262,
+        0,
+        0.275637,
+        0,
+        2.16633,
+        0.3264,
+        1.93111,
+        1
+      ],
+      "curved": false
+    },
+    {
+      "id": "O-CASED",
+      "category": "opening",
+      "parentId": "W-SOUTH",
+      "confidence": "low",
+      "dimensions": [
+        0.9144,
+        2.1336,
+        0
+      ],
+      "transform": [
+        0.953717,
+        0,
+        -0.300706,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.300706,
+        0,
+        0.953717,
+        0,
+        5.265291,
+        -0.2832,
+        5.2865,
+        1
+      ],
+      "curved": false
+    },
+    {
+      "id": "F-FLOOR",
+      "category": "floor",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        3.9624,
+        8.382,
+        0
+      ],
+      "transform": [
+        0.956305,
+        0,
+        -0.292372,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.292372,
+        0,
+        0.956305,
+        0,
+        4.039961,
+        -1.35,
+        1.278626,
+        1
+      ],
+      "curved": false
+    }
+  ],
+  "objects": [
+    {
+      "id": "B-1",
+      "category": "storage",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        0.6096,
+        0.9144,
+        0.6096
+      ],
+      "transform": [
+        -0.280667,
+        0,
+        -0.959805,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.959805,
+        0,
+        -0.280667,
+        0,
+        1.770461,
+        -0.8928,
+        -0.497651,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "B-2",
+      "category": "storage",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        0.9144,
+        0.9144,
+        0.6096
+      ],
+      "transform": [
+        -0.299041,
+        0,
+        -0.95424,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.95424,
+        0,
+        -0.299041,
+        0,
+        1.981103,
+        -0.8928,
+        0.234766,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "B-3",
+      "category": "storage",
+      "parentId": null,
+      "confidence": "medium",
+      "dimensions": [
+        0.762,
+        0.9144,
+        0.6096
+      ],
+      "transform": [
+        -0.275637,
+        0,
+        -0.961262,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.961262,
+        0,
+        -0.275637,
+        0,
+        2.238314,
+        -0.8928,
+        1.032628,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "B-SINK",
+      "category": "sink",
+      "parentId": null,
+      "confidence": "medium",
+      "dimensions": [
+        0.9144,
+        0.9144,
+        0.6096
+      ],
+      "transform": [
+        -0.287361,
+        0,
+        -0.957822,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.957822,
+        0,
+        -0.287361,
+        0,
+        2.477308,
+        -0.8928,
+        1.836059,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "B-UPPER",
+      "category": "storage",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        0.9144,
+        0.762,
+        0.3302
+      ],
+      "transform": [
+        -0.292372,
+        0,
+        -0.956305,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.956305,
+        0,
+        -0.292372,
+        0,
+        1.847508,
+        0.4026,
+        0.275611,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "B-TALL",
+      "category": "storage",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        0.6096,
+        2.1336,
+        0.762
+      ],
+      "transform": [
+        0.284015,
+        0,
+        0.95882,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -0.95882,
+        0,
+        0.284015,
+        0,
+        4.32,
+        -0.2832,
+        -2.844197,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "A-STOVE",
+      "category": "stove",
+      "parentId": null,
+      "confidence": "low",
+      "dimensions": [
+        0.762,
+        0.9144,
+        0.635
+      ],
+      "transform": [
+        0.305695,
+        0,
+        0.952129,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -0.952129,
+        0,
+        0.305695,
+        0,
+        4.950458,
+        -0.8928,
+        -1.390192,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "A-FRIDGE",
+      "category": "refrigerator",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        0.9144,
+        1.778,
+        0.762
+      ],
+      "transform": [
+        0.282341,
+        0,
+        0.959314,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -0.959314,
+        0,
+        0.282341,
+        0,
+        5.321151,
+        -0.461,
+        0.169792,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "X-TABLE",
+      "category": "table",
+      "parentId": null,
+      "confidence": "high",
+      "dimensions": [
+        1.2192,
+        0.762,
+        0.9144
+      ],
+      "transform": [
+        0.996195,
+        0,
+        -0.087156,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0.087156,
+        0,
+        0.996195,
+        0,
+        4.671191,
+        -0.969,
+        3.343288,
+        1
+      ],
+      "attributes": []
+    },
+    {
+      "id": "X-FIRE",
+      "category": "fireplace",
+      "parentId": null,
+      "confidence": "medium",
+      "dimensions": [
+        1.016,
+        1.016,
+        0.4064
+      ],
+      "transform": [
+        -0.956305,
+        0,
+        0.292372,
+        0,
+        0,
+        1,
+        0,
+        0,
+        -0.292372,
+        0,
+        -0.956305,
+        0,
+        6.465255,
+        -0.842,
+        4.693869,
+        1
+      ],
+      "attributes": []
+    }
+  ],
+  "sections": [
+    {
+      "label": "kitchen",
+      "center": [
+        4.039961,
+        -1.35,
+        1.278626
+      ]
+    }
+  ]
+}
