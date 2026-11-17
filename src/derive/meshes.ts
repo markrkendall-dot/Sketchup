@@ -1141,6 +1141,8 @@ export function outwardSide(fp: Pick<Footprint, 'a' | 'b' | 'normal' | 'wallId'>
  */
 export function buildFixtureParts(f: Fixture, finishes?: LevelFinishes): FixtureMesh['parts'] {
   if (f.kind === 'furniture') return buildFurnitureParts(f);
+  // A mesh fixture shows its asset (view3d/assets.ts), not boxes: FixtureMesh.mesh places it.
+  if (f.kind === 'mesh') return [];
   const fr = fixtureFrame(f);
   const byPart = new Map<FixturePart, BufferGeometry[]>();
   const put = (part: FixturePart, g: BufferGeometry) => {
@@ -1357,6 +1359,11 @@ export interface FixtureMesh {
   furniture?: { piece: FurniturePiece; wood: WoodId; fabric: FabricId; floorLayer: boolean; builtIn: boolean };
   /** One merged geometry per material part, level-local like the walls. */
   parts: { part: FixturePart; geometry: BufferGeometry }[];
+  /**
+   * A mesh fixture (no parts): its asset and where it stands, level-local (DESIGN.md "Mesh
+   * assets"; view3d/assets.ts meshFixtureMatrix turns it into a transform).
+   */
+  mesh?: { assetId: Id; origin: Vec2; direction: number; elevation: number; scale: number; width: number; depth: number; height: number };
 }
 
 export interface CounterMesh {
@@ -2622,6 +2629,17 @@ export function getLevelMeshes(plan: Plan, levelId: Id, viewMode: ViewMode): Lev
     const old = prevFixtures?.get(f.id);
     const entry: FixtureEntry = old && old.fixture === f && old.style === style ? old : { fixture: f, style, parts: buildFixtureParts(f, finishes) };
     nextFixtures.set(f.id, entry);
+    if (f.kind === 'mesh' && f.assetId) {
+      fixtureMeshes.push({
+        id: f.id,
+        kind: f.kind,
+        phase: sp(f.phase),
+        frontColor: frontColorOf(f, finishes),
+        parts: entry.parts,
+        mesh: { assetId: f.assetId, origin: f.origin, direction: f.direction, elevation: f.elevation, scale: f.meshScale ?? 1, width: f.width, depth: f.depth, height: f.height },
+      });
+      continue;
+    }
     if (!entry.parts.length) continue;
     const mesh: FixtureMesh = { id: f.id, kind: f.kind, phase: sp(f.phase), frontColor: frontColorOf(f, finishes), parts: entry.parts };
     if (isBath(f.kind)) mesh.bodyColor = bathBodyColorOf(f);

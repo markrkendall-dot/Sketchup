@@ -14,6 +14,7 @@ import { PropertiesPanel } from './ui/PropertiesPanel';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
 import { UnderlayFileInput } from './ui/UnderlayImport';
+import { MeshFileInput } from './ui/MeshImport';
 import { useNarrow } from './ui/useNarrow';
 
 // The 3D view (three, fiber, drei) loads on first use, so the 2D editor starts fast.
@@ -193,6 +194,7 @@ export function App() {
       </div>
       <StatusBar />
       <UnderlayFileInput />
+      <MeshFileInput />
       <HelpOverlay />
       <PropertiesDialog />
     </div>

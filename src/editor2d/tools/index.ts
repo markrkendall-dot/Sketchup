@@ -15,7 +15,7 @@ import {
 } from '../../store/uiStore';
 import type { Id, Level, Plan, Vec2, ViewMode } from '../../model/types';
 import { snapPoint, type GhostWall } from '../snap';
-import { fixtureTool, furnitureTool } from './fixtureTool';
+import { fixtureTool, furnitureTool, meshObjectTool } from './fixtureTool';
 import { doorTool, passageTool, windowTool } from './openingTool';
 import { measureTool } from './measureTool';
 import { rectTool } from './rectTool';
@@ -87,6 +87,7 @@ const tools: Record<ToolName, Tool> = {
   underlay: underlayTool,
   fixture: fixtureTool,
   furniture: furnitureTool,
+  meshObject: meshObjectTool,
   gradePoint: gradePointTool,
   column: columnTool,
   surface: surfaceTool,

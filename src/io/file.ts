@@ -1,3 +1,4 @@
+import { withoutUnusedAssets } from '../model/meshAsset';
 import { migrate } from '../model/plan';
 import type { Plan } from '../model/types';
 import type { usePlanStore } from '../store/planStore';
@@ -27,9 +28,9 @@ export function downloadBlob(blob: Blob, name: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Trigger a browser download of the plan as JSON. */
+/** Trigger a browser download of the plan as JSON (without the mesh assets nothing shows any more). */
 export function downloadPlan(plan: Plan): void {
-  downloadBlob(new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' }), planFileName(plan, 'json'));
+  downloadBlob(new Blob([JSON.stringify(withoutUnusedAssets(plan), null, 2)], { type: 'application/json' }), planFileName(plan, 'json'));
 }
 
 /** Read a JSON file chosen by the user. Throws a readable Error. */

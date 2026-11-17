@@ -383,14 +383,17 @@ function StairsGhost({ origin, direction, v }: { origin: Vec2; direction: number
  * the real symbol, with its kind and width on a pill (green while the width is typed).
  */
 function FixtureGhost({ preview, v, denom }: { preview: FixturePreview; v: Viewport; denom: number }) {
-  const ghost: Fixture = { id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: FIXTURE_DEFAULTS[preview.kind].height, elevation: 0, phase: 'existing', ...(preview.piece ? { piece: preview.piece } : {}), ...(preview.glass ? { glass: preview.glass } : {}), ...(preview.corner ? { corner: preview.corner } : {}) };
+  const ghost: Fixture = { id: 'ghost', kind: preview.kind, origin: preview.origin, direction: preview.direction, width: preview.width, depth: preview.depth, height: FIXTURE_DEFAULTS[preview.kind].height, elevation: 0, phase: 'existing', ...(preview.piece ? { piece: preview.piece } : {}), ...(preview.glass ? { glass: preview.glass } : {}), ...(preview.corner ? { corner: preview.corner } : {}), ...(preview.assetId ? { assetId: preview.assetId, label: preview.label } : {}) };
+  // A scanned object's ghost shows its outline at the scale its width gives.
+  const asset = useViewPlanStore((s) => (preview.assetId ? s.plan.assets?.[preview.assetId] : undefined));
+  if (asset) ghost.meshScale = preview.width / asset.size[0];
   const sym = fixtureSymbol(ghost);
-  const detail = fixtureDetail(ghost);
+  const detail = fixtureDetail(ghost, asset);
   const front = worldToScreen(v, midpoint(sym.front[0], sym.front[1]));
   const back = worldToScreen(v, preview.origin);
   const out = normalize(sub(front, back));
   const at = add(front, scale(out.x === 0 && out.y === 0 ? { x: 0, y: 1 } : out, 16));
-  const name = preview.piece ? furnitureNameOf({ piece: preview.piece, width: preview.width }) : FIXTURE_LABEL[preview.kind];
+  const name = preview.piece ? furnitureNameOf({ piece: preview.piece, width: preview.width }) : (preview.label ?? FIXTURE_LABEL[preview.kind]);
   const text = `${name} ${formatLengthCompact(preview.width, denom)}${preview.wallId ? '' : ' (free)'}`;
   return (
     <g className={`fixture-ghost${preview.typed ? ' typed' : ''}${preview.abuts ? ' abuts' : ''}`}>

@@ -42,7 +42,7 @@ import {
 import { planWallOffset, wallShift, type WallSide } from '../model/offset';
 import { planRenovation } from '../model/renovate';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from '../model/structure';
-import type { OptionLook, Beam, Column, RoomOptionFinishes, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, SavedView, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
+import type { OptionLook, Beam, Column, RoomOptionFinishes, Deck, Fence, Fixture, FloorOpening, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, MeshAsset, Post, Opening, Phase, Plan, PlanSettings, ProposedLook, Roof, Room, SavedView, ScanOverlay, Site, SiteSurface, Staircase, Stairs, Underlay, Vec2, Wall, WallKind } from '../model/types';
 import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem, staircaseProblem } from '../model/stairStyle';
 import { floorToFloor, normalizeDegrees, stairsHeightProblem, stairsRunOk, stairsWidthOk } from '../derive/stairs';
 import { useUiStore } from './uiStore';
@@ -51,6 +51,7 @@ import { optionsMeet } from '../derive/phase';
 import { fallbackElevation, terrainHeightAt } from '../derive/site';
 import { addOptionTo, applyPhaseIn, deleteOptionFrom, duplicateOptionIn, renameOptionIn, setEntityOptionsIn } from '../model/optionOps';
 import { isValidUnderlay, normalizeRotation } from '../model/underlay';
+import { isMeshScale, meshAssetProblem, meshFixtureSize, meshScaleOf, scanOverlayProblem } from '../model/meshAsset';
 import { isWoodId } from '../model/furniture';
 import { isVariantOf } from '../model/bath';
 import { KITCHEN_FIELD_KEYS, KITCHEN_FIELDS, KITCHEN_FINISH_FIELDS, KITCHEN_FINISH_KEYS, type KitchenFinishField } from '../model/casework';
@@ -135,7 +136,18 @@ export type JoistZonePatch = Partial<Omit<JoistZone, 'id'>>;
 export type FixturePatch = Partial<Omit<Fixture, 'id'>>;
 export type NewFixture = Omit<Fixture, 'id'> & { id?: Id };
 /** The fields of a fixture that updateFixture removes when the patch sets them to undefined. */
-const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS]);
+const OPTIONAL_FIXTURE_KEYS: ReadonlySet<keyof Fixture> = new Set<keyof Fixture>(['label', 'frontStyle', 'frontColor', 'counterOverhang', 'wood', 'fabric', 'builtIn', 'variant', 'glass', 'meshScale', ...KITCHEN_FIELD_KEYS]);
+/** Where a mesh fixture goes (addMeshFixture): its back's middle, facing and bottom, and optionally its scale, phase and label. */
+export interface MeshPlacement {
+  origin: Vec2;
+  direction: number;
+  elevation?: number;
+  meshScale?: number;
+  phase?: Phase;
+  /** Absent: the asset's name. */
+  label?: string;
+}
+export type ScanPatch = Partial<ScanOverlay>;
 export type UnderlayPatch = Partial<Underlay>;
 export type LevelPatch = Partial<Pick<Level, 'name' | 'wallHeight' | 'floorThickness' | 'foundation'>>;
 /** A level's casework defaults; undefined clears a field. */
@@ -407,6 +419,24 @@ export interface PlanState {
    * rotation is normalized to [0, 360). No-op without an underlay. One undo step.
    */
   updateUnderlay: (levelId: Id, patch: UnderlayPatch) => void;
+  /**
+   * Store a mesh (Plan.assets, DESIGN.md "Mesh assets"); returns its id, or null when it is not
+   * usable (model/meshAsset.ts meshAssetProblem). An asset already there under its id is kept.
+   * One undo step. Assets nothing shows are left out when the plan is saved.
+   */
+  addAsset: (asset: MeshAsset) => Id | null;
+  /**
+   * Place a mesh fixture showing an asset (given, and stored if new, or by id): its size is the
+   * asset's times its scale. Returns its id, or null. One undo step.
+   */
+  addMeshFixture: (levelId: Id, asset: MeshAsset | Id, placement: MeshPlacement) => Id | null;
+  /** A mesh fixture at a new uniform scale (its size follows); false when refused. One undo step. */
+  rescaleMeshFixture: (levelId: Id, id: Id, scale: number) => boolean;
+  /** Put a scan overlay on a level (its asset given, stored if new, or already in the plan), replacing any; false when refused. One undo step. */
+  setLevelScan: (levelId: Id, scan: ScanOverlay, asset?: MeshAsset) => boolean;
+  /** Patch the level's scan overlay (placement, opacity, visibility); invalid values are refused. One undo step. */
+  updateLevelScan: (levelId: Id, patch: ScanPatch) => void;
+  removeLevelScan: (levelId: Id) => void;
   /** Save a viewpoint (Plan.views); returns its id, or null when it is not usable (model/plan.ts viewProblem). */
   addView: (view: Omit<SavedView, 'id'>) => Id | null;
   deleteView: (id: Id) => void;
@@ -671,9 +701,21 @@ const sameOverhang = (p: Fixture['counterOverhang'], q: Fixture['counterOverhang
  * Apply a patch to one fixture of a level (a draft): refused (false) when the fixture is missing,
  * the result is not a usable fixture, or nothing changes. Undefined clears an optional field.
  */
-function patchFixture(level: Level, id: Id, patch: FixturePatch): boolean {
+function patchFixture(level: Level, id: Id, patch: FixturePatch, assets?: Plan['assets']): boolean {
   const f = level.fixtures[id];
   if (!f) return false;
+  // A mesh fixture keeps its proportions (DESIGN.md "Mesh assets"): a new width, depth or height
+  // is a new scale, and its size follows the scale.
+  if (f.kind === 'mesh') {
+    const asset = f.assetId ? assets?.[f.assetId] : undefined;
+    if (!asset || (patch.kind !== undefined && patch.kind !== 'mesh') || (patch.assetId !== undefined && patch.assetId !== f.assetId)) return false;
+    let scale = patch.meshScale ?? meshScaleOf(f);
+    if (patch.width !== undefined) scale = patch.width / asset.size[0];
+    else if (patch.depth !== undefined) scale = patch.depth / asset.size[1];
+    else if (patch.height !== undefined) scale = patch.height / asset.size[2];
+    if (!isMeshScale(scale)) return false;
+    patch = { ...patch, meshScale: scale, ...meshFixtureSize(asset, scale) };
+  }
   // A form the (new) kind does not come in is refused; a kind change drops the old form (cleanFixture).
   if (patch.variant !== undefined && !isVariantOf(patch.kind ?? f.kind, patch.variant)) return false;
   const next = cleanFixture({ ...f, ...patch, id });
@@ -1491,6 +1533,12 @@ export const usePlanStore = create<PlanState>()(
           let id: Id | null = null;
           editLevel(levelId, (level, plan) => {
             const f = cleanFixture({ ...input, id: input.id ?? newId() });
+            if (f.kind === 'mesh') {
+              // Its asset must be in the plan; its size is the asset's times its scale.
+              const asset = f.assetId ? plan.assets?.[f.assetId] : undefined;
+              if (!asset || !isMeshScale(meshScaleOf(f))) return false;
+              Object.assign(f, meshFixtureSize(asset, meshScaleOf(f)));
+            }
             if (fixtureProblem(f)) return false;
             tagWork(f, plan);
             level.fixtures[f.id] = f;
@@ -1499,12 +1547,12 @@ export const usePlanStore = create<PlanState>()(
           return id;
         },
 
-        updateFixture: (levelId, id, patch) => editLevel(levelId, (level) => (patchFixture(level, id, patch) ? undefined : false)),
+        updateFixture: (levelId, id, patch) => editLevel(levelId, (level, plan) => (patchFixture(level, id, patch, plan.assets) ? undefined : false)),
 
         updateFixtures: (levelId, ids, patch) =>
-          editLevel(levelId, (level) => {
+          editLevel(levelId, (level, plan) => {
             let changed = false;
-            for (const id of ids) if (patchFixture(level, id, patch)) changed = true;
+            for (const id of ids) if (patchFixture(level, id, patch, plan.assets)) changed = true;
             if (!changed) return false;
           }),
 
@@ -1880,6 +1928,92 @@ export const usePlanStore = create<PlanState>()(
           });
           return id;
         },
+
+        addAsset: (asset) => {
+          if (meshAssetProblem(asset)) return null;
+          set((s) => {
+            if (s.plan.assets?.[asset.id]) return;
+            s.plan.assets = { ...(s.plan.assets ?? {}), [asset.id]: { ...asset, size: [...asset.size], ...(asset.footprint ? { footprint: asset.footprint.map((p) => ({ x: p.x, y: p.y })) } : {}) } };
+            touch(s.plan);
+          });
+          return asset.id;
+        },
+
+        addMeshFixture: (levelId, asset, placement) => {
+          let id: Id | null = null;
+          set((s) => {
+            const level = s.plan.levels[levelId];
+            if (!level) return;
+            const given = typeof asset === 'string' ? undefined : asset;
+            if (given && meshAssetProblem(given)) return;
+            const assetId = typeof asset === 'string' ? asset : asset.id;
+            const stored = s.plan.assets?.[assetId] ?? given;
+            if (!stored) return;
+            const scale = placement.meshScale ?? 1;
+            if (!isMeshScale(scale)) return;
+            const f = cleanFixture({
+              id: newId(),
+              kind: 'mesh',
+              assetId,
+              origin: placement.origin,
+              direction: placement.direction,
+              ...meshFixtureSize(stored, scale),
+              elevation: placement.elevation ?? 0,
+              phase: placement.phase ?? 'existing',
+              label: placement.label ?? stored.name,
+              ...(scale !== 1 ? { meshScale: scale } : {}),
+            });
+            if (fixtureProblem(f)) return;
+            if (!s.plan.assets?.[assetId]) s.plan.assets = { ...(s.plan.assets ?? {}), [assetId]: { ...stored, size: [...stored.size] } };
+            tagWork(f, s.plan);
+            level.fixtures[f.id] = f;
+            id = f.id;
+            touch(s.plan);
+          });
+          return id;
+        },
+
+        rescaleMeshFixture: (levelId, id, scale) => {
+          const before = get().plan;
+          get().updateFixture(levelId, id, { meshScale: scale });
+          return get().plan !== before;
+        },
+
+        setLevelScan: (levelId, scan, asset) => {
+          let ok = false;
+          set((s) => {
+            const level = s.plan.levels[levelId];
+            if (!level) return;
+            if (asset && (meshAssetProblem(asset) || asset.id !== scan.assetId)) return;
+            const assets = { ...(s.plan.assets ?? {}), ...(asset && !s.plan.assets?.[asset.id] ? { [asset.id]: { ...asset, size: [...asset.size] as MeshAsset['size'] } } : {}) };
+            const next: ScanOverlay = { assetId: scan.assetId, origin: { x: scan.origin.x, y: scan.origin.y }, rotation: normalizeRotation(scan.rotation), elevation: scan.elevation, opacity: scan.opacity, visible: scan.visible };
+            if (scanOverlayProblem(next, assets)) return;
+            if (asset && !s.plan.assets?.[asset.id]) s.plan.assets = assets;
+            level.scan = next;
+            ok = true;
+            touch(s.plan);
+          });
+          return ok;
+        },
+
+        updateLevelScan: (levelId, patch) =>
+          editLevel(levelId, (level, plan) => {
+            const cur = level.scan;
+            if (!cur) return false;
+            const next: ScanOverlay = { ...cur, ...patch };
+            if (patch.origin) next.origin = { x: patch.origin.x, y: patch.origin.y };
+            if (patch.rotation !== undefined) next.rotation = Number.isFinite(patch.rotation) ? normalizeRotation(patch.rotation) : patch.rotation;
+            if (scanOverlayProblem(next, plan.assets ?? {})) return false;
+            const keys = Object.keys(patch) as (keyof ScanOverlay)[];
+            if (!keys.some((k) => (k === 'origin' ? next.origin.x !== cur.origin.x || next.origin.y !== cur.origin.y : next[k] !== cur[k]))) return false;
+            level.scan = next;
+          }),
+
+        removeLevelScan: (levelId) =>
+          editLevel(levelId, (level) => {
+            if (!level.scan) return false;
+            delete level.scan;
+          }),
 
         deleteView: (id) =>
           set((s) => {

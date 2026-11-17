@@ -335,7 +335,8 @@ export type FixtureKind =
   | 'dryer'
   | 'waterHeater'
   | 'box'
-  | 'furniture';
+  | 'furniture'
+  | 'mesh';
 /**
  * The form of a bath fixture (model/bath.ts VARIANTS): a bathtub in an alcove or freestanding, a
  * shower on a tray or curbless, a basin on a pedestal or hung on the wall.
@@ -420,6 +421,14 @@ export interface Fixture {
    * sink). Absent: 1" at the front; an island 1" all round.
    */
   counterOverhang?: { front: Inches; back: Inches; left: Inches; right: Inches };
+  /**
+   * Kind 'mesh' only (and required there): the scanned or imported mesh it shows (Plan.assets,
+   * DESIGN.md "Mesh assets"). Its width, depth and height are always the asset's size times
+   * `meshScale`, so selection, the footprint, collision and dimensions treat it as a box.
+   */
+  assetId?: Id;
+  /** Kind 'mesh' only: the uniform scale of its asset. Absent: 1. */
+  meshScale?: number;
   /** Kind 'furniture' only (and required there): what the piece is. */
   piece?: FurniturePiece;
   /**
@@ -647,6 +656,46 @@ export interface Underlay {
 }
 
 /**
+ * A mesh stored in the plan (DESIGN.md "Mesh assets"): a binary glTF, base64, already normalised.
+ * Convention: inches, three's axes as the app uses them (Y up, plan x = X, plan y = Z). A fixture's
+ * asset has its bounding box centred on X, its back edge on Z = 0 with its front toward +Z (glTF's
+ * own "front"), and its bottom on Y = 0, so it lays out like a fixture's frame with its origin at
+ * the middle of the back edge. A scan overlay's asset keeps the scan's own origin (not recentred).
+ */
+export interface MeshAsset {
+  id: Id;
+  format: 'glb';
+  /** The GLB file, base64. */
+  data: string;
+  /** What it is called (the file it came from). */
+  name: string;
+  /** The GLB's length in bytes. */
+  bytes: number;
+  /** Its bounding box, inches: [width along X, depth along Z, height along Y]. */
+  size: [Inches, Inches, Inches];
+  /**
+   * Optional: its outline on the floor (the convex hull of its vertices seen from above), in its
+   * own X and Z, inches; drawn on the plan in place of the bounding rectangle.
+   */
+  footprint?: Vec2[];
+}
+
+/**
+ * A room scan shown over a level in 3D (DESIGN.md "Mesh assets"): its asset (in the normalised
+ * convention, at the scan's own origin) placed with its 0,0 at `origin`, turned `rotation` degrees
+ * clockwise on the plan, its 0 height `elevation` above the level's floor top.
+ */
+export interface ScanOverlay {
+  assetId: Id;
+  origin: Vec2;
+  rotation: Degrees;
+  elevation: Inches;
+  /** 0..1. */
+  opacity: number;
+  visible: boolean;
+}
+
+/**
  * The framing over a level (schema version 7, DESIGN.md "Structure"): the joists of the floor above
  * it (or, on the top level, of the ceiling under the roof). `joists` is the joists' axis in degrees
  * (0..180, plan angles: 0 east-west, 90 north-south); `depth` overrides the depth derived from the
@@ -771,6 +820,8 @@ export interface Level {
    */
   optionFinishes?: Record<Id, OptionFinishes>;
   underlay?: Underlay;
+  /** A room scan shown over the level in 3D (absent: none). */
+  scan?: ScanOverlay;
   /** Under the parts of the floor with nothing of the building below (absent: none). */
   foundation?: Foundation;
 }
@@ -865,6 +916,8 @@ export interface Plan {
   options: DesignOption[];
   /** Saved viewpoints to walk from (DESIGN.md "3D"); the viewer opens on the first. Absent: none. */
   views?: SavedView[];
+  /** Meshes the mesh fixtures and scan overlays show, by id (absent: none). */
+  assets?: Record<Id, MeshAsset>;
 }
 
 /**

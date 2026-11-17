@@ -1,4 +1,4 @@
-import { Group, Mesh, type BufferGeometry, type Material, type MeshStandardMaterial } from 'three';
+import { Group, Mesh, type BufferGeometry, type Material, type MeshStandardMaterial, type Object3D } from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import { getLevelElevations } from '../derive/levels';
@@ -9,12 +9,13 @@ import type { ChimneyPart } from '../derive/site';
 import { DEFAULT_CABINET_COLOR, DEFAULT_COUNTER_COLOR, FIXTURE_LABEL, isCabinet } from '../model/casework';
 import { CERAMIC_WHITE, isBath } from '../model/bath';
 import { COLUMN_COLOR, DECK_COLOR, FENCE_COLOR, FOUNDATION_COLOR, SURFACE_COLOR, DEFAULT_LEAF_COLOR, DEFAULT_SASH_COLOR, defaultWallColor, defaultWallFinish, ROOF_COLOR, TRIM_COLOR } from '../model/finish';
-import type { BacksplashFinish, Column, CounterMaterial, FixtureKind, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
+import type { BacksplashFinish, Column, CounterMaterial, FixtureKind, Id, Phase, Plan, RoofFinish, SurfaceMaterial, ViewMode, WallFinish, WallKind } from '../model/types';
 import type { UiState } from '../store/uiStore';
 import { backsplashMaterial, ceilingMaterial, chimneyPartMaterial, fixturePartMaterial, isGlassPart, columnMaterial, counterMaterial, deckMaterial, fasciaMaterial, fenceMaterial, surfaceMaterial, memberMaterial, railingMaterial, floorFinishMaterial, floorMaterial, openingMaterial, rafterMaterial, flashingMaterial, roofMaterial, roomWallMaterial, stairPartMaterial, stairsMaterial, terrainMaterial, wallMaterial } from '../view3d/materials';
 import { visible3dLevels } from '../view3d/visibility';
 import { downloadBlob, planFileName } from './file';
 import { firstStructure, structureOf } from '../model/structures';
+import { base64ToBytes, meshFixturePose, scanOverlayPose, type MeshPose } from '../model/meshAsset';
 
 // 3D export (DESIGN.md "Persistence and export"). The export scene is built from the derived
 // geometry (derive/meshes.ts), never from the live r3f scene, which also holds lights, the grid
@@ -24,7 +25,51 @@ import { firstStructure, structureOf } from '../model/structures';
 export const METRES_PER_INCH = 0.0254;
 
 /** The 3D view's level visibility (which levels the export includes). */
-export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode' | 'showFurniture' | 'show3dRoofs'>>;
+export type ExportLevelVisibility = Pick<UiState, 'hidden3dLevels' | 'only3dActiveAndBelow' | 'activeLevelId'> & Partial<Pick<UiState, 'siteMode' | 'showFurniture' | 'show3dRoofs' | 'showScan'>>;
+
+/** Decoded mesh assets by id, for the export (decodeExportAssets). */
+export type ExportAssets = ReadonlyMap<Id, Object3D>;
+
+/**
+ * Decode the plan's mesh assets (DESIGN.md "Mesh assets") for buildExportScene: each one GLTFLoader
+ * reads into a fresh scene of its own, so the export's disposal frees them. One that fails to
+ * decode is left out (with a warning).
+ */
+export async function decodeExportAssets(plan: Pick<Plan, 'assets'>): Promise<Map<Id, Object3D>> {
+  const out = new Map<Id, Object3D>();
+  const entries = Object.values(plan.assets ?? {});
+  if (!entries.length) return out;
+  const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+  await Promise.all(
+    entries.map(async (a) => {
+      try {
+        const gltf = await new GLTFLoader().parseAsync(base64ToBytes(a.data).buffer as ArrayBuffer, '');
+        out.set(a.id, gltf.scene);
+      } catch (err) {
+        console.warn(`HomePlan: could not decode mesh asset ${a.id} for the export`, err);
+      }
+    }),
+  );
+  return out;
+}
+
+/** A copy of a decoded asset in a group at a pose (its geometry shared with `template`, which the export owns). */
+function placedAsset(template: Object3D, pose: MeshPose, name: string): Group {
+  const g = new Group();
+  g.name = name;
+  g.position.set(...pose.position);
+  g.rotation.y = pose.rotationY;
+  g.scale.setScalar(pose.scale);
+  const copy = template.clone(true);
+  copy.traverse((o) => {
+    if (!(o instanceof Mesh)) return;
+    // OBJ keeps mesh names only (toObj): each takes the object's.
+    o.name = name;
+    o.material = Array.isArray(o.material) ? o.material.map((m: Material) => m.clone()) : (o.material as Material).clone();
+  });
+  g.add(copy);
+  return g;
+}
 
 export type ExportFormat = 'glb' | 'obj';
 
@@ -136,7 +181,7 @@ const fixtureMeshName = (kind: FixtureKind, piece?: string) =>
  * mesh cache owns the originals) and materials are clones of the live view's, one per phase/kind
  * combination; free both with disposeExportScene().
  */
-export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility: ExportLevelVisibility): Group {
+export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility: ExportLevelVisibility, assets: ExportAssets = new Map()): Group {
   const root = new Group();
   root.name = plan.name.trim() || 'HomePlan';
   root.scale.setScalar(METRES_PER_INCH);
@@ -170,7 +215,7 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     const decks = getDeckMeshes(plan, id, viewMode);
     const guards = getFloorOpeningMeshes(plan, id, viewMode);
     const members = getMemberMeshes(plan, id, viewMode);
-    if (!level || (!members.length && !level.foundation && !meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.staircases.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length)) continue;
+    if (!level || (!members.length && !level.foundation && !meshes.walls.length && !meshes.floor && !meshes.floorFinishes.length && !meshes.stairs.length && !meshes.staircases.length && !meshes.roofs.length && !meshes.openings.length && !meshes.fixtures.length && !decks.length && !guards.length && !level.scan)) continue;
     const group = new Group();
     // A level of another structure stands at its structure's place and turn, named after it too.
     const st = structureOf(plan, id);
@@ -303,6 +348,13 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
     // Furniture only while its layer is on (absent: on).
     for (const f of meshes.fixtures) {
       if (f.furniture && !f.furniture.builtIn && levelVisibility.showFurniture === false) continue;
+      // A scanned object: its mesh at its pose, in inches like the rest (DESIGN.md "Mesh assets").
+      if (f.mesh) {
+        const template = assets.get(f.mesh.assetId);
+        const label = level.fixtures[f.id]?.label;
+        if (template) group.add(placedAsset(template, meshFixturePose({ ...f.mesh, meshScale: f.mesh.scale }), `Scanned object (${label || 'mesh'})`));
+        continue;
+      }
       for (const p of f.parts) {
         const m = mesh(fixtureMeshName(f.kind, f.furniture?.piece), p.geometry, material(fixtureMaterialName(f, p.part), fixturePartMaterial(f, p.part)));
         if (f.phase === 'demo' || isGlassPart(p.part)) m.renderOrder = 1;
@@ -319,6 +371,10 @@ export function buildExportScene(plan: Plan, viewMode: ViewMode, levelVisibility
       if (b.phase === 'demo') m.renderOrder = 1;
       group.add(m);
     }
+    // The scan overlay, when it shows in the view.
+    const scan = level.scan;
+    const scanMesh = scan && scan.visible && levelVisibility.showScan !== false ? assets.get(scan.assetId) : undefined;
+    if (scan && scanMesh) group.add(placedAsset(scanMesh, scanOverlayPose(scan), 'Scan overlay'));
     root.add(group);
   }
   const site = new Group();
@@ -402,7 +458,7 @@ export async function downloadExport(
   viewMode: ViewMode,
   levelVisibility: ExportLevelVisibility,
 ): Promise<void> {
-  const root = buildExportScene(plan, viewMode, levelVisibility);
+  const root = buildExportScene(plan, viewMode, levelVisibility, await decodeExportAssets(plan));
   try {
     if (!root.children.length) throw new Error('Nothing to export: the visible levels have no walls, floors, stairs, roofs, decks or site elements.');
     const blob =

@@ -13,8 +13,9 @@ import { STAIRCASE_STYLE_KEYS, staircaseFieldProblem } from './stairStyle';
 import { framingProblem, joistZoneProblem, memberProblem, normalizeJoists } from './structure';
 import { firstStructure, isStructureKind, normalizeDegrees, structureOf } from './structures';
 import { AS_TODAY } from './types';
-import type { OptionLook, CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, Opening, OptionFinishes, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, SavedView, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
+import type { OptionLook, CeilingFinish, DesignOption, RoomOptionFinishes, Column, Deck, Fence, Fixture, FloorOpening, FixtureKind, FloorFinish, Foundation, FrontStyle, Glazing, GradePoint, Id, JoistZone, Level, LevelFinishes, LevelFraming, Member, MeshAsset, Opening, OptionFinishes, Phase, Plan, PlanSettings, ProposedLook, Roof, RoofEave, RoofFinish, RoofShape, Room, RoomWallFinish, SavedView, ScanOverlay, Site, SiteSurface, Staircase, Stairs, Structure, StructureKind, SurfaceMaterial, Underlay, Vec2, Wall, WallFinish } from './types';
 import { isValidUnderlay, normalizeRotation } from './underlay';
+import { isMeshScale, MESH_SCALE_RANGE, meshAssetProblem, meshFixtureSize, referencedAssetIds, scanOverlayProblem } from './meshAsset';
 
 export const SCHEMA_VERSION = 10 as const;
 /** Nodes closer than this are the same node; see docs/DESIGN.md "Walls are a graph". */
@@ -840,7 +841,7 @@ const GRADE_POINT_KEYS = ['id', 'at', 'elevation'] as const;
 const COLUMN_KEYS = ['id', 'at', 'width', 'depth', 'rotation', 'base', 'top', 'kind', 'phase', 'optionIds', 'color', 'cap'] as const;
 const UNDERLAY_KEYS = ['image', 'pixelWidth', 'pixelHeight', 'origin', 'scale', 'rotation', 'opacity', 'locked'] as const;
 // The kitchen's optional fields (model/casework.ts KITCHEN_FIELDS) are checked by validKitchenFields.
-const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'optionIds', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass', ...KITCHEN_FIELD_KEYS] as const;
+const FIXTURE_KEYS = ['id', 'kind', 'origin', 'direction', 'width', 'depth', 'height', 'elevation', 'phase', 'optionIds', 'label', 'frontStyle', 'frontColor', 'counterOverhang', 'piece', 'wood', 'fabric', 'builtIn', 'variant', 'glass', 'assetId', 'meshScale', ...KITCHEN_FIELD_KEYS] as const;
 const FINISHES_KEYS = ['cabinetColor', 'counterColor', 'frontStyle', 'cabinetWood', 'ceilingFinish', 'ceilingColor', ...KITCHEN_FINISH_KEYS] as const;
 const DECK_KEYS = ['id', 'outline', 'elevation', 'railings', 'phase', 'optionIds', 'color'] as const;
 const FLOOR_OPENING_KEYS = ['id', 'outline', 'railings', 'phase', 'optionIds'] as const;
@@ -848,8 +849,10 @@ const STAIRCASE_KEYS = ['id', ...STAIRCASE_STYLE_KEYS] as const;
 const BEAM_KEYS = ['id', 'kind', 'a', 'b', 'width', 'depth', 'mount', 'phase', 'optionIds', 'label', 'za', 'zb', 'color', 'profile'] as const;
 const POST_KEYS = ['id', 'kind', 'at', 'width', 'depth', 'rotation', 'phase', 'optionIds', 'label', 'footing', 'base', 'top', 'color', 'profile'] as const;
 const JOIST_ZONE_KEYS = ['id', 'outline', 'joists', 'phase', 'optionIds'] as const;
-const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'optionFinishes', 'underlay'] as const;
-const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook', 'options', 'views'] as const;
+const LEVEL_KEYS = ['id', 'name', 'wallHeight', 'floorThickness', 'nodes', 'walls', 'openings', 'rooms', 'stairs', 'roofs', 'fixtures', 'decks', 'floorOpenings', 'staircases', 'framing', 'joistZones', 'members', 'finishes', 'optionFinishes', 'underlay', 'scan'] as const;
+const PLAN_KEYS = ['schemaVersion', 'id', 'name', 'structures', 'structureOrder', 'levels', 'settings', 'site', 'modifiedAt', 'proposedLook', 'options', 'views', 'assets'] as const;
+const ASSET_KEYS = ['id', 'format', 'data', 'name', 'bytes', 'size', 'footprint'] as const;
+const SCAN_KEYS = ['assetId', 'origin', 'rotation', 'elevation', 'opacity', 'visible'] as const;
 const STRUCTURE_KEYS = ['id', 'name', 'kind', 'origin', 'rotation', 'baseFloorElevation', 'levelOrder'] as const;
 const PROPOSED_LOOK_KEYS = ['wallFinish', 'wallColor', 'roofFinish', 'roofColor', 'boardColor', 'trimColor', 'sashColor', 'shutters'] as const;
 const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS);
@@ -1364,9 +1367,13 @@ const isOverhang = (v: unknown): v is NonNullable<Fixture['counterOverhang']> =>
  * store).
  */
 export function fixtureProblem(
-  f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang' | 'piece' | 'wood' | 'fabric' | 'builtIn' | 'variant' | 'glass'> & Partial<Pick<Fixture, KitchenField>>,
+  f: Pick<Fixture, 'kind' | 'origin' | 'direction' | 'width' | 'depth' | 'height' | 'elevation' | 'label' | 'frontStyle' | 'frontColor' | 'counterOverhang' | 'piece' | 'wood' | 'fabric' | 'builtIn' | 'variant' | 'glass' | 'assetId' | 'meshScale'> & Partial<Pick<Fixture, KitchenField>>,
 ): string | null {
   if (typeof f.kind !== 'string' || !FIXTURE_KINDS.includes(f.kind)) return `unknown kind ${String(f.kind)}`;
+  // A mesh fixture names its asset (DESIGN.md "Mesh assets"); nothing else does.
+  if (f.kind === 'mesh' && (typeof f.assetId !== 'string' || !f.assetId)) return 'a scanned object needs its mesh';
+  if (f.kind !== 'mesh' && (f.assetId !== undefined || f.meshScale !== undefined)) return 'only a scanned object has a mesh';
+  if (f.meshScale !== undefined && !isMeshScale(f.meshScale)) return `the mesh scale must be ${MESH_SCALE_RANGE.min} to ${MESH_SCALE_RANGE.max}`;
   if (f.kind === 'furniture' && !isFurniturePiece(f.piece)) return `furniture needs a known piece (${String(f.piece)})`;
   if (f.kind !== 'furniture' && f.piece !== undefined) return 'only furniture has a piece';
   if (f.wood !== undefined && !isWoodId(f.wood)) return `unknown wood ${String(f.wood)}`;
@@ -1385,11 +1392,19 @@ export function fixtureProblem(
   return FIXTURE_KINDS.includes(f.kind) ? kitchenFieldProblem(f) : null;
 }
 
-/** Fixtures read field by field: one with an unusable kind, size or position is dropped (with a warning); bad optional fields are dropped one by one. */
-function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
+/**
+ * Fixtures read field by field: one with an unusable kind, size or position is dropped (with a
+ * warning); bad optional fields are dropped one by one. A mesh fixture whose asset `assets` lacks
+ * is dropped; its size is its asset's times its scale (DESIGN.md "Mesh assets").
+ */
+function migrateFixtures(raw: Json, where: string, assets: Readonly<Record<Id, MeshAsset>> = {}): Level['fixtures'] {
   const out: Level['fixtures'] = {};
   for (const [fid, f] of Object.entries(raw)) {
     if (!isObject(f)) continue;
+    const mesh = f.kind === 'mesh';
+    const asset = mesh && typeof f.assetId === 'string' ? assets[f.assetId] : undefined;
+    // A bad scale is dropped alone (the asset's own size).
+    const meshScale = mesh && isMeshScale(f.meshScale) ? f.meshScale : undefined;
     const base = {
       kind: f.kind as FixtureKind,
       origin: f.origin as Vec2,
@@ -1399,8 +1414,11 @@ function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
       height: f.height as number,
       elevation: isNum(f.elevation) ? f.elevation : 0,
       piece: f.kind === 'furniture' ? (f.piece as Fixture['piece']) : undefined,
+      assetId: mesh ? (f.assetId as Id) : undefined,
+      meshScale,
+      ...(asset ? meshFixtureSize(asset, meshScale ?? 1) : {}),
     };
-    const problem = fixtureProblem(base);
+    const problem = fixtureProblem(base) ?? (mesh && !asset ? `its mesh ${String(f.assetId)} is missing` : null);
     if (problem) {
       console.warn(`HomePlan: ${where}: dropped fixture ${fid}: ${problem}`);
       continue;
@@ -1423,6 +1441,13 @@ function migrateFixtures(raw: Json, where: string): Level['fixtures'] {
     // Bath fixtures: a known form for the kind, a shower's glass sides (only the true ones kept).
     put(fixture, 'variant', isVariantOf(base.kind, f.variant) ? f.variant : undefined);
     put(fixture, 'glass', base.kind === 'shower' && isGlassSides(f.glass) ? glassSidesOf(f.glass) : undefined);
+    put(fixture, 'assetId', base.assetId);
+    put(fixture, 'meshScale', base.meshScale);
+    if (mesh) {
+      fixture.width = base.width;
+      fixture.depth = base.depth;
+      fixture.height = base.height;
+    }
     // The kitchen's fields: each kept when its kind takes it and it is valid (an unknown counter
     // material, a drawer bank of 9, a backsplash on an island are dropped alone).
     const kitchen = validKitchenFields(f, base.kind);
@@ -1579,7 +1604,44 @@ function migrateFoundation(raw: unknown): Foundation | undefined {
   return foundationProblem(f) ? undefined : f;
 }
 
-function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
+/**
+ * The stored meshes (DESIGN.md "Mesh assets"): each usable one kept under its own id, its fields
+ * whitelisted; a broken one is dropped with a warning (and so are the fixtures and overlays that
+ * show it).
+ */
+function migrateAssets(raw: unknown): Record<Id, MeshAsset> {
+  const out: Record<Id, MeshAsset> = {};
+  if (!isObject(raw)) return out;
+  for (const [id, a] of Object.entries(raw)) {
+    const problem = meshAssetProblem(a) ?? ((a as Json).id !== id ? 'its id does not match its key' : null);
+    if (problem) {
+      console.warn(`HomePlan: dropped mesh asset ${id}: ${problem}`);
+      continue;
+    }
+    const asset = pick(a as Json, ASSET_KEYS);
+    asset.size = [...((a as Json).size as number[])];
+    if ((a as Json).footprint) asset.footprint = ((a as Json).footprint as Vec2[]).map((p) => ({ x: p.x, y: p.y }));
+    out[id] = asset as unknown as MeshAsset;
+  }
+  return out;
+}
+
+/** A level's scan overlay, or undefined (none, or not usable: its asset missing is warned about). */
+function migrateScan(raw: unknown, assets: Readonly<Record<Id, MeshAsset>>, where: string): ScanOverlay | undefined {
+  if (raw === undefined) return undefined;
+  const problem = scanOverlayProblem(raw, assets);
+  if (problem) {
+    console.warn(`HomePlan: ${where}: dropped the scan overlay: ${problem}`);
+    return undefined;
+  }
+  const s = pick(raw as Json, SCAN_KEYS);
+  const origin = (raw as Json).origin as Vec2;
+  s.origin = { x: origin.x, y: origin.y };
+  s.rotation = normalizeRotation(s.rotation as number);
+  return s as unknown as ScanOverlay;
+}
+
+function migrateLevel(raw: unknown, id: string, lowest: boolean, assets: Readonly<Record<Id, MeshAsset>> = {}): Level {
   if (!isObject(raw)) fail(`level ${id} is not an object`);
   const where = `level ${id}`;
   const nodes = migrateNodes(record(raw.nodes, `${where} nodes`), where);
@@ -1595,7 +1657,7 @@ function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   level.rooms = migrateRooms(record(raw.rooms, `${where} rooms`));
   level.stairs = migrateStairs(record(raw.stairs, `${where} stairs`), lowest);
   level.roofs = migrateRoofs(record(raw.roofs, `${where} roofs`), where);
-  level.fixtures = migrateFixtures(record(raw.fixtures, `${where} fixtures`), where);
+  level.fixtures = migrateFixtures(record(raw.fixtures, `${where} fixtures`), where, assets);
   level.decks = migrateDecks(record(raw.decks, `${where} decks`), where);
   level.floorOpenings = migrateFloorOpenings(record(raw.floorOpenings, `${where} floor openings`), where);
   // A piece of stairs names its staircase; one naming none there forgets it, and a staircase with no
@@ -1623,6 +1685,7 @@ function migrateLevel(raw: unknown, id: string, lowest: boolean): Level {
   }
   put(level, 'optionFinishes', Object.keys(perOption).length ? perOption : undefined);
   put(level, 'underlay', migrateUnderlay(raw.underlay));
+  put(level, 'scan', migrateScan(raw.scan, assets, where));
   put(level, 'foundation', migrateFoundation(raw.foundation));
   return level as unknown as Level;
 }
@@ -1649,7 +1712,7 @@ function migrateSettings(raw: Json): PlanSettings {
  * least one level, every listed level present and in exactly one structure's stack. A level no
  * structure lists is dropped (as a level missing from levelOrder always was).
  */
-function migrateStructures(doc: Json): { structures: Record<Id, Structure>; structureOrder: Id[]; levels: Record<Id, Level> } {
+function migrateStructures(doc: Json, assets: Readonly<Record<Id, MeshAsset>> = {}): { structures: Record<Id, Structure>; structureOrder: Id[]; levels: Record<Id, Level> } {
   if (!Array.isArray(doc.structureOrder) || doc.structureOrder.length === 0) fail('structureOrder must be a non-empty array');
   const rawStructures = record(doc.structures, 'structures');
   const rawLevels = record(doc.levels, 'levels');
@@ -1666,7 +1729,7 @@ function migrateStructures(doc: Json): { structures: Record<Id, Structure>; stru
       if (typeof id !== 'string') fail(`structure ${sid}: levelOrder must contain level ids`);
       if (!(id in rawLevels)) fail(`level ${id} is listed in levelOrder but missing`);
       if (id in levels) fail(`level ${id} is listed twice in levelOrder`);
-      levels[id] = migrateLevel(rawLevels[id], id, id === order[0]);
+      levels[id] = migrateLevel(rawLevels[id], id, id === order[0], assets);
     }
     const s = pick(raw, STRUCTURE_KEYS);
     s.id = sid;
@@ -1723,7 +1786,8 @@ export function migrate(json: unknown): Plan {
     doc = step(doc);
     version = doc.schemaVersion;
   }
-  const { structures, structureOrder, levels } = migrateStructures(doc);
+  const assets = migrateAssets(doc.assets);
+  const { structures, structureOrder, levels } = migrateStructures(doc, assets);
   const plan = pick(doc, PLAN_KEYS);
   plan.schemaVersion = SCHEMA_VERSION;
   plan.id = typeof doc.id === 'string' && doc.id ? doc.id : newId();
@@ -1738,6 +1802,11 @@ export function migrate(json: unknown): Plan {
   plan.options = migrateOptions(doc.options);
   cleanOptionTags(plan as unknown as Plan);
   put(plan, 'views', migrateViews(doc.views, levels));
+  // Only the assets a mesh fixture or a scan overlay shows are kept (DESIGN.md "Mesh assets").
+  const used = referencedAssetIds({ levels });
+  const kept: Record<Id, MeshAsset> = {};
+  for (const [id, a] of Object.entries(assets)) if (used.has(id)) kept[id] = a;
+  put(plan, 'assets', Object.keys(kept).length ? kept : undefined);
   return plan as unknown as Plan;
 }
 

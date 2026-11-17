@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { VIEW_MODE_LABEL, VIEW_MODES } from '../derive/phase';
 import { activateUnderlayTool, setViewMode, switchTool } from '../editor2d/tools';
+import { requestMeshFile } from './MeshImport';
 import { MEASURE_RULE } from '../editor2d/tools/wallTool';
 import type { MeasureTo } from '../model/types';
 import { redo, undo, usePlanStore, useTemporal } from '../store/planStore';
@@ -257,6 +258,14 @@ function FileMenu() {
           <button role="menuitem" aria-label="Open kitchen" onClick={() => pick(() => void openExample('kitchen'))}>
             Open kitchen
             <small>The 2926 Wesley kitchen being redesigned, with its design options</small>
+          </button>
+          <button role="menuitem" onClick={() => pick(() => requestMeshFile({ mode: 'object' }))}>
+            Import scanned object...
+            <small>A .glb, .usdz or .ply mesh, placed like a cabinet at its true size</small>
+          </button>
+          <button role="menuitem" onClick={() => pick(() => requestMeshFile({ mode: 'scan', levelId: useUiStore.getState().activeLevelId }))}>
+            Load scan overlay...
+            <small>A room scan shown over the active level in 3D</small>
           </button>
           <button role="menuitem" onClick={() => pick(savePlan)}>
             Save <kbd>Ctrl+S</kbd>

@@ -6,7 +6,7 @@ import type { Column, FabricId, Fixture, FixtureKind, FurniturePiece, Id, Measur
 import type { BedSize } from '../model/furniture';
 
 export type OpeningToolName = Opening['type'];
-export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'furniture' | 'gradePoint' | 'column' | 'surface' | 'fence' | 'beam' | 'post' | 'joistZone' | OpeningToolName;
+export type ToolName = 'select' | 'wall' | 'rect' | 'measure' | 'room' | 'stairs' | 'roof' | 'deck' | 'floorOpening' | 'underlay' | 'fixture' | 'furniture' | 'meshObject' | 'gradePoint' | 'column' | 'surface' | 'fence' | 'beam' | 'post' | 'joistZone' | OpeningToolName;
 /** Tools that work on the site (E, C, A, Q); the others edit a level and are off in site mode. */
 export const SITE_TOOLS: readonly ToolName[] = ['gradePoint', 'column', 'surface', 'fence'];
 /** Tools allowed in site mode: select, measure, the site tools. */
@@ -111,6 +111,9 @@ export interface FixturePreview {
   glass?: Fixture['glass'];
   /** A corner unit's corner end (the tool turns it to the corner it is pushed into). */
   corner?: Fixture['corner'];
+  /** A mesh fixture's asset and name (the scanned object tool). */
+  assetId?: Id;
+  label?: string;
   /** Middle of the back edge. */
   origin: Vec2;
   direction: number;
@@ -189,6 +192,8 @@ export interface Draft {
   furnitureBed: BedSize;
   furnitureWood: WoodId | null;
   furnitureFabric: FabricId | null;
+  /** Scanned object tool: the asset (Plan.assets) the next click places. */
+  meshAssetId: Id | null;
   /** Rectangle tool: the first corner clicked, null when idle. */
   rectStart: WallStart | null;
   rectPreview: RectPreview | null;
@@ -385,6 +390,10 @@ export interface UiState {
   show3dGrid: boolean;
   /** 3D view: draw the roofs (off lifts every roof off, to look down into the top floor). */
   show3dRoofs: boolean;
+  /** 3D view: draw the levels' scan overlays that are set visible (the 3D bar's Scan checkbox). */
+  showScan: boolean;
+  /** 3D view: the scan overlays' opacity from the 3D bar's slider; null: each overlay's own. */
+  scanOpacity: number | null;
   /** Bumped to ask the 3D view to re-fit the camera to the plan. */
   fit3dRequest: number;
   /** Draw the active level's image underlay (a temporary hide; the plan keeps it). */
@@ -465,6 +474,8 @@ export interface UiState {
   requestFit3d: () => void;
   setShow3dGrid: (on: boolean) => void;
   setShow3dRoofs: (on: boolean) => void;
+  setShowScan: (on: boolean) => void;
+  setScanOpacity: (opacity: number | null) => void;
   toggleShowUnderlay: () => void;
   /** Select the underlay (clears the entity selection) or deselect it. */
   selectUnderlay: (on: boolean) => void;
@@ -524,6 +535,7 @@ export const emptyDraft = (): Draft => ({
   furnitureBed: 'queen',
   furnitureWood: null,
   furnitureFabric: null,
+  meshAssetId: null,
   rectStart: null,
   rectPreview: null,
   measure: null,
@@ -531,7 +543,8 @@ export const emptyDraft = (): Draft => ({
 });
 
 /** The tool choices a draft reset keeps (the pickers set them). */
-const keptDraft = (d: Draft): Pick<Draft, 'fixtureKind' | 'fixtureDirection' | 'furniturePiece' | 'furnitureBed' | 'furnitureWood' | 'furnitureFabric'> => ({
+const keptDraft = (d: Draft): Pick<Draft, 'fixtureKind' | 'fixtureDirection' | 'furniturePiece' | 'furnitureBed' | 'furnitureWood' | 'furnitureFabric' | 'meshAssetId'> => ({
+  meshAssetId: d.meshAssetId,
   fixtureKind: d.fixtureKind,
   fixtureDirection: d.fixtureDirection,
   furniturePiece: d.furniturePiece,
@@ -586,6 +599,8 @@ export const useUiStore = create<UiState>()((set) => ({
   only3dActiveAndBelow: false,
   show3dGrid: true,
   show3dRoofs: false,
+  showScan: true,
+  scanOpacity: null,
   fit3dRequest: 0,
   showUnderlay: true,
   underlaySelected: false,
@@ -705,6 +720,8 @@ export const useUiStore = create<UiState>()((set) => ({
   requestFit3d: () => set((s) => ({ fit3dRequest: s.fit3dRequest + 1 })),
   setShow3dGrid: (show3dGrid) => set({ show3dGrid }),
   setShow3dRoofs: (show3dRoofs) => set({ show3dRoofs }),
+  setShowScan: (showScan) => set({ showScan }),
+  setScanOpacity: (scanOpacity) => set({ scanOpacity: scanOpacity === null ? null : Math.min(1, Math.max(0, scanOpacity)) }),
   toggleShowUnderlay: () => set((s) => ({ showUnderlay: !s.showUnderlay })),
   selectUnderlay: (on) =>
     set((s) =>

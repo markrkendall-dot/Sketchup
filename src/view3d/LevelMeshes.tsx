@@ -1,5 +1,8 @@
 import { memo, useMemo } from 'react';
 import { SpotLight } from 'three';
+import type { FixtureMesh } from '../derive/meshes';
+import { meshFixturePose, scanOverlayPose } from '../model/meshAsset';
+import { useMeshAsset } from './assets';
 import { levelLights, type LevelLight } from '../derive/lights';
 import { LAMP_COLOR } from '../model/casework';
 import { getLevelElevations } from '../derive/levels';
@@ -36,6 +39,48 @@ function LevelLights({ levelId }: { levelId: Id }) {
       )}
     </>
   );
+}
+
+/** A demolished mesh fixture in the All view is see-through, like the demolished boxes. */
+const DEMO_MESH_OPACITY = 0.35;
+
+/**
+ * A mesh fixture (DESIGN.md "Mesh assets"): its asset from the decode cache (view3d/assets.ts) at
+ * the fixture's pose, or a pale box of its size while the asset decodes.
+ */
+function MeshFixture({ f }: { f: FixtureMesh }) {
+  const m = f.mesh!;
+  const assets = useViewPlanStore((s) => s.plan.assets);
+  const object = useMeshAsset({ assets }, m.assetId, f.phase === 'demo' ? DEMO_MESH_OPACITY : 1);
+  const pose = meshFixturePose({ origin: m.origin, direction: m.direction, elevation: m.elevation, meshScale: m.scale });
+  return (
+    <group name={`fixture:${f.id}`} position={pose.position} rotation={[0, pose.rotationY, 0]}>
+      {object ? (
+        <primitive object={object} scale={pose.scale} />
+      ) : (
+        <mesh name={`fixture:${f.id}:loading`} position={[0, m.height / 2, m.depth / 2]}>
+          <boxGeometry args={[m.width, m.height, m.depth]} />
+          <meshStandardMaterial color="#9aa7b4" transparent opacity={0.3} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * The level's scan overlay (Level.scan) when it is set visible and the 3D bar's Scan checkbox is on,
+ * at its pose and opacity (the bar's slider over the overlay's own).
+ */
+function ScanOverlayMesh({ levelId }: { levelId: Id }) {
+  const scan = useViewPlanStore((s) => s.plan.levels[levelId]?.scan);
+  const assets = useViewPlanStore((s) => s.plan.assets);
+  const on = useUiStore((s) => s.showScan);
+  const barOpacity = useUiStore((s) => s.scanOpacity);
+  const shown = !!scan && scan.visible && on;
+  const object = useMeshAsset({ assets }, shown ? scan.assetId : undefined, barOpacity ?? scan?.opacity ?? 1);
+  if (!shown || !object) return null;
+  const pose = scanOverlayPose(scan);
+  return <primitive name={`scan:${levelId}`} object={object} position={pose.position} rotation={[0, pose.rotationY, 0]} />;
 }
 
 /**
@@ -275,7 +320,11 @@ export const LevelMeshes = memo(function LevelMeshes({ levelId }: { levelId: Id 
           )}
         </group>
       ))}
-      {meshes.fixtures.filter((f) => showFurniture || !f.furniture || f.furniture.builtIn).map((f) => (
+      <ScanOverlayMesh levelId={levelId} />
+      {meshes.fixtures.filter((f) => f.mesh).map((f) => (
+        <MeshFixture key={f.id} f={f} />
+      ))}
+      {meshes.fixtures.filter((f) => !f.mesh && (showFurniture || !f.furniture || f.furniture.builtIn)).map((f) => (
         <group key={f.id} name={`fixture:${f.id}`}>
           {f.parts.map((p) => (
             <mesh

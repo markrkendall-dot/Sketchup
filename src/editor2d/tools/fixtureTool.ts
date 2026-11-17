@@ -153,9 +153,12 @@ interface PlacementSpec {
   placement: 'wall' | 'free';
   extra: Partial<Fixture>;
   name: (width: number) => string;
+  /** A typed width scales the depth and height with it (a mesh keeps its proportions). */
+  uniform?: boolean;
 }
 
-type SpecOf = (ui: UiState) => PlacementSpec;
+/** The spec now; null when there is nothing to place (a scanned object whose asset is gone). */
+type SpecOf = (ui: UiState, ctx: ToolContext) => PlacementSpec | null;
 
 const caseworkSpec: SpecOf = (ui) => ({ kind: ui.draft.fixtureKind, size: FIXTURE_DEFAULTS[ui.draft.fixtureKind], placement: 'wall', extra: { ...BATH_STOCK_EXTRA[ui.draft.fixtureKind] }, name: () => FIXTURE_LABEL[ui.draft.fixtureKind] });
 
@@ -169,17 +172,31 @@ const furnitureSpec: SpecOf = (ui) => {
   return { kind: 'furniture', piece, size: furnitureDefaults(piece, d.furnitureBed), placement: FURNITURE[piece].placement, extra, name: (width) => furnitureNameOf({ piece, width }) };
 };
 
+/**
+ * The scanned object tool (DESIGN.md "Mesh assets"): the asset the import just stored, at its own
+ * size (a typed width scales it uniformly), backing onto a wall like a cabinet, free elsewhere.
+ */
+const meshSpec: SpecOf = (ui, ctx) => {
+  const id = ui.draft.meshAssetId;
+  const asset = id ? ctx.plan().assets?.[id] : undefined;
+  if (!asset) return null;
+  const [width, depth, height] = asset.size;
+  return { kind: 'mesh', size: { width, depth, height, elevation: 0 }, placement: 'wall', extra: { assetId: asset.id, label: asset.name }, name: () => asset.name || FIXTURE_LABEL.mesh, uniform: true };
+};
+
 function preview(ctx: ToolContext, e: ToolPointerEvent | null, specOf: SpecOf): FixturePreview | null {
   const ui = ctx.ui();
   const cursor = e?.world ?? ui.draft.cursor;
-  if (!cursor) {
-    ui.patchDraft({ fixturePreview: null });
+  const spec = cursor ? specOf(ui, ctx) : null;
+  if (!cursor || !spec) {
+    ui.patchDraft({ fixturePreview: null, ...(cursor && !spec ? { error: true, message: 'Nothing to place: import a scanned object first (File, Import scanned object).' } : {}) });
     return null;
   }
-  const spec = specOf(ui);
-  const { kind, size: def } = spec;
+  const { kind } = spec;
   const typed = typedWidth(ui.draft.lengthBuffer);
-  const width = typed ?? def.width;
+  const width = typed ?? spec.size.width;
+  const k0 = spec.uniform ? width / spec.size.width : 1;
+  const def = { ...spec.size, depth: spec.size.depth * k0, height: spec.size.height * k0 };
   const k = ui.viewport.k;
   const level = ctx.level();
   // Shift swaps a wall piece to free and a free piece to the wall.
@@ -189,6 +206,7 @@ function preview(ctx: ToolContext, e: ToolPointerEvent | null, specOf: SpecOf): 
     ...(spec.extra.wood ? { wood: spec.extra.wood } : {}),
     ...(spec.extra.fabric ? { fabric: spec.extra.fabric } : {}),
     ...(spec.extra.glass ? { glass: spec.extra.glass } : {}),
+    ...(spec.extra.assetId ? { assetId: spec.extra.assetId, label: spec.extra.label } : {}),
   };
   let pv: FixturePreview;
   const face = toWall ? nearestFace(level, ui.viewMode, cursor, FACE_SNAP_PX / k) : null;
@@ -216,7 +234,19 @@ function place(ctx: ToolContext, e: ToolPointerEvent | null, specOf: SpecOf): vo
     ui.patchDraft({ error: true, message: `Can't read "${ui.draft.lengthBuffer}" as a width.` });
     return;
   }
-  const spec = specOf(ui);
+  const spec = specOf(ui, ctx);
+  if (!spec) return;
+  if (spec.kind === 'mesh' && spec.extra.assetId) {
+    const id = ctx.actions.addMeshFixture(ctx.levelId, spec.extra.assetId, { origin: pv.origin, direction: pv.direction, meshScale: pv.width / spec.size.width, phase: ui.drawPhase });
+    if (!id) {
+      ui.patchDraft({ error: true, message: 'Could not place that here.' });
+      return;
+    }
+    ui.setSelection({ ...EMPTY_SELECTION, fixtures: [id] });
+    ui.patchDraft({ lengthBuffer: '', error: false, message: `${spec.name(pv.width)} placed. Click to place another, or Esc and pick the select tool.` });
+    preview(ctx, e, specOf);
+    return;
+  }
   const def = spec.size;
   const fixture: Omit<Fixture, 'id'> = {
     kind: pv.kind,
@@ -304,6 +334,7 @@ function makePlacementTool(specOf: SpecOf): Tool {
 
 export const fixtureTool: Tool = makePlacementTool(caseworkSpec);
 export const furnitureTool: Tool = makePlacementTool(furnitureSpec);
+export const meshObjectTool: Tool = makePlacementTool(meshSpec);
 
 /** Change the kind the tool places (the panel's picker); the ghost follows at once. */
 export function setFixtureKind(ctx: ToolContext | null, kind: FixtureKind): void {

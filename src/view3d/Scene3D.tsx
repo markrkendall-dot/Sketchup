@@ -16,6 +16,7 @@ import { registerCapture, SKY_NAME, SUN_LIGHT_NAME } from './capture';
 import { Controls } from './Controls';
 import { viewSun } from './elevation';
 import { LevelMeshes } from './LevelMeshes';
+import { onMeshAssetDecoded, pruneAssetCache } from './assets';
 import { setEnvironmentMap } from './materials';
 import { FarGround, SiteColumns, SiteFences, SiteSurfaces, Terrain } from './SiteMeshes';
 import { visible3dLevels } from './visibility';
@@ -66,6 +67,8 @@ function sceneUiChanged(s: UiState, prev: UiState): boolean {
     s.only3dActiveAndBelow !== prev.only3dActiveAndBelow ||
     s.show3dRoofs !== prev.show3dRoofs ||
     s.showFurniture !== prev.showFurniture ||
+    s.showScan !== prev.showScan ||
+    s.scanOpacity !== prev.scanOpacity ||
     s.siteMode !== prev.siteMode
   );
 }
@@ -75,8 +78,13 @@ function InvalidateOnChange() {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
     const offPlan = viewPlanStore.subscribe((s, prev) => {
-      if (s.plan !== prev.plan) invalidate();
+      if (s.plan === prev.plan) return;
+      invalidate();
+      // Decoded meshes the plan no longer has are freed (view3d/assets.ts).
+      if (s.plan.assets !== prev.plan.assets) pruneAssetCache(s.plan);
     });
+    // A mesh asset decoded after the first frame shows as it arrives.
+    const offAssets = onMeshAssetDecoded(invalidate);
     // Not the whole ui store: the draft changes on every mouse move over the 2D plan.
     const offUi = useUiStore.subscribe((s, prev) => {
       if (
@@ -93,6 +101,7 @@ function InvalidateOnChange() {
     return () => {
       offPlan();
       offUi();
+      offAssets();
       setTextureRedraw(null);
     };
   }, [invalidate]);
@@ -205,9 +214,12 @@ function SunLight() {
     const offUi = useUiStore.subscribe((s, prev) => {
       if (sceneUiChanged(s, prev)) redraw();
     });
+    // A mesh asset that finishes decoding casts its shadow.
+    const offAssets = onMeshAssetDecoded(redraw);
     return () => {
       offPlan();
       offUi();
+      offAssets();
     };
   }, [light]);
   // The shadow map's render target.
@@ -393,6 +405,7 @@ function View3dToolbar() {
         <input type="checkbox" checked={furniture} onChange={(e) => setShowFurniture(e.target.checked)} />
         Furniture
       </label>
+      <ScanToggle />
       {!viewer && (
         <label title="Grid lines on the ground (12 inch cells, 10 foot sections)">
           <input type="checkbox" checked={grid} onChange={(e) => setShow3dGrid(e.target.checked)} />
@@ -449,6 +462,42 @@ function View3dToolbar() {
       </button>
       <SavedViews editable={!viewer} walking={walking} />
     </div>
+  );
+}
+
+/**
+ * The scan overlays (Level.scan, DESIGN.md "Mesh assets"), when a level has one: the Scan checkbox
+ * shows or hides them all, the slider sets their opacity for this view (its first move takes over
+ * from each overlay's own).
+ */
+function ScanToggle() {
+  const opacity = useViewPlanStore((s) => {
+    for (const l of Object.values(s.plan.levels)) if (l.scan) return l.scan.opacity;
+    return null;
+  });
+  const on = useUiStore((s) => s.showScan);
+  const bar = useUiStore((s) => s.scanOpacity);
+  if (opacity === null) return null;
+  const value = bar ?? opacity;
+  const { setShowScan, setScanOpacity } = useUiStore.getState();
+  return (
+    <span className="view3d-scan">
+      <label title="The room scan over the model (a level's scan overlay)">
+        <input type="checkbox" checked={on} onChange={(e) => setShowScan(e.target.checked)} />
+        Scan
+      </label>
+      <input
+        type="range"
+        min={0.05}
+        max={1}
+        step={0.05}
+        value={value}
+        disabled={!on}
+        aria-label="Scan opacity"
+        title={`Scan opacity ${Math.round(value * 100)}%`}
+        onChange={(e) => setScanOpacity(Number(e.target.value))}
+      />
+    </span>
   );
 }
 

@@ -17,6 +17,7 @@
     "@react-three/fiber": "9.8.1",
     "idb-keyval": "6.3.0",
     "immer": "10.2.0",
+    "meshoptimizer": "1.1.1",
     "nanoid": "5.1.16",
     "react": "19.3.0",
     "react-dom": "19.3.0",

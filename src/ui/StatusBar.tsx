@@ -87,6 +87,10 @@ const HINTS: Record<ToolName, { idle: string; busy: string }> = {
     idle: 'Pick a piece in the panel, click to place. Tab turns, Shift swaps.',
     busy: 'Type the width, then click or Enter to place. Esc clears.',
   },
+  meshObject: {
+    idle: 'Click to place the scanned object. Tab turns, Shift: free.',
+    busy: 'Type the width (it scales evenly), then click. Esc clears.',
+  },
   gradePoint: {
     idle: 'Click a spot on the ground, then type its elevation.',
     busy: "Type the elevation (-4, -6'4), Enter places it. Esc cancels.",
@@ -181,6 +185,10 @@ const FULL_HINTS: Record<ToolName, { idle: string; busy: string }> = {
   furniture: {
     idle: 'The piece chosen in the properties panel follows the cursor: a bed, dresser or desk backs onto the nearest wall face, a table, chair or rug is centred on the cursor (Shift swaps the two, Tab turns a free piece); click to place it. Type a width first to change it.',
     busy: 'Type the width in feet and inches, then click or press Enter to place it. Esc clears the width.',
+  },
+  meshObject: {
+    idle: 'The scanned object just imported follows the cursor at its true size, its back on the nearest wall face (hold Shift to place it free, Tab turns it); click to place it. Type a width first to scale it evenly.',
+    busy: 'Type the width in feet and inches (depth and height scale with it), then click or press Enter to place it. Esc clears the width.',
   },
   gradePoint: {
     idle: 'Click a spot on the ground. Then type its elevation in feet and inches (minus allowed, e.g. -4 or -6\'4) and press Enter; with nothing typed Enter uses the first floor level.',

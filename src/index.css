@@ -1939,3 +1939,13 @@ button.primary:hover:not(:disabled) {
 .link-button:hover:not(:disabled) {
   background: none;
 }
+
+/* The 3D bar's scan overlay checkbox and opacity slider (DESIGN.md "Mesh assets"). */
+.view3d-toolbar .view3d-scan {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.view3d-toolbar .view3d-scan input[type='range'] {
+  width: 72px;
+}

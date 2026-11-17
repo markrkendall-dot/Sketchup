@@ -317,7 +317,7 @@ export function wallObstacles(plan: Plan, levelId: Id, viewMode: ViewMode, z: nu
 export const FIXTURE_PAD = 2;
 
 /**
- * The cabinets, appliances and bath fixtures of a level in the way of the walker (level-local plan,
+ * The cabinets, appliances, bath fixtures and scanned objects (by their bounding box) of a level in the way of the walker (level-local plan,
  * absolute heights): each visible one's footprint from its bottom to its top, so a wall cabinet
  * over the waist is walked under. Furniture (a layer that can be hidden) is not in the way, nor is
  * a fixture being demolished in the All view.

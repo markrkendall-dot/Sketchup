@@ -126,7 +126,7 @@ export interface Roof {
 // Casework (schema version 3, see "Casework"): a cabinet, appliance or sink as a plan rectangle.
 export type FixtureKind = 'base' | 'wall' | 'tall' | 'island' | 'range' | 'fridge' | 'dishwasher' | 'wallOven' | 'hood' | 'microwave' | 'sink'
   | 'bathtub' | 'shower' | 'showerGlass' | 'toilet' | 'vanity' | 'basin' | 'washer' | 'dryer' | 'waterHeater' // see "Bath and laundry"
-  | 'box' | 'furniture';
+  | 'box' | 'furniture' | 'mesh';                                                           // see "Mesh assets"
 export interface Fixture {
   id: Id; kind: FixtureKind;
   origin: Vec2;              // middle of the BACK edge (against the wall)
@@ -138,6 +138,7 @@ export interface Fixture {
   counterOverhang?: { front: Inches; back: Inches; left: Inches; right: Inches }; // else 1" front (island: all round)
   variant?: 'alcove' | 'freestanding' | 'tray' | 'curbless' | 'pedestal' | 'wallHung'; // a tub's, shower's or basin's form
   glass?: { front?: boolean; left?: boolean; right?: boolean };                       // a shower's glass sides
+  assetId?: Id; meshScale?: number;  // kind 'mesh' only: the mesh it shows (Plan.assets) and its uniform scale (absent 1)
 }
 export interface LevelFinishes { cabinetColor?: string; counterColor?: string; frontStyle?: 'slab' | 'panel'; ceilingFinish?: CeilingFinish; ceilingColor?: string }
 
@@ -167,6 +168,7 @@ export interface Level {
   fixtures: Record<Id, Fixture>; decks: Record<Id, Deck>; floorOpenings: Record<Id, FloorOpening>;
   staircases: Record<Id, Staircase>;
   finishes?: LevelFinishes; underlay?: Underlay;
+  scan?: ScanOverlay;        // a room scan shown in 3D (see "Mesh assets")
 }
 
 // The site (see "Site and terrain"; the file carries it from schema version 2).
@@ -223,6 +225,7 @@ export interface Plan {
   settings: PlanSettings; site: Site; modifiedAt: string;
   proposedLook?: ProposedLook; // the siding, roof and windows after the work (see "The proposed look")
   options: DesignOption[];     // schema 10, at least one (see "Design options")
+  assets?: Record<Id, MeshAsset>; // meshes the mesh fixtures and scan overlays show (see "Mesh assets")
 }
 // Schema 10: every phased entity may carry optionIds?: Id[] (see "Design options").
 ```
@@ -1693,6 +1696,87 @@ for a leaf in another colour, unless demolished) or `shutter` (`_new` / `_demo` 
 `column_<kind>_<phase>` (plus `_<hex>` in a colour other than the default, not when demolished), a chimney's cap and
 spark arrestor `chimney_cap_<phase>` and `chimney_arrestor_<phase>` (see "Site and terrain"). UV attributes are
 still written; no texture or image is. The Export menu says "Siding textures are not exported; colours are."
+
+## Mesh assets (`model/meshAsset.ts`, `io/meshAsset.ts`, `io/meshImport.ts`, `view3d/assets.ts`)
+
+A scanned object (Apple Object Capture's USDZ, a glTF, an ARKit PLY) placed in a room at its true
+size, and a room scan shown over a level in 3D, both from a mesh stored in the plan, like an underlay
+image (docs/scan/FORMAT.md is what the capture app writes).
+
+**Assets.** `Plan.assets?: Record<Id, MeshAsset>`, each `{ id, format: 'glb', data, name, bytes, size,
+footprint? }`: `data` is the binary glTF in base64, `bytes` its length, `size` its bounding box
+`[width along X, depth along Z, height along Y]` in inches, `footprint` its outline seen from above
+(the convex hull of its vertices in its own X and Z, `{x: X, y: Z}`), drawn on the plan. The GLB is
+stored already normalised, in one convention: inches, and three's axes as the app uses them (Y up,
+plan x = X, plan y = Z). A fixture's mesh has its bounding box centred on X, its back edge on Z = 0
+with its front toward +Z (glTF's own front), and its bottom on Y = 0: the fixture frame of
+`derive/casework.ts`, whose origin is the middle of the back edge. A scan overlay's mesh is in the
+same convention except that it keeps the scan's own origin (not recentred). At most 4 MB of GLB
+(`MAX_ASSET_BYTES`; about 5.3 MB of base64 in the file).
+
+**Mesh fixtures.** Kind `'mesh'` with `assetId` (required) and `meshScale` (uniform, absent 1, 0.01 to
+100). `width`, `depth` and `height` always equal the asset's size times the scale (`meshFixtureSize`;
+`migrate` and the store recompute them), so selection, the plan footprint, snapping to walls,
+collision, walking (an obstacle by its box, like a cabinet: it is not on the furniture layer) and
+dimensions treat it as a box. Its pose (`meshFixturePose`): the asset's origin at the fixture's
+origin and bottom, turned `90 - direction` degrees about +Y (which takes +Z to the way the front
+faces and +X to the fixture's left, `-v`), scaled by `meshScale`. The store keeps its proportions: a
+new width, depth or height in `updateFixture` is a new scale (`patchFixture`); `rescaleMeshFixture`
+sets the scale; the panel's "Rescale by known dimension" picks width, depth or height, takes the
+measured size and scales to match (`scaleForDimension`, the idea of the underlay's `calibrateScale`).
+`addAsset` stores an asset; `addMeshFixture(levelId, asset | id, placement)` stores the asset if
+new and places the fixture (label: the asset's name) in one undo step.
+
+**Scan overlay.** `Level.scan?: ScanOverlay = { assetId, origin, rotation, elevation, opacity, visible }`:
+its asset's 0,0 at `origin` on the level, turned `rotation` degrees clockwise on the plan (a negative
+turn about +Y, like a structure; `scanOverlayPose`), its 0 height `elevation` above the floor top,
+drawn at `opacity` when `visible`. Store: `setLevelScan` (with its asset, stored if new),
+`updateLevelScan` (invalid values refused, rotation normalised), `removeLevelScan`, each one undo step.
+The 3D bar's Scan checkbox and slider (uiStore `showScan`, `scanOpacity`: view settings, not plan
+data, in the viewer too) hide every overlay or set their opacity for the view.
+
+**Loading.** No schema bump, as with the other optional data: `migrate` reads the assets first
+(whitelisted keys, `meshAssetProblem`: base64 data, a positive size; a broken one is dropped with a
+warning), then drops a mesh fixture or an overlay whose asset is missing (with the usual warning), a
+bad `meshScale` alone, and finally every asset no fixture or overlay refers to (`referencedAssetIds`);
+the key is absent when none is left. An older build drops the kind, the overlay and the assets. The
+store keeps an asset whose fixture was deleted (undo may want it); `downloadPlan` saves
+`withoutUnusedAssets(plan)`.
+
+**Import** (`io/meshImport.ts importMeshFile`, browser; loaded on first use, and each loader in turn
+with a dynamic import, so the editor's bundle does not carry them): `.glb` or an embedded `.gltf`
+(GLTFLoader), `.usdz` (USDLoader; metres), `.ply` (PLYLoader, vertex colours; a point cloud is
+refused). `io/meshAsset.ts` (no DOM needed, so node scripts use it too): `normaliseMesh` bakes every
+mesh's world transform and the unit (metres to inches), merges the meshes per material, decimates
+them with meshoptimizer's simplifier to the triangle budget (each material its share; an
+attribute-aware pass that keeps UVs and vertex colours, then a sloppy one if needed), moves the box
+into the convention when `recentre`, and with a DOM draws textures no larger than `maxTextureSize`;
+`toAssetGlb` writes the GLB with GLTFExporter (the approach of `io/export3d.ts`) and reports the size
+and footprint. Budgets: an object 60,000 triangles and 1024 px textures, a scan 120,000; a result
+over 4 MB is tried once at half the budget, then refused with a message. File, Import scanned object
+stores the asset and starts the scanned object tool (`meshObject`, the cabinet tool's
+`makePlacementTool` with the asset's size: its back snaps to a wall face, Shift places it free, a
+typed width scales it evenly). File, Load scan overlay (or the level's panel) puts the scan on the
+active level at its origin, unturned, 60% opaque.
+
+**3D** (`view3d/assets.ts`): `getLevelMeshes` stays pure and synchronous: a mesh fixture has no parts,
+only `FixtureMesh.mesh` (its asset and pose). The decode cache keeps one template scene per asset id
+and data string, decoded once with GLTFLoader (shadows on); `useMeshAsset(plan, assetId, opacity)`
+returns a clone sharing its geometry (and its materials unless see-through: a demolished fixture in
+All at 35%, an overlay at its opacity get their own, freed with the clone), or null while it decodes.
+`LevelMeshes` draws a mesh fixture as a `<primitive>` at its pose, or a pale box of its size while it
+decodes, following phase and option visibility like every fixture; and the level's overlay. When a
+decode finishes the view redraws and the sun's shadow map is redrawn. When the plan's assets change,
+`pruneAssetCache` disposes the templates (geometry, materials, textures) of assets it no longer has.
+The single-file viewer carries GLTFLoader (codeSplitting off inlines every dynamic import).
+
+**2D.** A mesh fixture draws as its footprint rectangle, its asset's outline inside it (from
+`footprint`), and its label (the asset's name; else OBJECT).
+
+**Export.** `decodeExportAssets` decodes the plan's assets afresh; `buildExportScene` puts each mesh
+fixture, as `Scanned object (<label>)`, and each visible overlay (`Scan overlay`, unless the 3D bar's
+Scan is off) in its level's group at its pose, in inches under the root's metre scale (GLB) or as is
+(OBJ, inches).
 
 ## 2D editor
 

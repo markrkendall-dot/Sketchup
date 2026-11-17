@@ -6,9 +6,12 @@ import type { ApplianceFinish, Backsplash, BacksplashFinish, CounterMaterial, Fi
 // toe-kick dimensions and the colour defaults. Pure data shared by the tool, the panel, the 3D
 // materials, the 2D symbols and the loader's validation.
 
-export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'cornerBase', 'wall', 'cornerWall', 'shelf', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', 'cooktop', 'recessedLight', 'pendant', 'underCabinetLight', ...BATH_KINDS, 'box', 'furniture'];
-/** The kinds the Cabinet tool offers (furniture has its own tool and catalogue, model/furniture.ts). */
-export const CASEWORK_KINDS: readonly FixtureKind[] = FIXTURE_KINDS.filter((k) => k !== 'furniture');
+export const FIXTURE_KINDS: readonly FixtureKind[] = ['base', 'cornerBase', 'wall', 'cornerWall', 'shelf', 'tall', 'island', 'sink', 'range', 'fridge', 'dishwasher', 'wallOven', 'hood', 'microwave', 'cooktop', 'recessedLight', 'pendant', 'underCabinetLight', ...BATH_KINDS, 'box', 'furniture', 'mesh'];
+/**
+ * The kinds the Cabinet tool offers (furniture has its own tool and catalogue, model/furniture.ts;
+ * a mesh fixture is placed from an imported asset, model/meshAsset.ts).
+ */
+export const CASEWORK_KINDS: readonly FixtureKind[] = FIXTURE_KINDS.filter((k) => k !== 'furniture' && k !== 'mesh');
 
 export const FIXTURE_LABEL: Record<FixtureKind, string> = {
   base: 'Base cabinet',
@@ -40,6 +43,7 @@ export const FIXTURE_LABEL: Record<FixtureKind, string> = {
   waterHeater: 'Water heater',
   box: 'Box',
   furniture: 'Furniture',
+  mesh: 'Scanned object',
 };
 
 /** The short word on an appliance's plan symbol. */
@@ -56,6 +60,7 @@ export const FIXTURE_PLAN_LABEL: Partial<Record<FixtureKind, string>> = {
   waterHeater: 'WH',
   shelf: 'SHELF',
   box: 'BOX',
+  mesh: 'OBJECT',
 };
 
 export interface FixtureSize {
@@ -105,6 +110,8 @@ export const FIXTURE_DEFAULTS: Record<FixtureKind, FixtureSize> = {
   box: { width: 24, depth: 24, height: 24, elevation: 0 },
   // Nominal: the Furniture tool places each piece at its own size (model/furniture.ts).
   furniture: { width: 24, depth: 24, height: 30, elevation: 0 },
+  // Nominal: a mesh fixture takes its asset's size (model/meshAsset.ts).
+  mesh: { width: 24, depth: 24, height: 24, elevation: 0 },
 };
 
 /** Wall cabinet heights the panel offers; tall cabinets 84 or 96. */

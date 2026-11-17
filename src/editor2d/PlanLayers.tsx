@@ -1,7 +1,8 @@
 import { isSwingDoor } from '../model/finish';
 import { memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { counterRuns, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
+import { counterRuns, fixtureFrame, fixturePoint, fixtureSymbol, type FixtureSymbol } from '../derive/casework';
+import { footprintToLocal, meshScaleOf } from '../model/meshAsset';
 import { backsplashPieces, backsplashPlanLines } from '../derive/backsplash';
 import { furnitureSymbol, type FurnitureSymbol } from '../derive/furniture';
 import { bathSymbol } from '../derive/bath';
@@ -23,7 +24,7 @@ import { FENCE_DEFAULTS, fencePostPoints, siteGhostLevelId } from '../derive/sit
 import { getStaircaseLayout } from '../derive/staircase';
 import { flightSteps, floorToFloor, stairsHoleOutline, stairsHoleStart, stairsSymbol, type StairsSymbol } from '../derive/stairs';
 import { add, polygonSignedArea, scale } from '../model/geometry';
-import type { Fixture, Id, Level, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
+import type { Fixture, Id, Level, MeshAsset, Opening, Roof, Vec2, ViewMode, Wall } from '../model/types';
 import { formatArea, formatLengthCompact } from '../model/units';
 import { useLayerPlan, useLayerUi } from './layerStores';
 import { outlinePath } from './outline';
@@ -480,8 +481,24 @@ export function FixtureGlyph({ sym, k, className, id, detail }: { sym: FixtureSy
   );
 }
 
-/** The drawing inside a fixture's outline: a furniture piece's or a bath fixture's detail, else none. */
-export const fixtureDetail = (f: Fixture): FurnitureSymbol | null => (f.kind === 'furniture' ? furnitureSymbol(f) : isBath(f.kind) ? bathSymbol(f) : null);
+/**
+ * The drawing inside a fixture's outline: a furniture piece's or a bath fixture's detail, a mesh
+ * fixture's outline seen from above (its asset's footprint, DESIGN.md "Mesh assets"), else none.
+ */
+export const fixtureDetail = (f: Fixture, asset?: Pick<MeshAsset, 'footprint'>): FurnitureSymbol | null =>
+  f.kind === 'furniture' ? furnitureSymbol(f) : isBath(f.kind) ? bathSymbol(f) : f.kind === 'mesh' ? meshSilhouette(f, asset) : null;
+
+/** A mesh fixture's footprint polygon on the plan (null without one). */
+function meshSilhouette(f: Fixture, asset?: Pick<MeshAsset, 'footprint'>): FurnitureSymbol | null {
+  if (!asset?.footprint || asset.footprint.length < 3) return null;
+  const fr = fixtureFrame(f);
+  const k = meshScaleOf(f);
+  const ring = asset.footprint.map((p) => {
+    const { s, d } = footprintToLocal(p, k);
+    return fixturePoint(fr, s, d);
+  });
+  return { lines: [], rects: [ring], circles: [] };
+}
 
 const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelId: Id; fixtureId: Id }) {
   const f = useLayerPlan((s) => s.plan.levels[levelId]?.fixtures?.[fixtureId]);
@@ -489,8 +506,9 @@ const FixtureShape = memo(function FixtureShape({ levelId, fixtureId }: { levelI
   const selected = useLayerUi((s) => s.selection.fixtures.includes(fixtureId));
   const showFurniture = useLayerUi((s) => s.showFurniture);
   const k = useLayerUi(viewportScale);
+  const asset = useLayerPlan((s) => (f?.kind === 'mesh' && f.assetId ? s.plan.assets?.[f.assetId] : undefined));
   const sym = useMemo(() => (f ? fixtureSymbol(f) : null), [f]);
-  const detail = useMemo(() => (f ? fixtureDetail(f) : null), [f]);
+  const detail = useMemo(() => (f ? fixtureDetail(f, asset) : null), [f, asset]);
   if (!f || !sym || !isVisible(f.phase, viewMode)) return null;
   // The furniture layer (Shift+F) off hides every piece.
   if (isLayerFurniture(f) && !showFurniture) return null;

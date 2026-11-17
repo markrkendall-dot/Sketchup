@@ -23,6 +23,8 @@ import { setFixtureKind, setFurnitureChoice } from '../editor2d/tools/fixtureToo
 import { BED_SIZE_IDS, BED_SIZES, bedOverall, bedSizeOf, FABRIC_IDS, FABRICS, FURNITURE, FURNITURE_CATEGORIES, FURNITURE_PIECES, furnitureDefaults, furnitureNameOf, pieceFabricOf, pieceWoodOf, WOOD_IDS, WOODS, type BedSize } from '../model/furniture';
 import { COLUMN_KIND_NAME, SURFACE_MATERIAL_NAME } from '../editor2d/tools/siteTools';
 import { confirmRemoveUnderlay, requestUnderlayImage } from '../editor2d/tools/underlayTool';
+import { MESH_DIMENSIONS, meshDimensionOf, meshScaleOf, scaleForDimension, type MeshDimension } from '../model/meshAsset';
+import { requestMeshFile } from './MeshImport';
 import {
   BACKSPLASH,
   BACKSPLASH_FINISH_LABEL,
@@ -1913,7 +1915,83 @@ function FurnitureProps({ level, fixture }: { level: Level; fixture: Fixture }) 
 
 function FixtureProps({ level, fixture }: { level: Level; fixture: Fixture }) {
   if (fixture.kind === 'furniture' && fixture.piece) return <FurnitureProps level={level} fixture={fixture} />;
+  if (fixture.kind === 'mesh') return <MeshFixtureProps level={level} fixture={fixture} />;
   return <CaseworkProps level={level} fixture={fixture} />;
+}
+
+const MESH_DIMENSION_LABEL: Record<MeshDimension, string> = { width: 'Width', depth: 'Depth', height: 'Height' };
+const meshDimensionOptions = MESH_DIMENSIONS.map((d) => ({ value: d, label: MESH_DIMENSION_LABEL[d] }));
+
+/**
+ * A scanned object (DESIGN.md "Mesh assets"): its name, its mesh's true size, its size and scale
+ * (always uniform: a new width scales the depth and height with it), and rescaling by a dimension
+ * measured with a tape (the idea of the underlay's Scale by two points).
+ */
+function MeshFixtureProps({ level, fixture }: { level: Level; fixture: Fixture }) {
+  const { updateFixture, rescaleMeshFixture } = usePlanStore.getState();
+  const asset = useViewPlanStore((s) => (fixture.assetId ? s.plan.assets?.[fixture.assetId] : undefined));
+  const denom = useViewPlanStore((s) => s.plan.settings.precisionDenominator);
+  const [dim, setDim] = useState<MeshDimension>('height');
+  const set = (patch: Partial<Fixture>) => updateFixture(level.id, fixture.id, patch);
+  const dir = String(fixture.direction);
+  const facing = FACING_OPTIONS.some((o) => o.value === dir) ? FACING_OPTIONS : [...FACING_OPTIONS, { value: dir, label: `${dir}°` }];
+  const scale = meshScaleOf(fixture);
+  const fmt = (v: number) => formatLength(v, denom);
+  return (
+    <>
+      <h3>{FIXTURE_LABEL.mesh}</h3>
+      <div className="field">
+        <label htmlFor={`fixture-label-${fixture.id}`}>Name</label>
+        <input
+          id={`fixture-label-${fixture.id}`}
+          aria-label="Name"
+          defaultValue={fixture.label ?? ''}
+          placeholder={asset?.name ?? 'none'}
+          onBlur={(e) => set({ label: e.target.value.trim() || undefined })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') releaseFocus(e.currentTarget);
+          }}
+        />
+      </div>
+      {asset ? (
+        <ReadOnly label="Mesh size">
+          {fmt(asset.size[0])} w x {fmt(asset.size[1])} d x {fmt(asset.size[2])} h
+        </ReadOnly>
+      ) : (
+        <p className="panel-note warning">Its mesh is missing from the plan.</p>
+      )}
+      <LengthField label="Width" value={fixture.width} onCommit={(v) => void (v !== null && set({ width: v }))} hint="Scales it evenly: depth and height follow." />
+      <LengthField label="Depth" value={fixture.depth} onCommit={(v) => void (v !== null && set({ depth: v }))} />
+      <LengthField label="Height" value={fixture.height} onCommit={(v) => void (v !== null && set({ height: v }))} />
+      <NumberField
+        label="Scale"
+        value={scale}
+        check={(v) => (v > 0 ? null : 'A scale above 0.')}
+        onCommit={(v) => void rescaleMeshFixture(level.id, fixture.id, v)}
+        hint="1 is the size it was scanned at."
+      />
+      {asset && (
+        <>
+          <h4>Rescale by known dimension</h4>
+          <SelectField label="Measured" value={dim} options={meshDimensionOptions} onChange={setDim} />
+          <LengthField
+            label="Real size"
+            value={meshDimensionOf(asset, dim, scale)}
+            onCommit={(v) => {
+              if (v === null) return;
+              const k = scaleForDimension(asset, dim, v);
+              if (k === null || !rescaleMeshFixture(level.id, fixture.id, k)) return 'That would scale it out of range.';
+            }}
+            hint={`Type the ${dim} you measured; the whole object scales to match.`}
+          />
+        </>
+      )}
+      <LengthField label="Bottom" value={fixture.elevation} bound="nonnegative" onCommit={(v) => void (v !== null && set({ elevation: v }))} hint="Above the floor." />
+      <SelectField label="Facing" value={dir} options={facing} onChange={(v) => set({ direction: Number(v) })} />
+      <PhaseSelect sel={{ fixtures: [fixture.id] }} value={fixture.phase} items={[fixture]} />
+      <p className="panel-note">Drag with the select tool to move. The plan shows its outline seen from above.</p>
+    </>
+  );
 }
 
 function CaseworkProps({ level, fixture }: { level: Level; fixture: Fixture }) {
@@ -3653,6 +3731,50 @@ function UnderlayProps({ level }: { level: Level }) {
   );
 }
 
+/**
+ * A level's scan overlay (Level.scan, DESIGN.md "Mesh assets"): load one, or show it, set its
+ * opacity, nudge its origin, turn and height until it lines up with the model, or remove it.
+ */
+function ScanOverlayFields({ level }: { level: Level }) {
+  const scan = level.scan;
+  const { updateLevelScan, removeLevelScan } = usePlanStore.getState();
+  const asset = useViewPlanStore((s) => (scan ? s.plan.assets?.[scan.assetId] : undefined));
+  if (!scan) {
+    return (
+      <div className="field readonly underlay-row">
+        <span className="label">Scan overlay</span>
+        <span className="value">
+          none
+          <button className="inline-button" onClick={() => requestMeshFile({ mode: 'scan', levelId: level.id })}>
+            Load scan overlay...
+          </button>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <>
+      <h4>Scan overlay</h4>
+      <ReadOnly label="Scan">{asset ? `${asset.name} (${(asset.bytes / 1024 / 1024).toFixed(2)} MB)` : 'missing'}</ReadOnly>
+      <label className="check-row">
+        <input type="checkbox" aria-label="Show the scan" checked={scan.visible} onChange={(e) => updateLevelScan(level.id, { visible: e.target.checked })} />
+        Show in 3D
+      </label>
+      <NumberField label="Opacity %" value={Math.round(scan.opacity * 100)} check={(v) => (v >= 0 && v <= 100 ? null : '0 to 100.')} onCommit={(v) => updateLevelScan(level.id, { opacity: v / 100 })} />
+      <LengthField label="Origin x" value={scan.origin.x} bound="any" onCommit={(v) => void (v !== null && updateLevelScan(level.id, { origin: { x: v, y: scan.origin.y } }))} hint="Where the scan's own 0,0 sits on the plan." />
+      <LengthField label="Origin y" value={scan.origin.y} bound="any" onCommit={(v) => void (v !== null && updateLevelScan(level.id, { origin: { x: scan.origin.x, y: v } }))} />
+      <NumberField label="Rotation" value={scan.rotation} onCommit={(v) => updateLevelScan(level.id, { rotation: v })} hint="Degrees clockwise on the plan, about its 0,0." />
+      <LengthField label="Elevation" value={scan.elevation} bound="any" onCommit={(v) => void (v !== null && updateLevelScan(level.id, { elevation: v }))} hint="Its 0 height above this level's floor top." />
+      <div className="panel-actions">
+        <button onClick={() => requestMeshFile({ mode: 'scan', levelId: level.id })}>Replace scan...</button>
+        <button className="danger" onClick={() => removeLevelScan(level.id)}>
+          Remove
+        </button>
+      </div>
+    </>
+  );
+}
+
 function UnderlayRow({ level }: { level: Level }) {
   const u = level.underlay;
   return (
@@ -3941,6 +4063,7 @@ function LevelProps({ level }: { level: Level }) {
         </>
       )}
       <UnderlayRow level={level} />
+      <ScanOverlayFields level={level} />
       <ReadOnly label="Rooms">{roomCount}</ReadOnly>
       <ReadOnly label="Unlabeled areas">{unlabeled}</ReadOnly>
       {faces && faces.openEnds.length > 0 && (
