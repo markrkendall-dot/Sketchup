@@ -175,6 +175,7 @@ function downscaleTexture(tex: Texture, max: number): void {
   tex.needsUpdate = true;
 }
 
+const KEPT_TEXTURE_SLOTS: ReadonlySet<string> = new Set(['map', 'alphaMap', 'emissiveMap']);
 const TEXTURE_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap'] as const;
 
 /**
@@ -237,10 +238,20 @@ export function normaliseMesh(source: Object3D, opts: NormaliseOptions): Group {
     else g.computeVertexNormals();
     const mat = material.clone();
     if (piece.color && 'vertexColors' in mat) mat.vertexColors = true;
+    // A plan file carries every byte of an asset, so only the colour survives: normal, roughness
+    // and the other maps are dropped, and an opaque colour map is stored as JPEG.
+    const slots = mat as unknown as Record<string, Texture | null | undefined> & { transparent?: boolean; alphaTest?: number };
     for (const slot of TEXTURE_SLOTS) {
-      const tex = (mat as unknown as Record<string, Texture | null | undefined>)[slot];
-      if (tex) downscaleTexture(tex, opts.maxTextureSize);
+      const tex = slots[slot];
+      if (!tex) continue;
+      if (!KEPT_TEXTURE_SLOTS.has(slot)) {
+        slots[slot] = null;
+        continue;
+      }
+      downscaleTexture(tex, opts.maxTextureSize);
+      if (slot === 'map' && !slots.transparent && !slots.alphaTest) tex.userData = { ...tex.userData, mimeType: 'image/jpeg' };
     }
+    mat.needsUpdate = true;
     const mesh = new Mesh(g, mat);
     mesh.name = material.name || out.name;
     out.add(mesh);
