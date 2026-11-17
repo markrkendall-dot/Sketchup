@@ -223,3 +223,102 @@ export function makeSyntheticBundle(): SyntheticBundle {
     frames: { format: 1, frames },
   };
 }
+
+/**
+ * The colours of mesh.ply's surfaces (sRGB bytes): the floor and each wall its own, so a test can
+ * tell which wall ended up where.
+ */
+export const MESH_COLOURS = {
+  floor: [150, 118, 82],
+  north: [60, 140, 70],
+  east: [50, 80, 190],
+  south: [222, 200, 60],
+  west: [200, 40, 40],
+} as const satisfies Record<string, readonly [number, number, number]>;
+/** mesh.ply's grid: about this many inches a cell. */
+const MESH_CELL = 9;
+
+/**
+ * mesh.ply: a coarse shell of the true room (the floor and the four wall faces, floor to ceiling, no
+ * openings cut), in the same turned and moved frame as room.json, each surface a grid of about 9"
+ * cells in its colour, its triangles facing into the room as ARKit's do. Binary little endian, as
+ * docs/scan/FORMAT.md says. About 4,000 triangles.
+ */
+export function makeSyntheticPly(): Uint8Array {
+  const { width: W, depth: D, ceiling: H } = TRUTH;
+  const verts: { p: V3; c: readonly number[] }[] = [];
+  const faces: [number, number, number][] = [];
+  /** A grid from `o` along `u` and `v` (plan x, height, plan y; inches), its front toward `inward`. */
+  const grid = (o: V3, u: V3, v: V3, inward: V3, colour: readonly number[]) => {
+    const nu = Math.max(1, Math.round(Math.hypot(...u) / MESH_CELL));
+    const nv = Math.max(1, Math.round(Math.hypot(...v) / MESH_CELL));
+    const base = verts.length;
+    for (let j = 0; j <= nv; j++) {
+      for (let i = 0; i <= nu; i++) {
+        const a = i / nu;
+        const b = j / nv;
+        const x = o[0] + u[0] * a + v[0] * b;
+        const h = o[1] + u[1] * a + v[1] * b;
+        const y = o[2] + u[2] * a + v[2] * b;
+        verts.push({ p: frame(local(x, y, h)).map((n) => Math.fround(r6(n))) as V3, c: colour });
+      }
+    }
+    // Counter-clockwise seen from `inward` when u x v points that way.
+    const n = crossV(u, v);
+    const flip = n[0] * inward[0] + n[1] * inward[1] + n[2] * inward[2] < 0;
+    const at = (i: number, j: number) => base + j * (nu + 1) + i;
+    for (let j = 0; j < nv; j++) {
+      for (let i = 0; i < nu; i++) {
+        const q = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
+        const tris: [number, number, number][] = [
+          [q[0], q[1], q[2]],
+          [q[0], q[2], q[3]],
+        ];
+        for (const t of tris) faces.push(flip ? [t[0], t[2], t[1]] : t);
+      }
+    }
+  };
+  // Axes as (plan x, height, plan y), matching local()'s world (x, y, z) up to the scan's frame.
+  grid([0, 0, 0], [W, 0, 0], [0, 0, D], [0, 1, 0], MESH_COLOURS.floor);
+  grid([0, 0, 0], [W, 0, 0], [0, H, 0], [0, 0, 1], MESH_COLOURS.north);
+  grid([0, 0, D], [W, 0, 0], [0, H, 0], [0, 0, -1], MESH_COLOURS.south);
+  grid([0, 0, 0], [0, 0, D], [0, H, 0], [1, 0, 0], MESH_COLOURS.west);
+  grid([W, 0, 0], [0, 0, D], [0, H, 0], [-1, 0, 0], MESH_COLOURS.east);
+
+  const header = [
+    'ply',
+    'format binary_little_endian 1.0',
+    'comment synthetic room shell (scripts/scan/fixtures/syntheticRoom.ts)',
+    `element vertex ${verts.length}`,
+    'property float x',
+    'property float y',
+    'property float z',
+    'property uchar red',
+    'property uchar green',
+    'property uchar blue',
+    `element face ${faces.length}`,
+    'property list uchar int vertex_indices',
+    'end_header',
+    '',
+  ].join('\n');
+  const head = new TextEncoder().encode(header);
+  const out = new Uint8Array(head.length + verts.length * 15 + faces.length * 13);
+  out.set(head);
+  const view = new DataView(out.buffer);
+  let at = head.length;
+  for (const v of verts) {
+    for (const n of v.p) {
+      view.setFloat32(at, n, true);
+      at += 4;
+    }
+    for (const c of v.c) out[at++] = c;
+  }
+  for (const f of faces) {
+    out[at++] = 3;
+    for (const i of f) {
+      view.setInt32(at, i, true);
+      at += 4;
+    }
+  }
+  return out;
+}

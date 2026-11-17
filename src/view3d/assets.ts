@@ -102,11 +102,13 @@ export function clearAssetCache(): void {
 
 /**
  * A copy of a template for one placement: shared geometry; its own materials when `opacity` is
- * under 1 (a demolished fixture, a scan overlay), which disposeMeshClone frees.
+ * under 1 (a demolished fixture, a scan overlay), which disposeMeshClone frees. `overlay` (a scan
+ * overlay, which lies on the walls and floor it was scanned from) also gets its own materials,
+ * drawn a little toward the camera so it does not flicker through the faces it sits on.
  */
-export function cloneMeshAsset(template: Group, opacity = 1): Object3D {
+export function cloneMeshAsset(template: Group, opacity = 1, overlay = false): Object3D {
   const copy = template.clone(true);
-  if (opacity < 1) {
+  if (opacity < 1 || overlay) {
     copy.traverse((o) => {
       const m = o as Mesh;
       if (!m.isMesh) return;
@@ -116,6 +118,11 @@ export function cloneMeshAsset(template: Group, opacity = 1): Object3D {
         c.opacity = opacity;
         c.depthWrite = false;
         c.userData.ownClone = true;
+        if (overlay) {
+          c.polygonOffset = true;
+          c.polygonOffsetFactor = -1;
+          c.polygonOffsetUnits = -4;
+        }
         return c;
       };
       m.material = Array.isArray(m.material) ? m.material.map(one) : one(m.material);
@@ -145,9 +152,10 @@ export function disposeMeshClone(copy: Object3D): void {
 
 /**
  * A clone of the plan's asset for one placement, or null while it decodes (or when the plan has
- * no such asset, or it failed). Re-renders when the decode finishes.
+ * no such asset, or it failed). Re-renders when the decode finishes. `overlay`: a scan overlay
+ * (cloneMeshAsset).
  */
-export function useMeshAsset(plan: Pick<Plan, 'assets'>, assetId: Id | undefined, opacity = 1): Object3D | null {
+export function useMeshAsset(plan: Pick<Plan, 'assets'>, assetId: Id | undefined, opacity = 1, overlay = false): Object3D | null {
   const asset = assetId ? plan.assets?.[assetId] : undefined;
   const [, bump] = useState(0);
   const template = asset ? meshAssetTemplate(asset) : null;
@@ -165,8 +173,8 @@ export function useMeshAsset(plan: Pick<Plan, 'assets'>, assetId: Id | undefined
     };
   }, [asset, template]);
   // Its own materials only once it is see-through; a new opacity is set on them in place.
-  const seeThrough = opacity < 1;
-  const copy = useMemo(() => (template ? cloneMeshAsset(template, seeThrough ? 0.5 : 1) : null), [template, seeThrough]);
+  const seeThrough = opacity < 1 || overlay;
+  const copy = useMemo(() => (template ? cloneMeshAsset(template, seeThrough ? 0.5 : 1, overlay) : null), [template, seeThrough, overlay]);
   useEffect(() => () => void (copy && disposeMeshClone(copy)), [copy]);
   useEffect(() => {
     if (copy && seeThrough) setCloneOpacity(copy, opacity);

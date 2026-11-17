@@ -15,11 +15,12 @@
 //      wall's inside face, y from the top wall's) and round to 1/8";
 //   5. walls are numbered round the room, clockwise on the plan from the top wall.
 // The floor is elevation 0 and the ceiling is the median wall height.
-import type { FixtureKind, FurniturePiece, Id, Plan } from '../../src/model/types';
+import type { FixtureKind, FurniturePiece, Id, MeshAsset, Plan } from '../../src/model/types';
 import { createEmptyPlan } from '../../src/model/plan';
 import { firstStructure } from '../../src/model/structures';
 import { getPlan, type NewFixture } from '../../src/store/planStore';
 import { addOpeningAt, drawWalls, fixture, label, stableIds, store, win, workIn } from '../planLib';
+import { scanOverlayOf } from './attachOverlay';
 import type { Confidence, ParsedScan, ScanOpeningType, Vec2 } from './roomplan';
 
 export type { Confidence, Vec2 } from './roomplan';
@@ -641,6 +642,24 @@ export function scanToDraft(scan: ParsedScan, name?: string, opts: TidyOptions =
   };
 }
 
+/**
+ * The tidy as a function on world points: an ARKit world point (metres, +Y up) to where the draft
+ * has it, in three's axes as the app uses them (inches; X = plan x, Y = height above the floor, Z =
+ * plan y). The same turn and shift the walls were given (roomplan.ts maps world x, z to plan x, y),
+ * so a mesh moved by it sits on the draft walls. Uses the draft's stored `tidy`, rounded to 0.0001
+ * degree and 0.01", well under the walls' own 1/8".
+ */
+export function worldToDraft(tidy: ScanDraft['tidy']): (x: number, y: number, z: number) => [number, number, number] {
+  const IN_PER_M = 1 / 0.0254;
+  const c = Math.cos(tidy.rotation * RAD);
+  const s = Math.sin(tidy.rotation * RAD);
+  return (x, y, z) => {
+    const px = x * IN_PER_M;
+    const py = z * IN_PER_M;
+    return [px * c - py * s + tidy.shift.x, y * IN_PER_M - tidy.floorElevation, px * s + py * c + tidy.shift.y];
+  };
+}
+
 // The generated data module
 
 /** The text of scripts/<name>-scan.ts: the draft as a typed const. */
@@ -692,9 +711,10 @@ function centerlines(walls: DraftWall[], closed: boolean): Vec2[] {
 /**
  * Build the draft as a plan in the store (one storey, every element existing) and return its JSON:
  * the walls on their centerlines, the openings, the fixtures, a room label and a saved view per
- * keyframe. The store is left holding the plan.
+ * keyframe, and the scan overlay when `overlay` (attachOverlay.ts overlayAsset) is given: its mesh
+ * already in the draft's frame, so at 0,0 unturned. The store is left holding the plan.
  */
-export function buildDraftPlan(draft: ScanDraft): DraftPlanResult {
+export function buildDraftPlan(draft: ScanDraft, overlay?: MeshAsset): DraftPlanResult {
   const skipped: string[] = [];
   store().setPlan(createEmptyPlan(`${draft.name} (scan draft)`, 'single'));
   workIn(getPlan().options[0].id);
@@ -743,6 +763,7 @@ export function buildDraftPlan(draft: ScanDraft): DraftPlanResult {
   for (const v of draft.views) {
     if (!store().addView({ name: v.name, levelId: lid, at: v.at, yaw: v.yaw, pitch: v.pitch })) skipped.push(`${v.name}: the view was refused`);
   }
+  if (overlay && !store().setLevelScan(lid, scanOverlayOf(overlay.id), overlay)) skipped.push('the scan overlay: refused');
   const plan = getPlan();
   return { json: stableIds(plan, `plan-${slug(draft.name)}-scan`), plan, skipped };
 }

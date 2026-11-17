@@ -704,6 +704,57 @@ The file is plain JSON with a `schemaVersion`; lengths are inches. Older files a
 open, and unknown fields are dropped. Underlay images are stored inside the file (downscaled),
 so a plan with photos can be a few megabytes.
 
+## Scan a room with the iPhone
+
+An iPhone with LiDAR (built for MK's iPhone 15 Pro) scans a room into a draft plan, a list of
+what to check with a tape, and a see-through scan of the room to compare against in 3D. The
+scan is a draft; the tape is the truth.
+
+1. **Install the app.** `ios/HomePlanCapture` is a small iPhone app built in Xcode on a Mac with a
+   free Apple ID; `ios/README.md` has the steps (and how to scan well: lights on, doors open, a
+   slow sweep).
+2. **Scan.** Scan room, walk the room slowly round the walls, then Done. The app saves a folder
+   (`docs/scan/FORMAT.md`): the walls, doors, windows and object boxes (`room.json`), the
+   coloured LiDAR mesh (`mesh.ply`) and photos with their camera positions (`frames/`).
+3. **Get the zip to the session.** Share zip, then upload it to the Claude session, or put it on
+   Google Drive and share the link. Unzip it into `scans/` (kept out of git).
+4. **Convert it.** `npm run scan -- scans/kitchen-room kitchen` writes:
+   - `docs/scan/kitchen/draft.json`: the tidied room as a plan (walls squared and joined into
+     corners, the openings, the cabinets and appliances as boxes, a saved view per photo), with
+     the scan mesh on it as the level's overlay (3D, the Scan checkbox and slider). Open it with
+     File, Open...;
+   - `docs/scan/kitchen/overlay.glb`: that mesh, moved onto the draft and decimated;
+   - `docs/scan/kitchen/MEASURE.md`: the tape list, each item with the number the scan read;
+   - `scripts/kitchen-scan.ts`: the draft as data, for a plan script to import. It is generated:
+     scan again and rerun rather than edit it.
+
+   It prints the room's size, what it found and what was scanned below high confidence.
+5. **Claude reviews it** against the photos: compares each wall, opening and cabinet with the
+   keyframes and edits the tape list (drops what the photos settle, adds what they put in doubt),
+   kept in the room's own folder (as `docs/kitchen/MEASURE.md`), since a rerun rewrites the one in
+   `docs/scan/`.
+6. **MK measures** what the list asks for.
+7. **The corrections go in the hand-written plan script** (as `scripts/kitchen-plan.ts`), which
+   starts from the scan's numbers and overrides them with the tape's. It can keep the overlay
+   with `attachScanOverlay(levelId, new URL('../docs/scan/kitchen/overlay.glb', import.meta.url))`
+   from `scripts/scan/attachOverlay.ts` (the same bytes every run). Then regenerate (CLAUDE.md,
+   "Generated files").
+
+**Scan an object.** Scan object in the app walks round it and builds a textured model on the
+phone (`object.usdz`). `npm run scan -- scans/chair-object chair` prints its size; in the app,
+File, Import scanned object... places it like a cabinet at that size. Measure one dimension
+with a tape and, if it is off, select it and use Rescale by known dimension in its panel.
+
+**Limits, stated plainly.**
+- The Swift app has not been compiled yet. Expect a round or two of fixes in Xcode.
+- RoomPlan is good to a few centimetres per wall, and errors add up round a room, so the tape list
+  is not optional.
+- Cabinets arrive as plain boxes: door layouts, toe kicks and counters come from photos and tape.
+- A saved view keeps only each photo's position, yaw and pitch, not its height, tilt or lens, so
+  it is near the photo's view, not on it.
+- Each overlay or scanned object adds up to a few MB to the plan file and to any viewer built
+  from it.
+
 ## Modelling 146 Mick Road
 
 `docs/examples/146-mick-road.json` is a starter plan of the owner's house, made from the site

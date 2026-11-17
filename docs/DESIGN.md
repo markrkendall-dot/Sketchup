@@ -1764,6 +1764,8 @@ only `FixtureMesh.mesh` (its asset and pose). The decode cache keeps one templat
 and data string, decoded once with GLTFLoader (shadows on); `useMeshAsset(plan, assetId, opacity)`
 returns a clone sharing its geometry (and its materials unless see-through: a demolished fixture in
 All at 35%, an overlay at its opacity get their own, freed with the clone), or null while it decodes.
+An overlay's materials also get a polygon offset toward the camera, since a scan lies on the very
+faces it was scanned from and would otherwise flicker through them.
 `LevelMeshes` draws a mesh fixture as a `<primitive>` at its pose, or a pale box of its size while it
 decodes, following phase and option visibility like every fixture; and the level's overlay. When a
 decode finishes the view redraws and the sun's shadow map is redrawn. When the plan's assets change,
@@ -1777,6 +1779,37 @@ The single-file viewer carries GLTFLoader (codeSplitting off inlines every dynam
 fixture, as `Scanned object (<label>)`, and each visible overlay (`Scan overlay`, unless the 3D bar's
 Scan is off) in its level's group at its pose, in inches under the root's metre scale (GLB) or as is
 (OBJ, inches).
+
+## Scans (`scripts/scan/`, `npm run scan`)
+
+The iPhone app (`ios/`) writes a bundle (docs/scan/FORMAT.md); `scripts/scan/cli.ts` turns a room
+bundle into a draft plan. Node only, nothing in the app: a scan arrives in the app as a plan file.
+
+1. `roomplan.ts parseRoom`: `room.json`, `frames.json`, `meta.json` to walls (their room-side faces),
+   openings on their walls, object boxes and keyframes, in inches on the plan. ARKit's world and
+   the app's three axes are both right handed and Y up, so plan x = world x, plan y = world z,
+   elevation = world y less the floor's: no mirror.
+2. `scanToPlan.ts scanToDraft`: the tidy (its header has the steps): one turn that squares the room,
+   each near-square wall squared about its middle, wall ends merged into shared corners, a shift so
+   the faces start at x 0, y 0, rounded to 1/8". The turn, shift and floor are kept as
+   `ScanDraft.tidy`; `worldToDraft(tidy)` applies them to any world point. Objects become fixtures
+   with their backs snapped to a wall; keyframes become saved views.
+3. `overlay.ts plyToOverlayGlb`: `mesh.ply` read with three's PLYLoader (colour management off, so
+   the sRGB bytes come through as they are, then turned to linear floats: glTF's COLOR_0 is linear),
+   every vertex moved by `worldToDraft`, then `normaliseMesh` (not recentred, `SCAN_BUDGET`) and
+   `toAssetGlb`, three quarters of the triangles at a time until the GLB fits `MAX_ASSET_BYTES`. The
+   tidy is baked into the vertices, so the overlay goes on at origin 0,0, rotation 0, elevation 0,
+   and the plan's own placement fields stay free for a plan script that draws the room elsewhere.
+4. `buildDraftPlan` draws the draft through `scripts/planLib.ts` (walls on their centerlines from
+   the faces and thicknesses) with the overlay (`attachOverlay.ts overlayAsset`, asset id
+   `scan-<name>`, size read from the GLB's accessors) as `Level.scan`; `stableIds` makes the JSON
+   the same every run. `tapeList.ts` writes the tape list; `emitScanModule` the draft as data,
+   without the mesh.
+
+A hand-written plan script takes the overlay with `attachScanOverlay(levelId, glbPath, placement?)`,
+synchronous like the other planLib helpers. The tests run all of it on
+`scripts/scan/fixtures/syntheticRoom.ts`, a known room written as a bundle turned 17 degrees and
+moved, with noisy walls and a coloured `mesh.ply` shell.
 
 ## 2D editor
 

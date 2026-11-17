@@ -25,6 +25,12 @@ cp dist-viewer/146-mick-road-rebuild-viewer.html docs/viewer/146-mick-road-rebui
 cp dist-viewer/kitchen-viewer.html docs/viewer/kitchen-viewer.html
 ```
 
+The scan outputs, `docs/scan/<name>/` (`draft.json`, `overlay.glb`, `MEASURE.md`) and
+`scripts/<name>-scan.ts`, come from `npm run scan -- <bundle dir> <name>` and are not hand edited:
+scan again or rerun. Tape corrections go in the hand-written plan script that imports the scan
+module. The reviewed tape list lives in the room's own folder (as `docs/kitchen/MEASURE.md`), since a
+rerun overwrites `docs/scan/<name>/MEASURE.md`.
+
 ## Before pushing
 
 ```
@@ -43,6 +49,14 @@ Both must pass. `npm test` also checks the example JSON against the script, so a
 - `docs/kitchen/`: the 2926 Wesley kitchen being redesigned: its photo and `MEASURE.md`, the list of what to
   measure. The plan is `scripts/kitchen-plan.ts` (README, "The kitchen redesign").
 - `docs/TODO.md`: changes MK has asked for that are not yet made.
+- `ios/`: the iPhone capture app (RoomPlan room scans, Object Capture object scans), not yet
+  compiled; `ios/README.md` has the install and scanning steps.
+- `scripts/scan/`: the scan converter behind `npm run scan` (README, "Scan a room with the
+  iPhone"): `roomplan.ts` parses a bundle, `scanToPlan.ts` tidies it into a draft, `overlay.ts`
+  makes the overlay GLB, `attachOverlay.ts` puts it in a plan, `tapeList.ts` writes the tape list,
+  `objectBundle.ts` describes an object bundle; `fixtures/` holds the synthetic room the tests run on.
+- `docs/scan/`: `FORMAT.md` (what the app writes, what the converter reads) and one folder of
+  outputs per converted scan. Raw bundles go in `scans/`, which is gitignored.
 - `docs/photos/`: the reference photos the starter is built from, numbered as the script cites them.
 - `docs/index.html`, `docs/viewer/` and `.github/workflows/pages.yml`: the GitHub Pages site,
   https://markrkendall-dot.github.io/Sketchup/, published from `main` (README, "Share a viewer"),

@@ -12,6 +12,17 @@ Nothing open for 146 Mick Road.
 - [ ] The kitchen is its own plan for now: join it to the rest of 2926 Wesley (the house with the
       bike shed) once that plan is in this repository.
 
+## Scanning with the iPhone (README, "Scan a room with the iPhone")
+
+- [ ] Build the iOS app (`ios/HomePlanCapture`) in Xcode and fix what does not compile.
+- [ ] First real scan of the 2926 Wesley kitchen: the draft should come within about 2" of the
+      measured 156 x 330, ceiling 108 (`scripts/kitchen-plan.ts`).
+- [ ] Confirm `mesh.ply` is collected alongside RoomPlan (ARKit scene reconstruction on the
+      shared session) and lines up with the walls.
+- [ ] Extend `SavedView` with height, roll and field of view, so a keyframe's view matches its
+      photo (the draft already records them, `DraftView`).
+- [ ] Real wall thicknesses: RoomPlan gives planes, so the draft draws a default thickness.
+
 ## Done
 
 - [x] 16 Nov 2026: the 2926 Wesley kitchen rebuilt to MK's measurements (room, windows, doors,

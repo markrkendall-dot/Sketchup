@@ -77,7 +77,7 @@ function ScanOverlayMesh({ levelId }: { levelId: Id }) {
   const on = useUiStore((s) => s.showScan);
   const barOpacity = useUiStore((s) => s.scanOpacity);
   const shown = !!scan && scan.visible && on;
-  const object = useMeshAsset({ assets }, shown ? scan.assetId : undefined, barOpacity ?? scan?.opacity ?? 1);
+  const object = useMeshAsset({ assets }, shown ? scan.assetId : undefined, barOpacity ?? scan?.opacity ?? 1, true);
   if (!shown || !object) return null;
   const pose = scanOverlayPose(scan);
   return <primitive name={`scan:${levelId}`} object={object} position={pose.position} rotation={[0, pose.rotationY, 0]} />;
