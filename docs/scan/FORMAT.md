@@ -18,7 +18,10 @@ three.js `Matrix4.fromArray`.
 | `room.usdz` | RoomPlan `.mesh` export. Kept as a record, not read |
 | `mesh.ply` | ARKit reconstruction mesh, binary little endian PLY: vertex `x y z` float32, `red green blue` uint8, faces as `vertex_indices` (uchar count, int32) |
 | `frames.json` | Keyframes, below |
-| `frames/0001.jpg` ... | The keyframe photos, long edge at most 1920 px |
+| `frames/0001.jpg` ... | The keyframe photos, long edge at most 1920 px, at most 400 |
+| `capture-log.txt` | What the app did, for debugging. Not read |
+
+`mesh.ply` is written only when ARKit gave mesh data alongside RoomPlan, so it may be absent.
 
 ### `room.json`
 
@@ -83,5 +86,5 @@ landscape-right sensor image). `intrinsics` are in pixels of the saved image.
 
 | File | Contents |
 |---|---|
-| `meta.json` | `{ "format": 1, "kind": "object", "name", "date", "device", "os", "app", "bounds": [width, height, depth] }` |
-| `object.usdz` | Textured model from Object Capture, metres, +Y up, sitting on y = 0 |
+| `meta.json` | `{ "format": 1, "kind": "object", "name", "date", "device", "os", "app", "bounds": [width, height, depth], "boundsMin": [x, y, z], "boundsMax": [x, y, z] }` |
+| `object.usdz` | Textured model from Object Capture, metres, +Y up. Not moved to sit on y = 0: the importer recentres it |
